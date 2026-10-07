@@ -1,5 +1,8 @@
 # OpenMontage on aivideo.marvice.tech
 
+> There is also a second Coolify setup in [`aivideo.marvice.tech/`](../../aivideo.marvice.tech/README.md) (Caddy login gate,
+> pinned OpenMontage version). Use only one of them for the domain.
+
 Installs [OpenMontage](https://github.com/calesthio/OpenMontage) on an Ubuntu/Debian server and
 publishes its Backlot storyboard UI at `https://aivideo.marvice.tech` behind basic auth.
 

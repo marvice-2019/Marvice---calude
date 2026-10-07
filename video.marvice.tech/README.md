@@ -3,8 +3,9 @@
 Marvice Studio runs on the Coolify server at **https://video.marvice.tech**, behind basic auth:
 
 - **https://video.marvice.tech/**: Marvice Studio, which turns a typed prompt into an MP4 (see below). Also at `/create`.
-- **https://video.marvice.tech/editor**: the video editor, [HyperFrames](https://github.com/heygen-com/hyperframes) Studio
-  (the `hyperframes preview` server with rendering to MP4). Its own interface keeps the HyperFrames name.
+- **https://video.marvice.tech/editor**: Marvice Editor Studio, the video editor. It is [HyperFrames](https://github.com/heygen-com/hyperframes)
+  Studio (the `hyperframes preview` server with rendering to MP4), rebranded at build time by `studio-brand/`:
+  Marvice logo, copper accent, tab title and favicon; the HeyGen Framey button and the project-name label are hidden.
 
 The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are cropped from `marvice_R_logo.ai`.
 
@@ -17,6 +18,7 @@ The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are
 | `docker-compose.yml` | Coolify Docker Compose resource: `studio` (private) + `auth` (public) and a persistent volume |
 | `Dockerfile.auth`, `Caddyfile`, `auth-entrypoint.sh` | Caddy basic-auth gate; the only service exposed to the internet. Routes `/` and `/create*` to `creator`, everything else (the editor at `/editor`, its assets and API) to `studio` |
 | `creator/` | Prompt-to-video service at `/create` (runs from the `studio` image with the `creator` command) |
+| `studio-brand/` | Patches the Studio's `index.html` during the image build (inline logo, CSS and a small script). If a HyperFrames upgrade changes that page, the build stops with a message instead of shipping it unbranded |
 
 ## 1. DNS (Hostinger)
 
@@ -53,16 +55,27 @@ Sizes: Reel 9:16 (1080×1920), Landscape 16:9 (1920×1080), Square 1:1 (1080×10
 Each video is saved in `/projects/creations/<id>/` and can be downloaded (MP4 or HTML) or opened in Studio.
 **Edit in Studio** replaces the Studio project's `index.html` and `assets/` after copying the old project to `/projects/.studio-backups/`.
 
-Add any of these in Coolify (Environment Variables), then redeploy. Each key switches its provider on:
+Add any of these in Coolify (Environment Variables), then redeploy. Each key switches its provider on. The **AI writer**
+and **AI footage** menus list every provider and model; the ones whose key is missing are greyed out and name the key.
 
-| Variable | Turns on | Optional model override |
+| Variable | AI writer models | AI footage models |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Claude writer | `ANTHROPIC_MODEL` (default `claude-opus-5-5`) |
-| `OPENAI_API_KEY` | OpenAI writer and Sora footage | `OPENAI_MODEL` (default `gpt-5`), `SORA_MODEL` (default `sora-2`), `OPENAI_BASE_URL` for an OpenAI-compatible service |
-| `GEMINI_API_KEY` | Gemini writer and Veo footage | `GEMINI_MODEL` (default `gemini-2.5-pro`), `VEO_MODEL` (default `veo-3.0-generate-001`) |
-| `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` | Any other model on OpenRouter | — |
+| `ANTHROPIC_API_KEY` | Claude Opus 5.5, Sonnet 5.5, Fable 5.1, Haiku 4.5 | — |
+| `OPENAI_API_KEY` | GPT-5, GPT-5 mini | Sora 2, Sora 2 Pro |
+| `GEMINI_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash | Veo 3.1, Veo 3.1 Fast, Veo 3, Veo 3 Fast |
+| `XAI_API_KEY` | Grok 4 | Grok Imagine Video |
+| `DEEPSEEK_API_KEY` | DeepSeek Chat, DeepSeek Reasoner | — |
+| `MISTRAL_API_KEY` | Mistral Large, Mistral Medium | — |
+| `FAL_KEY` | — | Kling 3, MiniMax Hailuo 03, Seedance 2.5, Seedance 2.0 Fast (via fal.ai) |
+| `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` | Any OpenRouter model you list | — |
 
-Veo and Sora make 16:9 or 9:16 clips; square and 4:5 videos crop them. Generated footage is billed by the provider per second.
+To add models to a menu, set `ANTHROPIC_MODEL`, `OPENAI_MODEL`, `GEMINI_MODEL`, `XAI_MODEL`, `DEEPSEEK_MODEL`,
+`MISTRAL_MODEL`, `OPENROUTER_MODEL`, `VEO_MODEL` or `SORA_MODEL` to a model ID or a comma-separated list; those appear
+first. `OPENAI_BASE_URL` points the OpenAI writer at an OpenAI-compatible service. `ANTHROPIC_EFFORT` (default `high`) sets
+Claude's effort.
+
+Veo, Sora and Grok make 8-second clips, the fal.ai models 10-second clips, up to 3 per video. All clips are 16:9 or 9:16;
+square and 4:5 videos crop them. Generated footage is billed by the provider per second.
 
 ## Updating
 
