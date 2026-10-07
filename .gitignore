@@ -1,2 +1,3 @@
 .claude/sdd-cache/
 .claude/.simplify-ignore-cache/
+node_modules/

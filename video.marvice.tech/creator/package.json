@@ -1,0 +1,16 @@
+{
+  "name": "video-creator",
+  "private": true,
+  "type": "module",
+  "description": "Prompt-to-video service for video.marvice.tech: an AI writes a HyperFrames composition (optionally over AI-generated footage) and the hyperframes CLI renders it to MP4.",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0"
+  }
+}
