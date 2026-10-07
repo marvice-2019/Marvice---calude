@@ -5,7 +5,7 @@
     if (wordmark && !wordmark.previousElementSibling?.classList.contains("marvice-brand")) {
       const brand = document.createElement("a");
       brand.className = "marvice-brand";
-      brand.href = "/create";
+      brand.href = "/";
       brand.title = "Marvice Studio";
       brand.innerHTML = '<i role="img" aria-label="Marvice"></i><span>Editor Studio</span>';
       wordmark.before(brand);
