@@ -1,7 +1,8 @@
-# Open Generative AI on aistudio.marvice.tech
+# Marvice AI Studio on aistudio.marvice.tech
 
 Deploys [Open Generative AI](https://github.com/Anil-matcha/Open-Generative-AI) (MIT), a
-self-hosted AI image, video, lip sync, cinema and workflow studio, at `https://aistudio.marvice.tech`.
+self-hosted AI image, video, lip sync, cinema and workflow studio, branded as
+**Marvice AI Studio**, at `https://aistudio.marvice.tech`.
 
 ## Prerequisites
 - DNS `A` record for `aistudio.marvice.tech` pointing at the server (91.108.110.216)
@@ -27,11 +28,19 @@ Re-run it to pull the latest upstream and redeploy. The first build takes a few 
 
 ## What it does
 1. Clones the upstream repo **with its submodules** to `/opt/Open-Generative-AI`
-2. Builds `open-generative-ai:latest` from the `Dockerfile` here. It is the upstream build,
-   except the runtime image keeps `packages/`: upstream copies only `node_modules`, whose
+2. Builds `open-generative-ai:latest` from the `Dockerfile` here. It is the upstream build
+   plus branding, and the runtime image keeps `packages/`: upstream copies only `node_modules`, whose
    workspace packages are symlinks into `packages/`
-3. Runs container `open-generative-ai` (`--restart unless-stopped`)
-4. Publishes it:
+3. Brands it while building (`brand/apply.mjs`, run inside the image build, so the
+   checkout in `/opt` stays clean):
+   - Product name in page titles, header, API-key screen and translations → "Marvice AI Studio"
+   - Marvice mark (`brand/marvice-mark.svg`) as the header logo, API-key screen logo and favicon
+   - Removes upstream's third-party promo banner (vadoo.tv)
+
+   Edits are exact text matches. If upstream changes one of those spots, the build prints
+   `brand: no match in ...` and that spot keeps the upstream look. Update `apply.mjs` then.
+4. Runs container `open-generative-ai` (`--restart unless-stopped`)
+5. Publishes it:
    - **Coolify server** (detected via `/data/coolify/proxy`): the container is published on
      the docker0 gateway and a route is written to
      `/data/coolify/proxy/dynamic/open-generative-ai.yaml` for Coolify's Traefik and its
