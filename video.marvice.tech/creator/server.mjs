@@ -15,6 +15,8 @@ const FILES = { "video.mp4": ["renders/video.mp4", "video/mp4"], "index.html": [
 
 const routes = [
   ["GET", /^\/create\/?$/, async (req, res) => send(res, 200, await readFile(PAGE), "text/html; charset=utf-8")],
+  ["GET", /^\/create\/assets\/(marvice-logo\.svg|marvice-mark\.svg)$/, async (req, res, name) =>
+    send(res, 200, await readFile(new URL(`./public/${name}`, import.meta.url)), "image/svg+xml")],
   ["GET", /^\/create\/api\/options$/, (req, res) =>
     json(res, 200, { providers: availableProviders(), sizes: SIZES, durations: DURATIONS })],
   ["GET", /^\/create\/api\/jobs$/, (req, res) => json(res, 200, listJobs())],

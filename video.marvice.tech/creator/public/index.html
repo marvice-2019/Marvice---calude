@@ -3,16 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Create a video · video.marvice.tech</title>
+<title>Marvice Studio</title>
+<link rel="icon" type="image/svg+xml" href="/create/assets/marvice-mark.svg">
 <style>
   :root {
-    --bg: #121826; --panel: #1b2335; --line: #2b3550; --text: #f3f1ea; --muted: #a9b3c7;
-    --accent: #f2a65a; --accent-ink: #2a1606; --ok: #6fcf97; --bad: #ff8a80;
+    /* Marvice brand: ink #2D3837, copper #BD8B53 (from the logo). */
+    --bg: #f6f3ee; --panel: #ffffff; --line: #e3ddd2; --text: #2d3837; --muted: #5f6b68;
+    --ink: #2d3837; --on-ink: #fbf8f3; --accent: #bd8b53; --ok: #1e6b3f; --bad: #a3352b;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--line); }
-  header b { font-size: 18px; } header a { color: var(--muted); text-decoration: none; } header a:hover { color: var(--text); }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 14px; } .brand img { height: 40px; display: block; }
+  .brand span { font-size: 15px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); border-left: 1px solid var(--line); padding-left: 14px; }
+  header a { color: var(--muted); text-decoration: none; white-space: nowrap; } header a:hover { color: var(--text); }
+  .narrow { display: none; }
   main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 80px; }
   h1 { font-size: 34px; margin: 0 0 6px; } .sub { color: var(--muted); margin: 0 0 28px; }
   textarea { width: 100%; min-height: 120px; resize: vertical; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 16px; font: inherit; font-size: 18px; }
@@ -28,33 +33,34 @@
   .row > div { flex: 1; min-width: 200px; }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; }
   .chip { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 8px 16px; cursor: pointer; font: inherit; }
-  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); font-weight: 600; }
   select { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font: inherit; }
-  .go { margin-top: 28px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px; padding: 16px 28px; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; }
+  .go { margin-top: 28px; background: var(--ink); color: var(--on-ink); border: 0; border-radius: 12px; padding: 16px 28px; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; }
   .go:disabled { opacity: .5; cursor: not-allowed; }
-  .note { background: #2a2216; border: 1px solid #5a4423; color: #f6dcb8; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; }
+  .note { background: #fbf3e8; border: 1px solid #e8d2b3; color: #5a4423; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; }
   .err { color: var(--bad); margin-top: 12px; min-height: 1.5em; }
   h2 { margin: 56px 0 16px; font-size: 22px; }
   .jobs { display: grid; gap: 16px; }
   .job { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; grid-template-columns: 220px 1fr; gap: 18px; }
   .job video { width: 100%; max-height: 360px; background: #000; border-radius: 8px; }
-  .ph { aspect-ratio: 1; border-radius: 8px; background: #0e1320; display: grid; place-items: center; color: var(--muted); font-size: 14px; text-align: center; padding: 12px; }
+  .ph { aspect-ratio: 1; border-radius: 8px; background: #efe9df; display: grid; place-items: center; color: var(--muted); font-size: 14px; text-align: center; padding: 12px; }
   .meta { color: var(--muted); font-size: 14px; }
-  .status { display: inline-block; font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #2b3550; }
-  .status.done { background: #1e3a2c; color: var(--ok); } .status.failed { background: #3a1e1e; color: var(--bad); }
+  .status { display: inline-block; font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #f1e6d6; color: #7a5329; }
+  .status.done { background: #e3f1e8; color: var(--ok); } .status.failed { background: #fbe6e4; color: var(--bad); }
   .prompt { font-size: 17px; margin: 8px 0; }
   .log { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--muted); }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
   .actions a, .actions button { background: transparent; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 14px; text-decoration: none; cursor: pointer; }
   .actions a:hover, .actions button:hover { border-color: var(--accent); }
   @media (max-width: 760px) { .sizes { grid-template-columns: repeat(2, 1fr); } .job { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) { header { padding: 12px 16px; } .brand img { height: 32px; } .brand { gap: 10px; } .brand span { padding-left: 10px; font-size: 13px; } .wide { display: none; } .narrow { display: inline; } }
 </style>
 </head>
 <body>
-<header><b>video.marvice.tech</b><a href="/">Open Studio →</a></header>
+<header><div class="brand"><img src="/create/assets/marvice-logo.svg" alt="Marvice"><span>Studio</span></div><a href="/"><span class="wide">Open video editor →</span><span class="narrow">Editor →</span></a></header>
 <main>
   <h1>Type it. Get a video.</h1>
-  <p class="sub">Describe the video. AI writes it, optionally films AI footage for it, and renders an MP4 you can download or keep editing in Studio.</p>
+  <p class="sub">Describe the video. AI writes it, optionally films AI footage for it, and renders an MP4 you can download or keep editing in the video editor.</p>
 
   <div id="setup" class="note" hidden>No AI is connected yet. Add an API key in Coolify (hyperframes-studio → Environment Variables: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GEMINI_API_KEY</code> or <code>OPENROUTER_API_KEY</code> + <code>OPENROUTER_MODEL</code>), then redeploy.</div>
 
@@ -146,7 +152,7 @@ function render(j) {
   const actions = j.status === "done" ? `<div class="actions">
       <a href="/create/files/${j.id}/video.mp4?download">Download MP4</a>
       <a href="/create/files/${j.id}/index.html?download">Download HTML</a>
-      <button type="button" data-studio="${j.id}">Edit in Studio</button></div>` : "";
+      <button type="button" data-studio="${j.id}">Open in editor</button></div>` : "";
   return `<article class="job">${media}<div>
     <span class="status ${j.status}">${STEPS[j.status] || j.status}</span>
     <span class="meta"> · ${esc(s.label)} · ${j.duration}s · ${esc(j.model)}${j.footage ? " · AI footage" : ""}</span>
@@ -157,7 +163,7 @@ function render(j) {
 $("jobs").onclick = async (e) => {
   const id = e.target.dataset.studio;
   if (!id) return;
-  if (!confirm("Replace the project currently open in Studio with this video? A backup of the current project is kept.")) return;
+  if (!confirm("Replace the project currently open in the video editor with this video? A backup of the current project is kept.")) return;
   try { await api(`jobs/${id}/studio`, { method: "POST" }); location.href = "/"; }
   catch (err) { alert(err.message); }
 };

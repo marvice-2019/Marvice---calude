@@ -1,7 +1,12 @@
-# video.marvice.tech — HyperFrames Studio
+# Marvice Studio — video.marvice.tech
 
-Runs [HyperFrames](https://github.com/heygen-com/hyperframes) Studio (the `hyperframes preview` server
-with rendering to MP4) on the Coolify server at **https://video.marvice.tech**, behind basic auth.
+Marvice Studio runs on the Coolify server at **https://video.marvice.tech**, behind basic auth:
+
+- **https://video.marvice.tech/create**: Marvice Studio, which turns a typed prompt into an MP4 (see below).
+- **https://video.marvice.tech/**: the video editor, [HyperFrames](https://github.com/heygen-com/hyperframes) Studio
+  (the `hyperframes preview` server with rendering to MP4). Its own interface keeps the HyperFrames name.
+
+The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are cropped from `marvice_R_logo.ai`.
 
 ## Files
 
@@ -35,7 +40,7 @@ In hPanel → Domains → `marvice.tech` → DNS, add:
 > ⚠️ Keep basic auth on. Studio's API reads, writes, and deletes project files and starts renders
 > without any login of its own (upstream security note F-001).
 
-## Prompt-to-video creator (`/create`)
+## Marvice Studio: prompt to video (`/create`)
 
 At https://video.marvice.tech/create you type what the video should show, pick a size and a length, and get an MP4:
 
