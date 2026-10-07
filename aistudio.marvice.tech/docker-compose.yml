@@ -1,0 +1,25 @@
+# Coolify "Docker Compose" resource for https://aistudio.marvice.tech
+# In Coolify: give ONLY the `auth` service a domain (https://aistudio.marvice.tech:8080)
+# and set BASIC_AUTH_PASSWORD (and usually MUAPI_API_KEY) in Environment Variables (see README).
+services:
+  app:
+    build:
+      context: .
+      args:
+        OGAI_REF: ${OGAI_REF:-00132ece7c38b6f2e428793973ae99c6953d899e}
+    restart: unless-stopped
+    environment:
+      # Optional. When set, nobody is asked for a key: the server adds it to every MuAPI call
+      # and it never reaches the browser. When empty, each user enters their own MuAPI key.
+      MUAPI_API_KEY: ${MUAPI_API_KEY:-}
+
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    restart: unless-stopped
+    environment:
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-admin}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:?set BASIC_AUTH_PASSWORD}
+    depends_on:
+      - app
