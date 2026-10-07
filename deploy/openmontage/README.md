@@ -1,5 +1,7 @@
 # OpenMontage on aivideo.marvice.tech
 
+> Prefer the Coolify deploy in [`aivideo.marvice.tech/`](../../aivideo.marvice.tech/README.md); this script is the SSH alternative.
+
 Installs [OpenMontage](https://github.com/calesthio/OpenMontage) on an Ubuntu/Debian server and
 publishes its Backlot storyboard UI at `https://aivideo.marvice.tech` behind basic auth.
 
