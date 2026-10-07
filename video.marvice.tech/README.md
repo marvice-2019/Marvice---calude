@@ -61,8 +61,8 @@ and **AI footage** menus list every provider and model; the ones whose key is mi
 | Variable | AI writer models | AI footage models |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | Claude Opus 5.5, Sonnet 5.5, Fable 5.1, Haiku 4.5 | — |
-| `OPENAI_API_KEY` | GPT-5, GPT-5 mini | Sora 2, Sora 2 Pro |
-| `GEMINI_API_KEY` | Gemini 2.5 Pro, Gemini 2.5 Flash | Veo 3.1, Veo 3.1 Fast, Veo 3, Veo 3 Fast |
+| `OPENAI_API_KEY` | GPT-6.1 Sol, GPT-5.5, GPT-5.4 mini | Sora 2, Sora 2 Pro |
+| `GEMINI_API_KEY` | Gemini 3.8 Flash, Gemini 3.1 Pro (needs a paid Gemini plan), Gemini 2.5 Flash | Veo 3.1, Veo 3.1 Fast, Veo 3.1 Lite (needs a paid Gemini plan) |
 | `XAI_API_KEY` | Grok 4 | Grok Imagine Video |
 | `DEEPSEEK_API_KEY` | DeepSeek Chat, DeepSeek Reasoner | — |
 | `MISTRAL_API_KEY` | Mistral Large, Mistral Medium | — |
