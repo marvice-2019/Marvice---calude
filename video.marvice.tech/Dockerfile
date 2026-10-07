@@ -28,12 +28,17 @@ RUN npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path /r
     && npm install -g hyperframes@${HYPERFRAMES_VERSION} \
     && npm cache clean --force
 
+# Prompt-to-video creator (served at /create); same image, started with `creator`.
+COPY creator/package.json creator/package-lock.json /app/creator/
+RUN cd /app/creator && npm ci --omit=dev && npm cache clean --force
+COPY creator /app/creator
+
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /projects
 VOLUME ["/projects"]
-EXPOSE 3002
+EXPOSE 3002 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
   CMD curl -fsS http://127.0.0.1:3002/ >/dev/null || exit 1

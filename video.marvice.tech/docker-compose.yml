@@ -1,6 +1,7 @@
 # Coolify "Docker Compose" resource for https://video.marvice.tech
 # In Coolify: give ONLY the `auth` service a domain (https://video.marvice.tech:8080)
 # and set BASIC_AUTH_USER / BASIC_AUTH_PASSWORD in Environment Variables (see README).
+# AI keys are optional; each one switches on its provider in the creator at /create.
 services:
   studio:
     build:
@@ -14,8 +15,38 @@ services:
       - hyperframes-projects:/projects
     shm_size: "1gb"
 
-  # The Studio API can read/write/delete files and start renders without any
-  # login, so it is only reachable through this basic-auth proxy.
+  # Prompt-to-video creator: same image as studio, renders into /projects/creations.
+  creator:
+    build:
+      context: .
+      args:
+        HYPERFRAMES_VERSION: ${HYPERFRAMES_VERSION:-0.8.140}
+    command: ["creator"]
+    restart: unless-stopped
+    environment:
+      STUDIO_DIR: /projects/${HYPERFRAMES_PROJECT:-studio}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      SORA_MODEL: ${SORA_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      VEO_MODEL: ${VEO_MODEL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+    volumes:
+      - hyperframes-projects:/projects
+    shm_size: "1gb"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4000/create/api/options"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+
+  # Studio and the creator have no login of their own (they can read, write and
+  # delete files and start renders), so they are only reachable through this gate.
   auth:
     build:
       context: .
@@ -26,6 +57,7 @@ services:
       BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:?set BASIC_AUTH_PASSWORD}
     depends_on:
       - studio
+      - creator
 
 volumes:
   hyperframes-projects:
