@@ -1,0 +1,31 @@
+# Coolify "Docker Compose" resource for https://video.marvice.tech
+# In Coolify: give ONLY the `auth` service a domain (https://video.marvice.tech:8080)
+# and set BASIC_AUTH_USER / BASIC_AUTH_PASSWORD in Environment Variables (see README).
+services:
+  studio:
+    build:
+      context: .
+      args:
+        HYPERFRAMES_VERSION: ${HYPERFRAMES_VERSION:-0.8.140}
+    restart: unless-stopped
+    environment:
+      HYPERFRAMES_PROJECT: ${HYPERFRAMES_PROJECT:-studio}
+    volumes:
+      - hyperframes-projects:/projects
+    shm_size: "1gb"
+
+  # The Studio API can read/write/delete files and start renders without any
+  # login, so it is only reachable through this basic-auth proxy.
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    restart: unless-stopped
+    environment:
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-admin}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:?set BASIC_AUTH_PASSWORD}
+    depends_on:
+      - studio
+
+volumes:
+  hyperframes-projects:

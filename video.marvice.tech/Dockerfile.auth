@@ -1,0 +1,7 @@
+# Basic-auth gate in front of HyperFrames Studio (which has no login of its own).
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY auth-entrypoint.sh /usr/local/bin/auth-entrypoint.sh
+RUN chmod +x /usr/local/bin/auth-entrypoint.sh
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/auth-entrypoint.sh"]
