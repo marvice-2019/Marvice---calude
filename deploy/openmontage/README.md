@@ -9,7 +9,7 @@ publishes its Backlot storyboard UI at `https://aivideo.marvice.tech` behind bas
 
 ## Install
 ```bash
-git clone -b claude/happy-albattani-vpyfet https://github.com/marvice-2019/Marvice---calude.git
+git clone https://github.com/marvice-2019/Marvice---calude.git
 cd Marvice---calude/deploy/openmontage
 sudo DOMAIN=aivideo.marvice.tech EMAIL=yuvarajgs@marvice.in bash install.sh
 ```
