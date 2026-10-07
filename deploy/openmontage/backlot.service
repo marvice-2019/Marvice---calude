@@ -1,12 +1,14 @@
 [Unit]
 Description=OpenMontage Backlot (living storyboard)
-After=network.target
+After=network-online.target docker.service
+Wants=network-online.target
 
 [Service]
 User=@OM_USER@
 WorkingDirectory=@OM_DIR@
-ExecStart=@OM_DIR@/.venv/bin/python -m backlot serve --port @PORT@
+ExecStart=@OM_DIR@/.venv/bin/python -m uvicorn backlot.server:app --host @HOST@ --port @PORT@ --log-level warning
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
