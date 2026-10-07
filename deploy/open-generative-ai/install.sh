@@ -19,6 +19,7 @@ CONTAINER="${CONTAINER:-open-generative-ai}"
 BASIC_AUTH="${BASIC_AUTH:-on}"            # on | off
 BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
 COOLIFY_PROXY_DIR="${COOLIFY_PROXY_DIR:-/data/coolify/proxy}"
+COOLIFY_NETWORK="${COOLIFY_NETWORK:-coolify}"
 HTPASSWD_FILE=/etc/open-generative-ai/htpasswd
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -63,20 +64,6 @@ cp -r "$HERE/brand" "$APP_DIR/.marvice-brand"
 echo "==> Build image $IMAGE (npm install + next build, takes a few minutes)"
 docker build -f "$HERE/Dockerfile" -t "$IMAGE" "$APP_DIR"
 
-if [ "$MODE" = coolify ]; then
-  # Traefik runs in Docker and reaches the host via host.docker.internal (the docker0
-  # gateway). Publish the app there only, so it is not reachable from the internet directly.
-  BIND_HOST="$(ip -4 addr show docker0 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1)"
-  BIND_HOST="${BIND_HOST:-172.17.0.1}"
-else
-  BIND_HOST=127.0.0.1
-fi
-
-echo "==> Run container $CONTAINER ($BIND_HOST:$APP_PORT)"
-docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-docker run -d --name "$CONTAINER" --restart unless-stopped \
-  -p "$BIND_HOST:$APP_PORT:3000" "$IMAGE"
-
 if [ "$BASIC_AUTH" = on ]; then
   echo "==> Basic auth"
   mkdir -p "$(dirname "$HTPASSWD_FILE")"
@@ -88,55 +75,66 @@ if [ "$BASIC_AUTH" = on ]; then
   [ "$MODE" = nginx ] && chgrp www-data "$HTPASSWD_FILE"
 fi
 
+docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+
 if [ "$MODE" = coolify ]; then
-  echo "==> Coolify Traefik route for $DOMAIN"
-  if ! docker inspect coolify-proxy --format '{{range .HostConfig.ExtraHosts}}{{.}} {{end}}' | grep -q host.docker.internal; then
-    echo "  WARNING: coolify-proxy has no host.docker.internal mapping; the route may 502."
-  fi
-  if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
-    ufw allow from 172.16.0.0/12 to any port "$APP_PORT" proto tcp comment open-generative-ai
-    ufw allow from 10.0.0.0/8 to any port "$APP_PORT" proto tcp comment open-generative-ai
-  fi
-  MIDDLEWARES="[]"
-  AUTH_BLOCK=""
+  # Publish the way Coolify publishes its own apps: the container joins Coolify's
+  # network and carries Traefik labels, which Coolify's proxy picks up from Docker.
+  # (A route file in $COOLIFY_PROXY_DIR/dynamic was not picked up on marvice.tech.)
+  docker network inspect "$COOLIFY_NETWORK" >/dev/null 2>&1 || {
+    echo "Docker network '$COOLIFY_NETWORK' not found; set COOLIFY_NETWORK to Coolify's proxy network."
+    exit 1
+  }
+  RESOLVER="$(docker inspect coolify-proxy --format '{{join .Config.Cmd " "}} {{join .Args " "}}' 2>/dev/null | \
+    grep -o 'certificatesresolvers\.[A-Za-z0-9_-]*' | head -1 | cut -d. -f2)"
+  RESOLVER="${RESOLVER:-letsencrypt}"
+  rm -f "$COOLIFY_PROXY_DIR/dynamic/open-generative-ai.yaml"   # left by earlier versions of this script
+
+  LABELS=(
+    --label "traefik.enable=true"
+    --label "traefik.docker.network=$COOLIFY_NETWORK"
+    --label "traefik.http.services.ogai.loadbalancer.server.port=3000"
+    --label "traefik.http.middlewares.ogai-https.redirectscheme.scheme=https"
+    --label "traefik.http.routers.ogai-http.rule=Host(\`$DOMAIN\`)"
+    --label "traefik.http.routers.ogai-http.entrypoints=http"
+    --label "traefik.http.routers.ogai-http.middlewares=ogai-https"
+    --label "traefik.http.routers.ogai-http.service=ogai"
+    --label "traefik.http.routers.ogai.rule=Host(\`$DOMAIN\`)"
+    --label "traefik.http.routers.ogai.entrypoints=https"
+    --label "traefik.http.routers.ogai.tls=true"
+    --label "traefik.http.routers.ogai.tls.certresolver=$RESOLVER"
+    --label "traefik.http.routers.ogai.service=ogai"
+  )
   if [ "$BASIC_AUTH" = on ]; then
-    MIDDLEWARES="[ogai-auth]"
-    USERS=""
-    while IFS= read -r line; do [ -n "$line" ] && USERS="$USERS          - \"$line\""$'\n'; done < "$HTPASSWD_FILE"
-    AUTH_BLOCK="    ogai-auth:
-      basicAuth:
-        realm: Marvice AI Studio
-        users:
-$USERS"
+    USERS="$(grep -v '^$' "$HTPASSWD_FILE" | paste -sd, -)"
+    LABELS+=(
+      --label "traefik.http.middlewares.ogai-auth.basicauth.users=$USERS"
+      --label "traefik.http.middlewares.ogai-auth.basicauth.realm=Marvice AI Studio"
+      --label "traefik.http.routers.ogai.middlewares=ogai-auth"
+    )
   fi
-  mkdir -p "$COOLIFY_PROXY_DIR/dynamic"
-  cat > "$COOLIFY_PROXY_DIR/dynamic/open-generative-ai.yaml" <<YAML
-http:
-  routers:
-    ogai-http:
-      rule: Host(\`$DOMAIN\`)
-      entryPoints: [http]
-      middlewares: [ogai-https]
-      service: ogai
-    ogai:
-      rule: Host(\`$DOMAIN\`)
-      entryPoints: [https]
-      middlewares: $MIDDLEWARES
-      service: ogai
-      tls:
-        certResolver: letsencrypt
-  middlewares:
-    ogai-https:
-      redirectScheme:
-        scheme: https
-$AUTH_BLOCK  services:
-    ogai:
-      loadBalancer:
-        servers:
-          - url: "http://host.docker.internal:$APP_PORT"
-YAML
-  echo "  Wrote $COOLIFY_PROXY_DIR/dynamic/open-generative-ai.yaml (Traefik reloads it automatically)"
+
+  echo "==> Run container $CONTAINER on network $COOLIFY_NETWORK (cert resolver: $RESOLVER)"
+  docker run -d --name "$CONTAINER" --restart unless-stopped \
+    --network "$COOLIFY_NETWORK" "${LABELS[@]}" "$IMAGE"
+
+  echo "==> Checking the route"
+  CODE=000
+  for _ in $(seq 1 30); do
+    CODE="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $DOMAIN" http://127.0.0.1/ || true)"
+    case "$CODE" in 301|302|307|308) break ;; esac
+    sleep 2
+  done
+  case "$CODE" in
+    301|302|307|308) echo "  Coolify proxy routes $DOMAIN (HTTP $CODE -> https)" ;;
+    *) echo "  WARNING: Coolify proxy answered HTTP $CODE for $DOMAIN, expected a redirect to https."
+       echo "  Check: docker logs --tail 50 coolify-proxy" ;;
+  esac
 else
+  echo "==> Run container $CONTAINER (127.0.0.1:$APP_PORT)"
+  docker run -d --name "$CONTAINER" --restart unless-stopped \
+    -p "127.0.0.1:$APP_PORT:3000" "$IMAGE"
+
   echo "==> nginx for $DOMAIN"
   AUTH=""
   [ "$BASIC_AUTH" = on ] && AUTH="    auth_basic \"Marvice AI Studio\";
