@@ -36,8 +36,9 @@ export const TEXT_PROVIDERS = {
     label: "OpenAI",
     keys: ["OPENAI_API_KEY"],
     models: () => modelList(env.OPENAI_MODEL, [
-      { id: "gpt-5", label: "GPT-5" },
-      { id: "gpt-5-mini", label: "GPT-5 mini" },
+      { id: "gpt-6.1-sol", label: "GPT-6.1 Sol" },
+      { id: "gpt-5.5", label: "GPT-5.5" },
+      { id: "gpt-5.4-mini", label: "GPT-5.4 mini (fastest)" },
     ]),
     generate: openAICompatible(() => env.OPENAI_BASE_URL || "https://api.openai.com/v1", "OPENAI_API_KEY"),
   },
@@ -45,7 +46,8 @@ export const TEXT_PROVIDERS = {
     label: "Gemini (Google)",
     keys: ["GEMINI_API_KEY"],
     models: () => modelList(env.GEMINI_MODEL, [
-      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+      { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
+      { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (paid tier)" },
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
     ]),
     generate: generateGemini,
@@ -103,8 +105,7 @@ export const FOOTAGE_PROVIDERS = {
     models: () => modelList(env.VEO_MODEL, [
       { id: "veo-3.1-generate-preview", label: "Veo 3.1" },
       { id: "veo-3.1-fast-generate-preview", label: "Veo 3.1 Fast" },
-      { id: "veo-3.0-generate-001", label: "Veo 3" },
-      { id: "veo-3.0-fast-generate-001", label: "Veo 3 Fast" },
+      { id: "veo-3.1-lite-generate-preview", label: "Veo 3.1 Lite" },
     ]).map((m) => ({ ...m, clipSeconds: 8 })),
     generate: generateVeo,
   },
