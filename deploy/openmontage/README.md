@@ -16,10 +16,16 @@ sudo DOMAIN=aivideo.marvice.tech EMAIL=yuvarajgs@marvice.in bash install.sh
 Re-running the script updates OpenMontage (`git pull` + `make setup`).
 
 ## What it does
-1. Installs git, make, FFmpeg, Python 3 venv, Node.js 20, Chromium libs, nginx, certbot
+1. Installs git, make, FFmpeg, Python 3 venv, Node.js 20 and Chromium libs
 2. Clones OpenMontage to `/opt/OpenMontage` as user `openmontage` and runs `make setup`
-3. Runs Backlot (`python -m backlot serve`) on `127.0.0.1:4750` via systemd (`openmontage-backlot`)
-4. Puts nginx with basic auth and a Let's Encrypt certificate in front of it
+3. Runs the Backlot board via systemd (`openmontage-backlot`, port 4750)
+4. Publishes it with basic auth (password file `/etc/openmontage/htpasswd`):
+   - **Coolify server** (detected via `/data/coolify/proxy`): Backlot binds to the docker0
+     gateway and a route is written to `/data/coolify/proxy/dynamic/openmontage.yaml`, so
+     Coolify's Traefik serves it with its Let's Encrypt resolver. No nginx is installed.
+   - **Plain server**: Backlot binds to `127.0.0.1` behind nginx + certbot.
+
+The `marvice.tech` server (91.108.110.216) runs Coolify, so it uses the first path.
 
 ## Making videos
 OpenMontage is driven by an AI coding agent, not a web form. On the server:
