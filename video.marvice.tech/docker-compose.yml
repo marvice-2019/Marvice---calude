@@ -9,8 +9,7 @@ services:
         HYPERFRAMES_VERSION: ${HYPERFRAMES_VERSION:-0.8.140}
     restart: unless-stopped
     environment:
-      - HYPERFRAMES_PROJECT=${HYPERFRAMES_PROJECT:-studio}
-      - SERVICE_FQDN_STUDIO_3002
+      HYPERFRAMES_PROJECT: ${HYPERFRAMES_PROJECT:-studio}
     volumes:
       - hyperframes-projects:/projects
     shm_size: "1gb"
