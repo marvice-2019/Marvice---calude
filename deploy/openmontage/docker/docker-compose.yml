@@ -1,0 +1,17 @@
+# Coolify: create a "Docker Compose" resource from this repo with
+# base directory /deploy/openmontage/docker, set the domain on the
+# `openmontage` service to https://aivideo.marvice.tech:4750 and set BACKLOT_PASSWORD.
+services:
+  openmontage:
+    build: .
+    environment:
+      - BACKLOT_USER=${BACKLOT_USER:-admin}
+      - BACKLOT_PASSWORD=${BACKLOT_PASSWORD:?set BACKLOT_PASSWORD}
+    volumes:
+      - openmontage-projects:/app/projects
+    restart: unless-stopped
+    expose:
+      - "4750"
+
+volumes:
+  openmontage-projects:
