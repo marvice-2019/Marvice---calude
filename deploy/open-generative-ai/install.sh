@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install Open Generative AI on aistudio.marvice.tech (Ubuntu/Debian, Docker).
+# Install Open Generative AI, branded as Marvice AI Studio, on aistudio.marvice.tech (Ubuntu/Debian, Docker).
 # Run as root:  sudo DOMAIN=aistudio.marvice.tech EMAIL=you@marvice.in bash install.sh
 #
 # Builds the app from https://github.com/Anil-matcha/Open-Generative-AI into a Docker
@@ -56,6 +56,10 @@ else
 fi
 git -C "$APP_DIR" submodule update --init --recursive
 
+echo "==> Marvice AI Studio branding"
+rm -rf "$APP_DIR/.marvice-brand"
+cp -r "$HERE/brand" "$APP_DIR/.marvice-brand"
+
 echo "==> Build image $IMAGE (npm install + next build, takes a few minutes)"
 docker build -f "$HERE/Dockerfile" -t "$IMAGE" "$APP_DIR"
 
@@ -101,6 +105,7 @@ if [ "$MODE" = coolify ]; then
     while IFS= read -r line; do [ -n "$line" ] && USERS="$USERS          - \"$line\""$'\n'; done < "$HTPASSWD_FILE"
     AUTH_BLOCK="    ogai-auth:
       basicAuth:
+        realm: Marvice AI Studio
         users:
 $USERS"
   fi
