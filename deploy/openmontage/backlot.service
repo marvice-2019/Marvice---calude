@@ -1,0 +1,12 @@
+[Unit]
+Description=OpenMontage Backlot (living storyboard)
+After=network.target
+
+[Service]
+User=@OM_USER@
+WorkingDirectory=@OM_DIR@
+ExecStart=@OM_DIR@/.venv/bin/python -m backlot serve --port @PORT@
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
