@@ -35,6 +35,7 @@ Re-run it to pull the latest upstream and redeploy. The first build takes a few 
    checkout in `/opt` stays clean):
    - Product name in page titles, header, API-key screen and translations → "Marvice AI Studio"
    - Marvice mark (`brand/marvice-mark.svg`) as the header logo, API-key screen logo and favicon
+   - Recolours upstream's cyan accent (`#22d3ee` and Tailwind `cyan-*`) to the mark's copper `#bd8b53`
    - Removes upstream's third-party promo banner (vadoo.tv)
 
    Edits are exact text matches. If upstream changes one of those spots, the build prints

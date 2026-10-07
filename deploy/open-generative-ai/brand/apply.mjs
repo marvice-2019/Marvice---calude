@@ -22,7 +22,7 @@ function walk(dir, out = []) {
     if (name === 'node_modules' || name.startsWith('.')) continue;
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(js|jsx|json|html)$/.test(name)) out.push(p);
+    else if (/\.(js|jsx|json|html|css)$/.test(name)) out.push(p);
   }
   return out;
 }
@@ -75,4 +75,31 @@ edit('components/StandaloneShell.js',
   `if (typeof window !== 'undefined') return localStorage.getItem('vadoo_banner_dismissed') !== '1';`,
   `return false;`);
 
-console.log(`brand: ${BRAND} applied to ${renamed} files${warnings ? `, ${warnings} warning(s)` : ''}`);
+// 5. Accent colour: upstream's cyan becomes the copper of the Marvice mark.
+// Runs after the logo edits above, which match on the original cyan class names.
+const COPPER = '#bd8b53', COPPER_DARK = '#a8763f';
+const recolor = [
+  [/#22d3ee/gi, COPPER],
+  [/#06b6d4/gi, COPPER_DARK],                       // primary hover
+  [/\b34,(\s*)211,(\s*)238\b/g, (_, a, b) => `189,${a}139,${b}83`],   // rgba() form of #22d3ee
+  [/\b6,(\s*)182,(\s*)212\b/g, (_, a, b) => `168,${a}118,${b}63`],    // rgba() form of #06b6d4
+  [/\bcyan-50\b/g, '[#faf4ec]'],
+  [/\bcyan-400\b/g, '[#c99c68]'],
+  [/\bcyan-500\b/g, `[${COPPER}]`],
+  [/\bcyan-600\b/g, `[${COPPER_DARK}]`],
+  [/\bcyan-700\b/g, '[#8f6334]'],
+];
+const colorFiles = [
+  ...walk('app'), ...walk('components'), ...walk('src'), ...walk('packages/studio/src'),
+  'tailwind.config.js', 'packages/studio/tailwind.config.js',
+];
+let recolored = 0;
+for (const f of colorFiles) {
+  if (!existsSync(f)) continue;
+  const src = readFileSync(f, 'utf8');
+  const out = recolor.reduce((acc, [re, to]) => acc.replace(re, to), src);
+  if (out !== src) { writeFileSync(f, out); recolored++; }
+}
+if (!recolored) { console.warn('brand: cyan accent not found anywhere'); warnings++; }
+
+console.log(`brand: ${BRAND} applied to ${renamed} files, accent recoloured in ${recolored}${warnings ? `, ${warnings} warning(s)` : ''}`);
