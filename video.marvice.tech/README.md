@@ -2,8 +2,8 @@
 
 Marvice Studio runs on the Coolify server at **https://video.marvice.tech**, behind basic auth:
 
-- **https://video.marvice.tech/create**: Marvice Studio, which turns a typed prompt into an MP4 (see below).
-- **https://video.marvice.tech/**: the video editor, [HyperFrames](https://github.com/heygen-com/hyperframes) Studio
+- **https://video.marvice.tech/**: Marvice Studio, which turns a typed prompt into an MP4 (see below). Also at `/create`.
+- **https://video.marvice.tech/editor**: the video editor, [HyperFrames](https://github.com/heygen-com/hyperframes) Studio
   (the `hyperframes preview` server with rendering to MP4). Its own interface keeps the HyperFrames name.
 
 The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are cropped from `marvice_R_logo.ai`.
@@ -15,7 +15,7 @@ The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are
 | `Dockerfile` | Node 22 + Chromium + chrome-headless-shell + ffmpeg + `hyperframes` CLI |
 | `entrypoint.sh` | Creates a project in `/projects` on first boot, then serves Studio on port 3002 |
 | `docker-compose.yml` | Coolify Docker Compose resource: `studio` (private) + `auth` (public) and a persistent volume |
-| `Dockerfile.auth`, `Caddyfile`, `auth-entrypoint.sh` | Caddy basic-auth gate; the only service exposed to the internet. Routes `/create*` to `creator`, everything else to `studio` |
+| `Dockerfile.auth`, `Caddyfile`, `auth-entrypoint.sh` | Caddy basic-auth gate; the only service exposed to the internet. Routes `/` and `/create*` to `creator`, everything else (the editor at `/editor`, its assets and API) to `studio` |
 | `creator/` | Prompt-to-video service at `/create` (runs from the `studio` image with the `creator` command) |
 
 ## 1. DNS (Hostinger)
@@ -40,9 +40,9 @@ In hPanel → Domains → `marvice.tech` → DNS, add:
 > ⚠️ Keep basic auth on. Studio's API reads, writes, and deletes project files and starts renders
 > without any login of its own (upstream security note F-001).
 
-## Marvice Studio: prompt to video (`/create`)
+## Marvice Studio: prompt to video (`/`)
 
-At https://video.marvice.tech/create you type what the video should show, pick a size and a length, and get an MP4:
+At https://video.marvice.tech/ you type what the video should show, pick a size and a length, and get an MP4:
 
 1. An AI writer turns the prompt into a HyperFrames composition (`index.html`).
 2. If AI footage is selected, the writer first plans one shot per 8 seconds (up to 3) and a video model films them.

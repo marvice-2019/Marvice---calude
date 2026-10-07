@@ -57,7 +57,7 @@
 </style>
 </head>
 <body>
-<header><div class="brand"><img src="/create/assets/marvice-logo.svg" alt="Marvice"><span>Studio</span></div><a href="/"><span class="wide">Open video editor →</span><span class="narrow">Editor →</span></a></header>
+<header><div class="brand"><img src="/create/assets/marvice-logo.svg" alt="Marvice"><span>Studio</span></div><a href="/editor#project/studio"><span class="wide">Open video editor →</span><span class="narrow">Editor →</span></a></header>
 <main>
   <h1>Type it. Get a video.</h1>
   <p class="sub">Describe the video. AI writes it, optionally films AI footage for it, and renders an MP4 you can download or keep editing in the video editor.</p>
@@ -164,7 +164,7 @@ $("jobs").onclick = async (e) => {
   const id = e.target.dataset.studio;
   if (!id) return;
   if (!confirm("Replace the project currently open in the video editor with this video? A backup of the current project is kept.")) return;
-  try { await api(`jobs/${id}/studio`, { method: "POST" }); location.href = "/"; }
+  try { await api(`jobs/${id}/studio`, { method: "POST" }); location.href = "/editor#project/studio"; }
   catch (err) { alert(err.message); }
 };
 
