@@ -6,13 +6,12 @@
 #   ./hf.sh lint          ./hf.sh check --json      ./hf.sh render -o ../brag.mp4
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
-BIN="${HYPERFRAMES_BIN:-$(command -v hyperframes || true)}"
-if [ -z "$BIN" ]; then
-  for c in "$HERE/node_modules/.bin/hyperframes" /tmp/claude-0/*/*/scratchpad/hf-probe/node_modules/.bin/hyperframes; do
-    [ -x "$c" ] && BIN="$c" && break
-  done
-fi
-[ -n "$BIN" ] || { echo "hyperframes CLI not found; npm install hyperframes" >&2; exit 1; }
+# Resolve the CLI: $HYPERFRAMES_BIN, a local install next to this script, a global
+# install, else npx with the version this video was rendered with.
+BIN="${HYPERFRAMES_BIN:-}"
+[ -n "$BIN" ] || { [ -x "$HERE/node_modules/.bin/hyperframes" ] && BIN="$HERE/node_modules/.bin/hyperframes"; }
+[ -n "$BIN" ] || BIN="$(command -v hyperframes || true)"
+[ -n "$BIN" ] || BIN="npx --yes hyperframes@0.8.145"
 
 export HYPERFRAMES_NO_TELEMETRY=1 HYPERFRAMES_SKIP_SKILLS=1
 if [ -z "$PRODUCER_HEADLESS_SHELL_PATH" ]; then
@@ -23,4 +22,4 @@ if [ -z "$PRODUCER_HEADLESS_SHELL_PATH" ]; then
 fi
 
 cmd="$1"; shift
-exec "$BIN" "$cmd" "$HERE/composition" "$@"
+exec $BIN "$cmd" "$HERE/composition" "$@"

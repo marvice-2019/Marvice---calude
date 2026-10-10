@@ -21,10 +21,10 @@ ffmpeg -y -v error -ss "$AT" -i "$RAW" -frames:v 1 -q:v 2 "$POSTER"
 # oversampled brick-wall limiter at -1.5 dBTP (loudnorm's own limiter overshoots
 # on short transients such as the keypresses and the bell).
 M=$(ffmpeg -v info -i "$RAW" -vn -af "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json" -f null - 2>&1 | sed -n '/{/,/}/p')
-j() { printf '%s' "$M" | sed -n "s/.*\"$1\" *: *\"\([^\"]*\)\".*/\1/p" | head -1; }
-[ -n "$(j input_i)" ] || { echo "loudness measurement failed" >&2; printf '%s\n' "$M" >&2; exit 1; }
-GAIN=$(awk -v i="$(j input_i)" 'BEGIN{printf "%.2f", -14 - i}')
-echo "measured: I=$(j input_i) LUFS  TP=$(j input_tp) dBTP -> gain ${GAIN} dB, limiter -2 dBTP"
+measured() { printf '%s' "$M" | sed -n "s/.*\"$1\" *: *\"\([^\"]*\)\".*/\1/p" | head -1; }
+[ -n "$(measured input_i)" ] || { echo "loudness measurement failed" >&2; printf '%s\n' "$M" >&2; exit 1; }
+GAIN=$(awk -v i="$(measured input_i)" 'BEGIN{printf "%.2f", -14 - i}')
+echo "measured: I=$(measured input_i) LUFS  TP=$(measured input_tp) dBTP -> gain ${GAIN} dB, limiter -2 dBTP"
 AF="aresample=192000,volume=${GAIN}dB,alimiter=limit=0.794:attack=2:release=60:asc=1:level=false,aresample=48000,atrim=0:${DUR}"
 
 ffmpeg -y -v error -i "$RAW" -i "$POSTER" \
