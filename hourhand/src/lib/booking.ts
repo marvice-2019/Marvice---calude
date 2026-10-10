@@ -40,7 +40,11 @@ export async function freeSlots(store: DataStore, host: User, eventType: EventTy
   });
 }
 
-/** GET /api/slots?slug=&event=&from=&to=&tz= */
+/**
+ * GET /api/slots?slug=&event=&from=&to=&tz=&token=
+ * `token` is an optional manage token: when it names a confirmed booking for this host and event,
+ * that booking's own time doesn't hide slots. Any other token is ignored.
+ */
 export async function handleGetSlots(store: DataStore, params: URLSearchParams, now: Date): Promise<HandlerResult> {
   const errors: Record<string, string> = {};
   const slug = params.get("slug") ?? "";
@@ -60,7 +64,10 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
 
   const found = await store.getPublicEventType(slug, event);
   if (!found) return { status: 404, body: { error: "not_found" } };
-  const slots = await freeSlots(store, found.host, found.eventType, from, to, now);
+  const token = params.get("token");
+  const moving = token ? await store.getBookingByManageToken(token) : null;
+  const movingId = moving && moving.status === "confirmed" && moving.hostId === found.host.id && moving.eventTypeId === found.eventType.id ? moving.id : null;
+  const slots = await freeSlots(store, found.host, found.eventType, from, to, now, movingId);
   return { status: 200, body: { timezone: tz ?? found.host.timezone, slots: slots.map((s) => s.toISOString()) } };
 }
 

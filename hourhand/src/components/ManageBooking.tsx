@@ -62,7 +62,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
     <section aria-labelledby="reschedule-heading" className="mt-8">
       <h2 id="reschedule-heading" className="font-semibold text-text">Reschedule</h2>
       <div hidden={picked !== null}>
-        <SlotPicker slug={slug} event={event} bookingWindowDays={bookingWindowDays} onPick={(slot, tz) => setPicked({ slot, tz })} />
+        <SlotPicker slug={slug} event={event} bookingWindowDays={bookingWindowDays} manageToken={token} onPick={(slot, tz) => setPicked({ slot, tz })} />
       </div>
       {picked && (
         <div className="mt-4 grid max-w-md gap-3">

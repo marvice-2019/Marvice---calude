@@ -10,6 +10,8 @@ interface PickerProps {
   slug: string;
   event: string;
   bookingWindowDays: number;
+  /** When rescheduling: the booking's manage token, so its own time doesn't hide slots. */
+  manageToken?: string;
   /** Called with the chosen slot (ISO instant) and the zone the guest was viewing times in. */
   onPick: (slot: string, tz: string) => void;
 }
@@ -30,7 +32,7 @@ const shift = ({ y, m }: Month, by: number): Month => ({ y: y + Math.floor((m + 
 const monthLabel = ({ y, m }: Month) => new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(Date.UTC(y, m, 1));
 
 /** Month calendar plus the open times of the chosen day, in a zone the guest can change. */
-export function SlotPicker({ slug, event, bookingWindowDays, onPick }: PickerProps) {
+export function SlotPicker({ slug, event, bookingWindowDays, manageToken, onPick }: PickerProps) {
   const detected = useSyncExternalStore(noSubscribe, detectZone, () => null);
   const [chosenZone, setChosenZone] = useState<string | null>(null);
   const tz = chosenZone ?? detected;
@@ -53,13 +55,14 @@ export function SlotPicker({ slug, event, bookingWindowDays, onPick }: PickerPro
     const from = new Date(Math.max(now.getTime(), Date.UTC(sy, sm, 1) - DAY));
     const to = new Date(Date.UTC(sy, sm + 1, 1) + DAY);
     const params = new URLSearchParams({ slug, event, from: from.toISOString(), to: to.toISOString() });
+    if (manageToken) params.set("token", manageToken);
     let live = true;
     fetch(`/api/slots?${params}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((body: { slots: string[] }) => live && setLoaded({ key, slots: body.slots }))
       .catch(() => live && setLoaded({ key, slots: null }));
     return () => { live = false; };
-  }, [sy, sm, attempt, slug, event, now]);
+  }, [sy, sm, attempt, slug, event, manageToken, now]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, string[]>();
