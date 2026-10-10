@@ -22,3 +22,5 @@ node_modules/
 # Python bytecode
 __pycache__/
 *.pyc
+# Agent worktrees, machine-local
+.claude/worktrees/
