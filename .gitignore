@@ -5,3 +5,18 @@ node_modules/
 # simple-workflow plugin artifacts (local-only; delete entries to share via git)
 .simple-workflow/
 .simple-workflow
+# Skipper — machine-local artifacts (hook scratch + derived index), never commit
+.claude/.skipper-*
+.skipper/*
+!.skipper/receipts/
+
+# Plugin per-machine session state — never commit
+.harnesskit/
+.anchor/
+.cto-toolkit/
+.claude-designlog-hooks.log
+
+# Clawness — per-machine session state (memory.md and rules/ stay shared)
+.clawness/*
+!.clawness/memory.md
+!.clawness/rules/
