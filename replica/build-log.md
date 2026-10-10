@@ -10,13 +10,15 @@ One line per screen or unit. "Done" means built and checked: build, types, lint,
 | shell (18 routes) | 2026-10-10 | done | most host screens are still stubs | — |
 | API `/api/slots`, `/api/bookings` | 2026-10-10 | done | rate limiting; Turnstile on abuse | the re-check that a start is still offered has to run after the repeated-key lookup, or it rejects the booking's own slot |
 | S13 public profile | 2026-10-10 | done | — | — |
-| S14 booking page | 2026-10-10 | partial | 24h toggle | avoiding a server/browser render mismatch on the detected time zone |
-| S15 details form | 2026-10-10 | partial | phone number and question answers are validated but not saved (the invitee type has no fields for them); add guests | — |
-| S16 confirmation | 2026-10-10 | partial | add-to-calendar file, redirect option | — |
-| S11 bookings list | 2026-10-10 | done | filters (past / cancelled tabs), detail actions | — |
-| S17/S18 manage page | — | not started | cancel and reschedule | — |
+| S14 booking page | 2026-10-10 | done | — (12h/24h toggle added in round 2; remembered per browser) | avoiding a server/browser render mismatch on the detected time zone and the stored clock choice |
+| S15 details form | 2026-10-10 | partial | add guests (phone and answers are saved since round 2) | — |
+| S16 confirmation | 2026-10-10 | partial | add-to-calendar file, redirect option; times always shown 12h | — |
+| S11 bookings list | 2026-10-10 | done | filters (past / cancelled tabs) | — |
+| S12 booking detail | 2026-10-10 | partial | host actions (cancel, reschedule, mark no-show) | — |
+| S17 guest cancel | 2026-10-10 | done | email delivery of the link (shown on the confirmation page for now) | cancelling twice must stay a no-op; a past start counts as inside the cut-off |
+| S18 guest reschedule | 2026-10-10 | done | email delivery of the link | the overlap check and the slot list both have to skip the booking being moved, or the guest can't shift by one slot; a retry with the same key must return the same new booking instead of hitting "cancelled" |
 
-**Feature parity after the slice** (`parity.py replica/features.csv`): 24.1 / 100, with must-haves 4 of 22 done (more are partial). Not shippable yet, as expected at this stage.
+**Feature parity after round 2** (`parity.py replica/features.csv`): 33.9 / 100, must-haves 6 of 22 done (up from 24.1 and 4 after the first slice). Not shippable yet.
 
 **End-to-end check, 2026-10-10** (Node fetch against `next start` on localhost):
 
