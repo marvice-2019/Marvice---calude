@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LocalTime } from "@/components/LocalTime";
 import { ManageBooking } from "@/components/ManageBooking";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { store, type LocationKind } from "@/lib/data";
-import { formatDate, formatTime, zoneName } from "@/lib/format";
+import { formatDate, zoneName } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
           <div>
             <dt className="text-sm text-text-muted">When</dt>
             <dd className={cancelled ? "text-text-muted line-through" : "text-text"}>
-              {formatDate(booking.startAt, tz)}, {formatTime(booking.startAt, tz)} to {formatTime(booking.endAt, tz)} ({zoneName(tz)})
+              {formatDate(booking.startAt, tz)}, <LocalTime date={booking.startAt} tz={tz} /> to <LocalTime date={booking.endAt} tz={tz} /> ({zoneName(tz)})
             </dd>
           </div>
           {booking.locationKind && <div><dt className="text-sm text-text-muted">Where</dt><dd className="text-text">{locationLabels[booking.locationKind]}</dd></div>}

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { focusRing } from "@/components/ui/focus";
-import { formatDate, formatTime, zoneName } from "@/lib/format";
+import { formatDate, zoneName } from "@/lib/format";
+import { LocalTime } from "./LocalTime";
 import { SlotPicker } from "./SlotPicker";
 
 export interface FlowQuestion { id: string; label: string; kind: string; required: boolean }
@@ -76,7 +77,7 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
   return (
     <form onSubmit={submit} noValidate className="mt-6 grid max-w-md gap-4">
       <div>
-        <p className="font-semibold text-text">{formatDate(start, tz)}, {formatTime(start, tz)} {zoneName(tz)}</p>
+        <p className="font-semibold text-text">{formatDate(start, tz)}, <LocalTime date={start} tz={tz} /> {zoneName(tz)}</p>
         <button type="button" onClick={onBack} className={`min-h-11 text-sm font-semibold text-accent underline ${focusRing}`}>Pick another time</button>
       </div>
       {taken && (
@@ -86,7 +87,7 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
             {taken.map((s) => (
               <li key={s}>
                 <Button variant="secondary" className="w-full" onClick={() => { setTaken(null); onPick(s); }}>
-                  {formatDate(new Date(s), tz)}, {formatTime(new Date(s), tz)} {zoneName(tz)}
+                  {formatDate(new Date(s), tz)}, <LocalTime date={s} tz={tz} /> {zoneName(tz)}
                 </Button>
               </li>
             ))}
