@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
 import { focusRing } from "@/components/ui/focus";
-import { dayKey, formatDate, formatTime, zoneName } from "@/lib/format";
+import { dayKey, formatDate, formatTime, zoneName, type HourCycle } from "@/lib/format";
 
 interface PickerProps {
   slug: string;
@@ -21,6 +21,38 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const noSubscribe = () => () => {};
 const detectZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+const CYCLE_KEY = "hourhand.timeFormat";
+const cycleListeners = new Set<() => void>();
+let cycleOverride: HourCycle | null = null; // keeps the choice for this visit when storage is unavailable
+
+function localeCycle(): HourCycle {
+  const hc = new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolvedOptions().hourCycle;
+  return hc === "h23" || hc === "h24" ? "24h" : "12h";
+}
+function readCycle(): HourCycle {
+  if (cycleOverride) return cycleOverride;
+  try {
+    const stored = localStorage.getItem(CYCLE_KEY);
+    if (stored === "12h" || stored === "24h") return stored;
+  } catch {
+    // Storage blocked: fall back to the locale default.
+  }
+  return localeCycle();
+}
+function writeCycle(cycle: HourCycle) {
+  cycleOverride = cycle;
+  try {
+    localStorage.setItem(CYCLE_KEY, cycle);
+  } catch {
+    // Storage blocked: the choice still holds for this visit.
+  }
+  cycleListeners.forEach((l) => l());
+}
+function subscribeCycle(listener: () => void) {
+  cycleListeners.add(listener);
+  return () => { cycleListeners.delete(listener); };
+}
+
 type Month = { y: number; m: number }; // m is 0-11
 type Loaded = { key: string; slots: string[] | null }; // null slots = failed
 
@@ -36,6 +68,8 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, onPick
   const detected = useSyncExternalStore(noSubscribe, detectZone, () => null);
   const [chosenZone, setChosenZone] = useState<string | null>(null);
   const tz = chosenZone ?? detected;
+  const storedCycle = useSyncExternalStore(subscribeCycle, readCycle, () => null);
+  const cycle: HourCycle = storedCycle ?? "12h";
   const [now] = useState(() => new Date());
   const [month, setMonth] = useState<Month | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -126,6 +160,16 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, onPick
         )}
       </section>
       <section aria-label="Pick a time">
+        <div role="radiogroup" aria-label="Time format" className="mb-3 flex gap-2">
+          {(["12h", "24h"] as const).map((c) => (
+            <Button
+              key={c} role="radio" aria-checked={cycle === c} variant={cycle === c ? "primary" : "secondary"}
+              onClick={() => writeCycle(c)}
+            >
+              {c}
+            </Button>
+          ))}
+        </div>
         <p className="text-sm text-text-muted">{zoneLabel}</p>
         <Label htmlFor="tz" className="mt-2">Time zone</Label>
         <select
@@ -142,8 +186,8 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, onPick
             <ul className="mt-2 grid gap-2">
               {byDay.get(day)!.map((s) => (
                 <li key={s}>
-                  <Button variant="secondary" className="w-full" onClick={() => onPick(s, tz)} aria-label={`${formatDate(new Date(s), tz)}, ${formatTime(new Date(s), tz)} ${zoneName(tz)}`}>
-                    {formatTime(new Date(s), tz)}
+                  <Button variant="secondary" className="w-full" onClick={() => onPick(s, tz)} aria-label={`${formatDate(new Date(s), tz)}, ${formatTime(new Date(s), tz, cycle)} ${zoneName(tz)}`}>
+                    {formatTime(new Date(s), tz, cycle)}
                   </Button>
                 </li>
               ))}

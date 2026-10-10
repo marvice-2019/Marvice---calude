@@ -3,8 +3,11 @@ export function zoneName(tz: string): string {
   return tz === "Asia/Kolkata" ? "IST" : tz.replaceAll("_", " ");
 }
 
-/** "3:30 pm" in `tz`. */
-export function formatTime(date: Date, tz: string): string {
+export type HourCycle = "12h" | "24h";
+
+/** "3:30 pm" in `tz`, or "15:30" with the 24h cycle. */
+export function formatTime(date: Date, tz: string, cycle: HourCycle = "12h"): string {
+  if (cycle === "24h") return new Intl.DateTimeFormat("en-IN", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
   return new Intl.DateTimeFormat("en-IN", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(date).toLowerCase();
 }
 
