@@ -1,0 +1,10 @@
+feature,area,priority,original,clone,notes
+Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,no,fix 1: sync misses events (16 reviews/2 sources)
+Never offer a slot when calendar sync is stale,integrations,must,no,no,fix 1
+One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,must,no,no,fix 2: billing (14 reviews/2 sources)
+Human support reply under 1 business day; WhatsApp/callback on paid plans,support,should,no,no,fix 3: support (14 reviews/2 sources); ops not code
+Date overrides + block-a-week + recurring + one-off links (web and mobile),availability,must,no,no,fix 4: availability (11 reviews/2 sources)
+Mobile app parity with web; save confirmation; crash-free >=99.5%,mobile,must,no,no,fix 5: bugs (26 reviews/2 sources)
+Time zone confirm step and explicit AM/PM or 24h toggle,booking,should,no,no,fix 6: thin (2 reviews/1 source) but cheap
+Low-cost second seat or flat 2-person price,pricing,should,no,no,fix 7: seats (5 reviews/3 sources) -> /replica-launch
+Dark mode,design,could,no,no,fix 8: thin (2 reviews/1 source)
