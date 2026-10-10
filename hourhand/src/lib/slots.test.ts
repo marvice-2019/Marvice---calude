@@ -8,7 +8,7 @@ const weekly = (weekday: number, intervals: { from: string; to: string }[]): Ava
 const override = (onDate: string, intervals: { from: string; to: string }[]): AvailabilityRule => ({ id: `d${onDate}`, scheduleId: "s", kind: "date", weekday: null, onDate, intervals });
 const hours = [{ from: "10:00", to: "13:00" }, { from: "15:00", to: "19:00" }];
 
-function input(over: Partial<SlotInput> & { eventType?: Partial<SlotInput["eventType"]> } = {}): SlotInput {
+function input(over: Partial<Omit<SlotInput, "eventType">> & { eventType?: Partial<SlotInput["eventType"]> } = {}): SlotInput {
   const { eventType, ...rest } = over;
   return {
     eventType: { id: "et", durationMinutes: 30, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, minNoticeMinutes: 0, bookingWindowDays: 60, dailyLimit: null, ...eventType },
