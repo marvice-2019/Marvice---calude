@@ -87,8 +87,13 @@ export interface Invitee {
   name: string;
   email: string;
   timezone: string;
+  phone: string | null;
+  answers: InviteeAnswer[];
   manageToken: string;
 }
+
+/** One entry of invitees.answers (jsonb). The label is copied so later edits to the question don't rewrite history. */
+export interface InviteeAnswer { questionId: string; label: string; answer: string }
 
 export type BookingWithInvitee = Booking & { invitee: Invitee };
 
@@ -125,7 +130,7 @@ export interface CreateBookingInput {
   eventTypeId: string;
   startAt: Date;
   idempotencyKey: string;
-  invitee: { name: string; email: string; timezone: string };
+  invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
 }
 
 /** Mirrors the bookings.no_double_booking exclusion constraint (Postgres 23P01). */

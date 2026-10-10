@@ -67,7 +67,7 @@ export function buildSeed(now: Date): Seed {
       status: cancelled ? "cancelled" : "confirmed", locationKind: et.id === "evt_coaching" ? "google_meet" : null,
       idempotencyKey: `seed-${id}`, cancelledAt: cancelled ? now : null, cancelledBy: cancelled ? "guest" : null,
       cancelReason: cancelled ? "Travelling that week." : null, createdAt: now,
-      invitee: { id: `inv_${id}`, bookingId: id, hostId: priya.id, name: guest[0], email: guest[1], timezone: guest[2], manageToken: `tok_${id}` },
+      invitee: { id: `inv_${id}`, bookingId: id, hostId: priya.id, name: guest[0], email: guest[1], timezone: guest[2], phone: null, answers: [], manageToken: `tok_${id}` },
     };
   };
   const [coaching, intro] = eventTypes;

@@ -85,3 +85,29 @@ describe("handleCreateBooking", () => {
     expect(noAnswer).toMatchObject({ status: 400, body: { fields: { "answers.q_goal": expect.any(String) } } });
   });
 });
+
+describe("invitee phone and answers", () => {
+  it("round-trip through handleCreateBooking into the store", async () => {
+    const store = fresh();
+    const [slot] = await firstSlots(store);
+    const res = await handleCreateBooking(store, { ...good(slot, "key-phone-0001"), phone: "+91 98765 43210" }, now);
+    expect(res.status).toBe(201);
+    const saved = await store.getBookingByManageToken((res.body as { manageToken: string }).manageToken);
+    expect(saved?.invitee.phone).toBe("+91 98765 43210");
+    expect(saved?.invitee.answers).toEqual([{ questionId: "q_goal", label: "What would you like to work on?", answer: "Planning a career move." }]);
+  });
+  it("stores a null phone when none is given", async () => {
+    const store = fresh();
+    const [slot] = await firstSlots(store);
+    const res = await handleCreateBooking(store, good(slot, "key-phone-0002"), now);
+    const saved = await store.getBookingByManageToken((res.body as { manageToken: string }).manageToken);
+    expect(saved?.invitee.phone).toBeNull();
+  });
+});
+
+describe("request key message", () => {
+  it("says missing when absent and gives the length rule when too short", () => {
+    expect(validateBookingRequest({ ...good("2026-10-20T05:30:00.000Z"), idempotencyKey: "" })).toMatchObject({ fields: { idempotencyKey: "Missing request key." } });
+    expect(validateBookingRequest({ ...good("2026-10-20T05:30:00.000Z"), idempotencyKey: "short" })).toMatchObject({ fields: { idempotencyKey: "Request key must be 8–100 characters." } });
+  });
+});

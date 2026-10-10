@@ -95,7 +95,8 @@ export function validateBookingRequest(input: unknown): Validation {
   if (!EMAIL.test(email) || email.length > 254) fields.email = "Enter a valid email address.";
   if (!isIanaTimeZone(body.timezone)) fields.timezone = "Pick a valid time zone.";
   if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) fields.phone = "Enter a phone number with country code, like +91 98765 43210.";
-  if (idempotencyKey.length < 8 || idempotencyKey.length > 100) fields.idempotencyKey = "Missing request key.";
+  if (!idempotencyKey) fields.idempotencyKey = "Missing request key.";
+  else if (idempotencyKey.length < 8 || idempotencyKey.length > 100) fields.idempotencyKey = "Request key must be 8–100 characters.";
 
   const answers: Record<string, string> = {};
   if (body.answers !== undefined) {
@@ -138,7 +139,8 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
   if (existing) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
 
-  const missing = (await store.listCustomQuestions(eventType.id)).filter((q) => q.required && !req.answers[q.id]);
+  const questions = await store.listCustomQuestions(eventType.id);
+  const missing = questions.filter((q) => q.required && !req.answers[q.id]);
   if (missing.length > 0) {
     return { status: 400, body: { error: "invalid_request", fields: Object.fromEntries(missing.map((q) => [`answers.${q.id}`, "This one is required."])) } };
   }
@@ -150,7 +152,10 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   try {
     const booking = await store.createBooking({
       eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey,
-      invitee: { name: req.name, email: req.email, timezone: req.timezone },
+      invitee: {
+        name: req.name, email: req.email, timezone: req.timezone, phone: req.phone,
+        answers: questions.filter((q) => req.answers[q.id]).map((q) => ({ questionId: q.id, label: q.label, answer: req.answers[q.id] })),
+      },
     });
     return { status: 201, body: { bookingId: booking.id, manageToken: booking.invitee.manageToken } };
   } catch (err) {
