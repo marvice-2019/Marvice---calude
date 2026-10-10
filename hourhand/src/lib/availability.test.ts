@@ -17,6 +17,12 @@ describe("availability validation", () => {
     expect(validateIntervals([{ from: "09:00", to: "09:00" }], "w1")).toHaveProperty("w1-0-to");
   });
 
+  it("flags every range that overlaps an earlier, longer one", () => {
+    const errors = validateIntervals([{ from: "09:00", to: "17:00" }, { from: "10:00", to: "11:00" }, { from: "12:00", to: "13:00" }], "w1");
+    expect(errors).toHaveProperty("w1-1-from");
+    expect(errors).toHaveProperty("w1-2-from");
+  });
+
   it("rejects overlapping ranges on the same day", () => {
     const r = validateWeeklyHours({ 2: [{ from: "13:00", to: "17:00" }, { from: "09:00", to: "13:30" }] });
     expect(r).toEqual({ ok: false, errors: { "w2-1-from": "This range overlaps another one on the same day." } });

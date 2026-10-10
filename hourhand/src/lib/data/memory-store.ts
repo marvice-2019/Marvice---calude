@@ -185,8 +185,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       db.questions = db.questions.filter((q) => q.eventTypeId !== id);
     },
     async saveQuestions(eventTypeId, questions) {
+      // Keep a client-sent id only when it already belongs to a question of this event type.
+      const own = new Set(db.questions.filter((q) => q.eventTypeId === eventTypeId).map((q) => q.id));
       const saved = questions.map((q, position) => ({
-        id: q.id ?? randomUUID(), eventTypeId, label: q.label, kind: q.kind, required: q.required, choices: [...q.choices], position,
+        id: q.id !== null && own.has(q.id) ? q.id : randomUUID(), eventTypeId, label: q.label, kind: q.kind, required: q.required, choices: [...q.choices], position,
       }));
       db.questions = [...db.questions.filter((q) => q.eventTypeId !== eventTypeId), ...saved];
       return saved;

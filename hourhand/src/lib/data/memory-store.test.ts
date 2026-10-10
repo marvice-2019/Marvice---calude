@@ -48,6 +48,22 @@ describe("memory store createBooking", () => {
     expect(rebooked.status).toBe("confirmed");
   });
 
+  it("does not reuse a question id that belongs to another event type", async () => {
+    const { store } = await setup();
+    const q = { label: "Anything else?", kind: "short_text" as const, required: false, choices: [] };
+    const [saved] = await store.saveQuestions("evt_intro", [{ ...q, id: "q_goal" }]);
+    expect(saved.id).not.toBe("q_goal");
+    const coaching = await store.listCustomQuestions("evt_coaching");
+    expect(coaching.map((c) => c.id)).toEqual(["q_goal"]);
+    expect(coaching[0].label).toBe("What would you like to work on?");
+  });
+
+  it("keeps a question id that belongs to the same event type", async () => {
+    const { store } = await setup();
+    const [saved] = await store.saveQuestions("evt_coaching", [{ label: "Goal?", kind: "long_text", required: true, choices: [], id: "q_goal" }]);
+    expect(saved.id).toBe("q_goal");
+  });
+
   it("seeds Priya's public event types", async () => {
     const { store } = await setup();
     expect((await store.getPublicEventType("priya", "coaching"))?.eventType.durationMinutes).toBe(45);

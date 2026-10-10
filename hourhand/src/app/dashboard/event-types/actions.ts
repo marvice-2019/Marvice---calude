@@ -36,7 +36,7 @@ export async function saveEventType(id: string | null, form: EventTypeForm, ques
 
 export async function setEventTypeActive(id: string, active: boolean): Promise<void> {
   const user = await store.getCurrentUser();
-  await store.setEventTypeActive(user.id, id, active);
+  await store.setEventTypeActive(user.id, id, active === true);
   refresh(user.slug, id);
 }
 

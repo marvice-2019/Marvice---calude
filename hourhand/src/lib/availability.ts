@@ -36,10 +36,16 @@ export function validateIntervals(intervals: Interval[], prefix: string): FieldE
     else good.push({ i, from, to });
   });
   good.sort((a, b) => a.from - b.from);
-  for (let k = 1; k < good.length; k++) {
-    if (good[k].from < good[k - 1].to) {
-      const later = Math.max(good[k].i, good[k - 1].i);
+  let maxEnd = -1;
+  let maxEndIndex = -1;
+  for (const r of good) {
+    if (r.from < maxEnd) {
+      const later = Math.max(r.i, maxEndIndex);
       errors[`${prefix}-${later}-from`] = "This range overlaps another one on the same day.";
+    }
+    if (r.to > maxEnd) {
+      maxEnd = r.to;
+      maxEndIndex = r.i;
     }
   }
   return errors;

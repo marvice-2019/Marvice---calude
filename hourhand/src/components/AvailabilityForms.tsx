@@ -39,7 +39,18 @@ function RangeRows({ prefix, label, ranges, onChange, errors }: {
                   <span className="sr-only">{label}, range {i + 1}, </span>
                   {field === "from" ? "From" : "To"}
                 </Label>
-                <Input id={id} name={id} type="time" required value={r[field]} error={errors[id]} onChange={(e) => set(i, field, e.target.value)} />
+                <Input
+                  id={id}
+                  name={id}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="([01]\d|2[0-3]):[0-5]\d|24:00"
+                  placeholder="17:00"
+                  required
+                  value={r[field]}
+                  error={errors[id]}
+                  onChange={(e) => set(i, field, e.target.value)}
+                />
               </div>
             );
           })}
@@ -105,6 +116,7 @@ export function WeeklyHoursForm({ initial }: { initial: Record<number, Interval[
           );
         })}
       </ul>
+      <p className="text-sm text-text-muted">Use 24-hour time, like 09:00 or 17:30. Use 24:00 for midnight.</p>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" loading={pending}>Save hours</Button>
         <Button variant="secondary" onClick={copyMonday}>Copy Monday to weekdays</Button>

@@ -1,5 +1,5 @@
 // Pure validation for the event type editor. Limits mirror the checks on event_types and custom_questions in replica/schema.sql.
-import type { CustomQuestion, EventLocation, EventType, EventTypeDraft, LocationKind, QuestionDraft } from "./data/types";
+import { LOCATION_KINDS, type CustomQuestion, type EventLocation, type EventType, type EventTypeDraft, type LocationKind, type QuestionDraft } from "./data/types";
 
 export const DURATION = { min: 5, max: 720 } as const;
 export const START_INCREMENTS = [5, 10, 15, 20, 30, 45, 60] as const;
@@ -57,6 +57,14 @@ function whole(raw: string): number | null {
 export function validateEventType(form: EventTypeForm, takenSlugs: readonly string[]):
   { ok: true; value: EventTypeDraft } | { ok: false; errors: EventTypeErrors } {
   const errors: EventTypeErrors = {};
+
+  // The form arrives from the client, so check every field is text before using string methods on it.
+  for (const key of Object.keys(NEW_EVENT_TYPE_FORM) as (keyof EventTypeForm)[]) {
+    if (typeof form[key] !== "string") errors[key] = "Enter text for this field.";
+  }
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  if (form.locationKind && !LOCATION_KINDS.includes(form.locationKind)) errors.locationKind = "Pick a location from the list.";
 
   const name = form.name.trim();
   if (!name) errors.name = "Give this event type a name.";

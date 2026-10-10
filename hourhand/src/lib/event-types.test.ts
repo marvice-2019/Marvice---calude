@@ -79,6 +79,19 @@ describe("validateEventType", () => {
   });
 });
 
+describe("validateEventType input checks", () => {
+  it("rejects a location kind outside the list without throwing", () => {
+    const result = validateEventType({ ...valid, locationKind: "evil" as unknown as EventTypeForm["locationKind"] }, []);
+    expect(result).toEqual({ ok: false, errors: { locationKind: "Pick a location from the list." } });
+  });
+
+  it("rejects a non-string field without throwing", () => {
+    const result = validateEventType({ ...valid, name: 123 as unknown as string }, []);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.name).toBeTruthy();
+  });
+});
+
 describe("validateQuestions", () => {
   it("needs a label and two choices for a single select", () => {
     const result = validateQuestions([

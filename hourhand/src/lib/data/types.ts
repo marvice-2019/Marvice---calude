@@ -47,6 +47,10 @@ export interface EventType {
 export type LocationKind =
   | "google_meet" | "zoom" | "teams" | "phone_host_calls" | "phone_guest_calls" | "in_person" | "custom" | "ask_guest";
 
+export const LOCATION_KINDS: readonly LocationKind[] = [
+  "google_meet", "zoom", "teams", "phone_host_calls", "phone_guest_calls", "in_person", "custom", "ask_guest",
+];
+
 export interface EventLocation {
   id: string;
   eventTypeId: string;
