@@ -1,5 +1,5 @@
 // Pure validation for the event type editor. Limits mirror the checks on event_types and custom_questions in replica/schema.sql.
-import type { CustomQuestion, EventTypeDraft, LocationKind, QuestionDraft } from "./data/types";
+import type { CustomQuestion, EventLocation, EventType, EventTypeDraft, LocationKind, QuestionDraft } from "./data/types";
 
 export const DURATION = { min: 5, max: 720 } as const;
 export const START_INCREMENTS = [5, 10, 15, 20, 30, 45, 60] as const;
@@ -100,6 +100,23 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
       startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
       location: form.locationKind ? { kind: form.locationKind, value: valueLabel ? locationValue : null } : null,
     },
+  };
+}
+
+/** Starting values for a new event type: the schema defaults, 30 minutes on Google Meet. */
+export const NEW_EVENT_TYPE_FORM: EventTypeForm = {
+  name: "", slug: "", durationMinutes: "30", description: "", locationKind: "google_meet", locationValue: "", minNoticeMinutes: "240",
+  bookingWindowDays: "60", startIncrementMinutes: "30", bufferBeforeMinutes: "0", bufferAfterMinutes: "0", dailyLimit: "", cancelCutoffMinutes: "0",
+};
+
+/** The editor's values for a saved event type and its first location. */
+export function toForm(et: EventType, location: EventLocation | undefined): EventTypeForm {
+  return {
+    name: et.name, slug: et.slug, durationMinutes: String(et.durationMinutes), description: et.description ?? "",
+    locationKind: location?.kind ?? "", locationValue: location?.value ?? "", minNoticeMinutes: String(et.minNoticeMinutes),
+    bookingWindowDays: String(et.bookingWindowDays), startIncrementMinutes: String(et.startIncrementMinutes),
+    bufferBeforeMinutes: String(et.bufferBeforeMinutes), bufferAfterMinutes: String(et.bufferAfterMinutes),
+    dailyLimit: et.dailyLimit === null ? "" : String(et.dailyLimit), cancelCutoffMinutes: String(et.cancelCutoffMinutes),
   };
 }
 
