@@ -24,7 +24,8 @@ Re-run it to pull the latest upstream and redeploy. The first build takes a few 
 | `BASIC_AUTH` | `on` | `off` makes the studio public (users still need their own Muapi key) |
 | `BASIC_AUTH_USER` | `admin` | Password file: `/etc/open-generative-ai/htpasswd` |
 | `APP_REF` | `main` | Upstream branch, tag or commit to deploy |
-| `APP_PORT` | `3001` | Host port the container is published on |
+| `APP_PORT` | `3001` | Host port for the container (nginx mode only) |
+| `COOLIFY_NETWORK` | `coolify` | Docker network of Coolify's proxy |
 
 ## What it does
 1. Clones the upstream repo **with its submodules** to `/opt/Open-Generative-AI`
@@ -42,10 +43,11 @@ Re-run it to pull the latest upstream and redeploy. The first build takes a few 
    `brand: no match in ...` and that spot keeps the upstream look. Update `apply.mjs` then.
 4. Runs container `open-generative-ai` (`--restart unless-stopped`)
 5. Publishes it:
-   - **Coolify server** (detected via `/data/coolify/proxy`): the container is published on
-     the docker0 gateway and a route is written to
-     `/data/coolify/proxy/dynamic/open-generative-ai.yaml` for Coolify's Traefik and its
-     Let's Encrypt resolver.
+   - **Coolify server** (detected via `/data/coolify/proxy`): the container joins Coolify's
+     `coolify` network with Traefik labels (HTTP→HTTPS redirect, Let's Encrypt via Coolify's
+     resolver, basic auth), the same way Coolify publishes its own apps. The script then checks
+     that the proxy answers for the domain. Earlier versions wrote a route file to
+     `/data/coolify/proxy/dynamic/`; that file was ignored on marvice.tech and is now removed.
    - **Plain server**: published on `127.0.0.1` behind nginx + certbot.
 
 ## Operations
