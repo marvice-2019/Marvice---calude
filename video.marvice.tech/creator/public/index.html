@@ -52,7 +52,12 @@
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
   .actions a, .actions button { background: transparent; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 14px; text-decoration: none; cursor: pointer; }
   .actions a:hover, .actions button:hover { border-color: var(--accent); }
-  @media (max-width: 760px) { .sizes { grid-template-columns: repeat(2, 1fr); } .job { grid-template-columns: 1fr; } }
+  .brag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 28px; }
+  .brag div { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 12px; padding: 14px 16px; }
+  .brag b { display: block; font-size: 26px; line-height: 1.2; }
+  .brag span { display: block; font-weight: 600; margin-bottom: 4px; }
+  .brag small { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+  @media (max-width: 760px) { .brag, .sizes { grid-template-columns: repeat(2, 1fr); } .job { grid-template-columns: 1fr; } }
   @media (max-width: 480px) { header { padding: 12px 16px; } .brand img { height: 32px; } .brand { gap: 10px; } .brand span { padding-left: 10px; font-size: 13px; } .wide { display: none; } .narrow { display: inline; } }
 </style>
 </head>
@@ -61,6 +66,13 @@
 <main>
   <h1>Type it. Get a video.</h1>
   <p class="sub">Describe the video. AI writes it, optionally films AI footage for it, and renders an MP4 you can download or keep editing in the video editor.</p>
+
+  <section class="brag" id="brag" aria-label="What Marvice Studio can do">
+    <div><b id="brag-writers">–</b><span>AI writers</span><small id="brag-writers-list"></small></div>
+    <div><b id="brag-footage">–</b><span>AI video models</span><small id="brag-footage-list"></small></div>
+    <div><b id="brag-sizes">–</b><span>Sizes</span><small id="brag-sizes-list"></small></div>
+    <div><b id="brag-length">–</b><span>Seconds long</span><small>MP4 to download, or open it in the video editor and keep editing</small></div>
+  </section>
 
   <div id="setup" class="note" hidden>No AI writer is connected yet. In Coolify (hyperframes-studio → Environment Variables) add at least one key — <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GEMINI_API_KEY</code>, <code>XAI_API_KEY</code>, <code>DEEPSEEK_API_KEY</code>, <code>MISTRAL_API_KEY</code> or <code>OPENROUTER_API_KEY</code> + <code>OPENROUTER_MODEL</code> — then redeploy. Greyed-out choices below show which key each one needs.</div>
 
@@ -104,6 +116,15 @@ function pressGroup(container, value, attr) {
 async function init() {
   const opts = await api("options");
   sizes = opts.sizes;
+  const names = (list) => list.map((p) => p.label).join(" · ");
+  const models = (list) => list.reduce((n, p) => n + (p.models?.length || 1), 0);
+  $("brag-writers").textContent = models(opts.providers.text);
+  $("brag-writers-list").textContent = names(opts.providers.text);
+  $("brag-footage").textContent = models(opts.providers.footage);
+  $("brag-footage-list").textContent = names(opts.providers.footage);
+  $("brag-sizes").textContent = Object.keys(sizes).length;
+  $("brag-sizes-list").textContent = Object.values(sizes).map((s) => s.label).join(" · ");
+  $("brag-length").textContent = `${Math.min(...opts.durations)}–${Math.max(...opts.durations)}`;
   $("sizes").innerHTML = Object.entries(sizes).map(([id, s]) => {
     const k = 40 / Math.max(s.width, s.height);
     return `<button type="button" class="size" data-size="${id}"><span class="shape"><i style="width:${s.width * k}px;height:${s.height * k}px"></i></span><span>${s.label}<small>${s.width}×${s.height}</small></span></button>`;
