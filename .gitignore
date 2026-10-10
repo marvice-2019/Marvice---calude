@@ -1,3 +1,20 @@
 .claude/sdd-cache/
 .claude/.simplify-ignore-cache/
 node_modules/
+
+# simple-workflow plugin artifacts (local-only; delete entries to share via git)
+.simple-workflow/
+.simple-workflow
+# Skipper — machine-local artifacts (hook scratch + derived index), never commit
+.claude/.skipper-*
+.skipper/*
+!.skipper/receipts/
+# Plugin hook state — machine-local, never commit
+.anchor/
+.claude-designlog-hooks.log
+.clawness/*
+!.clawness/memory.md
+!.clawness/rules/
+.cto-toolkit/
+.harnesskit/
+.superstack/
