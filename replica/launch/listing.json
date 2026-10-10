@@ -1,0 +1,16 @@
+{
+  "avoid": ["Calendly", "Calendly, LLC"],
+  "app_store": {
+    "name": "Hourhand: Booking Links",
+    "subtitle": "Sync you can see. People reply",
+    "promotional_text": "New: a sync light on every calendar. If one disconnects, we pause bookings and tell you, so nobody double-books.",
+    "description": "Hourhand turns your calendar into a booking link that keeps its word.\n\nShare one link. Clients see only the times you are really free, pick one, and it lands in your calendar with a video link and a reminder.\n\nBuilt for coaches, tutors, therapists and anyone who books their own clients.\n\nWhat makes it different:\n- A sync light for every connected calendar (Google, Outlook, iCloud). If one stops syncing, bookings pause and you get an alert. No surprise double-bookings.\n- Availability that holds: date overrides, block a whole week, recurring sessions and one-off links, all from your phone.\n- WhatsApp, SMS and email reminders, so fewer clients forget.\n- Every time shows its time zone, with AM/PM or 24-hour clocks.\n- A real person answers support within one working day.\n- Cancel your plan in one tap. We email you 7 days before every renewal.\n\nFree for one person. Duo covers you and an assistant for one flat price.",
+    "keywords": "scheduler,appointment,calendar,coach,tutor,therapist,reminders,availability,clients,sessions",
+    "whats_new": "Sync light: see at a glance that every calendar is connected."
+  },
+  "google_play": {
+    "title": "Hourhand: Booking Links",
+    "short_description": "One booking link that syncs every calendar. Real people answer support.",
+    "full_description": "Hourhand turns your calendar into a booking link that keeps its word.\n\nShare one link. Clients see only the times you are really free, pick one, and it lands in your calendar with a video link and a reminder.\n\nBuilt for coaches, tutors, therapists and anyone who books their own clients.\n\n- A sync light for every calendar. If one disconnects, bookings pause and you get an alert.\n- Date overrides, block a week, recurring sessions, one-off links.\n- WhatsApp, SMS and email reminders.\n- Time zones shown on every time.\n- A real person answers within one working day.\n- Cancel in one tap, with a reminder 7 days before every renewal.\n\nFree for one person. Duo covers two people for one flat price."
+  }
+}

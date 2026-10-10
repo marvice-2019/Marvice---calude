@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hourhand: booking links that stay in sync</title>
+<meta name="description" content="One booking link for coaches, tutors and therapists. A sync light on every calendar, and a real person when something breaks.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fffdf8;--surface:#f7f1e8;--border:#e8dfd2;--border-input:#8a7f70;
+  --text:#1f1a14;--muted:#62584b;--accent:#b4410e;--on-accent:#fff;
+  --highlight:#f2a93b;--danger:#b42318;--success:#1b7a4b;
+  --r-sm:6px;--r-md:10px;--r-lg:16px;
+  --shadow:0 1px 2px rgba(31,26,20,.06),0 1px 3px rgba(31,26,20,.10);
+  --pop:0 12px 32px rgba(31,26,20,.14);
+  --display:"Fraunces",Georgia,serif;--sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.5 var(--sans)}
+a{color:var(--accent)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+header.nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0}
+.logo{display:flex;align-items:center;gap:10px;font:600 22px/1 var(--display);color:var(--text);text-decoration:none}
+.mark{width:28px;height:28px;flex:none}
+.btn{display:inline-block;background:var(--accent);color:var(--on-accent);font:600 16px/1 var(--sans);padding:14px 22px;border-radius:var(--r-md);text-decoration:none;border:0}
+.btn:hover{filter:brightness(.92)}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border-input)}
+.hero{display:grid;gap:40px;padding:40px 0 64px}
+.hero h1{font:700 40px/1.08 var(--display);letter-spacing:-.01em;margin:0 0 16px}
+.hero p.lede{font-size:18px;color:var(--muted);margin:0 0 24px;max-width:34em}
+.note{font-size:14px;color:var(--muted);margin-top:12px}
+.panel{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--pop);padding:20px}
+.panel h3{font:600 18px/1.3 var(--sans);margin:0 0 4px}
+.panel .sub{color:var(--muted);font-size:14px;margin:0 0 16px}
+.sync{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--success);background:#eef6f1;border-radius:var(--r-pill,999px);padding:6px 10px;width:max-content;margin-bottom:16px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--success)}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.slot{border:1px solid var(--border-input);border-radius:var(--r-sm);padding:10px 4px;text-align:center;font:500 14px/1 var(--sans);background:#fff;color:var(--text)}
+.slot.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tz{font-size:12px;color:var(--muted);margin:12px 0 0}
+section{padding:56px 0;border-top:1px solid var(--border)}
+h2{font:700 28px/1.2 var(--display);margin:0 0 24px}
+.grid{display:grid;gap:16px}
+.card{background:var(--surface);border-radius:var(--r-lg);padding:20px}
+.card h3{font:600 18px/1.3 var(--sans);margin:0 0 6px}
+.card p{margin:0;color:var(--muted)}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:16px}
+.steps li{counter-increment:s;background:var(--surface);border-radius:var(--r-lg);padding:20px 20px 20px 64px;position:relative}
+.steps li::before{content:counter(s);position:absolute;left:20px;top:18px;width:30px;height:30px;border-radius:50%;background:var(--highlight);color:var(--text);font:700 16px/30px var(--sans);text-align:center}
+.steps b{display:block;margin-bottom:4px}
+.extras{color:var(--muted);font-size:15px;margin-top:20px}
+.toggle{display:inline-flex;border:1px solid var(--border-input);border-radius:999px;overflow:hidden;margin-bottom:20px}
+.toggle button{font:500 14px/1 var(--sans);padding:10px 16px;background:transparent;border:0;color:var(--text);cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+.plans{display:grid;gap:16px}
+.plan{background:#fff;border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;display:flex;flex-direction:column}
+.plan.rec{border:2px solid var(--accent)}
+.badge{font:600 12px/1 var(--sans);color:var(--on-accent);background:var(--accent);border-radius:999px;padding:6px 10px;width:max-content;margin-bottom:12px}
+.plan h3{font:600 20px/1.2 var(--sans);margin:0 0 4px}
+.plan .for{color:var(--muted);font-size:14px;margin:0 0 16px}
+.price{font:700 32px/1 var(--display)}
+.price small{font:400 14px var(--sans);color:var(--muted)}
+.gst{font-size:13px;color:var(--muted);margin:6px 0 16px}
+.plan ul{padding-left:18px;margin:0 0 20px;color:var(--text);flex:1}
+.plan li{margin:4px 0}
+.reassure{text-align:center;color:var(--muted);margin-top:20px}
+details{background:var(--surface);border-radius:var(--r-md);padding:16px 20px;margin-bottom:10px}
+summary{font-weight:600;cursor:pointer}
+details p{margin:10px 0 0;color:var(--muted)}
+.final{text-align:center}
+.final h2{margin-bottom:16px}
+footer{padding:32px 0;color:var(--muted);font-size:14px;border-top:1px solid var(--border)}
+@media (min-width:720px){
+  .hero{grid-template-columns:1.1fr .9fr;align-items:center;padding:64px 0 88px}
+  .hero h1{font-size:52px}
+  .grid{grid-template-columns:repeat(3,1fr)}
+  .steps{grid-template-columns:repeat(3,1fr)}
+  .plans{grid-template-columns:repeat(3,1fr)}
+}
+@media (prefers-reduced-motion:no-preference){.btn{transition:filter .12s cubic-bezier(.2,.8,.2,1)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="nav">
+    <a class="logo" href="#" aria-label="Hourhand home">
+      <svg class="mark" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="14" fill="#b4410e"/><line x1="14" y1="14" x2="19.5" y2="7.5" stroke="#fffdf8" stroke-width="3" stroke-linecap="round"/><circle cx="14" cy="14" r="2.4" fill="#f2a93b"/></svg>
+      hourhand
+    </a>
+    <a class="btn ghost" href="#pricing">Pricing</a>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <h1>Your booking link, kept in sync. And a person when it isn’t.</h1>
+        <p class="lede">One link for coaches, tutors and therapists. It shows only the times you’re really free, and a real person answers if anything goes wrong.</p>
+        <a class="btn" href="#start">Start free</a>
+        <p class="note">Free for one person. No card needed.</p>
+      </div>
+      <div class="panel" role="img" aria-label="Example booking page showing a green sync light and open time slots">
+        <h3>45-min coaching session</h3>
+        <p class="sub">with Priya · video call</p>
+        <div class="sync"><span class="dot"></span>Google Calendar · in sync, checked 2 min ago</div>
+        <div class="slots">
+          <span class="slot">9:00 am</span><span class="slot on">10:30 am</span><span class="slot">12:00 pm</span>
+          <span class="slot">2:00 pm</span><span class="slot">3:30 pm</span><span class="slot">5:00 pm</span>
+        </div>
+        <p class="tz">Thu 14 Nov · times in IST (your time)</p>
+      </div>
+    </div>
+
+    <section aria-labelledby="problem">
+      <h2 id="problem">Two things a booking tool should never do</h2>
+      <div class="grid" style="grid-template-columns:1fr">
+        <div class="card"><h3>Say you’re free when you’re not</h3><p>A calendar quietly stops syncing, a client books over another session, and you find out when two people turn up.</p></div>
+        <div class="card"><h3>Go silent when it breaks</h3><p>You get a bot, a help article or a script. And cancelling turns out to be harder than signing up was.</p></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="how">
+      <h2 id="how">How it works</h2>
+      <ol class="steps">
+        <li><b>Connect your calendars</b>Google, Outlook or iCloud. Each one gets a sync light.</li>
+        <li><b>Share your link</b>On WhatsApp, Instagram or your site. Clients pick a time you’re actually free.</li>
+        <li><b>Show up</b>It lands in your calendar with the video link, and you both get a reminder.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="features">
+      <h2 id="features">Built around what goes wrong</h2>
+      <div class="grid">
+        <div class="card"><h3>The sync light</h3><p>Green for every calendar. If one disconnects, bookings pause and you get a WhatsApp alert.</p></div>
+        <div class="card"><h3>People, not a bot</h3><p>A human reply within one working day, on every plan.</p></div>
+        <div class="card"><h3>One-tap cancel</h3><p>A reminder 7 days before every renewal. Pausing really pauses billing.</p></div>
+        <div class="card"><h3>Availability that holds</h3><p>Date overrides, block a whole week, recurring sessions and one-off links, from your phone.</p></div>
+        <div class="card"><h3>Duo for two</h3><p>You and an assistant for one flat price, not two seats.</p></div>
+        <div class="card"><h3>No time zone guesswork</h3><p>Every time shows its zone, with AM/PM or 24-hour clocks.</p></div>
+      </div>
+      <p class="extras">Also included: payments at booking (Razorpay or Stripe), video links, WhatsApp, SMS and email reminders, buffers between sessions.</p>
+    </section>
+
+    <section id="pricing" aria-labelledby="price-h">
+      <h2 id="price-h">Simple pricing</h2>
+      <div class="toggle" role="group" aria-label="Currency">
+        <button type="button" aria-pressed="true" data-cur="inr">₹ INR</button>
+        <button type="button" aria-pressed="false" data-cur="usd">$ USD</button>
+      </div>
+      <div class="plans">
+        <div class="plan">
+          <h3>Free</h3><p class="for">For trying it, or a light schedule</p>
+          <div class="price" data-inr="₹0" data-usd="$0">₹0</div><p class="gst">&nbsp;</p>
+          <ul><li>1 person, unlimited booking links</li><li>2 calendars with sync light</li><li>Email reminders</li></ul>
+          <a class="btn ghost" href="#start">Start free</a>
+        </div>
+        <div class="plan rec">
+          <span class="badge">Most people pick this</span>
+          <h3>Solo</h3><p class="for">For a coach, tutor or therapist</p>
+          <div class="price" data-inr="₹399<small> /month</small>" data-usd="$7<small> /month</small>">₹399<small> /month</small></div>
+          <p class="gst" data-inr="+ 18% GST · or ₹3,990/year" data-usd="or $70/year">+ 18% GST · or ₹3,990/year</p>
+          <ul><li>Unlimited calendars</li><li>Sync alerts on WhatsApp and email</li><li>300 WhatsApp/SMS reminders a month</li><li>Payments at booking, no footer</li><li>Human reply within 1 working day</li></ul>
+          <a class="btn" href="#start">Start Solo</a>
+        </div>
+        <div class="plan">
+          <h3>Duo</h3><p class="for">For you and an assistant, or two co-hosts</p>
+          <div class="price" data-inr="₹599<small> /month</small>" data-usd="$11<small> /month</small>">₹599<small> /month</small></div>
+          <p class="gst" data-inr="+ 18% GST · or ₹5,990/year" data-usd="or $110/year">+ 18% GST · or ₹5,990/year</p>
+          <ul><li>Everything in Solo, for 2 people</li><li>Shared calendar</li><li>600 reminders a month</li><li>Extra person ₹249/month</li></ul>
+          <a class="btn ghost" href="#start">Start Duo</a>
+        </div>
+      </div>
+      <p class="reassure">Cancel in one tap. We’ll remind you before every renewal.</p>
+    </section>
+
+    <section aria-labelledby="faq">
+      <h2 id="faq">Questions</h2>
+      <details><summary>What happens if my calendar stops syncing?</summary><p>Bookings pause for that calendar, you get an alert, and the light turns red until you reconnect. Nobody can book a time we can’t check.</p></details>
+      <details><summary>Can I move my existing booking links over?</summary><p>Yes. Recreate your event types in a few minutes, then swap the link in your bio. There’s no automatic importer yet.</p></details>
+      <details><summary>Do you send WhatsApp reminders?</summary><p>Yes, on Solo and Duo, with 300 or 600 a month included.</p></details>
+      <details><summary>How do I cancel?</summary><p>Settings › Plan › Cancel. One tap. You keep access until the end of the period you’ve paid for.</p></details>
+      <details><summary>Who answers support?</summary><p>A person, within one working day.</p></details>
+      <details><summary>Is GST included?</summary><p>No. Prices are shown before GST, and the invoice shows the 18% separately with your GSTIN.</p></details>
+    </section>
+
+    <section class="final" id="start">
+      <h2>Book clients without double-checking your calendar.</h2>
+      <a class="btn" href="#">Start free</a>
+      <p class="note">No card needed.</p>
+    </section>
+  </main>
+
+  <footer>© 2026 Hourhand · Privacy · Terms · Support</footer>
+</div>
+<script>
+document.querySelectorAll('.toggle button').forEach(b=>b.addEventListener('click',()=>{
+  const cur=b.dataset.cur;
+  document.querySelectorAll('.toggle button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  document.querySelectorAll('[data-inr]').forEach(el=>{el.innerHTML=el.dataset[cur]});
+}));
+</script>
+</body>
+</html>
