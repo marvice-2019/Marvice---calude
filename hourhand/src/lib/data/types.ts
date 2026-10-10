@@ -167,4 +167,11 @@ export interface DataStore {
   cancelBooking(bookingId: string, by: "host" | "guest", reason?: string): Promise<BookingWithInvitee>;
   /** Atomically books `startAt` for the same guest and cancels the old booking. The overlap check ignores the old booking. */
   rescheduleBooking(bookingId: string, startAt: Date, idempotencyKey: string): Promise<BookingWithInvitee>;
+  /** Replaces the weekly rules: weekday (0 = Sunday) to its ranges. Days left out or empty are unavailable. */
+  saveWeeklyHours(scheduleId: string, byWeekday: Record<number, Interval[]>): Promise<void>;
+  /** Sets one date's hours, replacing any override for that date. Empty intervals = unavailable all day. */
+  saveDateOverride(scheduleId: string, date: string, intervals: Interval[]): Promise<void>;
+  deleteDateOverride(scheduleId: string, date: string): Promise<void>;
+  /** Marks every date from `from` to `to` (both included, YYYY-MM-DD) unavailable. */
+  blockDateRange(scheduleId: string, from: string, to: string): Promise<void>;
 }

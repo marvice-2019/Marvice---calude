@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { datesInRange } from "../availability";
 import { overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
-import { SlotTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore } from "./types";
+import { SlotTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type Interval } from "./types";
 
 const MIN = 60_000;
 
@@ -112,5 +113,26 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       }
       return booking;
     },
+    async saveWeeklyHours(scheduleId, byWeekday) {
+      db.rules = db.rules.filter((r) => !(r.scheduleId === scheduleId && r.kind === "weekly"));
+      for (const [day, intervals] of Object.entries(byWeekday)) {
+        if (intervals.length === 0) continue;
+        db.rules.push({ id: randomUUID(), scheduleId, kind: "weekly", weekday: Number(day), onDate: null, intervals: intervals.map((i) => ({ ...i })) });
+      }
+    },
+    async saveDateOverride(scheduleId, date, intervals) {
+      setOverride(scheduleId, date, intervals);
+    },
+    async deleteDateOverride(scheduleId, date) {
+      db.rules = db.rules.filter((r) => !(r.scheduleId === scheduleId && r.kind === "date" && r.onDate === date));
+    },
+    async blockDateRange(scheduleId, from, to) {
+      for (const date of datesInRange(from, to)) setOverride(scheduleId, date, []);
+    },
   };
+
+  function setOverride(scheduleId: string, date: string, intervals: Interval[]) {
+    db.rules = db.rules.filter((r) => !(r.scheduleId === scheduleId && r.kind === "date" && r.onDate === date));
+    db.rules.push({ id: randomUUID(), scheduleId, kind: "date", weekday: null, onDate: date, intervals: intervals.map((i) => ({ ...i })) });
+  }
 }
