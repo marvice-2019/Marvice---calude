@@ -19,3 +19,6 @@ node_modules/
 .harnesskit/
 .superstack/
 # designlog plugin hook log (local-only)
+# Python bytecode
+__pycache__/
+*.pyc
