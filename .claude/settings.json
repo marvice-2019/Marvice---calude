@@ -28,8 +28,8 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/sdd-cache-post.sh\"",
-            "async": true,
-            "timeout": 10
+            "timeout": 10,
+            "async": true
           }
         ]
       },
@@ -53,5 +53,16 @@
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "brag": {
+      "source": {
+        "source": "github",
+        "repo": "latent-spaces/brag"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "brag@brag": true
   }
 }
