@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { datesInRange } from "../availability";
 import { overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
-import { SlotTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type Interval } from "./types";
+import {
+  EventTypeInUseError, SlotTakenError, SlugTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft,
+  type Interval,
+} from "./types";
 
 const MIN = 60_000;
 
@@ -34,6 +37,27 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, createdAt: new Date(),
       invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", "") },
     };
+  }
+
+  function owned(userId: string, id: string): EventType {
+    const eventType = db.eventTypes.find((e) => e.userId === userId && e.id === id);
+    if (!eventType) throw new Error(`Unknown event type ${id}`);
+    return eventType;
+  }
+
+  /** Same rule as unique (user_id, slug). */
+  function assertSlugFree(userId: string, slug: string, exceptId: string | null) {
+    if (db.eventTypes.some((e) => e.userId === userId && e.slug === slug && e.id !== exceptId)) throw new SlugTakenError();
+  }
+
+  function fields(draft: EventTypeDraft): Omit<EventTypeDraft, "location"> {
+    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes } = draft;
+    return { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes };
+  }
+
+  function setLocation(eventTypeId: string, draft: EventTypeDraft) {
+    db.locations = db.locations.filter((l) => l.eventTypeId !== eventTypeId);
+    if (draft.location) db.locations.push({ id: randomUUID(), eventTypeId, ...draft.location, position: 0 });
   }
 
   return {
@@ -128,6 +152,44 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     },
     async blockDateRange(scheduleId, from, to) {
       for (const date of datesInRange(from, to)) setOverride(scheduleId, date, []);
+    },
+    async createEventType(userId, draft) {
+      assertSlugFree(userId, draft.slug, null);
+      const mine = db.eventTypes.filter((e) => e.userId === userId);
+      const eventType: EventType = {
+        id: randomUUID(), userId, scheduleId: db.schedules.find((s) => s.userId === userId && s.isDefault)?.id ?? null,
+        ...fields(draft), hidden: false, active: true, position: Math.max(-1, ...mine.map((e) => e.position)) + 1,
+      };
+      db.eventTypes.push(eventType);
+      setLocation(eventType.id, draft);
+      return eventType;
+    },
+    async updateEventType(userId, id, draft) {
+      const eventType = owned(userId, id);
+      assertSlugFree(userId, draft.slug, id);
+      Object.assign(eventType, fields(draft));
+      setLocation(id, draft);
+      return eventType;
+    },
+    async setEventTypeActive(userId, id, active) {
+      return Object.assign(owned(userId, id), { active });
+    },
+    async deleteEventType(userId, id, now = new Date()) {
+      owned(userId, id);
+      const used = db.bookings.filter((b) => b.eventTypeId === id);
+      const upcoming = used.filter((b) => b.status === "confirmed" && b.startAt.getTime() > now.getTime()).length;
+      if (upcoming > 0) throw new EventTypeInUseError("upcoming", upcoming);
+      if (used.length > 0) throw new EventTypeInUseError("history", 0);
+      db.eventTypes = db.eventTypes.filter((e) => e.id !== id);
+      db.locations = db.locations.filter((l) => l.eventTypeId !== id);
+      db.questions = db.questions.filter((q) => q.eventTypeId !== id);
+    },
+    async saveQuestions(eventTypeId, questions) {
+      const saved = questions.map((q, position) => ({
+        id: q.id ?? randomUUID(), eventTypeId, label: q.label, kind: q.kind, required: q.required, choices: [...q.choices], position,
+      }));
+      db.questions = [...db.questions.filter((q) => q.eventTypeId !== eventTypeId), ...saved];
+      return saved;
     },
   };
 

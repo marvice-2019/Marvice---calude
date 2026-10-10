@@ -174,4 +174,41 @@ export interface DataStore {
   deleteDateOverride(scheduleId: string, date: string): Promise<void>;
   /** Marks every date from `from` to `to` (both included, YYYY-MM-DD) unavailable. */
   blockDateRange(scheduleId: string, from: string, to: string): Promise<void>;
+  /** Throws SlugTakenError when the user already has an event type with that slug (unique (user_id, slug)). */
+  createEventType(userId: string, draft: EventTypeDraft): Promise<EventType>;
+  updateEventType(userId: string, id: string, draft: EventTypeDraft): Promise<EventType>;
+  setEventTypeActive(userId: string, id: string, active: boolean): Promise<EventType>;
+  /** Throws EventTypeInUseError while bookings still point at it (bookings.event_type_id is on delete restrict). */
+  deleteEventType(userId: string, id: string, now?: Date): Promise<void>;
+  /** Replaces the event type's questions; list order becomes position. */
+  saveQuestions(eventTypeId: string, questions: QuestionDraft[]): Promise<CustomQuestion[]>;
+}
+
+/** The editable fields of an event type, already validated. */
+export type EventTypeDraft = Pick<EventType,
+  "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes"> & {
+  location: { kind: LocationKind; value: string | null } | null;
+};
+
+/** A question as edited; `id` is null for a new one. */
+export type QuestionDraft = Pick<CustomQuestion, "label" | "kind" | "required" | "choices"> & { id: string | null };
+
+export class SlugTakenError extends Error {
+  readonly code = "slug_taken";
+  constructor() {
+    super("That link is already used by another event type");
+    this.name = "SlugTakenError";
+  }
+}
+
+/** "upcoming": confirmed bookings still ahead. "history": only past or cancelled bookings, which must be kept. */
+export class EventTypeInUseError extends Error {
+  readonly code = "event_type_in_use";
+  constructor(readonly reason: "upcoming" | "history", readonly upcomingCount: number) {
+    super(reason === "upcoming"
+      ? `This event type has ${upcomingCount} upcoming ${upcomingCount === 1 ? "booking" : "bookings"}. Cancel or move ${upcomingCount === 1 ? "it" : "them"} first, or turn the link off to stop new bookings.`
+      : "Past bookings were made with this event type, so it stays in your history. Turn the link off to stop new bookings.");
+    this.name = "EventTypeInUseError";
+  }
 }
