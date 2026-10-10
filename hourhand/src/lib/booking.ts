@@ -1,5 +1,5 @@
 import { computeSlots, isSyncStale } from "./slots";
-import { SlotTakenError, type DataStore, type EventType, type User } from "./data/types";
+import { SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -157,4 +157,11 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
     if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, req.start, now);
     throw err;
   }
+}
+
+/** Upcoming bookings soonest first, then past ones most recent first. */
+export function upcomingFirst<B extends Pick<Booking, "endAt">>(bookings: B[], at: Date = new Date()): { bookings: B[]; now: number } {
+  const now = at.getTime();
+  const byStart = [...bookings].sort((a, b) => a.endAt.getTime() - b.endAt.getTime());
+  return { bookings: [...byStart.filter((b) => b.endAt.getTime() >= now), ...byStart.filter((b) => b.endAt.getTime() < now).reverse()], now };
 }
