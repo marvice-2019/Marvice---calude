@@ -5,7 +5,7 @@ import { buildSeed } from "./seed";
 import { SlotTakenError } from "./types";
 
 const NOW = new Date("2026-10-10T06:00:00Z");
-const guest = { name: "Meera Iyer", email: "meera@example.com", timezone: "Asia/Kolkata" };
+const guest = { name: "Meera Iyer", email: "meera@example.com", timezone: "Asia/Kolkata", phone: null, answers: [] };
 
 async function setup() {
   const store = createMemoryStore(buildSeed(NOW));

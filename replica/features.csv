@@ -14,20 +14,20 @@ Multiple duration options on one event type,event types,should,yes,no,S05; help 
 Buffers before and after meetings,event types,must,yes,yes,"slot engine + booking overlap check, tested"
 Daily / weekly booking limits,event types,should,yes,no,S06; help meeting limits
 Hidden event types (link only),event types,should,yes,no,S04; API EventType hidden flag
-Custom questions on the booking form,booking,must,yes,partial,required questions enforced on the form; answers not saved to the invitee yet
+Custom questions on the booking form,booking,must,yes,yes,required questions enforced; answers saved with question label and shown to host
 "Group event type (one host, many invitees, seat limit)",event types,could,yes,no,S05; API kind=group
 Public profile page listing event types,booking,must,yes,yes,"S13 lists active, non-hidden event types"
-"Booking page: date picker, slots, guest time zone, 12h/24h",booking,must,yes,partial,"S14 built; guest zone detect + picker, 12h only (no 24h toggle yet)"
-Guest details form with add-guests and text-reminder phone,booking,must,yes,partial,"S15 built; phone validated but not saved, no add-guests yet"
+"Booking page: date picker, slots, guest time zone, 12h/24h",booking,must,yes,yes,"S14: calendar, guest zone + picker, 12h/24h toggle remembered per browser"
+Guest details form with add-guests and text-reminder phone,booking,must,yes,partial,S15: phone + answers saved; add-guests not built
 Confirmation page with add-to-calendar and optional redirect,booking,must,yes,partial,S16 summary + manage link; no add-to-calendar file or redirect yet
-"Guest cancel via emailed link, with reason",booking,must,yes,no,"S17; API cancel_url, Cancellation"
-Guest reschedule via emailed link,booking,must,yes,no,"S18; API reschedule_url, old/new invitee"
-Cancellation policy text and cut-off,booking,should,yes,no,help add a cancellation policy
+"Guest cancel via emailed link, with reason",booking,must,yes,partial,"S17 works with reason + cut-off; link shown on confirmation page, no email sent yet"
+Guest reschedule via emailed link,booking,must,yes,partial,"S18 works (atomic move, new link, retry-safe); no email sent yet"
+Cancellation policy text and cut-off,booking,should,yes,partial,cut-off enforced on cancel; no policy text field in the UI yet
 Prefill guest details via link parameters,booking,could,yes,no,help prefill
 Embed booking page on a website (inline / popup),sharing,should,yes,no,help embed options
 One-off meeting and single-use links,sharing,should,yes,no,S19; API one-off event type; help single-use
 "Meetings list: upcoming, past, cancelled",host,must,yes,yes,"S11 lists bookings upcoming first, cancelled marked"
-"Meeting detail with cancel, reschedule, mark no-show",host,must,yes,no,"S12; API no-show, cancellation"
+"Meeting detail with cancel, reschedule, mark no-show",host,must,yes,partial,"S12 shows guest, phone, answers; host actions not built"
 Confirmation email + calendar invite to host and guest,notifications,must,yes,no,F10; help scheduling notifications
 "Reminders before the meeting (email, text)",notifications,must,yes,no,F10; help automations
 "Video link auto-created (Google Meet, Zoom)",integrations,should,yes,no,S20; API conference location

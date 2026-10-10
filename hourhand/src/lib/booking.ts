@@ -23,8 +23,11 @@ function parseInstant(value: unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Free slot starts for one public event type, using everything the engine needs from the store. */
-export async function freeSlots(store: DataStore, host: User, eventType: EventType, from: Date, to: Date, now: Date): Promise<Date[]> {
+/**
+ * Free slot starts for one public event type, using everything the engine needs from the store.
+ * `movingId` is a booking being rescheduled: its own time doesn't block the slots it could move to.
+ */
+export async function freeSlots(store: DataStore, host: User, eventType: EventType, from: Date, to: Date, now: Date, movingId: string | null = null): Promise<Date[]> {
   const [{ schedule, rules }, connections, busyBlocks, bookings] = await Promise.all([
     store.getDefaultSchedule(host.id),
     store.listCalendarConnections(host.id),
@@ -32,12 +35,16 @@ export async function freeSlots(store: DataStore, host: User, eventType: EventTy
     store.listBookings(host.id),
   ]);
   return computeSlots({
-    eventType, schedule, rules, busyBlocks, bookings, now, rangeStart: from, rangeEnd: to,
+    eventType, schedule, rules, busyBlocks, bookings: bookings.filter((b) => b.id !== movingId), now, rangeStart: from, rangeEnd: to,
     syncStale: isSyncStale(connections, now),
   });
 }
 
-/** GET /api/slots?slug=&event=&from=&to=&tz= */
+/**
+ * GET /api/slots?slug=&event=&from=&to=&tz=&token=
+ * `token` is an optional manage token: when it names a confirmed booking for this host and event,
+ * that booking's own time doesn't hide slots. Any other token is ignored.
+ */
 export async function handleGetSlots(store: DataStore, params: URLSearchParams, now: Date): Promise<HandlerResult> {
   const errors: Record<string, string> = {};
   const slug = params.get("slug") ?? "";
@@ -57,7 +64,10 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
 
   const found = await store.getPublicEventType(slug, event);
   if (!found) return { status: 404, body: { error: "not_found" } };
-  const slots = await freeSlots(store, found.host, found.eventType, from, to, now);
+  const token = params.get("token");
+  const moving = token ? await store.getBookingByManageToken(token) : null;
+  const movingId = moving && moving.status === "confirmed" && moving.hostId === found.host.id && moving.eventTypeId === found.eventType.id ? moving.id : null;
+  const slots = await freeSlots(store, found.host, found.eventType, from, to, now, movingId);
   return { status: 200, body: { timezone: tz ?? found.host.timezone, slots: slots.map((s) => s.toISOString()) } };
 }
 
@@ -95,7 +105,8 @@ export function validateBookingRequest(input: unknown): Validation {
   if (!EMAIL.test(email) || email.length > 254) fields.email = "Enter a valid email address.";
   if (!isIanaTimeZone(body.timezone)) fields.timezone = "Pick a valid time zone.";
   if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) fields.phone = "Enter a phone number with country code, like +91 98765 43210.";
-  if (idempotencyKey.length < 8 || idempotencyKey.length > 100) fields.idempotencyKey = "Missing request key.";
+  if (!idempotencyKey) fields.idempotencyKey = "Missing request key.";
+  else if (idempotencyKey.length < 8 || idempotencyKey.length > 100) fields.idempotencyKey = "Request key must be 8–100 characters.";
 
   const answers: Record<string, string> = {};
   if (body.answers !== undefined) {
@@ -116,9 +127,10 @@ export function validateBookingRequest(input: unknown): Validation {
   };
 }
 
-async function slotTaken(store: DataStore, host: User, eventType: EventType, after: Date, now: Date): Promise<HandlerResult> {
+/** The 409 a guest sees when their time is gone, with the next three open times after it. */
+export async function slotTaken(store: DataStore, host: User, eventType: EventType, after: Date, now: Date, movingId: string | null = null): Promise<HandlerResult> {
   const windowEnd = new Date(now.getTime() + eventType.bookingWindowDays * DAY);
-  const slots = await freeSlots(store, host, eventType, now, windowEnd, now);
+  const slots = await freeSlots(store, host, eventType, now, windowEnd, now, movingId);
   const later = slots.filter((s) => s >= after);
   const nextSlots = (later.length > 0 ? later : slots).slice(0, 3).map((s) => s.toISOString());
   return { status: 409, body: { error: "slot_taken", nextSlots } };
@@ -138,7 +150,8 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
   if (existing) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
 
-  const missing = (await store.listCustomQuestions(eventType.id)).filter((q) => q.required && !req.answers[q.id]);
+  const questions = await store.listCustomQuestions(eventType.id);
+  const missing = questions.filter((q) => q.required && !req.answers[q.id]);
   if (missing.length > 0) {
     return { status: 400, body: { error: "invalid_request", fields: Object.fromEntries(missing.map((q) => [`answers.${q.id}`, "This one is required."])) } };
   }
@@ -150,7 +163,10 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   try {
     const booking = await store.createBooking({
       eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey,
-      invitee: { name: req.name, email: req.email, timezone: req.timezone },
+      invitee: {
+        name: req.name, email: req.email, timezone: req.timezone, phone: req.phone,
+        answers: questions.filter((q) => req.answers[q.id]).map((q) => ({ questionId: q.id, label: q.label, answer: req.answers[q.id] })),
+      },
     });
     return { status: 201, body: { bookingId: booking.id, manageToken: booking.invitee.manageToken } };
   } catch (err) {

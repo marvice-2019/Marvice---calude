@@ -44,6 +44,41 @@ describe("handleGetSlots", () => {
     const params = new URLSearchParams({ slug: "priya", event: "nope", from: now.toISOString(), to: new Date(now.getTime() + DAY).toISOString() });
     expect((await handleGetSlots(fresh(), params, now)).status).toBe(404);
   });
+
+  describe("with a manage token", () => {
+    async function setup() {
+      const store = fresh();
+      const before = await firstSlots(store);
+      const created = await handleCreateBooking(store, good(before[0], "key-token-0001"), now);
+      const { manageToken } = created.body as { manageToken: string };
+      const booked = (await store.getBookingByManageToken(manageToken))!;
+      const slotsFor = async (token?: string) => {
+        const params = new URLSearchParams({ slug: "priya", event: "coaching", from: now.toISOString(), to: new Date(now.getTime() + 14 * DAY).toISOString() });
+        if (token !== undefined) params.set("token", token);
+        return ((await handleGetSlots(store, params, now)).body as { slots: string[] }).slots;
+      };
+      // A slot whose start falls inside the booking's buffered window.
+      const overlapping = before.find((s) => s !== before[0] && new Date(s) >= booked.bufferedStart && new Date(s) < booked.bufferedEnd)!;
+      return { slotsFor, manageToken, overlapping };
+    }
+
+    it("hides a slot overlapping the booking without a token", async () => {
+      const { slotsFor, overlapping } = await setup();
+      expect(overlapping).toBeDefined();
+      expect(await slotsFor()).not.toContain(overlapping);
+    });
+    it("includes that slot when the booking's own token is given", async () => {
+      const { slotsFor, manageToken, overlapping } = await setup();
+      expect(await slotsFor(manageToken)).toContain(overlapping);
+    });
+    it("ignores a bogus token", async () => {
+      const { slotsFor, overlapping } = await setup();
+      const slots = await slotsFor("not-a-real-token");
+      expect(slots).not.toContain(overlapping);
+      expect(slots).toEqual(await slotsFor());
+    });
+  });
+
 });
 
 describe("handleCreateBooking", () => {
@@ -83,5 +118,31 @@ describe("handleCreateBooking", () => {
     expect(bad).toMatchObject({ status: 400, body: { fields: { email: expect.any(String) } } });
     const noAnswer = await handleCreateBooking(store, { ...good(first), answers: {} }, now);
     expect(noAnswer).toMatchObject({ status: 400, body: { fields: { "answers.q_goal": expect.any(String) } } });
+  });
+});
+
+describe("invitee phone and answers", () => {
+  it("round-trip through handleCreateBooking into the store", async () => {
+    const store = fresh();
+    const [slot] = await firstSlots(store);
+    const res = await handleCreateBooking(store, { ...good(slot, "key-phone-0001"), phone: "+91 98765 43210" }, now);
+    expect(res.status).toBe(201);
+    const saved = await store.getBookingByManageToken((res.body as { manageToken: string }).manageToken);
+    expect(saved?.invitee.phone).toBe("+91 98765 43210");
+    expect(saved?.invitee.answers).toEqual([{ questionId: "q_goal", label: "What would you like to work on?", answer: "Planning a career move." }]);
+  });
+  it("stores a null phone when none is given", async () => {
+    const store = fresh();
+    const [slot] = await firstSlots(store);
+    const res = await handleCreateBooking(store, good(slot, "key-phone-0002"), now);
+    const saved = await store.getBookingByManageToken((res.body as { manageToken: string }).manageToken);
+    expect(saved?.invitee.phone).toBeNull();
+  });
+});
+
+describe("request key message", () => {
+  it("says missing when absent and gives the length rule when too short", () => {
+    expect(validateBookingRequest({ ...good("2026-10-20T05:30:00.000Z"), idempotencyKey: "" })).toMatchObject({ fields: { idempotencyKey: "Missing request key." } });
+    expect(validateBookingRequest({ ...good("2026-10-20T05:30:00.000Z"), idempotencyKey: "short" })).toMatchObject({ fields: { idempotencyKey: "Request key must be 8–100 characters." } });
   });
 });
