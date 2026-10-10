@@ -6,7 +6,7 @@ import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { FOOTAGE_PROVIDERS, TEXT_PROVIDERS } from "./providers.mjs";
+import { FOOTAGE_PROVIDERS, TEXT_PROVIDERS, enabledModel } from "./providers.mjs";
 import {
   COMPOSITION_SYSTEM,
   FOOTAGE_SYSTEM,
@@ -50,11 +50,13 @@ export function listJobs() {
 
 export const getJob = (id) => jobs.get(id);
 
-export async function createJob({ prompt, size, duration, text, footage }) {
+export async function createJob({ prompt, size, duration, text, model, footage, footageModel }) {
   if (!prompt?.trim()) throw new Error("Type what the video should show.");
   if (!SIZES[size]) throw new Error("Unknown size.");
-  if (!TEXT_PROVIDERS[text]?.enabled()) throw new Error("That AI model is not configured.");
-  if (footage && !FOOTAGE_PROVIDERS[footage]?.enabled()) throw new Error("That footage AI is not configured.");
+  const writer = enabledModel(TEXT_PROVIDERS, text, model);
+  if (!writer) throw new Error("That AI model is not configured.");
+  const clipModel = footage ? enabledModel(FOOTAGE_PROVIDERS, footage, footageModel) : null;
+  if (footage && !clipModel) throw new Error("That footage AI is not configured.");
   const seconds = Math.min(Math.max(Number(duration) || 15, 4), 120);
 
   const createdAt = new Date().toISOString();
@@ -66,8 +68,10 @@ export async function createJob({ prompt, size, duration, text, footage }) {
     size,
     duration: seconds,
     text,
-    model: TEXT_PROVIDERS[text].model(),
+    model: writer.id,
     footage: footage || null,
+    footageModel: clipModel?.id ?? null,
+    clipSeconds: clipModel?.clipSeconds ?? null,
     status: "queued",
     log: [],
     createdAt,
@@ -123,21 +127,22 @@ async function produce(job) {
 
   if (job.footage) {
     const maker = FOOTAGE_PROVIDERS[job.footage];
-    const shots = Math.min(MAX_CLIPS, Math.ceil(job.duration / maker.clipSeconds));
+    const shots = Math.min(MAX_CLIPS, Math.ceil(job.duration / job.clipSeconds));
     await step(job, "planning", `Planning ${shots} footage shot(s) with ${writer.label}…`);
     const plan = extractJson(await ask(FOOTAGE_SYSTEM, footageRequest({ ...job, shots })));
     const prompts = (plan.shots ?? []).slice(0, shots);
     if (!prompts.length) throw new Error("No footage shots were planned.");
     for (const [i, prompt] of prompts.entries()) {
       const file = `clip-${i + 1}.mp4`;
-      await step(job, "footage", `Generating footage ${i + 1}/${prompts.length} with ${maker.label}…`);
+      await step(job, "footage", `Generating footage ${i + 1}/${prompts.length} with ${maker.label} (${job.footageModel})…`);
       await maker.generate({
         prompt,
         aspect: SIZES[job.size].footageAspect,
+        model: job.footageModel,
         outPath: join(dir, "assets", file),
         log: (msg) => log(job, msg),
       });
-      clips.push({ file, prompt, seconds: maker.clipSeconds });
+      clips.push({ file, prompt, seconds: job.clipSeconds });
     }
   }
 

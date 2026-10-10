@@ -1,0 +1,8 @@
+# Basic-auth gate in front of Open Generative AI. With MUAPI_API_KEY set, anyone who
+# reaches the app spends the company's MuAPI credits, so it is only reachable through here.
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY auth-entrypoint.sh /usr/local/bin/auth-entrypoint.sh
+RUN chmod +x /usr/local/bin/auth-entrypoint.sh
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/auth-entrypoint.sh"]
