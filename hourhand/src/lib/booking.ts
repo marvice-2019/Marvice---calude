@@ -23,8 +23,11 @@ function parseInstant(value: unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Free slot starts for one public event type, using everything the engine needs from the store. */
-export async function freeSlots(store: DataStore, host: User, eventType: EventType, from: Date, to: Date, now: Date): Promise<Date[]> {
+/**
+ * Free slot starts for one public event type, using everything the engine needs from the store.
+ * `movingId` is a booking being rescheduled: its own time doesn't block the slots it could move to.
+ */
+export async function freeSlots(store: DataStore, host: User, eventType: EventType, from: Date, to: Date, now: Date, movingId: string | null = null): Promise<Date[]> {
   const [{ schedule, rules }, connections, busyBlocks, bookings] = await Promise.all([
     store.getDefaultSchedule(host.id),
     store.listCalendarConnections(host.id),
@@ -32,7 +35,7 @@ export async function freeSlots(store: DataStore, host: User, eventType: EventTy
     store.listBookings(host.id),
   ]);
   return computeSlots({
-    eventType, schedule, rules, busyBlocks, bookings, now, rangeStart: from, rangeEnd: to,
+    eventType, schedule, rules, busyBlocks, bookings: bookings.filter((b) => b.id !== movingId), now, rangeStart: from, rangeEnd: to,
     syncStale: isSyncStale(connections, now),
   });
 }
@@ -117,9 +120,10 @@ export function validateBookingRequest(input: unknown): Validation {
   };
 }
 
-async function slotTaken(store: DataStore, host: User, eventType: EventType, after: Date, now: Date): Promise<HandlerResult> {
+/** The 409 a guest sees when their time is gone, with the next three open times after it. */
+export async function slotTaken(store: DataStore, host: User, eventType: EventType, after: Date, now: Date, movingId: string | null = null): Promise<HandlerResult> {
   const windowEnd = new Date(now.getTime() + eventType.bookingWindowDays * DAY);
-  const slots = await freeSlots(store, host, eventType, now, windowEnd, now);
+  const slots = await freeSlots(store, host, eventType, now, windowEnd, now, movingId);
   const later = slots.filter((s) => s >= after);
   const nextSlots = (later.length > 0 ? later : slots).slice(0, 3).map((s) => s.toISOString());
   return { status: 409, body: { error: "slot_taken", nextSlots } };

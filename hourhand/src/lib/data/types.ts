@@ -37,6 +37,8 @@ export interface EventType {
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
   dailyLimit: number | null;
+  /** Guests can't cancel online once the start is closer than this. 0 = any time before the start. */
+  cancelCutoffMinutes: number;
   hidden: boolean;
   active: boolean;
   position: number;
@@ -77,6 +79,8 @@ export interface Booking {
   cancelledAt: Date | null;
   cancelledBy: "host" | "guest" | "system" | null;
   cancelReason: string | null;
+  /** The booking this one replaced when a guest rescheduled. */
+  rescheduledFromId: string | null;
   createdAt: Date;
 }
 
@@ -146,6 +150,7 @@ export class SlotTakenError extends Error {
 export interface DataStore {
   getCurrentUser(): Promise<User>;
   getUserBySlug(slug: string): Promise<User | null>;
+  getUser(id: string): Promise<User | null>;
   listEventTypes(userId: string): Promise<EventType[]>;
   getEventType(userId: string, id: string): Promise<EventType | null>;
   getPublicEventType(hostSlug: string, eventSlug: string): Promise<{ host: User; eventType: EventType } | null>;
@@ -160,4 +165,6 @@ export interface DataStore {
   getBookingByManageToken(token: string): Promise<BookingWithInvitee | null>;
   createBooking(input: CreateBookingInput): Promise<BookingWithInvitee>;
   cancelBooking(bookingId: string, by: "host" | "guest", reason?: string): Promise<BookingWithInvitee>;
+  /** Atomically books `startAt` for the same guest and cancels the old booking. The overlap check ignores the old booking. */
+  rescheduleBooking(bookingId: string, startAt: Date, idempotencyKey: string): Promise<BookingWithInvitee>;
 }

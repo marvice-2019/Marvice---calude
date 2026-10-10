@@ -10,9 +10,37 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   const db = structuredClone(seed);
   const host = db.users[0];
 
+  /** Builds a confirmed booking after the overlap check. `movingId` is the booking being rescheduled, which the check skips. */
+  function build(input: CreateBookingInput, movingId: string | null): BookingWithInvitee {
+    const et = db.eventTypes.find((e) => e.id === input.eventTypeId);
+    if (!et) throw new Error(`Unknown event type ${input.eventTypeId}`);
+
+    const startAt = input.startAt;
+    const endAt = new Date(startAt.getTime() + et.durationMinutes * MIN);
+    const bufferedStart = new Date(startAt.getTime() - et.bufferBeforeMinutes * MIN);
+    const bufferedEnd = new Date(endAt.getTime() + et.bufferAfterMinutes * MIN);
+    // Same rule as the exclusion constraint: no two confirmed bookings of one host overlap, buffers included.
+    const clash = db.bookings.some(
+      (b) => b.hostId === et.userId && b.status === "confirmed" && b.id !== movingId &&
+        overlaps(bufferedStart.getTime(), bufferedEnd.getTime(), b.bufferedStart.getTime(), b.bufferedEnd.getTime()),
+    );
+    if (clash) throw new SlotTakenError();
+
+    const id = randomUUID();
+    return {
+      id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed",
+      locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null,
+      idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, createdAt: new Date(),
+      invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", "") },
+    };
+  }
+
   return {
     async getCurrentUser() {
       return host;
+    },
+    async getUser(id) {
+      return db.users.find((u) => u.id === id) ?? null;
     },
     async getUserBySlug(slug) {
       return db.users.find((u) => u.slug === slug) ?? null;
@@ -60,28 +88,20 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     async createBooking(input: CreateBookingInput) {
       const repeat = db.bookings.find((b) => b.idempotencyKey === input.idempotencyKey);
       if (repeat) return repeat;
-      const et = db.eventTypes.find((e) => e.id === input.eventTypeId);
-      if (!et) throw new Error(`Unknown event type ${input.eventTypeId}`);
-
-      const startAt = input.startAt;
-      const endAt = new Date(startAt.getTime() + et.durationMinutes * MIN);
-      const bufferedStart = new Date(startAt.getTime() - et.bufferBeforeMinutes * MIN);
-      const bufferedEnd = new Date(endAt.getTime() + et.bufferAfterMinutes * MIN);
-      // Same rule as the exclusion constraint: no two confirmed bookings of one host overlap, buffers included.
-      const clash = db.bookings.some(
-        (b) => b.hostId === et.userId && b.status === "confirmed" &&
-          overlaps(bufferedStart.getTime(), bufferedEnd.getTime(), b.bufferedStart.getTime(), b.bufferedEnd.getTime()),
-      );
-      if (clash) throw new SlotTakenError();
-
-      const id = randomUUID();
-      const booking: BookingWithInvitee = {
-        id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed",
-        locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null,
-        idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, createdAt: new Date(),
-        invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", "") },
-      };
+      const booking = build(input, null);
       db.bookings.push(booking);
+      return booking;
+    },
+    async rescheduleBooking(bookingId, startAt, idempotencyKey) {
+      const repeat = db.bookings.find((b) => b.idempotencyKey === idempotencyKey);
+      if (repeat) return repeat;
+      const old = db.bookings.find((b) => b.id === bookingId);
+      if (!old) throw new Error(`Unknown booking ${bookingId}`);
+      const { name, email, timezone, phone, answers } = old.invitee;
+      // Both steps run synchronously, so no other request can see the half-done state (one transaction in Postgres).
+      const booking = build({ eventTypeId: old.eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers: answers.map((a) => ({ ...a })) } }, old.id);
+      db.bookings.push(booking);
+      Object.assign(old, { status: "cancelled", cancelledAt: new Date(), cancelledBy: "guest", cancelReason: "Rescheduled" });
       return booking;
     },
     async cancelBooking(bookingId, by, reason) {
