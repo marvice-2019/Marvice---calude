@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Marvice Studio — launch video</title>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+  /* Marvice brand, copied from creator/public/index.html */
+  :root {
+    --bg: #f6f3ee; --panel: #ffffff; --line: #e3ddd2; --text: #2d3837; --muted: #5f6b68;
+    --ink: #2d3837; --on-ink: #fbf8f3; --accent: #bd8b53; --ok: #1e6b3f;
+    --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  #root { width: 100%; height: 100%; position: relative; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); }
+  .clip { position: absolute; inset: 0; overflow: hidden; }
+  #s1 { z-index: 1; } #s2 { z-index: 2; } #s4 { z-index: 3; } #s5 { z-index: 4; }
+
+  /* ---- Scene 1: hook ---- */
+  #hook { position: absolute; left: 160px; top: 300px; }
+  #hook h1 { font-size: 168px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.02; color: var(--ink); }
+  #hook .b { color: var(--accent); }
+  #rule { width: 260px; height: 10px; background: var(--accent); margin-top: 44px; transform-origin: left center; border-radius: 2px; }
+
+  /* ---- Scene 2 + 3: the real /create page, zoomed 1.3× ---- */
+  /* 1920×1080 canvas shown at 1.6× so the page reads at video size: 1200×675 CSS px */
+  #page { position: absolute; left: 0; top: 0; width: 1200px; height: 675px; background: var(--bg); zoom: 1.6; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 14px; } .brand img { height: 40px; display: block; }
+  .brand span { font-size: 15px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); border-left: 1px solid var(--line); padding-left: 14px; }
+  header a { color: var(--muted); white-space: nowrap; font-size: 16px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 80px; font-size: 16px; line-height: 1.5; }
+  .label { display: block; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 24px 0 10px; }
+  .label:first-child { margin-top: 0; }
+  .ta { width: 100%; min-height: 120px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; font-size: 18px; line-height: 1.5; }
+  .ta.focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ch { display: none; }
+  #caret { display: inline-block; width: 2px; height: 22px; background: var(--ink); vertical-align: -4px; margin-left: 1px; }
+  .sizes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .size { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; text-align: left; display: flex; gap: 14px; align-items: center; font-size: 16px; }
+  .size.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .shape { flex: none; width: 44px; height: 44px; display: grid; place-items: center; }
+  .shape i { display: block; border: 2px solid var(--accent); border-radius: 3px; }
+  .size small { display: block; color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 16px; }
+  .row > div { flex: 1; min-width: 200px; }
+  .row > div:nth-child(2) { flex: 1.5; }   /* room for "Claude (Anthropic) · claude-opus-5-5" */
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 8px 16px; font-size: 16px; }
+  .chip.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); font-weight: 600; }
+  .select { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 11px 36px 11px 12px; font-size: 16px; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .select::after { content: ""; position: absolute; right: 14px; top: 18px; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); }
+  .go { margin-top: 28px; background: var(--ink); color: var(--on-ink); border: 0; border-radius: 12px; padding: 16px 28px; font-size: 18px; font-weight: 700; display: inline-block; }
+  h2 { margin: 56px 0 16px; font-size: 22px; }
+  .job { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; grid-template-columns: 220px 1fr; gap: 18px; position: relative; overflow: hidden; }
+  #prog { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--accent); transform-origin: left center; }
+  .slot { position: relative; aspect-ratio: 1; }
+  .ph, .vid { position: absolute; inset: 0; border-radius: 8px; }
+  .ph { background: #efe9df; display: grid; place-items: center; color: var(--muted); font-size: 14px; text-align: center; padding: 12px; line-height: 1.4; }
+  .vid { background: #000; display: grid; place-items: center; }
+  .vid i { width: 0; height: 0; border-left: 26px solid #fff; border-top: 16px solid transparent; border-bottom: 16px solid transparent; margin-left: 6px; }
+  .pills { position: relative; height: 24px; }
+  .status { position: absolute; left: 0; top: 0; font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: #f1e6d6; color: #7a5329; white-space: nowrap; }
+  .status.done { background: #e3f1e8; color: var(--ok); }
+  .meta { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .prompt { font-size: 17px; margin: 8px 0; }
+  .logs { position: relative; height: 20px; }
+  .log { position: absolute; left: 0; top: 0; font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .actions { display: flex; gap: 10px; margin-top: 12px; }
+  .actions span { border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 7px 12px; font-size: 14px; }
+
+  /* ---- Scene 4: highlights ---- */
+  #rows { position: absolute; left: 160px; top: 50%; transform: translateY(-50%); width: 1640px; display: grid; gap: 60px; }
+  .hrow { display: grid; grid-template-columns: 500px 1fr; align-items: center; gap: 40px; }
+  .hrow h3 { font-size: 84px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+  .hrow .opts { display: flex; gap: 18px; flex-wrap: wrap; }
+  .opt { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 18px 28px; font-size: 34px; display: flex; gap: 20px; align-items: center; }
+  .opt small { display: block; color: var(--muted); font-size: 22px; }
+  .opt .shape { width: 64px; height: 64px; } .opt .shape i { border-width: 3px; }
+  .opt.on { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+  .opt.pill { border-radius: 999px; padding: 16px 30px; }
+  .opt.pill.on { background: var(--ink); color: var(--on-ink); border-color: var(--ink); font-weight: 600; }
+
+  /* ---- Scene 5: outro ---- */
+  #ink { position: absolute; inset: 0; background: var(--ink); }
+  #outro { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 42px; }
+  #logoWrap { display: flex; align-items: center; gap: 30px; }
+  #logoWrap img { height: 118px; display: block; }
+  #logoWrap span { font-size: 40px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); border-left: 2px solid #4a5654; padding-left: 30px; }
+  #url { font-size: 76px; font-weight: 700; letter-spacing: -0.02em; color: var(--on-ink); }
+  #url b { color: var(--accent); font-weight: 700; }
+  #tag { font-size: 32px; color: #c9c3b8; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="21">
+
+  <!-- Music bed (ende.app, Happy Beats / Business Moves vol. 11) -->
+  <audio class="clip" id="music" src="assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3" data-start="0" data-duration="21" data-volume="0.8" data-fade-out="1.6"></audio>
+  <!-- SFX (Kenney, CC0) -->
+  <audio class="clip" id="sfx-02-impactsoft-medium-001" src="assets/sfx/impact/impactSoft_medium_001.ogg" data-start="1.6" data-duration="0.18" data-volume="0.8"></audio>
+  <!-- typing -->
+  <audio class="clip" id="sfx-03-keypress-001" src="assets/sfx/keyboard/keypress-001.wav" data-start="5.80" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-04-keypress-004" src="assets/sfx/keyboard/keypress-004.wav" data-start="5.89" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-05-keypress-007" src="assets/sfx/keyboard/keypress-007.wav" data-start="5.98" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-06-keypress-010" src="assets/sfx/keyboard/keypress-010.wav" data-start="6.07" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-07-keypress-013" src="assets/sfx/keyboard/keypress-013.wav" data-start="6.16" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-08-keypress-016" src="assets/sfx/keyboard/keypress-016.wav" data-start="6.25" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-09-keypress-019" src="assets/sfx/keyboard/keypress-019.wav" data-start="6.34" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-10-keypress-022" src="assets/sfx/keyboard/keypress-022.wav" data-start="6.43" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-11-keypress-001" src="assets/sfx/keyboard/keypress-001.wav" data-start="6.52" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-12-keypress-004" src="assets/sfx/keyboard/keypress-004.wav" data-start="6.61" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-13-keypress-007" src="assets/sfx/keyboard/keypress-007.wav" data-start="6.70" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-14-keypress-010" src="assets/sfx/keyboard/keypress-010.wav" data-start="6.79" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-15-keypress-013" src="assets/sfx/keyboard/keypress-013.wav" data-start="6.88" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-16-keypress-016" src="assets/sfx/keyboard/keypress-016.wav" data-start="6.97" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-17-keypress-019" src="assets/sfx/keyboard/keypress-019.wav" data-start="7.06" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-18-keypress-022" src="assets/sfx/keyboard/keypress-022.wav" data-start="7.15" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-19-keypress-001" src="assets/sfx/keyboard/keypress-001.wav" data-start="7.24" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-20-keypress-004" src="assets/sfx/keyboard/keypress-004.wav" data-start="7.33" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-21-keypress-007" src="assets/sfx/keyboard/keypress-007.wav" data-start="7.42" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-22-keypress-010" src="assets/sfx/keyboard/keypress-010.wav" data-start="7.51" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-23-keypress-013" src="assets/sfx/keyboard/keypress-013.wav" data-start="7.60" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-24-keypress-016" src="assets/sfx/keyboard/keypress-016.wav" data-start="7.69" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-25-keypress-019" src="assets/sfx/keyboard/keypress-019.wav" data-start="7.78" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-26-keypress-022" src="assets/sfx/keyboard/keypress-022.wav" data-start="7.87" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-27-keypress-001" src="assets/sfx/keyboard/keypress-001.wav" data-start="7.96" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-28-keypress-004" src="assets/sfx/keyboard/keypress-004.wav" data-start="8.05" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-29-keypress-007" src="assets/sfx/keyboard/keypress-007.wav" data-start="8.14" data-duration="0.25" data-volume="0.28"></audio>
+  <audio class="clip" id="sfx-30-click-003" src="assets/sfx/interface/click_003.ogg" data-start="8.96" data-duration="0.01" data-volume="0.6"></audio>
+  <audio class="clip" id="sfx-31-click-002" src="assets/sfx/interface/click_002.ogg" data-start="10.01" data-duration="0.01" data-volume="0.4"></audio>
+  <audio class="clip" id="sfx-32-click-002" src="assets/sfx/interface/click_002.ogg" data-start="10.54" data-duration="0.01" data-volume="0.4"></audio>
+  <audio class="clip" id="sfx-33-click-002" src="assets/sfx/interface/click_002.ogg" data-start="11.06" data-duration="0.01" data-volume="0.4"></audio>
+  <audio class="clip" id="sfx-34-click-002" src="assets/sfx/interface/click_002.ogg" data-start="11.60" data-duration="0.01" data-volume="0.4"></audio>
+  <audio class="clip" id="sfx-35-click-002" src="assets/sfx/interface/click_002.ogg" data-start="12.12" data-duration="0.01" data-volume="0.4"></audio>
+  <audio class="clip" id="sfx-36-impactbell-heavy-000" src="assets/sfx/impact/impactBell_heavy_000.ogg" data-start="12.65" data-duration="1.48" data-volume="0.6"></audio>
+  <audio class="clip" id="sfx-37-drop-001" src="assets/sfx/interface/drop_001.ogg" data-start="13.9" data-duration="0.11" data-volume="0.5"></audio>
+  <audio class="clip" id="sfx-38-drop-001" src="assets/sfx/interface/drop_001.ogg" data-start="14.4" data-duration="0.11" data-volume="0.5"></audio>
+  <audio class="clip" id="sfx-39-drop-001" src="assets/sfx/interface/drop_001.ogg" data-start="14.9" data-duration="0.11" data-volume="0.5"></audio>
+  <audio class="clip" id="sfx-40-drop-001" src="assets/sfx/interface/drop_001.ogg" data-start="15.4" data-duration="0.11" data-volume="0.5"></audio>
+  <audio class="clip" id="sfx-41-impactsoft-medium-001" src="assets/sfx/impact/impactSoft_medium_001.ogg" data-start="17.75" data-duration="0.18" data-volume="0.8"></audio>
+
+  <!-- Scene 1: hook (the product's own H1) -->
+  <div class="clip" id="s1" data-start="0" data-duration="3.8" data-track-index="0">
+    <div id="hook">
+      <h1 id="h1a">Type it.</h1>
+      <h1 id="h1b">Get a <span class="b">video.</span></h1>
+      <div id="rule"></div>
+    </div>
+  </div>
+
+  <!-- Scenes 2 + 3: the /create page, then the job it creates -->
+  <div class="clip" id="s2" data-start="3.5" data-duration="10.5" data-track-index="1">
+    <div id="page"><div id="pageInner" data-layout-allow-overflow>
+      <header><div class="brand"><img src="assets/img/marvice-logo.svg" alt="Marvice"><span>Studio</span></div><a>Open video editor →</a></header>
+      <main>
+        <span class="label">What should the video show?</span>
+        <div class="ta" id="ta"><span id="typed"></span><span id="caret"></span></div>
+
+        <span class="label">Size</span>
+        <div class="sizes">
+          <div class="size on"><span class="shape"><i style="width:22.5px;height:40px"></i></span><span>Reel 9:16<small>1080×1920</small></span></div>
+          <div class="size"><span class="shape"><i style="width:40px;height:22.5px"></i></span><span>Landscape 16:9<small>1920×1080</small></span></div>
+          <div class="size"><span class="shape"><i style="width:40px;height:40px"></i></span><span>Square 1:1<small>1080×1080</small></span></div>
+          <div class="size"><span class="shape"><i style="width:32px;height:40px"></i></span><span>Portrait 4:5<small>1080×1350</small></span></div>
+        </div>
+
+        <div class="row">
+          <div><span class="label">Length</span><div class="chips"><span class="chip">8s</span><span class="chip on">15s</span><span class="chip">30s</span><span class="chip">60s</span></div></div>
+          <div><span class="label">AI writer</span><div class="select">Claude (Anthropic) · claude-opus-5-5</div></div>
+          <div><span class="label">AI footage</span><div class="select">Google Veo</div></div>
+        </div>
+
+        <span class="go" id="go">Create video</span>
+
+        <h2>Your videos</h2>
+        <article class="job" id="job">
+          <div id="prog"></div>
+          <div class="slot">
+            <div class="ph" id="ph">Working…<br>this takes a few minutes</div>
+            <div class="vid" id="vid"><i></i></div>
+          </div>
+          <div>
+            <div class="pills">
+              <span class="status" id="p0">Queued</span>
+              <span class="status" id="p1">Planning</span>
+              <span class="status" id="p2">Filming AI footage</span>
+              <span class="status" id="p3">Writing</span>
+              <span class="status" id="p4">Checking</span>
+              <span class="status" id="p5">Rendering</span>
+              <span class="status done" id="p6">Ready</span>
+            </div>
+            <div class="meta">Reel 9:16 · 15s · claude-opus-5-5 · AI footage</div>
+            <p class="prompt" id="jobPrompt"></p>
+            <div class="logs">
+              <span class="log" id="l1">Planning 1 footage shot(s) with Claude (Anthropic)…</span>
+              <span class="log" id="l2">Generating footage 1/1 with Google Veo…</span>
+              <span class="log" id="l3">Writing the video with Claude (Anthropic) (claude-opus-5-5)…</span>
+              <span class="log" id="l4">Checking the composition…</span>
+              <span class="log" id="l5">Rendering the MP4…</span>
+              <span class="log" id="l6">Done.</span>
+            </div>
+            <div class="actions" id="actions"><span>Download MP4</span><span>Download HTML</span><span>Open in editor</span></div>
+          </div>
+        </article>
+      </main>
+    </div></div>
+  </div>
+
+  <!-- Scene 4: the real options -->
+  <div class="clip" id="s4" data-start="13.8" data-duration="4.3" data-track-index="2">
+    <div id="rows">
+      <div class="hrow"><h3>Any size.</h3><div class="opts">
+        <div class="opt on"><span class="shape"><i style="width:30px;height:54px"></i></span><span>Reel<small>9:16</small></span></div>
+        <div class="opt"><span class="shape"><i style="width:54px;height:30px"></i></span><span>Landscape<small>16:9</small></span></div>
+        <div class="opt"><span class="shape"><i style="width:54px;height:54px"></i></span><span>Square<small>1:1</small></span></div>
+        <div class="opt"><span class="shape"><i style="width:43px;height:54px"></i></span><span>Portrait<small>4:5</small></span></div>
+      </div></div>
+      <div class="hrow"><h3>Any length.</h3><div class="opts">
+        <div class="opt pill">8s</div><div class="opt pill on">15s</div><div class="opt pill">30s</div><div class="opt pill">60s</div>
+      </div></div>
+      <div class="hrow"><h3>Any writer.</h3><div class="opts">
+        <div class="opt pill on">Claude</div><div class="opt pill">OpenAI</div><div class="opt pill">Gemini</div>
+      </div></div>
+      <div class="hrow"><h3>Any footage.</h3><div class="opts">
+        <div class="opt pill on">Google Veo</div><div class="opt pill">OpenAI Sora</div><div class="opt pill">None (motion graphics only)</div>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Scene 5: outro -->
+  <div class="clip" id="s5" data-start="17.7" data-duration="3.3" data-track-index="3">
+    <div id="ink"></div>
+    <div id="outro">
+      <div id="logoWrap"><img src="assets/img/marvice-logo-light.svg" alt="Marvice"><span>Studio</span></div>
+      <div id="url">video.marvice.tech<b>/create</b></div>
+      <div id="tag">This video was rendered by it.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // The prompt that gets typed. Illustrative UI text, same shape as the page's own placeholder.
+  const PROMPT = "A 15-second launch reel for a Bengaluru café. Warm tones, three menu highlights.";
+  const typed = document.getElementById("typed");
+  const chars = [...PROMPT].map((c) => { const s = document.createElement("span"); s.className = "ch"; s.textContent = c; typed.appendChild(s); return s; });
+  document.getElementById("jobPrompt").textContent = PROMPT;
+
+  const tl = gsap.timeline({ paused: true });
+  const T0 = 5.8, DT = 0.03;           // typing: starts on the 5.80 beat, 80 chars ≈ 2.4 s
+
+  // Scene 1 — hook
+  tl.fromTo("#h1a", { y: 50, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, 0.3);
+  tl.fromTo("#h1b", { y: 50, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" }, 1.55);
+  tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 1.9);
+  tl.to("#hook", { y: -50, opacity: 0, duration: 0.35, ease: "power2.in" }, 3.4);
+
+  // Scene 2 — the page slides up, prompt gets typed, button pressed
+  tl.fromTo("#page", { y: 1080 }, { y: 0, duration: 0.75, ease: "power3.out" }, 3.55);
+  tl.fromTo("#ta", { className: "ta" }, { className: "ta focus", duration: 0.01 }, 4.35);
+  tl.fromTo("#caret", { opacity: 1 }, { opacity: 0, duration: 0.45, repeat: 2, yoyo: true, ease: "steps(1)" }, 4.4);
+  tl.set("#caret", { opacity: 1 }, T0);
+  chars.forEach((s, i) => tl.set(s, { display: "inline" }, T0 + i * DT));
+  tl.fromTo("#caret", { opacity: 1 }, { opacity: 0, duration: 0.45, repeat: 1, yoyo: true, ease: "steps(1)", immediateRender: false }, 8.25);
+  tl.set("#caret", { opacity: 0 }, 8.96);
+  tl.fromTo("#go", { scale: 1, backgroundColor: "#2d3837" }, { scale: 0.95, backgroundColor: "#1a2120", duration: 0.09, repeat: 1, yoyo: true, ease: "power1.inOut" }, 8.96);
+
+  // Scene 3 — scroll to "Your videos", the job runs
+  tl.fromTo("#job", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 9.3);
+  tl.fromTo("#pageInner", { y: 0 }, { y: -560, duration: 0.6, ease: "power3.inOut" }, 9.25);
+  tl.fromTo("#vid", { opacity: 0 }, { opacity: 0, duration: 0.01 }, 9.3);
+  tl.fromTo("#actions", { opacity: 0 }, { opacity: 0, duration: 0.01 }, 9.3);
+  tl.fromTo("#prog", { scaleX: 0 }, { scaleX: 1, duration: 2.65, ease: "none" }, 10.0);
+  const steps = [9.3, 10.01, 10.54, 11.06, 11.60, 12.12, 12.65];   // beats of the track
+  for (let i = 0; i < 7; i++) {
+    const t = steps[i];
+    tl.fromTo("#p" + i, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.18, ease: "power2.out" }, t);
+    if (i > 0) tl.to("#p" + (i - 1), { opacity: 0, duration: 0.12 }, t);
+    if (i > 0) tl.fromTo("#l" + i, { opacity: 0 }, { opacity: 1, duration: 0.15 }, t);
+    if (i > 1) tl.to("#l" + (i - 1), { opacity: 0, duration: 0.1 }, t);
+  }
+  tl.fromTo("#p6", { scale: 0.7 }, { scale: 1, duration: 0.5, ease: "back.out(2)" }, 12.65);
+  tl.to("#ph", { opacity: 0, duration: 0.25 }, 12.65);
+  tl.to("#vid", { opacity: 1, duration: 0.3 }, 12.7);
+  tl.fromTo("#actions > span", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.08, ease: "power2.out" }, 12.85);
+  tl.to("#actions", { opacity: 1, duration: 0.01 }, 12.85);
+  tl.to("#page", { opacity: 0, y: -60, duration: 0.35, ease: "power2.in" }, 13.55);
+
+  // Scene 4 — the real options, one row per beat
+  const rows = gsap.utils.toArray("#rows .hrow");
+  rows.forEach((row, i) => {
+    const t = 13.9 + i * 0.5;
+    tl.fromTo(row.querySelector("h3"), { x: -40, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, ease: "power3.out" }, t);
+    tl.fromTo(row.querySelectorAll(".opt"), { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, stagger: 0.07, ease: "power3.out" }, t + 0.1);
+  });
+
+  // Scene 5 — dip to ink, logo, URL
+  tl.fromTo("#ink", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power1.inOut" }, 17.7);
+  tl.fromTo("#logoWrap", { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: "power3.out" }, 17.95);
+  tl.fromTo("#url", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, 18.2);
+  tl.fromTo("#tag", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 18.45);
+
+  window.__timelines = window.__timelines || {};
+  window.__timelines["main"] = tl;
+  tl.seek(0);
+</script>
+</body>
+</html>
