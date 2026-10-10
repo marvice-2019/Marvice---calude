@@ -1,4 +1,44 @@
 feature,area,priority,original,clone,notes
+"Sign up with email, Google or Microsoft",onboarding,must,yes,no,S01
+Connect Google Calendar to read busy times,calendar,must,yes,no,S02 S10; help connect-your-calendar
+Connect Outlook / Office 365 calendar,calendar,must,yes,no,S02 S10
+Choose which calendars to check for conflicts,calendar,must,yes,no,S10
+Choose one calendar new bookings are added to,calendar,must,yes,no,S10
+Weekly working hours with time zone,availability,must,yes,no,S03 S09; API AvailabilityRule wday
+Date-specific overrides (custom hours or unavailable),availability,must,yes,no,S09; API AvailabilityRule date
+Several named availability schedules,availability,should,yes,no,S09; API list schedules
+"One-on-one event type with name, slug, duration, description",event types,must,yes,no,S05; API EventType
+Multiple duration options on one event type,event types,should,yes,no,S05; help multiple durations
+"Event location: video, phone, in person, custom, ask invitee",event types,must,yes,no,S05; API LocationConfiguration
+"Minimum notice, booking window, start increments",event types,must,yes,no,S06; help fine-tune availability
+Buffers before and after meetings,event types,must,yes,no,S06; help buffers
+Daily / weekly booking limits,event types,should,yes,no,S06; help meeting limits
+Hidden event types (link only),event types,should,yes,no,S04; API EventType hidden flag
+Custom questions on the booking form,booking,must,yes,no,S07 S15; API CustomQuestion
+"Group event type (one host, many invitees, seat limit)",event types,could,yes,no,S05; API kind=group
+Public profile page listing event types,booking,must,yes,no,S13
+"Booking page: date picker, slots, guest time zone, 12h/24h",booking,must,yes,no,S14; help time zones
+Guest details form with add-guests and text-reminder phone,booking,must,yes,no,"S15; API Invitee, event_guests"
+Confirmation page with add-to-calendar and optional redirect,booking,must,yes,no,S16; help redirect
+"Guest cancel via emailed link, with reason",booking,must,yes,no,"S17; API cancel_url, Cancellation"
+Guest reschedule via emailed link,booking,must,yes,no,"S18; API reschedule_url, old/new invitee"
+Cancellation policy text and cut-off,booking,should,yes,no,help add a cancellation policy
+Prefill guest details via link parameters,booking,could,yes,no,help prefill
+Embed booking page on a website (inline / popup),sharing,should,yes,no,help embed options
+One-off meeting and single-use links,sharing,should,yes,no,S19; API one-off event type; help single-use
+"Meetings list: upcoming, past, cancelled",host,must,yes,no,S11; API list events
+"Meeting detail with cancel, reschedule, mark no-show",host,must,yes,no,"S12; API no-show, cancellation"
+Confirmation email + calendar invite to host and guest,notifications,must,yes,no,F10; help scheduling notifications
+"Reminders before the meeting (email, text)",notifications,must,yes,no,F10; help automations
+"Video link auto-created (Google Meet, Zoom)",integrations,should,yes,no,S20; API conference location
+Collect payment at booking (Stripe / PayPal),payments,should,yes,no,S20; API Invitee.payment
+Meeting polls,event types,could,yes,no,help meeting polls
+Round robin / collective team scheduling,teams,skip,yes,skip,out of scope: sales-team product; Duo gets a shared calendar
+Routing forms and Salesforce,teams,skip,yes,skip,out of scope: enterprise lead routing
+Notetaker and Callie AI assistant,ai,skip,yes,skip,out of scope: reviewers ask for fewer AI features
+Contacts and Opportunities CRM,crm,skip,yes,skip,out of scope: 'calendar app that desires to be a CRM'
+"Single sign-on, SCIM, admin roles",admin,skip,yes,skip,out of scope: enterprise
+Exchange on-premise calendars,calendar,skip,yes,skip,out of scope at launch: rare for solo coaches
 Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,no,fix 1: sync misses events (16 reviews/2 sources)
 Never offer a slot when calendar sync is stale,integrations,must,no,no,fix 1
 One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,must,no,no,fix 2: billing (14 reviews/2 sources)
