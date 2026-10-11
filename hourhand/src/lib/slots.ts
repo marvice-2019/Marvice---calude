@@ -47,7 +47,7 @@ function isoDate(dayMs: number): string {
 }
 
 /** Calendar date (as a UTC-midnight timestamp) of an instant, seen in `tz`. */
-function localDay(instant: Date, tz: string): number {
+export function localDay(instant: Date, tz: string): number {
   const d = new TZDate(instant.getTime(), tz);
   return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -59,7 +59,7 @@ function wallTime(dayMs: number, minutes: number, tz: string): number {
 }
 
 /** The Monday that starts a local day's week (Monday to Sunday, as the week reads in India). */
-const weekOf = (dayMs: number) => dayMs - ((new Date(dayMs).getUTCDay() + 6) % 7) * DAY;
+export const weekOf = (dayMs: number) => dayMs - ((new Date(dayMs).getUTCDay() + 6) % 7) * DAY;
 
 function intervalsFor(dayMs: number, rules: AvailabilityRule[]): Interval[] {
   const date = isoDate(dayMs);

@@ -7,6 +7,7 @@ import { PackageUnavailableError, takeCredits } from "../packages/packages";
 import { hashLinkToken, newLinkToken } from "../links";
 import { checkOneOff, oneOffSlug } from "./one-off";
 import { queueWaitlistFor } from "../waitlist";
+import { localDay, weekOf } from "../slots";
 import {
   EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingLink,
   type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval, type User,
@@ -173,6 +174,36 @@ export function createPgStore(pool: pg.Pool): DataStore {
     throw new RequestKeyConflictError();
   }
 
+  /**
+   * The daily and weekly limits again, inside the booking's transaction and under a lock on the event type, so two
+   * guests booking different times at once can't both take the last place. Counts the way the slot engine does.
+   */
+  async function checkLimits(client: pg.PoolClient, eventTypeId: string, starts: Date[]): Promise<void> {
+    const { rows: [et] } = await client.query(
+      `select e.daily_limit, e.weekly_limit, s.timezone from event_types e
+         join availability_schedules s on s.user_id = e.user_id and s.is_default
+        where e.id = $1 for update of e`, [eventTypeId]);
+    if (!et || (et.daily_limit === null && et.weekly_limit === null)) return;
+    const { rows } = await client.query(
+      `select start_at from bookings where event_type_id = $1 and start_at >= $2 and start_at < $3
+         and (status = 'confirmed' or (status = 'pending_payment' and hold_expires_at > now()))`,
+      [eventTypeId, new Date(starts[0].getTime() - 2 * WEEK), new Date(starts[starts.length - 1].getTime() + 2 * WEEK)]);
+    const perDay = new Map<number, number>();
+    const perWeek = new Map<number, number>();
+    const add = (start: Date) => {
+      const day = localDay(start, et.timezone);
+      perDay.set(day, (perDay.get(day) ?? 0) + 1);
+      perWeek.set(weekOf(day), (perWeek.get(weekOf(day)) ?? 0) + 1);
+    };
+    for (const r of rows) add(r.start_at);
+    for (const start of starts) {
+      const day = localDay(start, et.timezone);
+      if (et.daily_limit !== null && (perDay.get(day) ?? 0) >= et.daily_limit) throw new SlotTakenError();
+      if (et.weekly_limit !== null && (perWeek.get(weekOf(day)) ?? 0) >= et.weekly_limit) throw new SlotTakenError();
+      add(start);
+    }
+  }
+
   /** A lost race on the idempotency key returns the winner's booking (if it is the same request); a lost race on the slot is SlotTakenError. */
   async function settle(error: unknown, idempotencyKey: string, isSameRequest: (b: BookingWithInvitee) => boolean): Promise<BookingWithInvitee> {
     if (code(error) === "23505" || code(error) === "23P01") {
@@ -309,6 +340,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
         const id = await tx(async (client) => {
           const linkId = input.bookingLinkToken === undefined ? null : await takeLink(client, input, input.bookingLinkToken);
           const weekStarts = Array.from({ length: input.weeks ?? 1 }, (_, i) => new Date(input.startAt.getTime() + i * WEEK));
+          await checkLimits(client, input.eventTypeId, weekStarts);
           const purchaseId = input.packageToken === undefined ? null : await takeCredits(client, input.packageToken, input.eventTypeId, weekStarts);
           const newId = await insertBooking(client, input, null, linkId);
           // A held booking says nothing yet: its emails and calendar write go out once the payment is confirmed.

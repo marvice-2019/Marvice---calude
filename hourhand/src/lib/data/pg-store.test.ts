@@ -79,6 +79,25 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect(rejected).toHaveLength(1);
       expect(rejected[0].reason).toBeInstanceOf(SlotTakenError);
     });
+
+    it("keeps the daily and weekly limits when two guests book different times at once", async () => {
+      await pool.query("update event_types set daily_limit = 1 where id = $1", [intro.id]);
+      try {
+        const sameDay = await Promise.allSettled([
+          store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-15T04:00:00Z"), idempotencyKey: "pg-limit-a", invitee: guest }),
+          store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-15T09:00:00Z"), idempotencyKey: "pg-limit-b", invitee: guest }),
+        ]);
+        expect(sameDay.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        expect(sameDay.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason).toBeInstanceOf(SlotTakenError);
+        await pool.query("update event_types set daily_limit = null, weekly_limit = 2 where id = $1", [intro.id]);
+        // Wednesday and Thursday of the same week: one more fits, the next doesn't.
+        await store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-16T04:00:00Z"), idempotencyKey: "pg-limit-c", invitee: guest });
+        await expect(store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-17T04:00:00Z"), idempotencyKey: "pg-limit-d", invitee: guest }))
+          .rejects.toBeInstanceOf(SlotTakenError);
+      } finally {
+        await pool.query("update event_types set daily_limit = null, weekly_limit = null where id = $1", [intro.id]);
+      }
+    });
   });
 
   describe("rescheduleBooking", () => {
