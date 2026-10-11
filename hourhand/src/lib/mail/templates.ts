@@ -256,6 +256,19 @@ export function renderPackageMail(kind: "package_guest" | "package_host", c: Pac
   }, { replyTo: c.guestEmail });
 }
 
+/** A GST invoice or credit note for the guest: the key figures and a link to the full document to view, print or save. */
+export function renderInvoiceMail(v: { kind: "invoice" | "credit_note"; number: string; supplierName: string; supplierEmail: string; totalMinor: number; description: string; url: string; originalNumber: string | null }): RenderedMail {
+  const isNote = v.kind === "credit_note";
+  return render(isNote ? `Credit note ${v.number} from ${v.supplierName}` : `Invoice ${v.number} from ${v.supplierName}`, {
+    heading: isNote ? "Your credit note" : "Your tax invoice",
+    intro: isNote ? `Your refund is recorded against invoice ${v.originalNumber}.` : `Thanks for your payment to ${v.supplierName}. Here's your GST invoice.`,
+    rows: [["Number", v.number], ["For", v.description], [isNote ? "Refunded" : "Paid", formatMoney(v.totalMinor, "INR")]],
+    link: { label: isNote ? "View the credit note" : "View the invoice", url: v.url },
+    note: "Open the link to print it or save it as a PDF for your records.",
+    footer: `Sent by Hourhand for ${v.supplierName}. Reply to this email to reach them.`,
+  }, { replyTo: v.supplierEmail });
+}
+
 export function renderMagicLink(url: string): RenderedMail {
   return render("Your Hourhand sign-in link", {
     heading: "Sign in to Hourhand", intro: "Use the button below to sign in. The link works once and expires in 15 minutes.",

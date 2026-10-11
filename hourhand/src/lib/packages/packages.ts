@@ -3,6 +3,7 @@ import { BillingApiError } from "../billing/providers";
 import { NotFoundError } from "../data/types";
 import { parsePrice, PRICE_INVALID } from "../event-types";
 import { kickJobs } from "../jobs/kick";
+import { invoiceForPurchase } from "../gst/invoices";
 import type { PaymentCheckDeps } from "../payments/booking-payments";
 import type { HostRazorpayAuth } from "../payments/host-razorpay";
 import type { RazorpayOrders, RazorpayPayment } from "../payments/razorpay-orders";
@@ -243,6 +244,7 @@ export async function applyPurchasePayment(pool: pg.Pool, purchaseId: string, ra
     await client.query(
       `update package_purchases set status = 'paid', provider_payment_id = $2, paid_at = $3, expires_at = $4, last_error = null, updated_at = $3 where id = $1`,
       [purchaseId, razorpayPaymentId, now, new Date(now.getTime() + p.valid_days * DAY)]);
+    await invoiceForPurchase(client, purchaseId, now);
     for (const [kind, to] of [["package_guest", p.guest_email], ["package_host", p.host_email]]) {
       await client.query(
         `insert into notifications (booking_id, user_id, channel, kind, recipient, send_at, dedupe_key)

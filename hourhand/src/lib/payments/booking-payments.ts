@@ -3,6 +3,7 @@ import { BillingApiError } from "../billing/providers";
 import { queueBookingNotifications } from "../data/notifications";
 import type { BookingWithInvitee, CreateBookingInput, DataStore } from "../data/types";
 import { kickJobs } from "../jobs/kick";
+import { creditNoteForRefund, invoiceForPayment } from "../gst/invoices";
 import type { HostRazorpayAuth } from "./host-razorpay";
 import type { RazorpayOrders, RazorpayPayment } from "./razorpay-orders";
 
@@ -114,8 +115,11 @@ export async function applyCapturedPayment(pool: pg.Pool, bookingId: string, raz
       return "refund_pending" as const;
     }
     await client.query("update bookings set status = 'confirmed', hold_expires_at = null where id = $1", [bookingId]);
-    await client.query("update payments set status = 'paid', provider_payment_id = $2, paid_at = $3, updated_at = $3 where booking_id = $1", [bookingId, razorpayPaymentId, now]);
+    const { rows: [paid] } = await client.query(
+      "update payments set status = 'paid', provider_payment_id = $2, paid_at = $3, updated_at = $3 where booking_id = $1 returning id", [bookingId, razorpayPaymentId, now]);
     await queueBookingNotifications(client, bookingId, "booked", now);
+    // A GST-registered host's guest gets a tax invoice with the payment (deposits aren't invoiced).
+    if (paid) await invoiceForPayment(client, paid.id, now);
     return "confirmed" as const;
   });
   if (result === "confirmed") kickJobs();
@@ -295,9 +299,13 @@ export async function processRefunds(deps: PaymentCheckDeps & { pool: pg.Pool },
   const setError = (row: RefundRow, message: string) =>
     pool.query("update payments set last_error = $2, updated_at = $3 where id = $1 and status = 'refund_pending'", [row.id, message.slice(0, 500), now]);
   const markRefunded = async (row: RefundRow, refundId: string, amount: number) => {
-    await pool.query(
-      "update payments set status = 'refunded', refund_id = $2, refunded_minor = $3, last_error = null, updated_at = $4 where id = $1 and status = 'refund_pending'",
-      [row.id, refundId, amount, now]);
+    await inTx(pool, async (client) => {
+      const { rowCount } = await client.query(
+        "update payments set status = 'refunded', refund_id = $2, refunded_minor = $3, last_error = null, updated_at = $4 where id = $1 and status = 'refund_pending'",
+        [row.id, refundId, amount, now]);
+      // An invoiced payment refunded in full is reversed by a credit note, recorded with the refund.
+      if (rowCount) await creditNoteForRefund(client, row.id, now);
+    });
     result.refunded += 1;
   };
 

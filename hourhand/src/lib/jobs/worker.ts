@@ -8,7 +8,8 @@ import type { InviteeAnswer, LocationKind } from "../data/types";
 import type { HourCycle } from "../format";
 import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { MailError, type Mailer } from "../mail/mailer";
-import { renderBookingMail, renderCalendarAlert, renderPackageMail, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
+import { invoiceById } from "../gst/invoices";
+import { renderBookingMail, renderCalendarAlert, renderInvoiceMail, renderPackageMail, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
 import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
 import { freeSlots } from "../booking";
 import { createPgStore } from "../data/pg-store";
@@ -292,6 +293,15 @@ async function renderRenewal(pool: pg.Pool, c: Claimed, baseUrl: string): Promis
   });
 }
 
+async function renderInvoice(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
+  const m = /^invoice:([0-9a-f-]{36})$/.exec(c.dedupe_key);
+  const v = m ? await invoiceById(pool, m[1]) : null;
+  if (!v) return { skip: "invoice not found" };
+  const { rows: [u] } = await pool.query("select email from users where id = $1", [v.hostId]);
+  return renderInvoiceMail({ kind: v.kind, number: v.number, supplierName: v.supplier.legalName, supplierEmail: u?.email ?? "", totalMinor: v.totalMinor,
+    description: v.description, url: `${baseUrl}/invoice/${v.token}`, originalNumber: v.originalNumber });
+}
+
 async function renderPackage(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
   const m = /^purchase:([0-9a-f-]{36}):package_(guest|host)$/.exec(c.dedupe_key);
   if (!m) return { skip: "not a package email" };
@@ -348,7 +358,7 @@ export async function processDueNotifications(
       continue;
     }
     // Host emails about their account rather than a booking.
-    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host";
+    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host" || c.kind === "invoice_guest";
     if (!isAccountMail) {
       if (!r?.id) { await skip(c, "booking no longer exists"); continue; }
       const why = skipReason(c.kind, r, now);
@@ -391,6 +401,7 @@ export async function processDueNotifications(
         const mail = c.kind === "calendar_alert_host" ? await renderAlert(pool, c, opts.baseUrl)
           : c.kind === "renewal_reminder_host" ? await renderRenewal(pool, c, opts.baseUrl)
           : c.kind === "package_guest" || c.kind === "package_host" ? await renderPackage(pool, c, opts.baseUrl)
+          : c.kind === "invoice_guest" ? await renderInvoice(pool, c, opts.baseUrl)
           : renderBookingMail(c.kind as BookingEmailKind, {
             ...toContext(r, opts.baseUrl),
             ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),
