@@ -42,6 +42,29 @@ agent-reach doctor             # shows which channels work and how to fix the re
 Sites that need a logged-in Chrome session (Reddit, Instagram, Facebook, Xiaohongshu) won't work
 on a headless server; use them from a desktop install instead.
 
+## Web terminal at agent.marvice.tech
+Optional: a password-protected browser terminal, so you can run `claude` from a phone or laptop
+without SSH. Run it after `install.sh`, on the Coolify server:
+```bash
+# DNS first: A record agent.marvice.tech -> the server's IP
+sudo bash web-terminal.sh
+# lock it to office/home IPs (recommended):
+sudo ALLOW_IPS="203.0.113.4/32,198.51.100.0/24" bash web-terminal.sh
+```
+What it does:
+1. Installs tmux and the [ttyd](https://github.com/tsl0922/ttyd) 1.7.7 binary (checksum-verified)
+2. Runs `agent-terminal` (systemd) as the `agent` user, bound to the docker0 gateway only, port 7681
+3. Writes `/data/coolify/proxy/dynamic/agent-terminal.yaml` so Coolify's Traefik serves it on HTTPS
+   (Let's Encrypt) with basic auth (`/etc/agent-reach/htpasswd`), a rate limit and, if set, an IP allowlist
+
+The session is a tmux session called `main`: closing the browser keeps work running, reopening
+reattaches. Coolify servers only (it exits if `coolify-proxy` isn't a running Traefik).
+
+**Security:** whoever gets past the password has a shell as `agent` (no sudo) with its Claude
+login and saved cookies. Use a 16+ character password, set `ALLOW_IPS` where you can, and never
+share the login with clients. Turn it off with
+`systemctl disable --now agent-terminal && rm /data/coolify/proxy/dynamic/agent-terminal.yaml`.
+
 ## Accounts and cookies
 Cookies and tokens live only in the `agent` user's `~/.agent-reach/config.yaml`. Use spare
 accounts, never client or Marvice main accounts: cookie-based access can get accounts banned.
