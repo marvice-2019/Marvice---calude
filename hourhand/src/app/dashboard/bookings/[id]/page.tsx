@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -9,7 +10,9 @@ import { requireUser } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/billing/plans";
 import { formatDate, formatTime, zoneName } from "@/lib/format";
 import { getPool } from "@/lib/data/pg-store";
-import { bookingPayment, type BookingPaymentSummary } from "@/lib/payments/booking-payments";
+import { bookingPayment, DEPOSIT_HOLD_MS, type BookingPaymentSummary } from "@/lib/payments/booking-payments";
+import { GUEST_LOCATION_LABELS } from "@/lib/location-labels";
+import { waLink, waNumber, whatsappMessage, type WhatsAppKind } from "@/lib/whatsapp";
 import { cancelAsHost, rescheduleAsHost, setNoShow } from "./actions";
 
 const PAYMENT_WORDS: Record<BookingPaymentSummary["status"], string> = {
@@ -58,6 +61,9 @@ export default async function BookingDetailPage({ params, searchParams }: { para
   const done = query.done && Object.hasOwn(DONE, query.done) ? DONE[query.done] : null;
   const error = query.error && Object.hasOwn(ERRORS, query.error) ? ERRORS[query.error] : null;
   const payment = authEnabled() ? await bookingPayment(getPool(process.env.DATABASE_URL as string), user.id, booking.id) : null;
+  const whatsapp = upcoming ? await whatsappLinks(user, booking) : null;
+  const series = booking.seriesId ? (await store.listBookings(user.id)).filter((b) => b.seriesId === booking.seriesId) : [];
+  const laterWeeks = series.filter((b) => (b.seriesIndex ?? 0) > (booking.seriesIndex ?? 0) && b.status === "confirmed" && b.startAt > now).length;
   return (
     <div>
       <h1 className="font-display text-xl text-text">Booking with {booking.invitee.name}</h1>
@@ -71,14 +77,23 @@ export default async function BookingDetailPage({ params, searchParams }: { para
             {booking.status === "cancelled" && <span className="ml-2 rounded-md bg-danger-bg px-2 py-0.5 text-sm text-danger">Cancelled</span>}
             {booking.status === "pending_payment" && <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">Awaiting payment</span>}
             {booking.invitee.noShowAt && <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">No-show</span>}
+            {confirmed && booking.invitee.runningLateMinutes && (
+              <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">
+                Running {booking.invitee.runningLateMinutes} min late{booking.invitee.runningLateAt && ` (said at ${formatTime(booking.invitee.runningLateAt, tz)})`}
+              </span>
+            )}
           </dd>
+          {series.length > 1 && <dd className="text-sm text-text-muted">Week {booking.seriesIndex} of {new Set(series.map((b) => b.seriesIndex)).size}, every week at this time</dd>}
         </div>
         <div><dt className="text-sm text-text-muted">Email</dt><dd className="text-text">{booking.invitee.email}</dd></div>
         {payment && (
           <div>
             <dt className="text-sm text-text-muted">Payment</dt>
             <dd className="text-text">
-              {formatMoney(payment.amountMinor, "INR")}, {PAYMENT_WORDS[payment.status]}
+              {payment.kind === "deposit" && "Deposit: "}{formatMoney(payment.amountMinor, "INR")}, {payment.kind === "deposit" && payment.status === "paid" && booking.invitee.noShowAt ? "kept for the no-show" : PAYMENT_WORDS[payment.status]}
+              {payment.kind === "deposit" && payment.status === "paid" && !booking.invitee.noShowAt && confirmed && (
+                <span className="block text-sm text-text-muted">Refunded on {formatDate(new Date(booking.endAt.getTime() + DEPOSIT_HOLD_MS), tz)}, {formatTime(new Date(booking.endAt.getTime() + DEPOSIT_HOLD_MS), tz)} unless you mark a no-show before then.</span>
+              )}
               {payment.status === "refund_pending" && payment.lastError && (
                 <span className="block text-sm text-danger">Razorpay hasn&apos;t accepted the refund yet ({payment.lastError.slice(0, 120)}). Hourhand keeps retrying; check your Razorpay balance.</span>
               )}
@@ -91,6 +106,29 @@ export default async function BookingDetailPage({ params, searchParams }: { para
         ))}
       </dl>
       {upcoming && (
+        <section aria-labelledby="whatsapp" className="mt-6 grid max-w-xl gap-2">
+          <h2 id="whatsapp" className="font-display text-lg text-text">Message on WhatsApp</h2>
+          {whatsapp ? (
+            <>
+              <p className="text-sm text-text-muted">Opens WhatsApp on your phone or computer with the message written. You send it from your own number.</p>
+              <div className="flex flex-wrap gap-2">
+                {whatsapp.map((w) => (
+                  <a key={w.kind} href={w.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-md border border-border px-3 font-semibold text-accent underline">
+                    {w.label}
+                  </a>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-text-muted">
+              {booking.invitee.phone
+                ? `${booking.invitee.name}'s number (${booking.invitee.phone}) has no country code, so Hourhand won't guess where to send it. Check it with them first.`
+                : `${booking.invitee.name} didn't leave a WhatsApp number, so you can only email them.`}
+            </p>
+          )}
+        </section>
+      )}
+      {upcoming && (
         <section aria-labelledby="actions" className="mt-6 grid max-w-xl gap-4">
           <h2 id="actions" className="font-display text-lg text-text">Change this booking</h2>
           {query.confirm === "cancel" ? (
@@ -98,6 +136,12 @@ export default async function BookingDetailPage({ params, searchParams }: { para
               <input type="hidden" name="bookingId" value={booking.id} />
               <label htmlFor="reason" className="text-sm text-text-muted">Reason for {booking.invitee.name} (optional)</label>
               <textarea id="reason" name="reason" maxLength={500} rows={3} className="rounded-md border border-border bg-card p-2 text-text" />
+              {laterWeeks > 0 && (
+                <label className="flex min-h-11 items-center gap-3 text-text">
+                  <input type="checkbox" name="laterWeeks" className="h-5 w-5 accent-accent" />
+                  Also cancel the {laterWeeks === 1 ? "next week" : `${laterWeeks} later weeks`} in this series
+                </label>
+              )}
               <p className="text-sm text-text-muted">We&apos;ll email {booking.invitee.name} that you cancelled. A paid booking is refunded in full.</p>
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" variant="danger">Yes, cancel</Button>
@@ -149,4 +193,27 @@ export default async function BookingDetailPage({ params, searchParams }: { para
       <Link href="/dashboard/bookings" className="mt-4 inline-flex min-h-11 items-center font-semibold text-accent underline">Back to bookings</Link>
     </div>
   );
+}
+
+const WHATSAPP_LABELS: Record<WhatsAppKind, string> = { confirmation: "Send confirmation", reminder: "Send reminder", manage: "Send change-or-cancel link" };
+
+/** One wa.me link per message, or null when the guest left no usable number. */
+async function whatsappLinks(
+  user: { id: string; name: string },
+  booking: NonNullable<Awaited<ReturnType<typeof store.getBooking>>>,
+): Promise<{ kind: WhatsAppKind; label: string; href: string }[] | null> {
+  const number = waNumber(booking.invitee.phone);
+  if (!number) return null;
+  const [eventType, locations, h] = await Promise.all([
+    store.getEventType(user.id, booking.eventTypeId), store.listEventLocations(user.id, booking.eventTypeId), headers(),
+  ]);
+  const origin = process.env.BETTER_AUTH_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+  const kind = booking.locationKind;
+  const value = locations.find((l) => l.kind === kind)?.value ?? null;
+  const where = kind ? `${GUEST_LOCATION_LABELS[kind]}${booking.joinUrl ? `: ${booking.joinUrl}` : value ? `: ${value}` : ""}` : null;
+  const ctx = {
+    guestName: booking.invitee.name, hostName: user.name, eventName: eventType?.name ?? "booking", startAt: booking.startAt,
+    guestTimezone: booking.invitee.timezone, where, manageUrl: `${origin.replace(/\/+$/, "")}/b/${booking.invitee.manageToken}`,
+  };
+  return (Object.keys(WHATSAPP_LABELS) as WhatsAppKind[]).map((k) => ({ kind: k, label: WHATSAPP_LABELS[k], href: waLink(number, whatsappMessage(k, ctx)) }));
 }

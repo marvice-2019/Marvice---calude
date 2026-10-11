@@ -35,11 +35,18 @@ export interface EventTypeForm {
   /** Blank means no limit. */
   dailyLimit: string;
   cancelCutoffMinutes: string;
+  /** Most weeks a guest can book in one go; "1" means no repeats. */
+  maxRepeats: string;
+  /** Refundable no-show deposit in rupees as typed; blank means none. Free event types only. */
+  deposit: string;
   /** Rupees as typed. Blank means free. */
   price: string;
   /** Left off the public profile; its own link still books. */
   hidden: boolean;
 }
+
+/** The most weeks a guest can book in one go (event_types.max_repeats). */
+export const MAX_WEEKS = 12;
 
 export type EventTypeErrors = Partial<Record<keyof EventTypeForm, string>>;
 export type QuestionErrors = { label?: string; choices?: string }[];
@@ -139,6 +146,13 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
   const price = parsePrice(form.price);
   if (price === "invalid") errors.price = PRICE_INVALID;
   const priceMinor = price === "invalid" ? null : price;
+  const maxRepeats = number("maxRepeats", 1, MAX_WEEKS, `Enter 1 (no repeats) up to ${MAX_WEEKS} weeks.`);
+  if (!errors.maxRepeats && maxRepeats > 1 && priceMinor !== null) errors.maxRepeats = "Weekly repeats work on free event types for now. Sell a package for paid sessions.";
+  const deposit = parsePrice(form.deposit);
+  if (deposit === "invalid") errors.deposit = PRICE_INVALID;
+  const depositMinor = deposit === "invalid" ? null : deposit;
+  if (!errors.deposit && depositMinor !== null && priceMinor !== null) errors.deposit = "A priced event doesn't need a deposit: the price already commits the guest. Leave one of them empty.";
+  if (!errors.maxRepeats && !errors.deposit && depositMinor !== null && maxRepeats > 1) errors.maxRepeats = "Weekly repeats can't take a deposit. Set repeats to 1, or remove the deposit.";
 
   const valueLabel = form.locationKind ? LOCATION_VALUE_LABEL[form.locationKind] : undefined;
   const locationValue = form.locationValue.trim();
@@ -149,7 +163,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
     ok: true,
     value: {
       name, slug, description: form.description.trim() || null, durationMinutes, minNoticeMinutes, bookingWindowDays,
-      startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
+      startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, maxRepeats, depositMinor,
       priceMinor, currency: priceMinor === null ? null : "INR", hidden: form.hidden === true,
       location: form.locationKind ? { kind: form.locationKind, value: valueLabel ? locationValue : null } : null,
     },
@@ -159,7 +173,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
 /** Starting values for a new event type: the schema defaults, 30 minutes on Google Meet. */
 export const NEW_EVENT_TYPE_FORM: EventTypeForm = {
   name: "", slug: "", durationMinutes: "30", description: "", locationKind: "google_meet", locationValue: "", minNoticeMinutes: "240",
-  bookingWindowDays: "60", startIncrementMinutes: "30", bufferBeforeMinutes: "0", bufferAfterMinutes: "0", dailyLimit: "", cancelCutoffMinutes: "0",
+  bookingWindowDays: "60", startIncrementMinutes: "30", bufferBeforeMinutes: "0", bufferAfterMinutes: "0", dailyLimit: "", cancelCutoffMinutes: "0", maxRepeats: "1", deposit: "",
   price: "", hidden: false,
 };
 
@@ -170,7 +184,7 @@ export function toForm(et: EventType, location: EventLocation | undefined): Even
     locationKind: location?.kind ?? "", locationValue: location?.value ?? "", minNoticeMinutes: String(et.minNoticeMinutes),
     bookingWindowDays: String(et.bookingWindowDays), startIncrementMinutes: String(et.startIncrementMinutes),
     bufferBeforeMinutes: String(et.bufferBeforeMinutes), bufferAfterMinutes: String(et.bufferAfterMinutes),
-    dailyLimit: et.dailyLimit === null ? "" : String(et.dailyLimit), cancelCutoffMinutes: String(et.cancelCutoffMinutes),
+    dailyLimit: et.dailyLimit === null ? "" : String(et.dailyLimit), cancelCutoffMinutes: String(et.cancelCutoffMinutes), maxRepeats: String(et.maxRepeats), deposit: priceInput(et.depositMinor),
     price: priceInput(et.priceMinor), hidden: et.hidden,
   };
 }

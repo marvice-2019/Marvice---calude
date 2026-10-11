@@ -9,6 +9,8 @@ const items = [
   { href: "/dashboard/bookings", label: "Bookings" },
   { href: "/dashboard/event-types", label: "Event types" },
   { href: "/dashboard/links", label: "Links" },
+  { href: "/dashboard/packages", label: "Packages" },
+  { href: "/dashboard/invoices", label: "Invoices" },
   { href: "/dashboard/availability", label: "Availability" },
   { href: "/dashboard/calendars", label: "Calendars" },
   { href: "/dashboard/integrations", label: "Integrations" },

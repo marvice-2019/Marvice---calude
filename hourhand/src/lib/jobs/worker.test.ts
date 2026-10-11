@@ -155,6 +155,93 @@ describe.skipIf(!BASE)("email queue (TEST_DATABASE_URL)", () => {
     expect(sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"))!.text).toContain("Travelling");
   });
 
+  it("when the host cancels, the guest's email offers three free times that open the booking page on that day", async () => {
+    const b = await book();
+    await store.cancelBooking(priya.id, b.id, "host", "Called away");
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl });
+    const mail = sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"))!;
+    expect(mail.text).toContain(`Book another time with ${priya.name}`);
+    const urls = [...mail.text.matchAll(new RegExp(`${baseUrl}/${priya.slug}/${coaching.slug}\\?at=([^\\s]+)`, "g"))].map((m) => decodeURIComponent(m[1]));
+    expect(urls).toHaveLength(3);
+    const times = urls.map((u) => new Date(u).getTime());
+    expect(times).toEqual([...times].sort((x, y) => x - y));
+    expect(times.every((t) => t > Date.now() && t !== b.startAt.getTime())).toBe(true);
+    expect(mail.html).toContain(`${priya.slug}/${coaching.slug}?at=`);
+  });
+
+  it("a running-late tap after a short meeting's end still reaches the host, each email with the minutes tapped", async () => {
+    const b = await book();
+    const late = new Date(b.endAt.getTime() + 2 * MIN);
+    await store.markRunningLate(b.invitee.manageToken, 5, late);
+    await store.markRunningLate(b.invitee.manageToken, 15, new Date(late.getTime() + 1000));
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl, now: new Date(late.getTime() + 60_000) });
+    const subjects = sent.filter((m) => m.subject.startsWith("Running late")).map((m) => m.subject);
+    expect(subjects).toHaveLength(2);
+    expect(subjects.some((s) => s.includes(", 5 min,"))).toBe(true);
+    expect(subjects.some((s) => s.includes(", 15 min,"))).toBe(true);
+  });
+
+  it("the cancellation still goes out when looking up suggestions fails", async () => {
+    const b = await book();
+    await store.cancelBooking(priya.id, b.id, "host");
+    // The host lookup inside the suggestions throws; every other query works.
+    const flaky = new Proxy(pool, { get(target, prop) {
+      if (prop === "query") return (sql: unknown, ...rest: unknown[]) =>
+        typeof sql === "string" && sql.includes("from users where id = $1 and deleted_at is null") ? Promise.reject(new Error("db down")) : (target.query as (...a: unknown[]) => unknown)(sql, ...rest);
+      const v = Reflect.get(target, prop); return typeof v === "function" ? v.bind(target) : v;
+    } });
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(flaky, mailer, { baseUrl });
+    const mail = sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"));
+    expect(mail).toBeDefined();
+    expect(mail!.text).not.toContain("Book another time");
+  });
+
+  it("a weekly series sends one confirmation listing every week, with every week in the calendar file", async () => {
+    const start = new Date(Date.UTC(2032, 5, 7, 4, 0));
+    const first = await store.createBooking({ eventTypeId: coaching.id, startAt: start, idempotencyKey: `jobs-series-${Date.now()}`, weeks: 3, invitee: guest });
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl });
+    const toGuest = sent.filter((m) => m.to === guest.email && m.subject.startsWith("Booked"));
+    expect(toGuest).toHaveLength(1);
+    expect(toGuest[0].text).toContain("Every week (3)");
+    const ics = Buffer.from(toGuest[0].attachments![0].content, "base64").toString("utf8");
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(3);
+    expect(ics).toContain(`UID:${first.id}@hourhand`);
+    const toHost = sent.find((m) => m.subject.startsWith("New booking") && m.text.includes("Every week (3)"));
+    expect(toHost).toBeDefined();
+  });
+
+  it("cancelling a week and the later ones sends one pair of emails naming them all, and removes every week's reminders", async () => {
+    const start = new Date(Date.UTC(2032, 8, 6, 4, 0));
+    const first = await store.createBooking({ eventTypeId: coaching.id, startAt: start, idempotencyKey: `jobs-series-c-${Date.now()}`, weeks: 4, invitee: guest });
+    await processDueNotifications(pool, fakeMailer().mailer, { baseUrl }); // the booking emails
+    const { rows: weeks } = await pool.query("select id from bookings where series_id = $1 order by series_index", [first.id]);
+    await store.cancelBooking(priya.id, weeks[1].id, "guest", undefined, { laterWeeks: true });
+    const { rows: states } = await pool.query("select status from bookings where series_id = $1 order by series_index", [first.id]);
+    expect(states.map((s) => s.status)).toEqual(["confirmed", "cancelled", "cancelled", "cancelled"]);
+    const queuedReminders = await pool.query("select count(*)::int as n from notifications where booking_id = any($1) and kind = 'reminder_guest' and status = 'queued'",
+      [weeks.slice(1).map((w) => w.id)]);
+    expect(queuedReminders.rows[0].n).toBe(0);
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl });
+    const cancelMails = sent.filter((m) => m.subject.startsWith("Cancelled"));
+    expect(cancelMails).toHaveLength(2);
+    expect(cancelMails.every((m) => m.text.includes("Also cancelled (2)"))).toBe(true);
+  });
+
+  it("a guest's own cancel offers no other times", async () => {
+    const b = await book();
+    await store.cancelBooking(priya.id, b.id, "guest");
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl });
+    const mail = sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"))!;
+    expect(mail.text).not.toContain("Book another time");
+    expect(mail.text).not.toContain("?at=");
+  });
+
   it("a reminder already claimed for a booking that was cancelled is skipped at send time", async () => {
     const b = await book();
     // Simulate a cancellation that bypassed the queue update: the reminder stays queued.

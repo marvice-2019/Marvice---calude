@@ -9,7 +9,7 @@ const NOW = new Date("2026-10-10T06:00:00Z");
 const valid: EventTypeForm = {
   name: "30-min strategy call", slug: "strategy", durationMinutes: "30", description: "  Plan the next quarter.  ",
   locationKind: "zoom", locationValue: "", minNoticeMinutes: "240", bookingWindowDays: "60", startIncrementMinutes: "15",
-  bufferBeforeMinutes: "0", bufferAfterMinutes: "10", dailyLimit: "", cancelCutoffMinutes: "120", price: "", hidden: false,
+  bufferBeforeMinutes: "0", bufferAfterMinutes: "10", dailyLimit: "", cancelCutoffMinutes: "120", maxRepeats: "1", deposit: "", price: "", hidden: false,
 };
 
 function draft(overrides: Partial<EventTypeForm> = {}): EventTypeDraft {
@@ -51,7 +51,7 @@ describe("validateEventType", () => {
       value: {
         name: "30-min strategy call", slug: "strategy", description: "Plan the next quarter.", durationMinutes: 30, minNoticeMinutes: 240,
         bookingWindowDays: 60, startIncrementMinutes: 15, bufferBeforeMinutes: 0, bufferAfterMinutes: 10, dailyLimit: null,
-        cancelCutoffMinutes: 120, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
+        cancelCutoffMinutes: 120, maxRepeats: 1, depositMinor: null, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
       },
     });
   });
@@ -205,5 +205,14 @@ describe("event type store", () => {
     expect(back[1].id).toBe("q_goal");
     expect(back[2].choices).toEqual(["Friend", "LinkedIn"]);
     expect(await store.listCustomQuestions("usr_priya", "evt_intro")).toEqual([]);
+  });
+});
+
+describe("no-show deposit", () => {
+  it("is for free events, without weekly repeats", () => {
+    expect(validateEventType({ ...valid, deposit: "200" }, [])).toMatchObject({ ok: true, value: { depositMinor: 20_000, priceMinor: null } });
+    expect(validateEventType({ ...valid, deposit: "200", price: "499" }, [])).toMatchObject({ ok: false, errors: { deposit: expect.stringContaining("priced") } });
+    expect(validateEventType({ ...valid, deposit: "200", maxRepeats: "4" }, [])).toMatchObject({ ok: false, errors: { maxRepeats: expect.stringContaining("deposit") } });
+    expect(validateEventType({ ...valid, deposit: "0.5" }, [])).toMatchObject({ ok: false, errors: { deposit: expect.any(String) } });
   });
 });

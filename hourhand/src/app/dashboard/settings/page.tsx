@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DeleteAccountForm } from "@/components/DeleteAccountForm";
+import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
@@ -19,6 +20,12 @@ export default async function SettingsPage() {
       </ul>
 
       <Card className="mt-8 max-w-xl">
+        <h2 className="font-semibold text-text">Appearance</h2>
+        <p className="mt-1 text-text-muted">Dark mode is easier on the eyes at night. Device follows your phone or computer setting.</p>
+        <ThemeSwitch className="mt-4" />
+      </Card>
+
+      <Card className="mt-6 max-w-xl">
         <h2 className="font-semibold text-text">Signed in as {user.email}</h2>
         {authEnabled() ? (
           <>

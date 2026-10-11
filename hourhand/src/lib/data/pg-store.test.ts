@@ -286,6 +286,56 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
     });
   });
 
+  describe("running late", () => {
+    it("records the minutes and queues one host email per answer, however often the guest taps", async () => {
+      const booking = await store.createBooking({
+        eventTypeId: coaching.id, startAt: at("2034-02-06T04:00:00Z"), idempotencyKey: "pg-late-1", invitee: { ...guest, name: "Late Guest" },
+      });
+      const token = booking.invitee.manageToken;
+      const when = at("2034-02-06T03:45:00Z");
+      const tap = (m: number, s: number) => store.markRunningLate(token, m, new Date(when.getTime() + s * 1000));
+      await tap(10, 0);
+      await tap(10, 1); // a double tap
+      await tap(20, 2);
+      await tap(10, 3); // changed back: the host must hear it again
+      expect((await store.getBookingByManageToken(token))!.invitee).toMatchObject({ runningLateMinutes: 10, runningLateAt: new Date(when.getTime() + 3000) });
+      const { rows } = await pool.query("select kind, recipient, dedupe_key from notifications where booking_id = $1 and kind = 'late_host' order by send_at", [booking.id]);
+      expect(rows.map((r) => r.dedupe_key.replace(/:\d+$/, ""))).toEqual([10, 20, 10].map((m) => `booking:${booking.id}:late:${m}`));
+      expect(rows[0].recipient).toBe(priya.email);
+      await store.cancelBooking(priya.id, booking.id, "guest");
+      await expect(store.markRunningLate(token, 5, when)).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe("weekly series", () => {
+    const WEEK = 7 * 86_400_000;
+    it("books every week in one write; only the first week sends confirmations, every week gets reminders", async () => {
+      const first = await store.createBooking({
+        eventTypeId: coaching.id, startAt: at("2034-03-06T04:00:00Z"), idempotencyKey: "pg-series-1", weeks: 3, invitee: { ...guest, name: "Series Guest" },
+      });
+      expect([first.seriesId, first.seriesIndex]).toEqual([first.id, 1]);
+      const { rows } = await pool.query(
+        `select b.id, b.series_index, b.start_at, array(select n.kind from notifications n where n.booking_id = b.id and n.channel = 'email' order by n.kind) as kinds
+         from bookings b where b.series_id = $1 order by b.series_index`, [first.id]);
+      expect(rows.map((r) => r.series_index)).toEqual([1, 2, 3]);
+      expect(rows.map((r) => new Date(r.start_at).getTime() - first.startAt.getTime())).toEqual([0, WEEK, 2 * WEEK]);
+      expect(rows[0].kinds).toEqual(["booked_guest", "booked_host", "reminder_guest", "reminder_guest"]);
+      expect(rows[1].kinds).toEqual(["reminder_guest", "reminder_guest"]);
+      // The same request again returns the first week and adds nothing.
+      const again = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2034-03-06T04:00:00Z"), idempotencyKey: "pg-series-1", weeks: 3, invitee: guest });
+      expect(again.id).toBe(first.id);
+      expect((await pool.query("select count(*)::int as n from bookings where series_id = $1", [first.id])).rows[0].n).toBe(3);
+    });
+
+    it("a clash in a later week books nothing at all", async () => {
+      await store.createBooking({ eventTypeId: coaching.id, startAt: at("2034-04-17T04:00:00Z"), idempotencyKey: "pg-series-blocker", invitee: guest });
+      await expect(store.createBooking({
+        eventTypeId: coaching.id, startAt: at("2034-04-03T04:00:00Z"), idempotencyKey: "pg-series-2", weeks: 3, invitee: guest,
+      })).rejects.toMatchObject({ name: "SlotTakenError" });
+      expect((await pool.query("select count(*)::int as n from bookings where idempotency_key like 'pg-series-2%'")).rows[0].n).toBe(0);
+    });
+  });
+
   describe("single-use booking links", () => {
     const now = () => new Date();
     let n = 0;
@@ -432,6 +482,6 @@ function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
     startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit, hidden: e.hidden,
-    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, location: null,
+    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, depositMinor: e.depositMinor, location: null,
   };
 }

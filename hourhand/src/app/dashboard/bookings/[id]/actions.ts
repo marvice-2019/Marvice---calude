@@ -36,7 +36,7 @@ export async function cancelAsHost(form: FormData): Promise<void> {
     if (!booking) throw new NotFoundError("Booking");
     // The host can cancel any time before the start; there is no guest-style cutoff.
     if (booking.status !== "confirmed" || booking.startAt.getTime() <= Date.now()) return `${page(id)}?error=not_cancellable`;
-    await store.cancelBooking(user.id, id, "host", reason || undefined);
+    await store.cancelBooking(user.id, id, "host", reason || undefined, { laterWeeks: form.get("laterWeeks") === "on" });
     return `${page(id)}?done=cancelled`;
   });
 }

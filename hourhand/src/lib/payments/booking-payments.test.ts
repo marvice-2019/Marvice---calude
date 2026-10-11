@@ -13,7 +13,7 @@ import type { Plan } from "../billing/plans";
 import { handleConfirmPayment } from "./confirm-handler";
 import { keyPairAuth } from "./host-razorpay";
 import { razorpayOrders } from "./razorpay-orders";
-import { applyCapturedPayment, bookingPayment, confirmPayment, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, processRefunds, reconcilePayments, startPaidBooking } from "./booking-payments";
+import { applyCapturedPayment, bookingPayment, confirmPayment, DEPOSIT_HOLD_MS, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, processRefunds, reconcilePayments, releaseDeposits, startPaidBooking } from "./booking-payments";
 
 const BASE = process.env.TEST_DATABASE_URL;
 const auth = keyPairAuth("rzp_test_abcdefgh12", "k");
@@ -475,6 +475,49 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
       expect((await pool.query("select id, status, updated_at from payments order by id")).rows).toEqual(before);
     });
   });
+  describe("no-show deposits", () => {
+    /** A deposit booking, paid and confirmed, for a session at `startAt`. */
+    async function deposited(startAt: Date) {
+      const fake = fakeRazorpay();
+      const r = await startPaidBooking({ pool, store, auth, orders: fake.orders }, { ...input({ startAt }), priceMinor: 20_000, kind: "deposit" }, new Date());
+      const pay: FakePayment = { id: `pay_${Math.random().toString(36).slice(2, 10)}`, order_id: r.payment!.orderId, amount: 20_000, currency: "INR", status: "captured" };
+      fake.state.payments.set(pay.id, pay);
+      await confirmPayment({ pool, auth, orders: fake.orders }, { bookingId: r.booking.id, paymentId: pay.id, signature: sign(pay.order_id, pay.id) }, new Date());
+      return r.booking;
+    }
+    const pay = async (id: string) => (await pool.query("select kind, status from payments where booking_id = $1", [id])).rows[0];
+
+    it("is refunded a day after the session, kept for a no-show, and left alone before then", async () => {
+      const past = (h: number) => new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000 - h * 3_600_000);
+      const showed = await deposited(past(30));
+      const noShow = await deposited(past(33));
+      const recent = await deposited(past(5));
+      expect(await pay(showed.id)).toEqual({ kind: "deposit", status: "paid" });
+      await store.setNoShow(priya.id, noShow.id, true, new Date());
+      await releaseDeposits(pool, new Date());
+      expect((await pay(showed.id)).status).toBe("refund_pending");
+      expect((await pay(noShow.id)).status).toBe("paid");
+      expect((await pay(recent.id)).status).toBe("paid");
+      // Exactly at the edge it waits; a moment later it goes.
+      const recentEnd = (await booking(recent.id)) && (await pool.query("select end_at from bookings where id = $1", [recent.id])).rows[0].end_at as Date;
+      await releaseDeposits(pool, new Date(recentEnd.getTime() + DEPOSIT_HOLD_MS - 60_000));
+      expect((await pay(recent.id)).status).toBe("paid");
+      await releaseDeposits(pool, new Date(recentEnd.getTime() + DEPOSIT_HOLD_MS + 60_000));
+      expect((await pay(recent.id)).status).toBe("refund_pending");
+    });
+
+    it("a price is never released as if it were a deposit", async () => {
+      const fake = fakeRazorpay();
+      const startAt = new Date(Date.now() - 40 * 3_600_000);
+      const r = await startPaidBooking({ pool, store, auth, orders: fake.orders }, input({ startAt }), new Date());
+      const p: FakePayment = { id: `pay_${Math.random().toString(36).slice(2, 10)}`, order_id: r.payment!.orderId, amount: 50_000, currency: "INR", status: "captured" };
+      fake.state.payments.set(p.id, p);
+      await confirmPayment({ pool, auth, orders: fake.orders }, { bookingId: r.booking.id, paymentId: p.id, signature: sign(p.order_id, p.id) }, new Date());
+      await releaseDeposits(pool, new Date());
+      expect(await pay(r.booking.id)).toEqual({ kind: "payment", status: "paid" });
+    });
+  });
+
   describe("booking routes", () => {
     const now = () => new Date();
     let et: EventType;
@@ -495,6 +538,23 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
 
     beforeEach(() => setPrice(50_000));
     afterAll(() => setPrice(null));
+
+    it("a free event with a deposit holds the booking for the deposit amount", async () => {
+      await setPrice(null);
+      await pool.query("update event_types set deposit_minor = 20000 where id = $1", [eventTypeId]);
+      et = (await store.listEventTypes(priya.id)).find((e) => e.id === eventTypeId)!;
+      try {
+        const fake = fakeRazorpay();
+        const res = await handleCreateBooking(store, await request(), now(), undefined, deps(fake));
+        expect(res.status).toBe(201);
+        const body = res.body as Created & { payment: { amount: number } };
+        expect(body.payment.amount).toBe(20_000);
+        expect((await pool.query("select kind, amount_minor from payments where booking_id = $1", [body.bookingId])).rows[0]).toEqual({ kind: "deposit", amount_minor: 20_000 });
+        expect(await handleCreateBooking(store, { ...(await request()), weeks: 2 }, now(), undefined, deps(fake))).toMatchObject({ status: 400 });
+      } finally {
+        await pool.query("update event_types set deposit_minor = null where id = $1", [eventTypeId]);
+      }
+    });
 
     it("refuses a priced event when the host is on Free, has no Razorpay, or payments aren't set up", async () => {
       const req = await request();

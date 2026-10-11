@@ -15,6 +15,8 @@ interface Props {
   event: string;
   bookingWindowDays: number;
   hostName: string;
+  /** Later weeks of this booking's weekly series still to come; 0 when it isn't part of one. */
+  laterWeeks?: number;
 }
 
 function When({ slot, tz }: { slot: string; tz: string }) {
@@ -22,22 +24,23 @@ function When({ slot, tz }: { slot: string; tz: string }) {
 }
 
 /** The two things a guest can do with a booking: move it, or cancel it. */
-export function ManageBooking({ token, slug, event, bookingWindowDays, hostName }: Props) {
+export function ManageBooking({ token, slug, event, bookingWindowDays, hostName, laterWeeks = 0 }: Props) {
   return (
     <>
       <Reschedule token={token} slug={slug} event={event} bookingWindowDays={bookingWindowDays} />
-      <Cancel token={token} hostName={hostName} />
+      <Cancel token={token} hostName={hostName} laterWeeks={laterWeeks} />
     </>
   );
 }
 
-function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "hostName">) {
+function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "hostName" | "laterWeeks">) {
   const router = useRouter();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [taken, setTaken] = useState<string[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [pastPackage, setPastPackage] = useState(false);
 
   async function confirm() {
     if (!picked) return;
@@ -53,6 +56,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
         return;
       }
       if (res.status === 409 && body.error === "slot_taken") setTaken(body.nextSlots ?? []);
+      else if (res.status === 409 && body.error === "package_expired") setPastPackage(true);
       else if (res.status === 409) router.refresh();
       else setFailed(true);
     } catch {
@@ -85,6 +89,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
             </div>
           )}
           {failed && <p className="text-danger" role="alert">Something went wrong. Your booking hasn&apos;t moved. Try again.</p>}
+          {pastPackage && <p className="text-danger" role="alert">That time is after your package&apos;s end date. Pick an earlier time.</p>}
           <Button onClick={confirm} loading={busy}>{busy ? "Moving…" : "Move my booking to this time"}</Button>
           <button type="button" onClick={() => { setPicked(null); setTaken(null); }} className={`min-h-11 justify-self-start text-sm font-semibold text-accent underline ${focusRing}`}>
             Pick another time
@@ -95,18 +100,20 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
   );
 }
 
-function Cancel({ token, hostName }: { token: string; hostName: string }) {
+function Cancel({ token, hostName, laterWeeks }: { token: string; hostName: string; laterWeeks: number }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const reason = String(new FormData(e.currentTarget).get("reason") ?? "");
+    const data = new FormData(e.currentTarget);
+    const reason = String(data.get("reason") ?? "");
+    const alsoLater = data.get("laterWeeks") === "on";
     setBusy(true); setError(null);
     try {
       const res = await fetch(`/api/b/${encodeURIComponent(token)}/cancel`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason, laterWeeks: alsoLater }),
       });
       const body = await res.json();
       if (res.ok) {
@@ -133,6 +140,12 @@ function Cancel({ token, hostName }: { token: string; hostName: string }) {
             className={`mt-1 block w-full rounded-md border border-border-input bg-card p-3 text-base text-text ${focusRing}`}
           />
         </div>
+        {laterWeeks > 0 && (
+          <label className="flex min-h-11 items-start gap-3 text-text">
+            <input type="checkbox" name="laterWeeks" className={`mt-1 h-5 w-5 accent-accent ${focusRing}`} />
+            <span>Also cancel the {laterWeeks === 1 ? "next week" : `${laterWeeks} later weeks`} in this series</span>
+          </label>
+        )}
         {error && <p className="text-danger" role="alert">{error}</p>}
         <Button type="submit" variant="danger" loading={busy}>{busy ? "Cancelling…" : "Cancel booking"}</Button>
       </form>

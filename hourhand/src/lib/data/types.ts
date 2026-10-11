@@ -47,6 +47,10 @@ export interface EventType {
   position: number;
   /** A one_off type is a one-off meeting: offered only at its own times, through its single-use link. */
   kind: "one_on_one" | "group" | "one_off";
+  /** Guests may book the same time weekly for up to this many weeks in one go; 1 = no repeats. Free event types only. */
+  maxRepeats: number;
+  /** A refundable no-show deposit in paise, on a free event type; null = none. Refunded after the session unless marked a no-show. */
+  depositMinor: number | null;
 }
 
 /** What the host enters for a one-off meeting. */
@@ -112,6 +116,9 @@ export interface Booking {
   cancelReason: string | null;
   /** The booking this one replaced when a guest rescheduled. */
   rescheduledFromId: string | null;
+  /** A weekly series: the first week's booking id, and this week's place in it (1 = first). Both null otherwise. */
+  seriesId: string | null;
+  seriesIndex: number | null;
   createdAt: Date;
 }
 
@@ -127,6 +134,9 @@ export interface Invitee {
   manageToken: string;
   /** When the host marked the guest as not having turned up. */
   noShowAt: Date | null;
+  /** The guest said they're running this many minutes late, and when they said it. */
+  runningLateMinutes: number | null;
+  runningLateAt: Date | null;
 }
 
 /** One entry of invitees.answers (jsonb). The label is copied so later edits to the question don't rewrite history. */
@@ -173,6 +183,10 @@ export interface CreateBookingInput {
   holdUntil?: Date;
   /** Book through a single-use link: it must be open and for this event type, and is used up in the same transaction. */
   bookingLinkToken?: string;
+  /** Book the same time this many weeks running (2+), all or none. The returned booking is the first week. */
+  weeks?: number;
+  /** Pay with a session package (its buyer's token): one credit per booking, checked and used in the same write. Postgres only. */
+  packageToken?: string;
   invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
 }
 
@@ -273,8 +287,11 @@ export interface DataStore {
   getBooking(userId: string, id: string): Promise<BookingWithInvitee | null>;
   getBookingByManageToken(token: string): Promise<BookingWithInvitee | null>;
   createBooking(input: CreateBookingInput): Promise<BookingWithInvitee>;
-  /** Throws NotFoundError unless the booking belongs to `hostId`. */
-  cancelBooking(hostId: string, bookingId: string, by: "host" | "guest", reason?: string): Promise<BookingWithInvitee>;
+  /**
+   * Throws NotFoundError unless the booking belongs to `hostId`. With `laterWeeks`, a week of a series also cancels the
+   * series' later upcoming weeks in the same write; one pair of cancellation emails covers them all.
+   */
+  cancelBooking(hostId: string, bookingId: string, by: "host" | "guest", reason?: string, opts?: { laterWeeks?: boolean }): Promise<BookingWithInvitee>;
   /** Atomically books `startAt` for the same guest and cancels the old booking. The overlap check ignores the old booking. */
   /** `by` is recorded as who cancelled the old booking. */
   rescheduleBooking(hostId: string, bookingId: string, startAt: Date, idempotencyKey: string, by?: "host" | "guest"): Promise<BookingWithInvitee>;
@@ -312,6 +329,8 @@ export interface DataStore {
   /** Public: what `/l/{token}` shows. Only an open link reveals its host and event type. */
   /** `idempotencyKey`: a retried submit whose own booking is what uses the link gets it back as open. */
   resolveBookingLink(token: string, now: Date, opts?: { idempotencyKey?: string }): Promise<ResolvedBookingLink>;
+  /** Records that the guest is running `minutes` late on a confirmed booking and emails the host. NotFoundError otherwise. */
+  markRunningLate(manageToken: string, minutes: number, now: Date): Promise<BookingWithInvitee>;
   /**
    * A hidden one_off event type at the given times, with a single-use link to it that expires at the last time; all in one
    * write. Throws InvalidOneOffError unless there are 1–20 distinct future times and the duration is 5–720 minutes.
@@ -324,7 +343,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

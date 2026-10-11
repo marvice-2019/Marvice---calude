@@ -40,15 +40,19 @@ export function foldLine(line: string): string {
   return parts.join("\r\n ");
 }
 
-export function buildIcs(e: IcsEvent): string {
+/** One file with one event, or one event per week of a weekly series (each week is its own booking). */
+export function buildIcs(events: IcsEvent | IcsEvent[]): string {
   const lines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Hourhand//Bookings//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    "BEGIN:VEVENT",
-    `UID:${e.uid}`, `DTSTAMP:${utc(e.stamp)}`, `DTSTART:${utc(e.start)}`, `DTEND:${utc(e.end)}`,
-    `SUMMARY:${icsText(e.summary)}`, `DESCRIPTION:${icsText(e.description)}`,
-    ...(e.location ? [`LOCATION:${icsText(e.location)}`] : []),
-    `URL:${e.url}`,
-    "END:VEVENT", "END:VCALENDAR",
+    ...[events].flat().flatMap((e) => [
+      "BEGIN:VEVENT",
+      `UID:${e.uid}`, `DTSTAMP:${utc(e.stamp)}`, `DTSTART:${utc(e.start)}`, `DTEND:${utc(e.end)}`,
+      `SUMMARY:${icsText(e.summary)}`, `DESCRIPTION:${icsText(e.description)}`,
+      ...(e.location ? [`LOCATION:${icsText(e.location)}`] : []),
+      `URL:${e.url}`,
+      "END:VEVENT",
+    ]),
+    "END:VCALENDAR",
   ];
   return lines.map(foldLine).join("\r\n") + "\r\n";
 }

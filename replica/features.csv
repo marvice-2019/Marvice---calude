@@ -45,6 +45,14 @@ One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,mus
 Human support reply under 1 business day; WhatsApp/callback on paid plans,support,should,no,no,fix 3: support (14 reviews/2 sources); ops not code
 Date overrides + block-a-week + recurring + one-off links (web and mobile),availability,must,no,partial,"web: overrides, block a stretch of days, one-off links (B8); no recurring sessions, no mobile"
 Mobile app parity with web; save confirmation; crash-free >=99.5%,mobile,must,no,no,fix 5: bugs (26 reviews/2 sources)
-Time zone confirm step and explicit AM/PM or 24h toggle,booking,should,no,no,fix 6: thin (2 reviews/1 source) but cheap
+Time zone confirm step and explicit AM/PM or 24h toggle,booking,should,no,yes,"fix 6: confirm tick when viewing a zone other than the device's, host's time shown; 12h/24h toggle already there"
 Low-cost second seat or flat 2-person price,pricing,should,no,no,fix 7: seats (5 reviews/3 sources) -> /replica-launch
-Dark mode,design,could,no,no,fix 8: thin (2 reviews/1 source)
+Dark mode,design,could,no,yes,"fix 8: follows the device, plus a Device/Light/Dark switch in settings and on booking pages"
+Send confirmation or reminder on WhatsApp from the host's own number,notifications,should,no,yes,"wa.me buttons on a booking; official WhatsApp API later (B9)"
+Block India's public holidays in one go,availability,should,no,yes,DoPT gazetted list 2026-2027; lunar dates flagged
+Guest says they're running late,booking,should,no,yes,"5-30 min, from 2 h before to 30 min after start; emails the host once per choice"
+Offer nearest free times when the host cancels,notifications,should,no,yes,three one-tap links in the guest's cancellation email
+Weekly recurring bookings,booking,should,partial,yes,"up to 12 weeks, all or none, cancel this and later weeks"
+Session packages paid by UPI,payments,should,no,yes,"credits derived from bookings, private buyer link, Razorpay on the host's account"
+Refundable no-show deposit,payments,should,no,yes,refunded a day after the session unless marked a no-show
+GST tax invoices and credit notes to guests,payments,should,no,yes,"CGST Rule 46 particulars, gapless FY numbering, CSV export; CA to confirm"

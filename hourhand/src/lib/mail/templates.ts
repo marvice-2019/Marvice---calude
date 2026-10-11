@@ -27,6 +27,8 @@ export interface BookingMailContext {
   cancelReason: string | null;
   /** What the guest paid for this booking (paise, INR), or null for a free booking. */
   paidMinor?: number | null;
+  /** The payment was a refundable no-show deposit, not a price. */
+  paidIsDeposit?: boolean;
   /** For reschedules: when the booking used to be. */
   previousStartAt: Date | null;
   /** For a rescheduled booking: who moved it (who cancelled the old one). */
@@ -37,6 +39,14 @@ export interface BookingMailContext {
   manageUrl: string;
   /** The host's view of the booking in the dashboard. */
   dashboardUrl: string;
+  /** For late_host: how many minutes late the guest said they'll be. */
+  runningLateMinutes?: number | null;
+  /** For cancelled_guest after the host cancelled: free times to book instead, nearest the cancelled one. */
+  rebook?: { at: Date; url: string }[];
+  /** For the first week's confirmations of a weekly series: every week still booked, in order, the first included. */
+  series?: { bookingId: string; startAt: Date; endAt: Date; manageUrl: string }[];
+  /** For cancellations: later weeks of the same series cancelled in the same step. */
+  alsoCancelled?: Date[];
 }
 
 export interface RenderedMail { subject: string; text: string; html: string; attachments?: Attachment[]; replyTo?: string }
@@ -60,11 +70,12 @@ function where(c: BookingMailContext): string | null {
 }
 
 type Row = [label: string, value: string];
-type Block = { heading: string; intro: string; rows: Row[]; link?: { label: string; url: string }; note?: string; footer: string };
+type Block = { heading: string; intro: string; rows: Row[]; link?: { label: string; url: string }; choices?: { heading: string; items: { label: string; url: string }[] }; note?: string; footer: string };
 
 function toText(b: Block): string {
   const lines = [b.heading, "", b.intro, "", ...b.rows.map(([k, v]) => `${k}: ${v}`)];
   if (b.link) lines.push("", `${b.link.label}: ${b.link.url}`);
+  if (b.choices) lines.push("", b.choices.heading, ...b.choices.items.map((i) => `- ${i.label}: ${i.url}`));
   if (b.note) lines.push("", b.note);
   lines.push("", "—", b.footer);
   return lines.join("\n");
@@ -77,11 +88,15 @@ function toHtml(b: Block): string {
     ? `<p style="margin:24px 0"><a href="${escapeHtml(b.link.url)}" style="background:#16181d;color:#ffffff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${escapeHtml(b.link.label)}</a></p>`
     : "";
   const note = b.note ? `<p style="margin:16px 0;color:#5b6170">${escapeHtml(b.note)}</p>` : "";
+  const choices = b.choices
+    ? `<p style="margin:24px 0 8px;font-weight:600;color:#16181d">${escapeHtml(b.choices.heading)}</p>` + b.choices.items.map((i) =>
+      `<p style="margin:0 0 8px"><a href="${escapeHtml(i.url)}" style="border:1px solid #16181d;color:#16181d;padding:8px 14px;border-radius:6px;text-decoration:none;display:inline-block">${escapeHtml(i.label)}</a></p>`).join("")
+    : "";
   return `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f6f4;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5">
 <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:10px;padding:28px">
 <h1 style="margin:0 0 12px;font-size:20px;color:#16181d">${escapeHtml(b.heading)}</h1>
 <p style="margin:0 0 16px;color:#16181d">${escapeHtml(b.intro)}</p>
-<table role="presentation" style="border-collapse:collapse">${rows}</table>${link}${note}
+<table role="presentation" style="border-collapse:collapse">${rows}</table>${link}${choices}${note}
 <p style="margin:28px 0 0;font-size:13px;color:#8a8f9c">${escapeHtml(b.footer)}</p>
 </div></body></html>`;
 }
@@ -89,29 +104,38 @@ function toHtml(b: Block): string {
 const render = (subject: string, b: Block, extra: Partial<RenderedMail> = {}): RenderedMail =>
   ({ subject: oneLine(subject), text: toText(b), html: toHtml(b), ...extra });
 
+/** "Every week": the series' dates, one line each, when this is a series confirmation. */
+const seriesRow = (c: BookingMailContext, tz: string, cycle: HourCycle): Row[] => [
+  ...(c.series && c.series.length > 1 ? [[`Every week (${c.series.length})`, c.series.map((s) => when(s.startAt, tz, cycle)).join("\n")] as Row] : []),
+  ...(c.alsoCancelled?.length ? [[`Also cancelled (${c.alsoCancelled.length})`, c.alsoCancelled.map((d) => when(d, tz, cycle)).join("\n")] as Row] : []),
+];
+
 function guestRows(c: BookingMailContext): Row[] {
-  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.guestTimezone, "12h")], ["With", hostLabel(c)]];
+  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.guestTimezone, "12h")], ...seriesRow(c, c.guestTimezone, "12h"), ["With", hostLabel(c)]];
   const w = where(c);
   if (w) rows.push(["Where", w]);
-  if (c.paidMinor) rows.push(["Paid", formatMoney(c.paidMinor, "INR")]);
+  if (c.paidMinor) rows.push(c.paidIsDeposit ? ["Deposit", `${formatMoney(c.paidMinor, "INR")}, refunded a day after your session. Kept only if you don't turn up.`] : ["Paid", formatMoney(c.paidMinor, "INR")]);
   return rows;
 }
 
 function hostRows(c: BookingMailContext): Row[] {
-  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.hostTimezone, c.hostTimeFormat)],
+  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.hostTimezone, c.hostTimeFormat)], ...seriesRow(c, c.hostTimezone, c.hostTimeFormat),
     ["Guest", `${c.guestName} <${c.guestEmail}>`], ["Guest's time zone", zoneName(c.guestTimezone)]];
   const w = where(c);
   if (w) rows.push(["Where", w]);
   for (const a of c.answers) if (a.answer.trim()) rows.push([a.label, a.answer]);
-  if (c.paidMinor) rows.push(["Paid", `${formatMoney(c.paidMinor, "INR")} to your Razorpay account`]);
+  if (c.paidMinor) rows.push(c.paidIsDeposit
+    ? ["Deposit", `${formatMoney(c.paidMinor, "INR")} in your Razorpay account. Refunded a day after the session unless you mark a no-show.`]
+    : ["Paid", `${formatMoney(c.paidMinor, "INR")} to your Razorpay account`]);
   return rows;
 }
 
 function calendarFile(c: BookingMailContext): Attachment {
-  const ics = buildIcs({
-    uid: `${c.bookingId}@hourhand`, start: c.startAt, end: c.endAt, stamp: c.issuedAt,
-    summary: `${c.eventName} with ${hostLabel(c)}`, description: `Change or cancel: ${c.manageUrl}`, location: where(c), url: c.manageUrl,
-  });
+  const weeks = c.series && c.series.length > 1 ? c.series : [{ bookingId: c.bookingId, startAt: c.startAt, endAt: c.endAt, manageUrl: c.manageUrl }];
+  const ics = buildIcs(weeks.map((w) => ({
+    uid: `${w.bookingId}@hourhand`, start: w.startAt, end: w.endAt, stamp: c.issuedAt,
+    summary: `${c.eventName} with ${hostLabel(c)}`, description: `Change or cancel: ${w.manageUrl}`, location: where(c), url: w.manageUrl,
+  })));
   return { filename: "booking.ics", content: Buffer.from(ics, "utf8").toString("base64"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" };
 }
 
@@ -124,7 +148,7 @@ function cancelNote(c: BookingMailContext, to: "guest" | "host"): string | undef
   const reason = c.cancelReason ? `Reason given: ${c.cancelReason}` : "";
   // A paid booking is refunded in full on cancellation; say so, since that's what the guest wants to know first.
   const refund = !c.paidMinor ? "" : to === "guest"
-    ? `Your payment of ${formatMoney(c.paidMinor, "INR")} is being refunded to the way you paid. Banks usually take 5 to 7 working days.`
+    ? `Your ${c.paidIsDeposit ? "deposit" : "payment"} of ${formatMoney(c.paidMinor, "INR")} is being refunded to the way you paid. Banks usually take 5 to 7 working days.`
     : `The guest's ${formatMoney(c.paidMinor, "INR")} is being refunded from your Razorpay account.`;
   return [refund, reason].filter(Boolean).join(" ") || undefined;
 }
@@ -135,7 +159,10 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
     case "booked_guest":
       return render(`Booked: ${c.eventName} with ${host}, ${formatDate(c.startAt, c.guestTimezone)}`, {
         heading: "You're booked", intro: `Hi ${c.guestName}, your time with ${host} is confirmed.`,
-        rows: guestRows(c), link: manageLink(c), note: "The attached file adds this to your calendar.", footer: guestFooter(c),
+        rows: guestRows(c), link: manageLink(c), footer: guestFooter(c),
+        note: c.series && c.series.length > 1
+          ? "The attached file adds every week to your calendar. Each week's reminder has its own link to move or cancel that week."
+          : "The attached file adds this to your calendar.",
       }, { attachments: [calendarFile(c)], replyTo: c.hostEmail });
     case "booked_host":
       return render(`New booking: ${c.guestName}, ${c.eventName}, ${formatDate(c.startAt, c.hostTimezone)}`, {
@@ -144,13 +171,16 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
     case "reminder_guest":
       return render(`Reminder: ${c.eventName} with ${host}, ${formatTime(c.startAt, c.guestTimezone, "12h")} ${zoneName(c.guestTimezone)}`, {
         heading: "Coming up soon", intro: `Hi ${c.guestName}, a reminder of your time with ${host}.`,
-        rows: guestRows(c), link: manageLink(c), note: "Can't make it? Use the link above so they know.", footer: guestFooter(c),
+        rows: guestRows(c), link: manageLink(c), note: "Can't make it, or running late on the day? Use the link above so they know.", footer: guestFooter(c),
       }, { replyTo: c.hostEmail });
     case "cancelled_guest":
       return render(`Cancelled: ${c.eventName} with ${host}`, {
         heading: "Your booking is cancelled",
         intro: c.cancelledBy === "guest" ? `Hi ${c.guestName}, you cancelled your time with ${host}.` : `Hi ${c.guestName}, ${host} cancelled your booking.`,
         rows: guestRows(c), note: cancelNote(c, "guest"), footer: guestFooter(c),
+        ...(c.cancelledBy === "host" && c.rebook?.length ? {
+          choices: { heading: `Book another time with ${host}`, items: c.rebook.map((s) => ({ label: when(s.at, c.guestTimezone, "12h"), url: s.url })) },
+        } : {}),
       }, { replyTo: c.hostEmail });
     case "cancelled_host":
       return render(`Cancelled: ${c.guestName}, ${c.eventName}, ${formatDate(c.startAt, c.hostTimezone)}`, {
@@ -164,6 +194,12 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
         rows: [...guestRows(c), ...(c.previousStartAt ? [["Was", when(c.previousStartAt, c.guestTimezone, "12h")] as Row] : [])],
         link: manageLink(c), note: "The attached file adds the new time to your calendar. Remove the old one if you saved it.", footer: guestFooter(c),
       }, { attachments: [calendarFile(c)], replyTo: c.hostEmail });
+    case "late_host":
+      return render(`Running late: ${c.guestName}, ${c.runningLateMinutes ?? "a few"} min, ${c.eventName}`, {
+        heading: `${c.guestName} is running late`,
+        intro: `${c.guestName} says they'll be about ${c.runningLateMinutes ?? "a few"} minutes late for ${c.eventName} at ${formatTime(c.startAt, c.hostTimezone, c.hostTimeFormat)}.`,
+        rows: hostRows(c), link: dashboardLink(c), footer: hostFooter,
+      }, { replyTo: c.guestEmail });
     case "rescheduled_host":
       return render(`Moved: ${c.guestName}, ${c.eventName}, now ${formatDate(c.startAt, c.hostTimezone)}`, {
         heading: "A booking has a new time", intro: c.movedBy === "host" ? `You moved ${c.eventName} with ${c.guestName}.` : `${c.guestName} moved ${c.eventName}.`,
@@ -195,6 +231,42 @@ export function renderRenewalReminder(a: { planName: string; price: string; rene
     link: { label: "Manage your plan", url: a.planUrl },
     footer: "Sent by Hourhand about your subscription.",
   });
+}
+
+export interface PackageMailContext {
+  hostName: string; hostEmail: string; guestName: string; guestEmail: string; packageName: string; eventName: string;
+  sessions: number; priceMinor: number; expiresAt: Date; timezone: string; buyerUrl: string; dashboardUrl: string;
+}
+
+/** A paid session package: the buyer's private link to book their sessions, or the host's note of the sale. */
+export function renderPackageMail(kind: "package_guest" | "package_host", c: PackageMailContext): RenderedMail {
+  const until = formatDate(c.expiresAt, c.timezone);
+  const rows: Row[] = [["Package", c.packageName], ["Sessions", `${c.sessions} × ${c.eventName}`], ["Paid", formatMoney(c.priceMinor, "INR")], ["Book by", until]];
+  if (kind === "package_guest") {
+    return render(`Your ${c.sessions} sessions with ${c.hostName}`, {
+      heading: "Your package is ready", intro: `Hi ${c.guestName}, thanks for buying ${c.packageName}. Book your sessions any time before ${until}.`,
+      rows, link: { label: "Book your sessions", url: c.buyerUrl },
+      note: "Keep this email: the link is yours alone and shows how many sessions you have left. Cancel a session in time and you get it back.",
+      footer: `Sent by Hourhand for ${c.hostName}. Reply to this email to reach them.`,
+    }, { replyTo: c.hostEmail });
+  }
+  return render(`Package sold: ${c.guestName}, ${c.packageName}`, {
+    heading: "You sold a package", intro: `${c.guestName} <${c.guestEmail}> bought ${c.packageName}. The money went to your Razorpay account.`,
+    rows, link: { label: "Open in Hourhand", url: c.dashboardUrl }, footer: "Sent by Hourhand about your booking page.",
+  }, { replyTo: c.guestEmail });
+}
+
+/** A GST invoice or credit note for the guest: the key figures and a link to the full document to view, print or save. */
+export function renderInvoiceMail(v: { kind: "invoice" | "credit_note"; number: string; supplierName: string; supplierEmail: string; totalMinor: number; description: string; url: string; originalNumber: string | null }): RenderedMail {
+  const isNote = v.kind === "credit_note";
+  return render(isNote ? `Credit note ${v.number} from ${v.supplierName}` : `Invoice ${v.number} from ${v.supplierName}`, {
+    heading: isNote ? "Your credit note" : "Your tax invoice",
+    intro: isNote ? `Your refund is recorded against invoice ${v.originalNumber}.` : `Thanks for your payment to ${v.supplierName}. Here's your GST invoice.`,
+    rows: [["Number", v.number], ["For", v.description], [isNote ? "Refunded" : "Paid", formatMoney(v.totalMinor, "INR")]],
+    link: { label: isNote ? "View the credit note" : "View the invoice", url: v.url },
+    note: "Open the link to print it or save it as a PDF for your records.",
+    footer: `Sent by Hourhand for ${v.supplierName}. Reply to this email to reach them.`,
+  }, { replyTo: v.supplierEmail });
 }
 
 export function renderMagicLink(url: string): RenderedMail {

@@ -40,6 +40,9 @@ export async function saveEventType(id: string | null, form: EventTypeForm, ques
   }
   const gate = await priceError(user.id, details.value.priceMinor);
   if (gate) return { ok: false, errors: { price: gate }, questionErrors: [] };
+  // A deposit is a payment too: same plan and Razorpay requirement.
+  const depositGate = await priceError(user.id, details.value.depositMinor);
+  if (depositGate) return { ok: false, errors: { deposit: depositGate }, questionErrors: [] };
   try {
     const saved = id ? await store.updateEventType(user.id, id, details.value) : await store.createEventType(user.id, details.value);
     await store.saveQuestions(user.id, saved.id, checked.value);
