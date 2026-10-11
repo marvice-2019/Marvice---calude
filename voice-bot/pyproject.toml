@@ -1,0 +1,5 @@
+[tool.codeflash]
+# Settings `codeflash init` writes; added by hand because init needs an interactive terminal.
+module-root = "."
+tests-root = "tests"
+formatter-cmds = ["disabled"]
