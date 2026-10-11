@@ -1,5 +1,6 @@
 // Paid bookings against real Postgres and a fake Razorpay (only with TEST_DATABASE_URL; uses its own database <name>_bp,
 // dropped and recreated on every run).
+import { closeAccount } from "../data/account-lifecycle";
 import { createHmac, randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -212,6 +213,21 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
     expect((await payment(r.booking.id))[0]).toMatchObject({ status: "refund_pending", provider_payment_id: pay.id, paid_at: expect.any(Date) });
     expect(await applyCapturedPayment(pool, r.booking.id, pay.id, new Date())).toBe("refund_pending");
   });
+  it("closing the host's account releases a held booking (checked inside a rolled-back transaction)", async () => {
+    const fake = fakeRazorpay();
+    const r = await startPaidBooking({ pool, store, auth, orders: fake.orders }, input(), new Date());
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await closeAccount(client, r.booking.hostId, new Date());
+      const { rows: [b] } = await client.query("select status, hold_expires_at, cancelled_by from bookings where id = $1", [r.booking.id]);
+      expect(b).toMatchObject({ status: "cancelled", hold_expires_at: null, cancelled_by: "system" });
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+  });
+
   describe("reconciler", () => {
     const later = (minutes: number) => new Date(Date.now() + minutes * 60_000);
     const run = (fake: ReturnType<typeof fakeRazorpay>, now: Date) =>

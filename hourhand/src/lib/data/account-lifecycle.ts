@@ -17,6 +17,11 @@ export async function closeAccount(client: Client, userId: string, now: Date): P
   const cancelled = await client.query(
     `update bookings set status = 'cancelled', cancelled_at = $2, cancelled_by = 'host', cancel_reason = 'The host closed their account'
      where host_id = $1 and status = 'confirmed' and start_at > $2 returning id`, [userId, now]);
+  // Holds waiting on a guest's payment are released too. They never sent any email, so they aren't returned for one;
+  // a payment that still lands is caught by the reconciler and refunded.
+  await client.query(
+    `update bookings set status = 'cancelled', cancelled_at = $2, cancelled_by = 'system', cancel_reason = 'The host closed their account', hold_expires_at = null
+     where host_id = $1 and status = 'pending_payment'`, [userId, now]);
   return cancelled.rows.map((r) => r.id as string);
 }
 

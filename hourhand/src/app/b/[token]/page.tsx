@@ -19,6 +19,9 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
   if (!host || !eventType) notFound();
   const tz = booking.invitee.timezone;
   const cancelled = booking.status === "cancelled";
+  const pending = booking.status === "pending_payment";
+  // A hold that ran out before the guest paid: say so plainly rather than "cancelled".
+  const unpaid = cancelled && booking.cancelReason === "Payment not completed";
 
   return (
     <main className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
@@ -38,9 +41,17 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
       </Card>
       {cancelled ? (
         <>
-          <p className="mt-6 font-semibold text-text" role="status">This booking is cancelled.</p>
+          <p className="mt-6 font-semibold text-text" role="status">
+            {unpaid ? "The payment wasn't completed, so this time was released." : "This booking is cancelled."}
+          </p>
           <Link href={`/${host.slug}/${eventType.slug}`} className={`mt-3 ${buttonClasses({ variant: "primary" })}`}>Book another time</Link>
         </>
+      ) : pending ? (
+        <p className="mt-6 max-w-md text-text" role="status">
+          Waiting for your payment. This time is held for you until{" "}
+          {booking.holdExpiresAt ? <LocalTime date={booking.holdExpiresAt} tz={tz} /> : "a few minutes from now"}.
+          If you&apos;ve paid, it confirms here within a minute.
+        </p>
       ) : (
         <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} />
       )}
