@@ -3,9 +3,9 @@ import { LegalLinks } from "@/components/LegalLinks";
 import { SignInForm } from "@/components/SignInForm";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { authEnabled, googleEnabled } from "@/lib/auth/auth";
+import { authEnabled, googleEnabled, microsoftEnabled } from "@/lib/auth/auth";
 import { getSignedInUser } from "@/lib/auth/session";
-import { signInWithGoogle } from "./actions";
+import { signInWithGoogle, signInWithMicrosoft } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       )}
       {error && (
         <p role="alert" className="mt-4 rounded-md bg-danger-bg p-3 text-sm text-danger">
-          That link didn&apos;t work. It may have expired or been used already. Ask for a new one below.
+          {error === "microsoft"
+            ? "We couldn't sign you in with Microsoft. If you already have a Hourhand account with that email, sign in with an email link below instead."
+            : "That link didn't work. It may have expired or been used already. Ask for a new one below."}
         </p>
       )}
       <Card className="mt-6">
@@ -39,6 +41,13 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           <form action={signInWithGoogle} className="mt-4 border-t border-border pt-4">
             <Button type="submit" variant="secondary" className="w-full">
               Continue with Google
+            </Button>
+          </form>
+        )}
+        {authEnabled() && microsoftEnabled() && (
+          <form action={signInWithMicrosoft} className={googleEnabled() ? "mt-3" : "mt-4 border-t border-border pt-4"}>
+            <Button type="submit" variant="secondary" className="w-full">
+              Continue with Microsoft
             </Button>
           </form>
         )}

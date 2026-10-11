@@ -17,6 +17,25 @@ export function googleEnabled(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+export function microsoftEnabled(): boolean {
+  return Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
+}
+
+/**
+ * Social sign-in providers from the environment. Microsoft is deliberately not a trusted provider for account linking:
+ * Entra often doesn't vouch for the email, so a Microsoft account showing someone's address must not take over their
+ * Hourhand account. An email that already has an account is refused and the host signs in with their email link.
+ */
+export function socialProvidersFromEnv(env: Record<string, string | undefined> = process.env) {
+  return {
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } } : {}),
+    // tenant "common": work, school and personal Microsoft accounts. No profile photo: it would be stored inline in users.image.
+    ...(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET
+      ? { microsoft: { clientId: env.MICROSOFT_CLIENT_ID, clientSecret: env.MICROSOFT_CLIENT_SECRET, tenantId: "common", disableProfilePhoto: true } }
+      : {}),
+  };
+}
+
 /**
  * The public base URL that sign-in links are built from. Production must set it: without it Better Auth
  * falls back to the request's Host header, and a forged Host would put a stranger's domain in a real sign-in email.
@@ -104,9 +123,7 @@ function createAuth() {
         },
       },
     },
-    socialProviders: googleEnabled()
-      ? { google: { clientId: process.env.GOOGLE_CLIENT_ID as string, clientSecret: process.env.GOOGLE_CLIENT_SECRET as string } }
-      : {},
+    socialProviders: socialProvidersFromEnv(),
     plugins: [
       magicLink({ expiresIn: 15 * 60, storeToken: "hashed", sendMagicLink: async ({ email, url }) => {
           // Both the sign-in page and direct calls to /api/auth reach here, so the per-email limit lives here.
