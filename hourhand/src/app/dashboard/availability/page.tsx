@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { todayIn } from "@/lib/availability";
 import { store, type Interval } from "@/lib/data";
 import { deleteDateOverrideAction } from "./actions";
+import { requireUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ const longDate = (date: string) =>
 const hoursText = (intervals: Interval[]) => (intervals.length ? intervals.map((i) => `${i.from}–${i.to}`).join(", ") : "Unavailable");
 
 export default async function AvailabilityPage() {
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   const { schedule, rules } = await store.getDefaultSchedule(user.id);
   const today = todayIn(schedule.timezone, new Date());
 

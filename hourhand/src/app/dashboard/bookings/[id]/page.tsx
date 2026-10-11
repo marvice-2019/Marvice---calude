@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { store } from "@/lib/data";
+import { requireUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   const booking = await store.getBooking(user.id, id);
   if (!booking) notFound();
   return (

@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { requireUser } from "@/lib/auth/session";
 
-export default function IntegrationsPage() {
+export default async function IntegrationsPage() {
+  await requireUser();
   return (
     <div>
       <h1 className="font-display text-xl text-text">Integrations</h1>

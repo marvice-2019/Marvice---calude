@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { todayIn, validateDateOverride, validateDateRange, validateWeeklyHours, type FieldErrors, type WeeklyHours } from "@/lib/availability";
 import { store, type Interval } from "@/lib/data";
+import { requireUser } from "@/lib/auth/session";
 
 export type FormState = { status: "idle" | "saved" | "error"; errors: FieldErrors; savedAt?: number };
 
@@ -10,7 +11,7 @@ const PATH = "/dashboard/availability";
 
 /** The signed-in host's default schedule. The schedule id never comes from the form. */
 async function mySchedule() {
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   return (await store.getDefaultSchedule(user.id)).schedule;
 }
 
