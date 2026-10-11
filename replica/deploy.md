@@ -23,7 +23,7 @@ The repo is ready to deploy as a **public beta**. Five must-have features are st
 | Favicon, title, share image | yours (`src/app/icon.svg`, `src/app/opengraph-image.tsx`) |
 | Real Docker build | **not run here** (no Docker daemon in this sandbox); the first Coolify build is the real test. The steps it runs were each run above |
 
-**Still missing (must-haves):** Outlook calendar and Microsoft sign-in (B6, next), text/WhatsApp reminders (B9), add-guests on the booking form, an add-to-calendar button on the confirmation page (the confirmation email already carries the calendar file).
+**Still missing (must-haves):** text/WhatsApp reminders (B9), add-guests on the booking form, an add-to-calendar button on the confirmation page (the confirmation email already carries the calendar file).
 
 **Not yet tried against the real services:** Resend sending, Google Calendar freeBusy and push, Razorpay Checkout in a browser. The first live booking is that test.
 
@@ -77,7 +77,7 @@ Generate the two random values on your own machine with `openssl rand -hex 32` (
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | from Razorpay (test first) | for paid plans |
 | `RAZORPAY_PLAN_SOLO_MONTH`, `_SOLO_YEAR`, `_DUO_MONTH`, `_DUO_YEAR` | the 4 Plan ids | for paid plans |
 | `STRIPE_*` | only if you get Stripe (see backend.md) | no |
-| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | from Entra (section 6); used once B6 ships | after B6 |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | from Entra (section 6) | for Outlook and Sign in with Microsoft |
 | `TRUSTED_PROXIES` | leave unset (defaults cover Coolify's Docker network) | no |
 
 Never set `HOURHAND_ALLOW_MEMORY`, `HOURHAND_MAIL_TO_LOG`, `HOURHAND_E2E`, `GOOGLE_API_BASE_URL` or `RAZORPAY_API_BASE_URL` in production; they exist for local testing only.

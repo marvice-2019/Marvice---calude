@@ -1,7 +1,7 @@
 feature,area,priority,original,clone,notes
-"Sign up with email, Google or Microsoft",onboarding,must,yes,partial,S01: email sign-in link and Google; Microsoft comes with B6
+"Sign up with email, Google or Microsoft",onboarding,must,yes,yes,"S01 + B6: email sign-in link, Google, Microsoft (Microsoft not trusted for account linking)"
 Connect Google Calendar to read busy times,calendar,must,yes,yes,"B4: OAuth with PKCE, busy times every 5 min plus instant push, sync light"
-Connect Outlook / Office 365 calendar,calendar,must,yes,no,B6 next (Entra app registered by the owner)
+Connect Outlook / Office 365 calendar,calendar,must,yes,yes,"B6: work, school and personal accounts; busy times every 5 min via calendarView; no push yet"
 Choose which calendars to check for conflicts,calendar,must,yes,yes,B4: tick calendars to check; Free plan checks up to 2
 Choose one calendar new bookings are added to,calendar,must,yes,yes,B4: 'Add bookings here' per calendar
 Weekly working hours with time zone,availability,must,yes,yes,"S09: per-weekday ranges, on/off, copy Monday to weekdays, validated"
@@ -30,7 +30,7 @@ One-off meeting and single-use links,sharing,should,yes,no,S19; API one-off even
 "Meeting detail with cancel, reschedule, mark no-show",host,must,yes,yes,"B7: host cancel with reason, move to a free time, no-show and undo"
 Confirmation email + calendar invite to host and guest,notifications,must,yes,yes,B3: emails with .ics to both; B4: event in the host's calendar with Meet link
 "Reminders before the meeting (email, text)",notifications,must,yes,partial,B3: email reminders; WhatsApp in B9; no SMS
-"Video link auto-created (Google Meet, Zoom)",integrations,should,yes,partial,B4: Google Meet; Teams with B6; no Zoom
+"Video link auto-created (Google Meet, Zoom)",integrations,should,yes,partial,Google Meet (B4) and Microsoft Teams on work/school Outlook (B6); no Zoom
 Collect payment at booking (Stripe / PayPal),payments,should,yes,partial,"B5b: Razorpay through the host's own account, refunds on cancel; no Stripe or PayPal"
 Meeting polls,event types,could,yes,no,help meeting polls
 Round robin / collective team scheduling,teams,skip,yes,skip,out of scope: sales-team product; Duo gets a shared calendar
@@ -39,7 +39,7 @@ Notetaker and Callie AI assistant,ai,skip,yes,skip,out of scope: reviewers ask f
 Contacts and Opportunities CRM,crm,skip,yes,skip,out of scope: 'calendar app that desires to be a CRM'
 "Single sign-on, SCIM, admin roles",admin,skip,yes,skip,out of scope: enterprise
 Exchange on-premise calendars,calendar,skip,yes,skip,out of scope at launch: rare for solo coaches
-Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,partial,"Google: sync light, email alert on disconnect; Outlook B6; no iCloud, no WhatsApp alert"
+Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,partial,"Google and Outlook: sync light, email alert on disconnect; no iCloud, no WhatsApp alert"
 Never offer a slot when calendar sync is stale,integrations,must,no,yes,slot engine refuses stale sync; real Google sync since B4
 One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,must,no,yes,"B5a: cancel, pause and resume, renewal email 7 days ahead"
 Human support reply under 1 business day; WhatsApp/callback on paid plans,support,should,no,no,fix 3: support (14 reviews/2 sources); ops not code
