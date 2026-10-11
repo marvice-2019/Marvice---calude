@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeSlots } from "../slots";
 import { createMemoryStore } from "./memory-store";
 import { buildSeed } from "./seed";
-import { NotFoundError, SlotTakenError } from "./types";
+import { LinkUnavailableError, LinkUsedError, NotFoundError, SlotTakenError } from "./types";
 
 const NOW = new Date("2026-10-10T06:00:00Z");
 const guest = { name: "Meera Iyer", email: "meera@example.com", timezone: "Asia/Kolkata", phone: null, answers: [] };
@@ -109,6 +109,35 @@ describe("memory store createBooking", () => {
     expect(await store.purgeDeletedAccounts(new Date(NOW.getTime() + 31 * 864e5))).toBe(1);
     expect(await store.listBookings(host.id)).toEqual([]);
     expect(await store.listEventTypes(host.id)).toEqual([]);
+  });
+});
+
+describe("memory store single-use booking links", () => {
+  it("creates, lists, consumes, resolves and revokes like the Postgres store", async () => {
+    const { store, host } = await setup();
+    const startAt = new Date(NOW.getTime() + 20 * 24 * 60 * 60_000);
+    const { link, token } = await store.createBookingLink(host.id, "evt_intro", { label: "Ravi" }, NOW);
+    expect(link).toMatchObject({ eventTypeId: "evt_intro", label: "Ravi", state: "open", usedBy: null });
+    expect(await store.resolveBookingLink(token, NOW)).toMatchObject({ status: "open", host: { id: host.id }, eventType: { id: "evt_intro" } });
+    expect(await store.resolveBookingLink("nope", NOW)).toEqual({ status: "not_found" });
+    await expect(store.createBookingLink("someone-else", "evt_intro", {}, NOW)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(store.createBooking({ eventTypeId: "evt_coaching", startAt, idempotencyKey: "l0", bookingLinkToken: token, invitee: guest }))
+      .rejects.toBeInstanceOf(LinkUnavailableError);
+
+    const booking = await store.createBooking({ eventTypeId: "evt_intro", startAt, idempotencyKey: "l1", bookingLinkToken: token, invitee: guest });
+    expect((await store.listBookingLinks(host.id, NOW))[0]).toMatchObject({ id: link.id, state: "used", usedBy: { bookingId: booking.id, guestName: guest.name } });
+    expect(await store.resolveBookingLink(token, NOW)).toEqual({ status: "used" });
+    await expect(store.createBooking({ eventTypeId: "evt_intro", startAt: new Date(startAt.getTime() + 3600_000), idempotencyKey: "l2", bookingLinkToken: token, invitee: guest }))
+      .rejects.toBeInstanceOf(LinkUsedError);
+    await store.cancelBooking(host.id, booking.id, "guest");
+    expect((await store.listBookingLinks(host.id, NOW))[0].state).toBe("used");
+
+    const other = await store.createBookingLink(host.id, "evt_coaching", { expiresAt: new Date(NOW.getTime() + 60_000) }, NOW);
+    expect((await store.listBookingLinks(host.id, NOW)).map((l) => l.id)).toEqual([other.link.id, link.id]);
+    expect(await store.resolveBookingLink(other.token, new Date(NOW.getTime() + 120_000))).toEqual({ status: "expired" });
+    await expect(store.revokeBookingLink("someone-else", other.link.id, NOW)).rejects.toBeInstanceOf(NotFoundError);
+    expect(await store.revokeBookingLink(host.id, other.link.id, NOW)).toMatchObject({ state: "revoked", revokedAt: NOW });
+    expect(await store.resolveBookingLink(other.token, NOW)).toEqual({ status: "revoked" });
   });
 });
 

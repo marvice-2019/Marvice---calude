@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { datesInRange } from "../availability";
 import { overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
+import { hashLinkToken, newLinkToken } from "../links";
 import {
-  EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft,
-  type Interval,
+  EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type BookingLink, type BookingWithInvitee,
+  type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval,
 } from "./types";
 
 const MIN = 60_000;
@@ -14,6 +15,27 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   const db = structuredClone(seed);
   const deleted = new Map<string, Date>(); // user id -> when the account was closed
   const host = db.users[0];
+  type LinkRow = { id: string; userId: string; eventTypeId: string; tokenHash: string; label: string | null; expiresAt: Date | null; revokedAt: Date | null; createdAt: Date };
+  const links: LinkRow[] = []; // newest last
+  const linkOfBooking = new Map<string, string>(); // booking id -> booking link id (bookings.booking_link_id)
+
+  /** Same derived rule as Postgres: used when a booking made through it exists that the system didn't cancel. */
+  function toLink(row: LinkRow, now: Date): BookingLink {
+    const used = db.bookings.filter((b) => linkOfBooking.get(b.id) === row.id && !(b.status === "cancelled" && b.cancelledBy === "system")).at(-1);
+    const usedBy = used ? { bookingId: used.id, guestName: used.invitee.name, startAt: used.startAt } : null;
+    const state = usedBy ? "used" : row.revokedAt ? "revoked" : row.expiresAt && row.expiresAt.getTime() <= now.getTime() ? "expired" : "open";
+    return { id: row.id, eventTypeId: row.eventTypeId, label: row.label, expiresAt: row.expiresAt, revokedAt: row.revokedAt, createdAt: row.createdAt, state, usedBy };
+  }
+
+  /** Checks the link is open and for this event type. Synchronous with the insert that follows, so no race. */
+  function openLink(token: string, eventTypeId: string): LinkRow {
+    const row = links.find((l) => l.tokenHash === hashLinkToken(token));
+    if (!row || row.eventTypeId !== eventTypeId) throw new LinkUnavailableError("not_found");
+    const { state } = toLink(row, new Date());
+    if (state === "used") throw new LinkUsedError();
+    if (state !== "open") throw new LinkUnavailableError(state);
+    return row;
+  }
 
   /** Builds a confirmed booking after the overlap check. `movingId` is the booking being rescheduled, which the check skips. */
   function build(input: CreateBookingInput, movingId: string | null): BookingWithInvitee {
@@ -126,9 +148,37 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
         if (repeat.eventTypeId === input.eventTypeId && repeat.rescheduledFromId === null) return repeat;
         throw new RequestKeyConflictError();
       }
+      const link = input.bookingLinkToken === undefined ? null : openLink(input.bookingLinkToken, input.eventTypeId);
       const booking = build(input, null);
       db.bookings.push(booking);
+      if (link) linkOfBooking.set(booking.id, link.id);
       return booking;
+    },
+    async createBookingLink(hostId, eventTypeId, opts, now) {
+      if (!owned(hostId, eventTypeId).active) throw new NotFoundError("Event type");
+      const token = newLinkToken();
+      const row: LinkRow = { id: randomUUID(), userId: hostId, eventTypeId, tokenHash: hashLinkToken(token), label: opts.label ?? null, expiresAt: opts.expiresAt ?? null, revokedAt: null, createdAt: new Date() };
+      links.push(row);
+      return { link: toLink(row, now), token };
+    },
+    async listBookingLinks(hostId, now) {
+      return links.filter((l) => l.userId === hostId).reverse().map((l) => toLink(l, now));
+    },
+    async revokeBookingLink(hostId, linkId, now) {
+      const row = links.find((l) => l.userId === hostId && l.id === linkId);
+      if (!row || toLink(row, now).state !== "open") throw new NotFoundError("Booking link");
+      row.revokedAt = now;
+      return toLink(row, now);
+    },
+    async resolveBookingLink(token, now) {
+      const row = links.find((l) => l.tokenHash === hashLinkToken(token));
+      if (!row) return { status: "not_found" };
+      const link = toLink(row, now);
+      if (link.state !== "open") return { status: link.state };
+      const linkHost = deleted.has(row.userId) ? undefined : db.users.find((u) => u.id === row.userId);
+      const eventType = db.eventTypes.find((e) => e.id === row.eventTypeId && e.active);
+      if (!linkHost || !eventType) return { status: "not_found" };
+      return { status: "open", link, host: linkHost, eventType };
     },
     async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey, by = "guest") {
       const repeat = db.bookings.find((b) => b.idempotencyKey === idempotencyKey);

@@ -3,9 +3,10 @@ import { datesInRange } from "../availability";
 import { kickJobs } from "../jobs/kick";
 import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
 import { queueBookingNotifications } from "./notifications";
+import { hashLinkToken, newLinkToken } from "../links";
 import {
-  EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
-  type EventType, type EventTypeDraft, type Interval, type User,
+  EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingLink,
+  type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval, type User,
 } from "./types";
 
 const MIN = 60_000;
@@ -54,6 +55,21 @@ const toBooking = (r: Row): BookingWithInvitee => ({
   },
 });
 
+/** The derived "used" rule, over bookings aliased b: any booking made through the link except one the system cancelled. */
+const USES_LINK = "not (b.status = 'cancelled' and b.cancelled_by = 'system')";
+const LINK = `select l.id, l.user_id, l.event_type_id, l.label, l.expires_at, l.revoked_at, l.created_at,
+  u.id as used_booking_id, u.name as used_guest_name, u.start_at as used_start_at
+  from booking_links l
+  left join lateral (select b.id, i.name, b.start_at from bookings b join invitees i on i.booking_id = b.id
+    where b.booking_link_id = l.id and ${USES_LINK} order by b.created_at desc limit 1) u on true`;
+const toLink = (r: Row, now: Date): BookingLink => {
+  const expiresAt = (r.expires_at as Date | null) ?? null;
+  const revokedAt = (r.revoked_at as Date | null) ?? null;
+  const usedBy = r.used_booking_id ? { bookingId: r.used_booking_id as string, guestName: r.used_guest_name as string, startAt: r.used_start_at as Date } : null;
+  const state = usedBy ? "used" : revokedAt ? "revoked" : expiresAt && expiresAt.getTime() <= now.getTime() ? "expired" : "open";
+  return { id: r.id as string, eventTypeId: r.event_type_id as string, label: (r.label as string | null) ?? null, expiresAt, revokedAt, createdAt: r.created_at as Date, state, usedBy };
+};
+
 const code = (error: unknown) => (error as { code?: string }).code;
 
 /** Postgres implementation of DataStore. Every read or write of host data filters by the user id it is given. */
@@ -84,7 +100,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
    * Inserts a booking (confirmed, or pending_payment with a hold) and its invitee. The no_double_booking constraint is the
    * overlap guard (23P01); it covers holds too, so this host's lapsed holds are cancelled first and never block the insert.
    */
-  async function insertBooking(client: pg.PoolClient, input: CreateBookingInput, movingId: string | null): Promise<string> {
+  async function insertBooking(client: pg.PoolClient, input: CreateBookingInput, movingId: string | null, linkId: string | null = null): Promise<string> {
     if (!isId(input.eventTypeId)) throw new Error(`Unknown event type ${input.eventTypeId}`);
     await expireHolds(client, input.eventTypeId);
     const { rows } = await client.query(
@@ -96,10 +112,10 @@ export function createPgStore(pool: pg.Pool): DataStore {
     const startAt = input.startAt;
     const endAt = new Date(startAt.getTime() + et.duration_minutes * MIN);
     const inserted = await client.query(
-      `insert into bookings (event_type_id, host_id, start_at, end_at, buffered_start, buffered_end, status, location_kind, idempotency_key, rescheduled_from_id, hold_expires_at)
-       values ($1,$2,$3,$4,$5,$6,$10,$7,$8,$9,$11) returning id`,
+      `insert into bookings (event_type_id, host_id, start_at, end_at, buffered_start, buffered_end, status, location_kind, idempotency_key, rescheduled_from_id, hold_expires_at, booking_link_id)
+       values ($1,$2,$3,$4,$5,$6,$10,$7,$8,$9,$11,$12) returning id`,
       [input.eventTypeId, et.user_id, startAt, endAt, new Date(startAt.getTime() - et.buffer_before_minutes * MIN), new Date(endAt.getTime() + et.buffer_after_minutes * MIN),
-        et.location_kind, input.idempotencyKey, movingId, input.holdUntil ? "pending_payment" : "confirmed", input.holdUntil ?? null]);
+        et.location_kind, input.idempotencyKey, movingId, input.holdUntil ? "pending_payment" : "confirmed", input.holdUntil ?? null, linkId]);
     const id = inserted.rows[0].id as string;
     const i = input.invitee;
     await client.query("insert into invitees (booking_id, host_id, name, email, timezone, phone, answers) values ($1,$2,$3,$4,$5,$6,$7)",
@@ -115,6 +131,30 @@ export function createPgStore(pool: pg.Pool): DataStore {
     await client.query(
       `update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null
        where host_id = (select user_id from event_types where id = $1) and status = 'pending_payment' and hold_expires_at < now()`, [eventTypeId]);
+  }
+
+  /**
+   * Uses up the single-use link for this booking, inside its transaction; returns the link id to record on it. The row
+   * lock serialises bookings on one link, and the used check is a separate statement so its fresh snapshot sees a
+   * booking the lock holder just committed.
+   */
+  async function takeLink(client: pg.PoolClient, input: CreateBookingInput, token: string): Promise<string> {
+    if (!isId(input.eventTypeId)) throw new Error(`Unknown event type ${input.eventTypeId}`);
+    // A lapsed payment hold made through the link frees it once cancelled by the system.
+    await expireHolds(client, input.eventTypeId);
+    const { rows } = await client.query("select id, event_type_id, expires_at, revoked_at from booking_links where token_hash = $1 for update", [hashLinkToken(token)]);
+    const link = rows[0];
+    if (!link || link.event_type_id !== input.eventTypeId) throw new LinkUnavailableError("not_found");
+    const used = await client.query(`select 1 from bookings b where b.booking_link_id = $1 and ${USES_LINK}`, [link.id]);
+    if (used.rowCount) throw new LinkUsedError();
+    if (link.revoked_at) throw new LinkUnavailableError("revoked");
+    if (link.expires_at && (link.expires_at as Date).getTime() <= Date.now()) throw new LinkUnavailableError("expired");
+    return link.id as string;
+  }
+
+  async function linkRows(db: Db, where: string, values: unknown[], now: Date): Promise<{ userId: string; link: BookingLink }[]> {
+    const { rows } = await db.query(`${LINK} where ${where} order by l.created_at desc`, values);
+    return rows.map((r) => ({ userId: r.user_id as string, link: toLink(r, now) }));
   }
 
   /** A key already used for this same request returns its booking; a key used for anything else is a conflict. */
@@ -254,7 +294,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
       if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
         const id = await tx(async (client) => {
-          const newId = await insertBooking(client, input, null);
+          const linkId = input.bookingLinkToken === undefined ? null : await takeLink(client, input, input.bookingLinkToken);
+          const newId = await insertBooking(client, input, null, linkId);
           // A held booking says nothing yet: its emails and calendar write go out once the payment is confirmed.
           if (!input.holdUntil) await queueBookingNotifications(client, newId, "booked", new Date());
           return newId;
@@ -421,6 +462,41 @@ export function createPgStore(pool: pg.Pool): DataStore {
         }
         return saved;
       });
+    },
+    async createBookingLink(hostId, eventTypeId, opts, now) {
+      const eventType = await owned(pool, hostId, eventTypeId);
+      if (!eventType.active) throw new NotFoundError("Event type");
+      const token = newLinkToken();
+      const { rows } = await pool.query("insert into booking_links (user_id, event_type_id, token_hash, label, expires_at) values ($1,$2,$3,$4,$5) returning id",
+        [hostId, eventTypeId, hashLinkToken(token), opts.label ?? null, opts.expiresAt ?? null]);
+      const [{ link }] = await linkRows(pool, "l.id = $1", [rows[0].id], now);
+      return { link, token };
+    },
+    async listBookingLinks(hostId, now) {
+      if (!isId(hostId)) return [];
+      return (await linkRows(pool, "l.user_id = $1", [hostId], now)).map((r) => r.link);
+    },
+    async revokeBookingLink(hostId, linkId, now) {
+      if (!isId(hostId) || !isId(linkId)) throw new NotFoundError("Booking link");
+      return tx(async (client) => {
+        // Locked like a booking through it would, so a revoke and a booking can't both win.
+        const locked = await client.query("select 1 from booking_links where id = $1 and user_id = $2 for update", [linkId, hostId]);
+        if (!locked.rowCount) throw new NotFoundError("Booking link");
+        const [{ link }] = await linkRows(client, "l.id = $1", [linkId], now);
+        if (link.state !== "open") throw new NotFoundError("Booking link");
+        await client.query("update booking_links set revoked_at = $2 where id = $1", [linkId, now]);
+        return { ...link, revokedAt: now, state: "revoked" as const };
+      });
+    },
+    async resolveBookingLink(token, now) {
+      const [found] = await linkRows(pool, "l.token_hash = $1", [hashLinkToken(token)], now);
+      if (!found) return { status: "not_found" };
+      if (found.link.state !== "open") return { status: found.link.state };
+      // A closed account or a link turned off reads as unknown: nothing about the host leaks.
+      const host = await this.getUser(found.userId);
+      const eventType = host && await this.getEventType(host.id, found.link.eventTypeId);
+      if (!host || !eventType?.active) return { status: "not_found" };
+      return { status: "open", link: found.link, host, eventType };
     },
   };
 }

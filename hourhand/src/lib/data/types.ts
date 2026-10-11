@@ -151,7 +151,50 @@ export interface CreateBookingInput {
   idempotencyKey: string;
   /** Set for a paid booking: it starts as pending_payment holding the slot until then, with no emails yet. Postgres only. */
   holdUntil?: Date;
+  /** Book through a single-use link: it must be open and for this event type, and is used up in the same transaction. */
+  bookingLinkToken?: string;
   invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
+}
+
+export type BookingLinkState = "open" | "used" | "expired" | "revoked";
+
+/**
+ * A single-use booking link. `state` is derived: used when a booking made through it exists that the system didn't
+ * cancel (a lapsed payment hold frees it); otherwise revoked, then expired, then open.
+ */
+export interface BookingLink {
+  id: string;
+  eventTypeId: string;
+  label: string | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  createdAt: Date;
+  state: BookingLinkState;
+  usedBy: { bookingId: string; guestName: string; startAt: Date } | null;
+}
+
+export type ResolvedBookingLink =
+  | { status: "open"; link: BookingLink; host: User; eventType: EventType }
+  | { status: "used" | "expired" | "revoked" | "not_found" };
+
+/** Someone already booked through this single-use link (or won the race to). */
+export class LinkUsedError extends Error {
+  readonly code = "link_used";
+  constructor() {
+    super("This link has already been used");
+    this.name = "LinkUsedError";
+  }
+}
+
+/** A booking link that can't be booked through: unknown (or for another event type), expired or revoked. */
+export class LinkUnavailableError extends Error {
+  readonly code = "link_unavailable";
+  readonly status: "used" | "expired" | "revoked" | "not_found";
+  constructor(status: "used" | "expired" | "revoked" | "not_found") {
+    super(status === "not_found" ? "Booking link not found" : `This link is ${status}`);
+    this.name = "LinkUnavailableError";
+    this.status = status;
+  }
 }
 
 /** Mirrors the bookings.no_double_booking exclusion constraint (Postgres 23P01). */
@@ -231,6 +274,14 @@ export interface DataStore {
   deleteAccount(userId: string, now?: Date): Promise<BookingWithInvitee[]>;
   /** Permanently removes accounts deleted more than 30 days before `now`, with everything they own. Returns how many. */
   purgeDeletedAccounts(now?: Date): Promise<number>;
+  /** Throws NotFoundError unless the event type is `hostId`'s and active. The raw token is returned only here. */
+  createBookingLink(hostId: string, eventTypeId: string, opts: { label?: string; expiresAt?: Date | null }, now: Date): Promise<{ link: BookingLink; token: string }>;
+  /** Newest first. */
+  listBookingLinks(hostId: string, now: Date): Promise<BookingLink[]>;
+  /** Throws NotFoundError unless it is `hostId`'s link and open at `now`. */
+  revokeBookingLink(hostId: string, linkId: string, now: Date): Promise<BookingLink>;
+  /** Public: what `/l/{token}` shows. Only an open link reveals its host and event type. */
+  resolveBookingLink(token: string, now: Date): Promise<ResolvedBookingLink>;
 }
 
 /** The editable fields of an event type, already validated. */
