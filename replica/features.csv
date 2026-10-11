@@ -12,19 +12,19 @@ Multiple duration options on one event type,event types,should,yes,no,S05; help 
 "Event location: video, phone, in person, custom, ask invitee",event types,must,yes,yes,"S05: Meet, Zoom, Teams, phone either way, in person, custom, guest picks; Meet link auto-created, Teams link with B6"
 "Minimum notice, booking window, start increments",event types,must,yes,yes,"slot engine, tested"
 Buffers before and after meetings,event types,must,yes,yes,"slot engine + booking overlap check, tested"
-Daily / weekly booking limits,event types,should,yes,partial,daily limit editable and enforced by slot engine; no weekly limit
+Daily / weekly booking limits,event types,should,yes,yes,"D5: daily and weekly (Monday-Sunday in the host's zone) limits, weekly at least daily, both enforced by the slot engine"
 Hidden event types (link only),event types,should,yes,yes,"B8: 'Only people with the link can book' in the editor; off the profile, own URL still books"
 Custom questions on the booking form,booking,must,yes,yes,required questions enforced; answers saved with question label and shown to host
 "Group event type (one host, many invitees, seat limit)",event types,could,yes,no,S05; API kind=group
 Public profile page listing event types,booking,must,yes,yes,"S13 lists active, non-hidden event types"
 "Booking page: date picker, slots, guest time zone, 12h/24h",booking,must,yes,yes,"S14: calendar, guest zone + picker, 12h/24h toggle remembered per browser"
-Guest details form with add-guests and text-reminder phone,booking,must,yes,partial,S15: phone + answers saved; add-guests not built
-Confirmation page with add-to-calendar and optional redirect,booking,must,yes,partial,"S16 summary + manage link, follows guest 12h/24h; no add-to-calendar file or redirect yet"
+Guest details form with add-guests and text-reminder phone,booking,must,yes,yes,"S15 + D2: phone, answers, up to 5 extra guests who get invites and reminders but never the manage link"
+Confirmation page with add-to-calendar and optional redirect,booking,must,yes,yes,"S16 + D1: Google, Outlook and .ics; optional https redirect after 5 s, checked again when the page renders"
 "Guest cancel via emailed link, with reason",booking,must,yes,yes,S17 + B3: manage link in every email; reason and cut-off
 Guest reschedule via emailed link,booking,must,yes,yes,"S18 + B3: atomic move, new link, email says who moved it"
-Cancellation policy text and cut-off,booking,should,yes,partial,cut-off enforced on cancel; no policy text field in the UI yet
-Prefill guest details via link parameters,booking,could,yes,no,help prefill
-Embed booking page on a website (inline / popup),sharing,should,yes,no,help embed options
+Cancellation policy text and cut-off,booking,should,yes,yes,"D5: policy text up to 1,000 characters on the booking page and next to Cancel; cut-off enforced"
+Prefill guest details via link parameters,booking,could,yes,yes,D4: ?name= and ?email= fill the details form
+Embed booking page on a website (inline / popup),sharing,should,yes,yes,"D4: /embed.js inline or popup, iframe resizes itself; dashboard and sign-in pages can't be framed"
 One-off meeting and single-use links,sharing,should,yes,yes,"B8: single-use links (hashed, used once, revocable) and one-off meetings with up to 20 hand-picked times, on the Links page"
 "Meetings list: upcoming, past, cancelled",host,must,yes,yes,"S11 lists bookings upcoming first, cancelled marked"
 "Meeting detail with cancel, reschedule, mark no-show",host,must,yes,yes,"B7: host cancel with reason, move to a free time, no-show and undo"
@@ -60,4 +60,4 @@ Private client notes and session history,crm,should,no,yes,"clients grouped by e
 Monthly earnings report,payments,should,no,yes,"IST month: bookings, packages, deposits kept, refunds, GST, fee estimate; emailed on the 1st; CSV for the accountant"
 Waitlist for full days,booking,should,no,yes,"guest leaves an email for a day in their zone; emailed once when a time there frees up; entries deleted a day after"
 Booking page as a mini website,booking,should,no,yes,"photo, headline, about, area, WhatsApp, Instagram, Google reviews link, services with prices, schema.org markup"
-Booking pages in Indian languages,booking,should,no,yes,"Hindi, Tamil, Telugu, Kannada on guest pages; host default plus a switcher; drafts pending native review; guest emails still English"
+Booking pages in Indian languages,booking,should,no,yes,"Hindi, Tamil, Telugu, Kannada on guest pages, guest emails and WhatsApp texts (D3); host emails English; drafts pending native review"
