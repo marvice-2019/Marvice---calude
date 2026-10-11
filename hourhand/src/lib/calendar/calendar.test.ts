@@ -441,7 +441,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const { mailer, sent } = recordingMailer();
       await processDueNotifications(pool, mailer, { baseUrl, calendar: null });
       await processDueNotifications(pool, mailer, { baseUrl, calendar: null, now: new Date(Date.now() + 30_000) });
-      expect((await queue(b.id)).find((q) => q.kind === "calendar_create")).toMatchObject({ status: "skipped", last_error: "Google Calendar is not configured" });
+      expect((await queue(b.id)).find((q) => q.kind === "calendar_create")).toMatchObject({ status: "skipped", last_error: "Google and Microsoft calendars are not configured on this server" });
       expect(sent.filter((m) => m.to === guest.email)).toHaveLength(1);
     });
   });

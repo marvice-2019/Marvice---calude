@@ -8,7 +8,7 @@ import { processRefunds, reconcilePayments, type PaymentCheckDeps } from "../pay
 import { setJobKick } from "./kick";
 import { BATCH_SIZE, processDueNotifications, type CalendarDeps } from "./worker";
 
-// The job loop: every few seconds (or at once when kicked) it syncs due Google calendars, settles pending booking payments, then runs due queue rows
+// The job loop: every few seconds (or at once when kicked) it syncs due calendars (Google, Microsoft), settles pending booking payments, then runs due queue rows
 // (email and calendar writes); once an hour it queues plan renewal reminders and purges closed accounts. All of it is safe on several servers at once.
 
 const HOUR = 3_600_000;
