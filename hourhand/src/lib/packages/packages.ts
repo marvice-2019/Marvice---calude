@@ -212,16 +212,20 @@ export async function startPurchase(
   if (row.status !== "pending") return { token: row.token, status: row.status, payment: null };
   if (row.provider_order_id) return { token: row.token, status: row.status, payment: checkout(row.provider_order_id) };
 
-  let order;
-  try {
-    order = await orders.createOrder({ amount: row.price_minor, currency: CURRENCY, receipt: `pkg-${row.id}`, notes: { package_purchase_id: row.id } });
-  } catch (error) {
-    throw new PurchaseStartError(`Payment could not start: ${(error as Error).message}`, error instanceof BillingApiError && error.retryable);
-  }
-  // Two concurrent repeats may both have made an order; the first one recorded wins and the other is never paid.
-  const { rows: [kept] } = await pool.query(
-    `update package_purchases set provider_order_id = coalesce(provider_order_id, $2), updated_at = now() where id = $1 returning provider_order_id`, [row.id, order.id]);
-  return { token: row.token, status: "pending", payment: checkout(kept.provider_order_id) };
+  // The row stays locked while the order is made, so a concurrent repeat waits and then reuses this order.
+  const orderId = await inTx(pool, async (client) => {
+    const { rows: [locked] } = await client.query("select provider_order_id from package_purchases where id = $1 for update", [row.id]);
+    if (locked.provider_order_id) return locked.provider_order_id as string;
+    let order;
+    try {
+      order = await orders.createOrder({ amount: row.price_minor, currency: CURRENCY, receipt: `pkg-${row.id}`, notes: { package_purchase_id: row.id } });
+    } catch (error) {
+      throw new PurchaseStartError(`Payment could not start: ${(error as Error).message}`, error instanceof BillingApiError && error.retryable);
+    }
+    await client.query("update package_purchases set provider_order_id = $2, updated_at = now() where id = $1", [row.id, order.id]);
+    return order.id;
+  });
+  return { token: row.token, status: "pending", payment: checkout(orderId) };
 }
 
 /**
@@ -304,11 +308,11 @@ export async function reconcilePurchases(deps: PaymentCheckDeps & { pool: pg.Poo
   const { rows } = await pool.query(
     `with due as (
        select id from package_purchases
-       where status = 'pending' and provider_order_id is not null and created_at < $1::timestamptz - $3 * interval '1 millisecond'
+       where status = 'pending' and created_at < $1::timestamptz - $3 * interval '1 millisecond'
          and (checked_at is null or checked_at < $1::timestamptz - $3 * interval '1 millisecond')
        order by checked_at nulls first, created_at limit $2 for update skip locked)
      update package_purchases p set checked_at = $1 from due where p.id = due.id
-     returning p.id, p.host_id, p.provider_order_id, p.created_at`, [now, limit, RECHECK_MS]);
+     returning p.id, p.host_id, p.provider_order_id, p.price_minor, p.currency, p.created_at`, [now, limit, RECHECK_MS]);
   const result: PurchaseReconcileResult = { claimed: rows.length, paid: 0, failed: 0, errors: 0 };
   const giveUp = async (r: { id: string; created_at: Date }) => {
     if (now.getTime() - new Date(r.created_at).getTime() <= GIVE_UP_MS) return;
@@ -317,6 +321,8 @@ export async function reconcilePurchases(deps: PaymentCheckDeps & { pool: pg.Poo
   };
   for (const r of rows) {
     try {
+      // Its order never got made: nothing can be paid, so it just times out.
+      if (!r.provider_order_id) { await giveUp(r); continue; }
       const auth = await deps.authFor(r.host_id);
       if (!auth) {
         await pool.query("update package_purchases set last_error = 'Razorpay disconnected', updated_at = $2 where id = $1", [r.id, now]);
@@ -325,9 +331,11 @@ export async function reconcilePurchases(deps: PaymentCheckDeps & { pool: pg.Poo
       }
       const orders = deps.ordersFor(auth);
       const items = await orders.orderPayments(r.provider_order_id);
-      const captured = items.find((p) => p.status === "captured");
-      const authorized = items.find((p) => p.status === "authorized");
-      const paid = captured ?? (authorized ? await captureOnce(orders, authorized.id, authorized.amount, authorized.currency) : null);
+      // Amounts from our own row, never Razorpay's word alone.
+      const ours = (p: RazorpayPayment) => p.amount === r.price_minor && p.currency === r.currency;
+      const captured = items.find((p) => p.status === "captured" && ours(p));
+      const authorized = items.find((p) => p.status === "authorized" && ours(p));
+      const paid = captured ?? (authorized ? await captureOnce(orders, authorized.id, r.price_minor, r.currency) : null);
       if (paid?.status === "captured") {
         if ((await applyPurchasePayment(pool, r.id, paid.id, now)) === "paid") result.paid += 1;
       } else {

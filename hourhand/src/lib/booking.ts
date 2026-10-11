@@ -235,8 +235,10 @@ export async function handleCreateBooking(
   if (isResult(found)) return found;
   const { host, eventType } = found;
   if (req.packageToken && found.linkToken) return { status: 400, body: { error: "invalid_request", fields: { packageToken: "Use your package link or the single-use link, not both." } } };
-  if (req.weeks > 1 && (req.weeks > eventType.maxRepeats || found.linkToken || eventType.priceMinor)) {
-    return { status: 400, body: { error: "invalid_request", fields: { weeks: eventType.maxRepeats > 1 ? `Book up to ${eventType.maxRepeats} weeks at a time.` : "This event can't be repeated." } } };
+  // A package buyer may book their sessions weekly (up to what's left, checked in the write); otherwise the host's setting rules.
+  const maxWeeks = req.packageToken ? 12 : eventType.maxRepeats;
+  if (req.weeks > 1 && (req.weeks > maxWeeks || found.linkToken || (!req.packageToken && eventType.priceMinor))) {
+    return { status: 400, body: { error: "invalid_request", fields: { weeks: maxWeeks > 1 ? `Book up to ${maxWeeks} weeks at a time.` : "This event can't be repeated." } } };
   }
 
   // A repeated submit returns the booking it already made, before the slot re-check (which it would now fail).

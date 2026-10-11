@@ -76,6 +76,7 @@ async function moveBooking(store: DataStore, booking: BookingWithInvitee, input:
   } catch (err) {
     if (isNamedError(err, "SlotTakenError")) return slotTaken(store, host, eventType, start, now, booking.id);
     if (isNamedError(err, "RequestKeyConflictError")) return { status: 409, body: { error: "key_conflict" } };
+    if (isNamedError(err, "PackageUnavailableError")) return { status: 409, body: { error: "package_expired" } };
     throw err;
   }
 }

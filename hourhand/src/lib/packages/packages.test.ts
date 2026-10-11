@@ -162,6 +162,26 @@ describe.skipIf(!BASE)("session packages (Postgres)", () => {
     expect((await purchaseByToken(pool, token))!.used).toBe(0);
   });
 
+  it("moving a package session keeps its credit used, and can't move it past the end date", async () => {
+    const { token } = await bought();
+    const a = await bookWith(token);
+    await bookWith(token);
+    const moved = await store.rescheduleBooking(priya.id, a.id, nextStart(), `pkg-move-${Math.random()}`);
+    expect((await purchaseByToken(pool, token))!.used).toBe(2);
+    await bookWith(token);
+    await expect(bookWith(token)).rejects.toMatchObject({ reason: "used_up" });
+    await expect(store.rescheduleBooking(priya.id, moved.id, new Date(Date.now() + 61 * DAY), `pkg-move-late-${Math.random()}`)).rejects.toMatchObject({ reason: "expired" });
+    expect((await purchaseByToken(pool, token))!.used).toBe(3);
+  });
+
+  it("an event type with packages sold can't be deleted, only turned off", async () => {
+    const { rows: [et] } = await pool.query(
+      "insert into event_types (user_id, name, slug, duration_minutes) values ($1, 'Pkg only', $2, 30) returning id", [priya.id, `pkg-only-${Math.random().toString(36).slice(2, 8)}`]);
+    const p2 = await createPackage(pool, priya.id, { eventTypeId: et.id, name: "2 sessions", sessions: 2, priceMinor: 100, validDays: 30 });
+    await startPurchase({ pool, auth, orders: fakeRazorpay().orders }, { packageId: p2.id, ...buyer() });
+    await expect(store.deleteEventType(priya.id, et.id)).rejects.toMatchObject({ name: "EventTypeInUseError" });
+  });
+
   it("two bookings racing for the last session: exactly one gets it", async () => {
     const { token } = await bought();
     await bookWith(token);
@@ -169,6 +189,14 @@ describe.skipIf(!BASE)("session packages (Postgres)", () => {
     const results = await Promise.allSettled([bookWith(token), bookWith(token)]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect((await purchaseByToken(pool, token))!.used).toBe(3);
+  });
+
+  it("two repeats of the same buy at once make one order", async () => {
+    const fake = fakeRazorpay();
+    const b = buyer();
+    const [one, two] = await Promise.all([1, 2].map(() => startPurchase({ pool, auth, orders: fake.orders }, { packageId: pkg.id, ...b })));
+    expect(two).toEqual(one);
+    expect(fake.state.creates).toBe(1);
   });
 
   it("a repeated start reuses the purchase and its order", async () => {
@@ -245,6 +273,18 @@ describe.skipIf(!BASE)("session packages (Postgres)", () => {
         expect(fake.state.creates).toBe(creates);
         const b = await store.getBooking(priya.id, (res.body as { bookingId: string }).bookingId);
         expect(b!.status).toBe("confirmed");
+        // A weekly series on the priced event type, drawing two credits at once.
+        const later = new Date(start.getTime() + 2 * DAY);
+        const offered = await slots(store, priya, { ...coaching, priceMinor: 150_000, currency: "INR" }, later, new Date(later.getTime() + 20 * DAY), new Date());
+        const open = new Set(offered.map((d) => d.getTime()));
+        const weekly = offered.find((d) => open.has(d.getTime() + 7 * DAY))!;
+        const series = await handleCreateBooking(store, {
+          slug: "priya", event: "coaching", start: weekly.toISOString(), name: "Kavya", email: "kavya@example.in", timezone: "Asia/Kolkata",
+          answers: Object.fromEntries((await store.listCustomQuestions(priya.id, coaching.id)).filter((q) => q.required).map((q) => [q.id, "Goal"])),
+          idempotencyKey: `pkg-series-${Math.random()}`, packageToken: token, weeks: 2,
+        }, new Date(), undefined, deps(fake));
+        expect(series).toMatchObject({ status: 201 });
+        expect((await purchaseByToken(pool, token))!.used).toBe(3);
       } finally {
         await pool.query("update event_types set price_minor = null, currency = null where id = $1", [coaching.id]);
       }

@@ -40,6 +40,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
   const [busy, setBusy] = useState(false);
   const [taken, setTaken] = useState<string[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [pastPackage, setPastPackage] = useState(false);
 
   async function confirm() {
     if (!picked) return;
@@ -55,6 +56,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
         return;
       }
       if (res.status === 409 && body.error === "slot_taken") setTaken(body.nextSlots ?? []);
+      else if (res.status === 409 && body.error === "package_expired") setPastPackage(true);
       else if (res.status === 409) router.refresh();
       else setFailed(true);
     } catch {
@@ -87,6 +89,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
             </div>
           )}
           {failed && <p className="text-danger" role="alert">Something went wrong. Your booking hasn&apos;t moved. Try again.</p>}
+          {pastPackage && <p className="text-danger" role="alert">That time is after your package&apos;s end date. Pick an earlier time.</p>}
           <Button onClick={confirm} loading={busy}>{busy ? "Moving…" : "Move my booking to this time"}</Button>
           <button type="button" onClick={() => { setPicked(null); setTaken(null); }} className={`min-h-11 justify-self-start text-sm font-semibold text-accent underline ${focusRing}`}>
             Pick another time

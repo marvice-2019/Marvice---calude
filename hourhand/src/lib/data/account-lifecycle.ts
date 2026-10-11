@@ -36,6 +36,7 @@ export async function purgeClosedAccounts(client: Client, now: Date): Promise<nu
   const { rows } = await client.query(
     `select id from users u where deleted_at < $1::timestamptz - interval '30 days'
        and not exists (select 1 from payments p where p.host_id = u.id and p.status in ('pending', 'refund_pending'))
+       and not exists (select 1 from package_purchases k where k.host_id = u.id and k.status = 'pending')
      for update`, [now]);
   const ids = rows.map((r) => r.id as string);
   if (ids.length === 0) return 0;

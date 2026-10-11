@@ -68,12 +68,15 @@ export default async function PackagePage({ params }: { params: Promise<{ token:
         </section>
       )}
 
-      {purchase.status === "paid" && !expired && left > 0 && (
+      {purchase.status === "paid" && !expired && left > 0 && !eventType.active && (
+        <p className="mt-8 max-w-md text-text" role="status">{host.name} has paused {eventType.name} for now, so sessions can&apos;t be booked here. Contact them to arrange your sessions.</p>
+      )}
+      {purchase.status === "paid" && !expired && left > 0 && eventType.active && (
         <section aria-labelledby="book" className="mt-8">
           <h2 id="book" className="font-semibold text-text">Book a session</h2>
           <BookingFlow
             slug={host.slug} event={eventType.slug} host={{ name: host.name, timezone: host.timezone }} bookingWindowDays={eventType.bookingWindowDays}
-            questions={questions} packageToken={token} maxWeeks={Math.min(left, eventType.priceMinor === null ? eventType.maxRepeats : 1)}
+            questions={questions} packageToken={token} maxWeeks={Math.min(left, 12)}
           />
         </section>
       )}

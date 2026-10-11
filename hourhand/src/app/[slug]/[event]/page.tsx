@@ -7,6 +7,8 @@ import { authEnabled } from "@/lib/auth/auth";
 import { store } from "@/lib/data";
 import { getPool } from "@/lib/data/pg-store";
 import { packagesForEventType } from "@/lib/packages/packages";
+import { hostPlan } from "@/lib/billing/account";
+import { razorpayStatus } from "@/lib/payments/host-razorpay";
 
 export default async function PublicEventPage({ params, searchParams }: { params: Promise<{ slug: string; event: string }>; searchParams: Promise<{ at?: string }> }) {
   const { slug, event } = await params;
@@ -17,8 +19,10 @@ export default async function PublicEventPage({ params, searchParams }: { params
   const questions = (await store.listCustomQuestions(host.id, eventType.id))
     .sort((a, b) => a.position - b.position)
     .map(({ id, label, kind, required }) => ({ id, label, kind, required }));
-  // Packages need Postgres (they're paid through Razorpay); the demo data has none.
-  const packages = authEnabled() ? await packagesForEventType(getPool(process.env.DATABASE_URL as string), host.id, eventType.id) : [];
+  // Packages need Postgres, a paid plan and the host's Razorpay; offered only when a buyer could actually pay.
+  const pool = authEnabled() ? getPool(process.env.DATABASE_URL as string) : null;
+  const canSell = pool ? (await hostPlan(pool, host.id)) !== "free" && (await razorpayStatus(pool, host.id)) !== null : false;
+  const packages = pool && canSell ? await packagesForEventType(pool, host.id, eventType.id) : [];
   return (
     <main className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
       <Link href={`/${host.slug}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-accent underline">{host.name}</Link>

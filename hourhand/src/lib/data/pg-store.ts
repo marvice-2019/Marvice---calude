@@ -3,7 +3,7 @@ import { datesInRange } from "../availability";
 import { kickJobs } from "../jobs/kick";
 import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
 import { queueBookingNotifications } from "./notifications";
-import { takeCredits } from "../packages/packages";
+import { PackageUnavailableError, takeCredits } from "../packages/packages";
 import { hashLinkToken, newLinkToken } from "../links";
 import { checkOneOff, oneOffSlug } from "./one-off";
 import {
@@ -369,8 +369,14 @@ export function createPgStore(pool: pg.Pool): DataStore {
           // The move keeps the booking's single-use link, so the link shows the current time.
           const linkId = (await client.query("select booking_link_id from bookings where id = $1", [bookingId])).rows[0].booking_link_id as string | null;
           const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId, linkId);
-          // A moved week stays its series' week: same series, same place in it.
-          await client.query("update bookings n set series_id = o.series_id, series_index = o.series_index from bookings o where n.id = $1 and o.id = $2", [newId, bookingId]);
+          // A moved week stays its series' week: same series, same place in it. A package session stays paid for by its
+          // package (or its credit would come back while still booked), and can't move past the package's end date.
+          await client.query(
+            "update bookings n set series_id = o.series_id, series_index = o.series_index, package_purchase_id = o.package_purchase_id from bookings o where n.id = $1 and o.id = $2",
+            [newId, bookingId]);
+          const { rows: [pk] } = await client.query(
+            "select p.expires_at from package_purchases p where p.id = (select package_purchase_id from bookings where id = $1) for update", [bookingId]);
+          if (pk && startAt.getTime() >= new Date(pk.expires_at).getTime()) throw new PackageUnavailableError("expired");
           // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
           // A calendar write already running for the old booking is left to finish; the move waits for it and then moves its event.
           await client.query(
@@ -503,9 +509,12 @@ export function createPgStore(pool: pg.Pool): DataStore {
       await tx(async (client) => {
         await owned(client, userId, id);
         const { rows } = await client.query(
-          "select count(*)::int as used, count(*) filter (where status = 'confirmed' and start_at > $2)::int as upcoming from bookings where event_type_id = $1", [id, now]);
+          `select count(*)::int as used, count(*) filter (where status = 'confirmed' and start_at > $2)::int as upcoming,
+             (select count(*)::int from package_purchases where event_type_id = $1) as sold
+           from bookings where event_type_id = $1`, [id, now]);
         if (rows[0].upcoming > 0) throw new EventTypeInUseError("upcoming", rows[0].upcoming);
-        if (rows[0].used > 0) throw new EventTypeInUseError("history", 0);
+        // A package sold for it is a record of money paid: keep the event type (it can be turned off instead).
+        if (rows[0].used > 0 || rows[0].sold > 0) throw new EventTypeInUseError("history", 0);
         await client.query("delete from event_types where user_id = $1 and id = $2", [userId, id]); // locations and questions cascade
       });
     },
