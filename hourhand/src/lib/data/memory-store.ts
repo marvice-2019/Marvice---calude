@@ -38,7 +38,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed", holdExpiresAt: null,
       locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null, joinUrl: null,
       idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, createdAt: new Date(),
-      invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", "") },
+      invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", ""), noShowAt: null },
     };
   }
 
@@ -130,7 +130,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       db.bookings.push(booking);
       return booking;
     },
-    async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey) {
+    async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey, by = "guest") {
       const repeat = db.bookings.find((b) => b.idempotencyKey === idempotencyKey);
       if (repeat) {
         if (repeat.hostId === hostId && repeat.rescheduledFromId === bookingId) return repeat;
@@ -142,7 +142,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       // Both steps run synchronously, so no other request can see the half-done state (one transaction in Postgres).
       const booking = build({ eventTypeId: old.eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers: answers.map((a) => ({ ...a })) } }, old.id);
       db.bookings.push(booking);
-      Object.assign(old, { status: "cancelled", cancelledAt: new Date(), cancelledBy: "guest", cancelReason: "Rescheduled" });
+      Object.assign(old, { status: "cancelled", cancelledAt: new Date(), cancelledBy: by, cancelReason: "Rescheduled" });
       return booking;
     },
     async cancelBooking(hostId, bookingId, by, reason) {
@@ -151,6 +151,12 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       if (booking.status === "confirmed") {
         Object.assign(booking, { status: "cancelled", cancelledAt: new Date(), cancelledBy: by, cancelReason: reason ?? null });
       }
+      return booking;
+    },
+    async setNoShow(hostId, bookingId, on, now) {
+      const booking = db.bookings.find((b) => b.hostId === hostId && b.id === bookingId && b.status === "confirmed" && b.startAt.getTime() <= now.getTime());
+      if (!booking) throw new NotFoundError("Booking");
+      booking.invitee.noShowAt = on ? now : null;
       return booking;
     },
     async saveWeeklyHours(userId, scheduleId, byWeekday) {

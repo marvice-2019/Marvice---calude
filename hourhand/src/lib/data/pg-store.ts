@@ -38,7 +38,7 @@ const toEventType = (r: Row): EventType => ({
 
 const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
   b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.created_at,
-  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token
+  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at
   from bookings b join invitees i on i.booking_id = b.id`;
 const toBooking = (r: Row): BookingWithInvitee => ({
   id: r.id as string, eventTypeId: r.event_type_id as string, hostId: r.host_id as string, startAt: r.start_at as Date, endAt: r.end_at as Date,
@@ -50,6 +50,7 @@ const toBooking = (r: Row): BookingWithInvitee => ({
   invitee: {
     id: r.invitee_id as string, bookingId: r.id as string, hostId: r.host_id as string, name: r.invitee_name as string, email: r.invitee_email as string,
     timezone: r.invitee_timezone as string, phone: r.invitee_phone as string | null, answers: r.answers as BookingWithInvitee["invitee"]["answers"], manageToken: r.manage_token as string,
+    noShowAt: (r.no_show_at as Date | null) ?? null,
   },
 });
 
@@ -264,7 +265,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
         return settle(error, input.idempotencyKey, isSameRequest);
       }
     },
-    async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey) {
+    async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey, by = "guest") {
       if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
       const isSameRequest = (b: BookingWithInvitee) => b.hostId === hostId && b.rescheduledFromId === bookingId;
       const repeat = await byKey(pool, idempotencyKey);
@@ -276,7 +277,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
           const { eventTypeId, invitee } = toBooking(old.rows[0]);
           // Cancel first: the exclusion constraint only covers confirmed rows, so the new slot may overlap the old one.
           // Both statements commit together or not at all.
-          await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'guest', cancel_reason = 'Rescheduled' where id = $1", [bookingId]);
+          await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = 'Rescheduled' where id = $1", [bookingId, by]);
           const { name, email, timezone, phone, answers } = invitee;
           const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId);
           // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
@@ -312,6 +313,15 @@ export function createPgStore(pool: pg.Pool): DataStore {
       const booking = await bookingWhere(pool, "b.id = $1 and b.host_id = $2", [bookingId, hostId]);
       if (!booking) throw new NotFoundError("Booking");
       return booking;
+    },
+    async setNoShow(hostId, bookingId, on, now) {
+      if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
+      // Only the host's own booking, and only once it has started: nobody can have missed it before then.
+      const { rowCount } = await pool.query(
+        "update invitees i set no_show_at = $3 from bookings b where b.id = i.booking_id and b.id = $1 and b.host_id = $2 and b.status = 'confirmed' and b.start_at <= $4",
+        [bookingId, hostId, on ? now : null, now]);
+      if (!rowCount) throw new NotFoundError("Booking");
+      return (await bookingWhere(pool, "b.id = $1 and b.host_id = $2", [bookingId, hostId]))!;
     },
     async saveWeeklyHours(userId, scheduleId, byWeekday) {
       await tx(async (client) => {

@@ -165,13 +165,42 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Checked:** forged pings get the same answer and change nothing; channel ids are uuids and tokens 48 hex characters compared in constant time; the claim, renew and stop queries are sound; tokens that can't be refreshed only mark the calendar; the connections ↔ push import cycle is safe; the scope change doesn't break existing connections.
 - **To confirm against real Google:** that `freeBusy.query` works with only `calendar.events.freebusy` (Google's reference lists it; the fake doesn't check scopes).
 
+## B7 evidence (2026-10-11, Postgres 16.15, production build)
+
+- 335 tests pass with `TEST_DATABASE_URL` set (after the review fixes below). No migration.
+- **Against Postgres:** the host's cancel records cancelled_by host and queues the guest and host cancellation emails, and a paid booking's payment goes to refund; the host's move cancels the old booking as moved by the host, confirms the new time, carries the payment, and refuses a taken time; no-show only after the start, both ways; another host's booking is not found for every action.
+- **Negative tests** (guard set aside, test fails): host scoping of no-show, the start-time rule on no-show, recording who moved the booking.
+- **End to end on a production build (16 of 16):** the detail page offers cancel and move; cancel asks first, records the host and reason, and the guest is told the host cancelled; move lists free times, lands on the new booking, cancels the old one as moved by the host, and the guest gets "Priya Raman moved your booking to a new time"; no-show is recorded, shown on the page and the list, and undone; another host gets 404. All earlier suites pass again (B5b 28, B5a 26, B4 23, B3 10, B2b 12, sign-in 15).
+
+## B7 review (fresh-context reviewer)
+
+- **Fixed (medium):** the server let a host move a booking that had already happened (only the page hid the form), which would cancel it as the host's, drop a no-show mark and email the guest. A move now needs an upcoming booking; a repeated submit still gets its move back. Test fails without it.
+- **Fixed (low):** each time on the move page has its own request key, so clicking a second time on a stale page is refused rather than silently repeating the first move; a malformed time shows its own message; tests now cover who-moved-it wording in both emails and the repeat. The wording test fails without the fix.
+- **Accepted (low):** two tabs submitting the same move at the same instant: one moves it, the other shows "not found" (the guest path behaves the same).
+- **Checked:** no path to another host's booking (forged ids and keys get not found or a conflict that leaks nothing); a taken time is refused by the free-time check and again by the database; the guest path and its emails are unchanged.
+
+## Production addresses for hourhand.cloud
+
+Set `BETTER_AUTH_URL=https://hourhand.cloud` in Coolify. Register exactly these:
+
+| Where | What to enter |
+| --- | --- |
+| Google Cloud → OAuth client → Authorized redirect URIs | `https://hourhand.cloud/api/auth/callback/google` and `https://hourhand.cloud/api/calendars/google/callback` |
+| Google Cloud → OAuth consent screen → Authorized domains | `hourhand.cloud` (home page and privacy policy must be on this domain for verification) |
+| Microsoft Entra → app → Authentication → Web redirect URIs (B6) | `https://hourhand.cloud/api/auth/callback/microsoft` and `https://hourhand.cloud/api/calendars/microsoft/callback` |
+| Razorpay Dashboard → Webhooks (your plans) | `https://hourhand.cloud/api/webhooks/razorpay`, events `subscription.*` |
+| Stripe Dashboard → Webhooks (if you get Stripe) | `https://hourhand.cloud/api/webhooks/stripe` |
+| Google Calendar instant sync | nothing to register: Hourhand tells Google `https://hourhand.cloud/api/webhooks/google-calendar` itself |
+| Resend → Domains | `hourhand.cloud`, then `EMAIL_FROM=Hourhand <booking@hourhand.cloud>`; add the SPF, DKIM and DMARC records Resend shows to the domain's DNS. Replies from guests and hosts go to each other (Reply-To), not to this address; if you also want mail sent to booking@ to arrive somewhere, add a mailbox (Google Workspace or Zoho) with its own MX records |
+| DNS | an A record for `hourhand.cloud` (and `www`) pointing at the Coolify server; Coolify issues the certificate |
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
 | --- | --- | --- |
 | Create a Google Cloud project with an OAuth client (web), redirect URI `https://<domain>/api/auth/callback/google`, plus `http://localhost:3000/...` for dev | 30 min | B2 |
 | Enable the Google Calendar API and **submit OAuth verification** for the `calendar.calendarlist.readonly`, `calendar.events.freebusy` and `calendar.events.owned` scopes (add exactly these on the consent screen first; B4b swapped `calendar.freebusy` for `calendar.events.freebusy`). Until it is approved, the app is limited to 100 test users | **2–6 weeks** | B4, public launch |
-| Resend account, domain `mail.<domain>` with SPF, DKIM, DMARC `p=none` | 1 day for DNS | B3 |
+| Resend account, domain `hourhand.cloud` with SPF, DKIM, DMARC `p=none`; sender `booking@hourhand.cloud` | 1 day for DNS | B3 |
 | Razorpay account (test mode keys) and KYC for live; turn on Subscriptions; create the 4 Plans and the webhook (see README → Plans and billing) | KYC takes days | B5 |
 | Stripe account (test mode keys); 2 Products with monthly and yearly Prices, Customer Portal on, webhook (see README) | 30 min | B5 |
 | In Razorpay (test mode first), set the business and GST invoice details: **Marvice Media Private Limited**, GSTIN **33AAMCM6642H1ZB** (Tamil Nadu), 37, Veeraragavapuram, Ekkadu Post, Tiruvallur, Tamil Nadu 602021; GST invoices at 18% on plan amounts set before tax. Decided 2026-10-11: invoices are issued from the Tamil Nadu registration | 15 min | B5 |

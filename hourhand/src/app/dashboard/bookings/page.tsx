@@ -33,6 +33,7 @@ export default async function BookingsPage() {
                 <span className={`rounded-md px-2 py-0.5 text-sm ${cancelled ? "bg-danger-bg text-danger" : pending ? "bg-warning-bg text-warning" : "bg-success-bg text-success"}`}>
                   {cancelled ? "Cancelled" : pending ? "Awaiting payment" : b.endAt.getTime() < now ? "Done" : "Confirmed"}
                 </span>
+                {b.invitee.noShowAt && <span className="rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">No-show</span>}
               </li>
             );
           })}

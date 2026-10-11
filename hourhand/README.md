@@ -57,7 +57,7 @@ Environment variables for sign-in:
 | `HOURHAND_ALLOW_MEMORY` | `1` only for a public demo. A production server refuses `HOURHAND_DATA=memory` (no sign-in) without it |
 | `BETTER_AUTH_SECRET` | signing sessions; a long random string (`openssl rand -hex 32`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in (optional) |
-| `RESEND_API_KEY`, `EMAIL_FROM` | sending email. `EMAIL_FROM` is a sender on your verified Resend domain, for example `Hourhand <bookings@mail.hourhand.app>`. **Required in production** |
+| `RESEND_API_KEY`, `EMAIL_FROM` | sending email. `EMAIL_FROM` is a sender on your verified Resend domain, for example `Hourhand <booking@hourhand.cloud>`. **Required in production** |
 | `HOURHAND_WORKER` | `0` to run a server without the job runner (only if another process runs it) |
 
 ## Email and jobs
@@ -131,6 +131,16 @@ Hosts on Solo or Duo can charge guests for an event type, in rupees through Razo
 - **Disconnecting Razorpay** is refused while a guest's payment is still being confirmed or refunded. **Closing an account** refunds paid upcoming bookings, and the 30-day purge waits until those refunds have gone through.
 - **Free hosts:** a priced event of a host whose plan lapsed can't be booked; guests are told to contact the host.
 - **Not built:** Stripe for non-INR (Stripe is invite-only for Indian businesses), partial refunds or cancellation fees, deposits, payment links for existing bookings, and the host's own webhook (not needed: Hourhand checks Razorpay itself).
+
+## Host actions on a booking
+
+From Dashboard → Bookings → a booking, the host can:
+
+- **Cancel** an upcoming booking (any time, with an optional reason, after a confirm step). The guest is told the host cancelled, and a paid booking is refunded in full from the host's Razorpay account.
+- **Move** it to another free time (the same free-time rules as booking). The guest is emailed "<host> moved your booking"; a paid booking keeps its payment.
+- **Mark a no-show** once the booking has started, and undo it. The bookings list shows it.
+
+A booking still waiting on payment, or already cancelled, has no actions.
 
 ## What is fake today
 

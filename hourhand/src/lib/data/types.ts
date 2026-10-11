@@ -105,6 +105,8 @@ export interface Invitee {
   phone: string | null;
   answers: InviteeAnswer[];
   manageToken: string;
+  /** When the host marked the guest as not having turned up. */
+  noShowAt: Date | null;
 }
 
 /** One entry of invitees.answers (jsonb). The label is copied so later edits to the question don't rewrite history. */
@@ -202,7 +204,10 @@ export interface DataStore {
   /** Throws NotFoundError unless the booking belongs to `hostId`. */
   cancelBooking(hostId: string, bookingId: string, by: "host" | "guest", reason?: string): Promise<BookingWithInvitee>;
   /** Atomically books `startAt` for the same guest and cancels the old booking. The overlap check ignores the old booking. */
-  rescheduleBooking(hostId: string, bookingId: string, startAt: Date, idempotencyKey: string): Promise<BookingWithInvitee>;
+  /** `by` is recorded as who cancelled the old booking. */
+  rescheduleBooking(hostId: string, bookingId: string, startAt: Date, idempotencyKey: string, by?: "host" | "guest"): Promise<BookingWithInvitee>;
+  /** Marks (or clears) the guest as a no-show. Throws NotFoundError unless it is `hostId`'s confirmed booking that has started by `now`. */
+  setNoShow(hostId: string, bookingId: string, on: boolean, now: Date): Promise<BookingWithInvitee>;
   /** Replaces the weekly rules: weekday (0 = Sunday) to its ranges. Days left out or empty are unavailable. */
   /** The four schedule writes throw NotFoundError unless the schedule belongs to `userId`. */
   saveWeeklyHours(userId: string, scheduleId: string, byWeekday: Record<number, Interval[]>): Promise<void>;
