@@ -70,6 +70,15 @@ describe.skipIf(!BASE)("extra guests (Postgres)", () => {
       invitee: { ...invitee, guests: ["a@x.in", "b@x.in", "c@x.in", "d@x.in", "e@x.in", "f@x.in"] } })).rejects.toThrow();
   });
 
+  it("remembers the language the guest booked in, through a move", async () => {
+    const b = await store.createBooking({ eventTypeId: coaching.id, startAt: new Date("2031-06-01T05:00:00Z"), idempotencyKey: "locale-1",
+      invitee: { name: "Kiran", email: "kiran@example.in", timezone: "Asia/Kolkata", phone: null, answers: [], locale: "ta" } });
+    expect(b.invitee.locale).toBe("ta");
+    expect((await store.rescheduleBooking(priya.id, b.id, new Date("2031-06-02T05:00:00Z"), "locale-1-move")).invitee.locale).toBe("ta");
+    await expect(store.createBooking({ eventTypeId: coaching.id, startAt: new Date("2031-06-03T05:00:00Z"), idempotencyKey: "locale-2",
+      invitee: { name: "Kiran", email: "kiran@example.in", timezone: "Asia/Kolkata", phone: null, answers: [], locale: "fr" } })).rejects.toThrow();
+  });
+
   it("sends each extra guest the news, never the link that changes the booking", async () => {
     await pool.query("delete from notifications");
     const invitee = { name: "Meera", email: "meera@example.in", timezone: "Asia/Kolkata", phone: null, answers: [], guests: ["ravi@example.in"] };

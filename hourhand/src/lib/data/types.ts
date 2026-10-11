@@ -143,6 +143,8 @@ export interface Invitee {
   runningLateAt: Date | null;
   /** Extra guests (emails) the person booking added; they hear about the booking but can't change it. */
   guests: string[];
+  /** The language the guest booked in (en, hi, ta, te, kn): their emails and WhatsApp texts follow it. */
+  locale: string;
 }
 
 /** One entry of invitees.answers (jsonb). The label is copied so later edits to the question don't rewrite history. */
@@ -193,7 +195,7 @@ export interface CreateBookingInput {
   weeks?: number;
   /** Pay with a session package (its buyer's token): one credit per booking, checked and used in the same write. Postgres only. */
   packageToken?: string;
-  invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[]; guests?: string[] };
+  invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[]; guests?: string[]; locale?: string };
 }
 
 export type BookingLinkState = "open" | "used" | "expired" | "revoked";
