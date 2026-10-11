@@ -248,6 +248,43 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect((await store.listBookings(priya.id)).length).toBeGreaterThan(0);
     });
   });
+  describe("host actions", () => {
+    const notifications = async (id: string) => (await pool.query("select * from notifications where booking_id = $1", [id])).rows.map((r) => JSON.stringify(r));
+    const pay = (b: { id: string }) => pool.query("insert into payments (booking_id, host_id, provider, amount_minor, currency, status) values ($1, $2, 'razorpay', 50000, 'INR', 'paid')", [b.id, priya.id]);
+    const paymentOf = async (id: string) => (await pool.query("select booking_id, status from payments where booking_id = $1", [id])).rows;
+    const book = (iso: string, key: string) => store.createBooking({ eventTypeId: coaching.id, startAt: at(iso), idempotencyKey: key, invitee: guest });
+
+    it("host cancel records the host, queues the cancellation emails and refunds a paid booking", async () => {
+      const b = await book("2030-03-04T04:00:00Z", "pg-host-cancel-1");
+      await pay(b);
+      await expect(store.cancelBooking(arun.id, b.id, "host")).rejects.toBeInstanceOf(NotFoundError);
+      expect(await store.cancelBooking(priya.id, b.id, "host", "Called away")).toMatchObject({ status: "cancelled", cancelledBy: "host", cancelReason: "Called away" });
+      expect((await notifications(b.id)).filter((n) => n.includes("cancelled")).length).toBeGreaterThan(0);
+      expect(await paymentOf(b.id)).toEqual([{ booking_id: b.id, status: "refund_pending" }]);
+    });
+
+    it("host reschedule records the host on the old booking, carries the payment over and refuses a taken slot", async () => {
+      const old = await book("2030-03-05T04:00:00Z", "pg-host-move-1");
+      await pay(old);
+      const taken = await book("2030-03-05T10:00:00Z", "pg-host-move-taken");
+      await expect(store.rescheduleBooking(arun.id, old.id, at("2030-03-05T08:00:00Z"), "pg-host-move-x", "host")).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.rescheduleBooking(priya.id, old.id, taken.startAt, "pg-host-move-2", "host")).rejects.toBeInstanceOf(SlotTakenError);
+      const moved = await store.rescheduleBooking(priya.id, old.id, at("2030-03-05T08:00:00Z"), "pg-host-move-3", "host");
+      expect(moved).toMatchObject({ status: "confirmed", rescheduledFromId: old.id });
+      expect(await store.getBooking(priya.id, old.id)).toMatchObject({ status: "cancelled", cancelledBy: "host" });
+      expect(await paymentOf(moved.id)).toEqual([{ booking_id: moved.id, status: "paid" }]);
+    });
+
+    it("no-show is only set after the start, toggles both ways, and only on the host's own booking", async () => {
+      const b = await book("2030-03-06T04:00:00Z", "pg-no-show-1");
+      const after = at("2030-03-06T04:30:00Z");
+      await expect(store.setNoShow(priya.id, b.id, true, at("2030-03-06T03:59:00Z"))).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.setNoShow(arun.id, b.id, true, after)).rejects.toBeInstanceOf(NotFoundError);
+      expect((await store.getBooking(priya.id, b.id))!.invitee.noShowAt).toBeNull();
+      expect((await store.setNoShow(priya.id, b.id, true, after)).invitee.noShowAt).toEqual(after);
+      expect((await store.setNoShow(priya.id, b.id, false, after)).invitee.noShowAt).toBeNull();
+    });
+  });
 });
 
 function draftOf(e: EventType): EventTypeDraft {

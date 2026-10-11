@@ -29,6 +29,8 @@ export interface BookingMailContext {
   paidMinor?: number | null;
   /** For reschedules: when the booking used to be. */
   previousStartAt: Date | null;
+  /** For a rescheduled booking: who moved it (who cancelled the old one). */
+  movedBy?: "host" | "guest" | "system" | null;
   /** When the email was queued. Used as the calendar file's timestamp, so a retried send has exactly the same body. */
   issuedAt: Date;
   /** The guest's cancel / reschedule page. Only ever sent to the guest. */
@@ -158,13 +160,13 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
       }, { replyTo: c.guestEmail });
     case "rescheduled_guest":
       return render(`Moved: ${c.eventName} with ${host}, now ${formatDate(c.startAt, c.guestTimezone)}`, {
-        heading: "Your booking has a new time", intro: `Hi ${c.guestName}, your time with ${host} has moved.`,
+        heading: "Your booking has a new time", intro: c.movedBy === "host" ? `Hi ${c.guestName}, ${host} moved your booking to a new time.` : `Hi ${c.guestName}, your time with ${host} has moved.`,
         rows: [...guestRows(c), ...(c.previousStartAt ? [["Was", when(c.previousStartAt, c.guestTimezone, "12h")] as Row] : [])],
         link: manageLink(c), note: "The attached file adds the new time to your calendar. Remove the old one if you saved it.", footer: guestFooter(c),
       }, { attachments: [calendarFile(c)], replyTo: c.hostEmail });
     case "rescheduled_host":
       return render(`Moved: ${c.guestName}, ${c.eventName}, now ${formatDate(c.startAt, c.hostTimezone)}`, {
-        heading: "A booking has a new time", intro: `${c.guestName} moved ${c.eventName}.`,
+        heading: "A booking has a new time", intro: c.movedBy === "host" ? `You moved ${c.eventName} with ${c.guestName}.` : `${c.guestName} moved ${c.eventName}.`,
         rows: [...hostRows(c), ...(c.previousStartAt ? [["Was", when(c.previousStartAt, c.hostTimezone, c.hostTimeFormat)] as Row] : [])],
         link: dashboardLink(c), footer: hostFooter,
       }, { replyTo: c.guestEmail });

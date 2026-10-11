@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { freeSlots } from "./booking";
 import { createMemoryStore } from "./data/memory-store";
 import { buildSeed } from "./data/seed";
-import type { DataStore } from "./data/types";
-import { handleCancel, handleReschedule } from "./manage";
+import { NotFoundError, type DataStore } from "./data/types";
+import { handleCancel, handleHostReschedule, handleReschedule } from "./manage";
 
 const now = new Date("2026-10-10T04:00:00Z");
 const DAY = 86_400_000;
@@ -112,5 +112,42 @@ describe("handleReschedule", () => {
   it("rejects a short request key", async () => {
     const res = await handleReschedule(fresh(), "tok_bkg_1", { start: now.toISOString(), idempotencyKey: "short" }, now);
     expect(res).toMatchObject({ status: 400, body: { fields: { idempotencyKey: expect.any(String) } } });
+  });
+});
+
+describe("host actions from the dashboard", () => {
+  async function setup() {
+    const store = fresh();
+    const host = (await store.getUserBySlug("priya"))!;
+    const booking = (await store.getBooking(host.id, "bkg_1"))!; // confirmed coaching booking
+    const slot = (await coachingSlots(store)).find((s) => s.getTime() !== booking.startAt.getTime())!;
+    return { store, host, booking, slot };
+  }
+
+  it("host reschedule moves the booking to a free time and records the host as the canceller", async () => {
+    const { store, host, booking, slot } = await setup();
+    const res = await handleHostReschedule(store, host.id, booking.id, { start: slot.toISOString(), idempotencyKey: "host-move-1" }, now);
+    expect(res.status).toBe(201);
+    expect(await store.getBooking(host.id, booking.id)).toMatchObject({ status: "cancelled", cancelledBy: "host", cancelReason: "Rescheduled" });
+  });
+
+  it("host reschedule refuses a taken time and another host's booking", async () => {
+    const { store, host, booking, slot } = await setup();
+    await store.createBooking({ eventTypeId: booking.eventTypeId, startAt: slot, idempotencyKey: "someone-else-1", invitee: booking.invitee });
+    const taken = await handleHostReschedule(store, host.id, booking.id, { start: slot.toISOString(), idempotencyKey: "host-move-2" }, now);
+    expect(taken.status).toBe(409);
+    const stranger = await handleHostReschedule(store, "someone-else", booking.id, { start: slot.toISOString(), idempotencyKey: "host-move-3" }, now);
+    expect(stranger.status).toBe(404);
+    expect((await store.getBooking(host.id, booking.id))!.status).toBe("confirmed");
+  });
+
+  it("no-show is only allowed once the booking has started, toggles both ways, and only for the host's own booking", async () => {
+    const { store, host, booking } = await setup();
+    const before = new Date(booking.startAt.getTime() - MIN);
+    const after = new Date(booking.startAt.getTime() + MIN);
+    await expect(store.setNoShow(host.id, booking.id, true, before)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(store.setNoShow("someone-else", booking.id, true, after)).rejects.toBeInstanceOf(NotFoundError);
+    expect((await store.setNoShow(host.id, booking.id, true, after)).invitee.noShowAt).toEqual(after);
+    expect((await store.setNoShow(host.id, booking.id, false, after)).invitee.noShowAt).toBeNull();
   });
 });

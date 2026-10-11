@@ -1,5 +1,5 @@
 import { freeSlots, slotTaken, type HandlerResult } from "./booking";
-import { RequestKeyConflictError, SlotTakenError, type DataStore } from "./data/types";
+import { RequestKeyConflictError, SlotTakenError, type BookingWithInvitee, type DataStore } from "./data/types";
 
 const MIN = 60_000;
 const MAX_REASON = 500;
@@ -32,7 +32,19 @@ export async function handleCancel(store: DataStore, token: string, reason: unkn
 export async function handleReschedule(store: DataStore, token: string, input: unknown, now: Date): Promise<HandlerResult> {
   const booking = await store.getBookingByManageToken(token);
   if (!booking) return notFound;
+  return moveBooking(store, booking, input, now, "guest");
+}
 
+/** The host moving one of their own bookings from the dashboard: the same free-slot check as the guest's move. */
+export async function handleHostReschedule(store: DataStore, hostId: string, bookingId: string, input: unknown, now: Date): Promise<HandlerResult> {
+  const booking = await store.getBooking(hostId, bookingId);
+  if (!booking) return notFound;
+  // A booking still waiting for payment isn't the host's to move yet.
+  if (booking.status === "pending_payment") return { status: 409, body: { error: "not_confirmed" } };
+  return moveBooking(store, booking, input, now, "host");
+}
+
+async function moveBooking(store: DataStore, booking: BookingWithInvitee, input: unknown, now: Date, by: "host" | "guest"): Promise<HandlerResult> {
   const body = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
   const fields: Record<string, string> = {};
   const start = typeof body.start === "string" ? new Date(body.start) : null;
@@ -55,7 +67,7 @@ export async function handleReschedule(store: DataStore, token: string, input: u
   if (!offered.some((s) => s.getTime() === start.getTime())) return slotTaken(store, host, eventType, start, now, booking.id);
 
   try {
-    const moved = await store.rescheduleBooking(booking.hostId, booking.id, start, idempotencyKey);
+    const moved = await store.rescheduleBooking(booking.hostId, booking.id, start, idempotencyKey, by);
     return { status: 201, body: { bookingId: moved.id, manageToken: moved.invitee.manageToken } };
   } catch (err) {
     if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, start, now, booking.id);

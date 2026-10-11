@@ -49,7 +49,7 @@ const CONTEXT = `
   select n.id as notification_id, n.created_at as queued_at, b.id, b.host_id, b.status, b.start_at, b.end_at, b.cancelled_by, b.cancel_reason,
     b.location_kind as booking_location_kind, b.join_url, b.external_event_id, b.external_calendar_id,
     prev.start_at as previous_start_at, prev.external_event_id as previous_event_id, prev.external_calendar_id as previous_calendar_id,
-    prev.join_url as previous_join_url,
+    prev.join_url as previous_join_url, prev.cancelled_by as previous_cancelled_by,
     i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.answers, i.manage_token, i.reminders_opt_out,
     e.name as event_name,
     (select p.amount_minor from payments p where p.booking_id = b.id and p.status in ('paid', 'refund_pending', 'refunded')
@@ -84,6 +84,7 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
     cancelledBy: (r.cancelled_by as BookingMailContext["cancelledBy"]) ?? null, cancelReason: (r.cancel_reason as string | null) ?? null,
     paidMinor: (r.paid_minor as number | null) ?? null,
     previousStartAt: r.previous_start_at ? new Date(r.previous_start_at as Date) : null,
+    movedBy: (r.previous_cancelled_by as BookingMailContext["movedBy"]) ?? null,
     issuedAt: new Date(r.queued_at as Date),
     manageUrl: `${baseUrl}/b/${r.manage_token as string}`, dashboardUrl: `${baseUrl}/dashboard/bookings/${r.id as string}`,
   };
