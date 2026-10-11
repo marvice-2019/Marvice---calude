@@ -161,11 +161,20 @@ From Dashboard → Bookings → a booking, the host can:
 
 A booking still waiting on payment, or already cancelled, has no actions.
 
+## Extras for India-first hosts
+
+- **WhatsApp buttons**: on an upcoming booking, "Message on WhatsApp" opens WhatsApp from the host's own number with a confirmation, reminder or change-or-cancel message already written. Numbers without a country code are taken as +91. No WhatsApp account is connected; the official API comes later.
+- **Holidays**: Dashboard → Availability → Holidays lists India's gazetted holidays for the next 12 months (DoPT orders for 2026 and 2027). Tick the ones you take off; each becomes a day off. Festivals that follow the moon are marked, since their dates can shift.
+- **Running late**: from 2 hours before a booking until 30 minutes after it starts, the guest's manage page has "Running late" buttons (5 to 30 minutes). The host gets one email per choice, and the booking page shows it.
+- **Book again**: when the host cancels, the guest's email offers the three free times nearest the cancelled one (never that one). Each opens the booking page on that day.
+- **Appearance**: dark mode follows the device; Settings and every booking page also have a Device / Light / Dark switch, kept per browser.
+- **Time-zone check**: if a guest looks at times in a zone other than their device's, the booking form asks them to confirm they'll be in that zone. It also shows the time on the host's clock when the two differ.
+
 ## What is fake today
 
 - **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Instant sync needs a public https address, so on localhost busy times are at most 5 minutes old.
 - **Email in development:** without `RESEND_API_KEY`, every email is printed to the server log instead of sent.
-- **WhatsApp, Microsoft and iCloud calendars:** not wired up yet. They will need `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
+- **WhatsApp API and iCloud calendars:** not wired up yet. WhatsApp sending from Hourhand will need `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID`; until then the WhatsApp buttons open the host's own app.
 
 ## Layout
 
