@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { buildSeed, type Seed } from "../src/lib/data/seed";
+import { buildSeed, type Seed } from "../src/lib/data/seed.ts";
 
 const MIN = 60_000;
 

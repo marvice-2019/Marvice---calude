@@ -9,8 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:migrate": "node scripts/migrate.ts",
+    "db:seed": "node scripts/seed.ts"
   },
   "dependencies": {
     "@date-fns/tz": "1.5.0",
@@ -29,7 +29,6 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "4.3.3",
-    "tsx": "4.23.15",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
   }
