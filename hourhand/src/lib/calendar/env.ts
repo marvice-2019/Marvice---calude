@@ -1,28 +1,44 @@
 import { resolveBaseUrl } from "../auth/auth";
 import { parseKey } from "../crypto/seal";
 import { googleClientFromEnv, type GoogleClient } from "./google";
-import type { CalendarProviders } from "./provider";
+import { microsoftClientFromEnv } from "./microsoft";
+import type { CalendarProviderId, CalendarProviders } from "./provider";
 
-/** Why Google Calendar is configured but can't run, or null. The job runner refuses to start on this; pages just say "not set up". */
-export function calendarConfigError(env: Record<string, string | undefined> = process.env): string | null {
-  if (env.HOURHAND_DATA !== "postgres" || !googleClientFromEnv(env)) return null;
+type Env = Record<string, string | undefined>;
+
+/** The calendar providers with an OAuth client in the environment. Each works without the other. */
+function configuredProviders(env: Env): { providers: CalendarProviders; google: GoogleClient | undefined } {
+  const google = googleClientFromEnv(env) ?? undefined;
+  const microsoft = microsoftClientFromEnv(env) ?? undefined;
+  return { providers: { ...(google ? { google } : {}), ...(microsoft ? { microsoft } : {}) }, google };
+}
+
+/** Why calendars are configured but can't run, or null. The job runner refuses to start on this; pages just say "not set up". */
+export function calendarConfigError(env: Env = process.env): string | null {
+  if (env.HOURHAND_DATA !== "postgres") return null;
+  const ids = Object.keys(configuredProviders(env).providers);
+  if (ids.length === 0) return null;
   try {
     parseKey(env.TOKEN_ENCRYPTION_KEY);
     return null;
   } catch (error) {
-    return `Google Calendar is configured but ${(error as Error).message}`;
+    const what = ids.map((id) => (id === "google" ? "Google Calendar" : "Outlook")).join(" and ");
+    return `${what} ${ids.length > 1 ? "are" : "is"} configured but ${(error as Error).message}`;
   }
 }
 
-/** Google Calendar needs the Postgres store, a Google OAuth client and a valid TOKEN_ENCRYPTION_KEY. Null when any is missing. */
-export function calendarDeps(env: Record<string, string | undefined> = process.env): { providers: CalendarProviders; google: GoogleClient; key: Buffer } | null {
+/**
+ * Calendars need the Postgres store, at least one provider's OAuth client (Google, Microsoft) and a valid
+ * TOKEN_ENCRYPTION_KEY. Null when any is missing. `google` is the Google client when configured, for watch channels.
+ */
+export function calendarDeps(env: Env = process.env): { providers: CalendarProviders; google: GoogleClient | undefined; key: Buffer } | null {
   if (env.HOURHAND_DATA !== "postgres") return null;
-  const google = googleClientFromEnv(env);
-  if (!google || calendarConfigError(env)) return null;
-  return { providers: { google }, google, key: parseKey(env.TOKEN_ENCRYPTION_KEY) };
+  const { providers, google } = configuredProviders(env);
+  if (Object.keys(providers).length === 0 || calendarConfigError(env)) return null;
+  return { providers, google, key: parseKey(env.TOKEN_ENCRYPTION_KEY) };
 }
 
-/** Where Google sends the host back. Add exactly this URL to the OAuth client's authorized redirect URIs. */
-export function calendarRedirectUri(fallbackOrigin: string, env: Record<string, string | undefined> = process.env): string {
-  return `${(resolveBaseUrl(env) ?? fallbackOrigin).replace(/\/+$/, "")}/api/calendars/google/callback`;
+/** Where the provider sends the host back. Add exactly this URL to that provider's OAuth client as a redirect URI. */
+export function calendarRedirectUri(fallbackOrigin: string, env: Env = process.env, provider: CalendarProviderId = "google"): string {
+  return `${(resolveBaseUrl(env) ?? fallbackOrigin).replace(/\/+$/, "")}/api/calendars/${provider}/callback`;
 }

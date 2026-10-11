@@ -13,9 +13,10 @@ export async function GET(request: NextRequest) {
   const back = (error: string) => NextResponse.redirect(new URL(`/dashboard/calendars?error=${error}`, request.url));
   if (!authEnabled()) return back("demo");
   const deps = calendarDeps();
-  if (!deps) return back("not_configured");
+  const google = deps?.providers.google;
+  if (!deps || !google) return back("not_configured");
   const s = startOAuth(deps.key, user.id);
-  const res = NextResponse.redirect(deps.google.authUrl({
+  const res = NextResponse.redirect(google.authUrl({
     redirectUri: calendarRedirectUri(request.nextUrl.origin), state: s.state, codeChallenge: s.codeChallenge, loginHint: user.email,
   }));
   res.cookies.set(OAUTH_COOKIE, s.cookie, {
