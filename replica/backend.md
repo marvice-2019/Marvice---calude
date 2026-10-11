@@ -89,12 +89,22 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 
 ## B4a evidence (2026-10-11, Postgres 16.15, production build, fake Google)
 
-- 206 tests pass with `TEST_DATABASE_URL` set. Migration 0004 applies on top of 0003.
+- 212 tests pass with `TEST_DATABASE_URL` set (after the review fixes below). Migration 0004 applies on top of 0003.
 - **Google client** checked against Google's docs (OAuth web-server flow, freeBusy, events.insert, Meet conference creation, scopes; read 2026-10-11) and tested against a fake: narrow scopes, offline access, consent, PKCE; `invalid_grant` means reconnect, outages and rate limits retry; a missing permission means reconnect; free/busy errors are errors; event creation uses a fixed id and treats 409 as "already created"; deleting a gone event is fine; a fake-Google URL is ignored in production.
 - **Against Postgres:** tokens are never stored readable; another host can't change, pick or disconnect a host's calendars; only owned calendars take bookings; expired access tokens refresh and re-seal; sync copies busy times from checked calendars only and replaces them atomically; failures go degraded, alert once after 3, recover cleanly; a revoked grant disconnects and alerts at once; demo connections are skipped; bookings create a Meet event and the confirmation carries the link; a failing write never holds the confirmation; reschedules move the same event; cancellations delete it; a revoked grant during a write disconnects.
 - **Negative tests** (guard set aside, test fails): the Meet wait, disconnect on a revoked write, the owner check for the bookings calendar, the owner check on conflict toggles, one alert per outage, skipping demo connections, moving instead of re-creating, and failing a sync when Google can't read a calendar.
 - **End to end on a production build against a fake Google (19 of 19):** connect redirects to the consent screen with narrow scopes and sets the handshake cookie; a forged state and a callback with no session are refused; the code is exchanged with the PKCE verifier; tokens aren't readable in the database; the first sync runs at once and the Google-busy slot disappears from the booking page; the Calendars page shows "In sync"; a booking creates the event with the guest and a Meet link and Google sends nothing; the guest's confirmation carries the link; cancelling removes the event. B3 (10 of 10), B2b (12 of 12) and sign-in (15 of 15) pass again.
 - **Not yet run against real Google:** needs your OAuth client values in `.env.local`, the redirect URI added, and your Google account as a test user.
+
+## B4a review (fresh-context reviewer)
+
+- **Fixed (medium-high):** cancelling or rescheduling while a worker was still creating the Google event marked that running job as skipped, so the delete or move didn't wait for it: a cancelled booking could stay in the host's calendar, and a reschedule could leave two events. A running calendar write is now left to finish, and the delete or move waits for it. Tests hold Google's create call open while the guest cancels or reschedules; with the fix set aside, both fail.
+- **Fixed (medium):** with Google configured but `TOKEN_ENCRYPTION_KEY` missing or wrong, the connect page and callback crashed and hosts couldn't disconnect. Now pages say "not set up", disconnecting still deletes the connection (just without revoking at Google), and the job runner refuses to start with a clear message. Negative test fails without it.
+- **Fixed (low-medium):** a sync already running when the host switched a calendar on could push the follow-up sync back 5 minutes, leaving that calendar's meetings bookable meanwhile. A finishing sync no longer delays an earlier requested one. Negative test fails without it.
+- **Fixed (low):** a demo calendar with no tokens no longer gets booked events queued (they could only fail). Negative test fails without it.
+- **Fixed (low, not pinned by a test):** the one alert email per outage is now claimed in a single statement, so a sync failure and a failed calendar write at the same instant can't both email. The race window is too narrow to reproduce in a test; a test written for it passed either way and was removed.
+- **Accepted (low):** if a host removes a calendar in Google and reconnects, bookings whose events were in it lose the link to them; later moves or cancellations can't update those events. Rare, and the host's own Google change caused it.
+- **Checked:** closing an account queues the calendar deletes at once and keeps the tokens until the 30-day purge, so the deletes run before the tokens go.
 
 ## Things only you can do (start the slow ones this week)
 

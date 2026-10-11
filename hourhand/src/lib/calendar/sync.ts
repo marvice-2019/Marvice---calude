@@ -58,7 +58,7 @@ export async function syncConnection(pool: pg.Pool, google: GoogleClient, key: B
     }
     await pool.query(
       `update calendar_connections set status = 'ok', last_synced_at = $2, error_count = 0, last_error = null, alert_sent_at = null,
-         next_sync_at = $2::timestamptz + make_interval(mins => $3), updated_at = $2 where id = $1`, [connectionId, now, SYNC_EVERY_MINUTES]);
+         next_sync_at = least(next_sync_at, $2::timestamptz + make_interval(mins => $3)), updated_at = $2 where id = $1`, [connectionId, now, SYNC_EVERY_MINUTES]);
     return { connectionId, ok: true };
   } catch (error) {
     await recordConnectionFailure(pool, connectionId, error, now);
@@ -102,12 +102,14 @@ export async function recordConnectionFailure(pool: Pick<pg.Pool, "query">, conn
      where id = $1 returning user_id, error_count, alert_sent_at, account_email`,
     [connectionId, revoked ? "disconnected" : "degraded", message, now, RETRY_FAILING_MINUTES]);
   if (!c || c.alert_sent_at || (!revoked && c.error_count < ALERT_AFTER_FAILURES)) return;
+  // Claim the one alert for this outage in a single statement: a sync and a calendar write failing together send one email.
+  const claimed = await pool.query("update calendar_connections set alert_sent_at = $2 where id = $1 and alert_sent_at is null", [connectionId, now]);
+  if (!claimed.rowCount) return;
   const { rows: [host] } = await pool.query("select email from users where id = $1 and deleted_at is null", [c.user_id]);
   if (!host) return;
   await pool.query(
     `insert into notifications (booking_id, user_id, channel, kind, recipient, send_at, dedupe_key)
      values (null, $1, 'email', 'calendar_alert_host', $2, $3, $4) on conflict (dedupe_key) do nothing`,
     [c.user_id, host.email, now, `calendar:${connectionId}:alert:${now.toISOString()}`]);
-  await pool.query("update calendar_connections set alert_sent_at = $2 where id = $1", [connectionId, now]);
 }
 

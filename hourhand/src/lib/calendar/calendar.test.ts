@@ -9,6 +9,7 @@ import { createPgStore } from "../data/pg-store";
 import type { DataStore, EventType, User } from "../data/types";
 import type { Mail, Mailer } from "../mail/mailer";
 import { MEET_LINK_WAIT_SECONDS, processDueNotifications } from "../jobs/worker";
+import { calendarConfigError, calendarDeps } from "./env";
 import { accessTokenFor, disconnectConnection, saveGoogleConnection, setAddToCalendar, setCheckConflicts } from "./connections";
 import { eventIdFor, GoogleApiError, REQUIRED_SCOPES, type BusyRange, type EventInput, type GoogleClient } from "./google";
 import { ALERT_AFTER_FAILURES, syncDueConnections } from "./sync";
@@ -32,6 +33,10 @@ function fakeGoogle() {
     failInsert: null as GoogleApiError | null,
     /** Calendars Google answers with an error for, as free/busy does for a deleted or unshared calendar. */
     freeBusyErrors: new Map<string, string>(),
+    /** When set, event creation waits for it: a write that is still running when something else happens. */
+    insertGate: null as Promise<void> | null,
+    /** Runs during a free/busy call: something the host does while a sync is in progress. */
+    duringFreeBusy: null as (() => Promise<void>) | null,
   };
   const meet = (id: string) => `https://meet.google.com/${id.slice(2, 5)}-${id.slice(5, 9)}-${id.slice(9, 12)}`;
   const g = {
@@ -43,11 +48,13 @@ function fakeGoogle() {
     async revoke(token: string) { s.revoked.push(token); },
     async freeBusy(_t: string, ids: string[]) {
       if (s.failFreeBusy) throw s.failFreeBusy;
+      if (s.duringFreeBusy) { const run = s.duringFreeBusy; s.duringFreeBusy = null; await run(); }
       const ok = ids.filter((id) => !s.freeBusyErrors.has(id));
       return { busy: new Map(ok.map((id) => [id, s.busy.get(id) ?? []])), errors: new Map([...s.freeBusyErrors].filter(([id]) => ids.includes(id))) };
     },
     async insertEvent(_t: string, calendarId: string, e: EventInput) {
       if (s.failInsert) throw s.failInsert;
+      if (s.insertGate) await s.insertGate;
       const id = eventIdFor(e.bookingId);
       s.events.set(id, { calendarId, start: e.start, end: e.end, summary: e.summary, attendee: e.attendee.email, withMeet: e.withMeet });
       return { id, joinUrl: e.withMeet ? meet(id) : null, conferencePending: false };
@@ -169,6 +176,22 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       expect(await setAddToCalendar(pool, priya.id, team.id)).toBe(false);
     });
 
+    it("a host can still disconnect when the server has no encryption key (the grant just isn't revoked)", async () => {
+      const id = await connect(priya);
+      expect(await disconnectConnection(pool, null, null, priya.id, id)).toBe(true);
+      expect(await store.listCalendarConnections(priya.id)).toEqual([]);
+    });
+
+    it("Google configured without a valid encryption key reads as not set up, and is reported as a configuration error", () => {
+      const env = { HOURHAND_DATA: "postgres", GOOGLE_CLIENT_ID: "c", GOOGLE_CLIENT_SECRET: "s" };
+      expect(calendarDeps(env)).toBeNull();
+      expect(calendarConfigError(env)).toMatch(/TOKEN_ENCRYPTION_KEY/);
+      expect(calendarConfigError({ ...env, TOKEN_ENCRYPTION_KEY: "short" })).toMatch(/32 bytes/);
+      expect(calendarConfigError({ ...env, TOKEN_ENCRYPTION_KEY: "ab".repeat(32) })).toBeNull();
+      expect(calendarDeps({ ...env, TOKEN_ENCRYPTION_KEY: "ab".repeat(32) })).not.toBeNull();
+      expect(calendarConfigError({ HOURHAND_DATA: "postgres" })).toBeNull(); // Google not configured at all is fine
+    });
+
     it("disconnecting revokes the grant and removes the calendars and busy times", async () => {
       const { google, s } = fakeGoogle();
       const id = await connect(priya);
@@ -252,6 +275,14 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       expect(await syncDueConnections(pool, google, key, new Date(Date.now() + 3 * 3600_000))).toEqual([]);
     });
 
+    it("a calendar switched on while a sync is running is synced again straight after, not 5 minutes later", async () => {
+      const { google, s } = fakeGoogle();
+      const id = await connect(priya);
+      s.duringFreeBusy = async () => { await pool.query("update calendar_connections set next_sync_at = now() where id = $1", [id]); };
+      await syncDueConnections(pool, google, key);
+      expect(await syncDueConnections(pool, google, key, new Date(Date.now() + 1000))).toHaveLength(1);
+    });
+
     it("leaves demo connections without tokens alone", async () => {
       const { google } = fakeGoogle();
       await pool.query("insert into calendar_connections (user_id, provider, account_email, credentials_encrypted) values ($1, 'google', 'demo@example.in', '')", [priya.id]);
@@ -323,6 +354,54 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       await processDueNotifications(pool, recordingMailer().mailer, deps);
       expect(s.events.size).toBe(0);
       expect((await queue(moved.id)).find((q) => q.kind === "calendar_delete")!.status).toBe("sent");
+    });
+
+    it("cancelling while the event is still being created waits for it, then removes it", async () => {
+      const { google, s } = fakeGoogle();
+      await connect(priya);
+      let open!: () => void;
+      s.insertGate = new Promise((r) => { open = r; });
+      const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
+      const deps = { baseUrl, calendar: { google, key } };
+      const a = processDueNotifications(pool, recordingMailer().mailer, deps); // worker A is now inside Google's create call
+      await new Promise((r) => setTimeout(r, 200));
+      await store.cancelBooking(priya.id, b.id, "guest");
+      await processDueNotifications(pool, recordingMailer().mailer, deps); // worker B sees the delete but must wait for A
+      expect((await queue(b.id)).find((q) => q.kind === "calendar_delete")!.status).toBe("queued");
+      s.insertGate = null;
+      open();
+      await a;
+      expect(s.events.has(eventIdFor(b.id))).toBe(true);
+      await processDueNotifications(pool, recordingMailer().mailer, { ...deps, now: new Date(Date.now() + 30_000) });
+      expect(s.events.size).toBe(0);
+    });
+
+    it("rescheduling while the event is still being created moves that event instead of making a second one", async () => {
+      const { google, s } = fakeGoogle();
+      await connect(priya);
+      let open!: () => void;
+      s.insertGate = new Promise((r) => { open = r; });
+      const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
+      const deps = { baseUrl, calendar: { google, key } };
+      const a = processDueNotifications(pool, recordingMailer().mailer, deps);
+      await new Promise((r) => setTimeout(r, 200));
+      const newStart = nextStart();
+      await store.rescheduleBooking(priya.id, b.id, newStart, `cal-move-${slot}`);
+      await processDueNotifications(pool, recordingMailer().mailer, deps);
+      s.insertGate = null;
+      open();
+      await a;
+      await processDueNotifications(pool, recordingMailer().mailer, { ...deps, now: new Date(Date.now() + 30_000) });
+      expect(s.events.size).toBe(1);
+      expect([...s.events.values()][0].start.toISOString()).toBe(newStart.toISOString());
+    });
+
+    it("a demo calendar without tokens never gets booked events queued", async () => {
+      const { rows: [c] } = await pool.query(
+        "insert into calendar_connections (user_id, provider, account_email, credentials_encrypted) values ($1, 'google', 'demo@example.in', '') returning id", [priya.id]);
+      await pool.query("insert into calendars (connection_id, user_id, external_id, name, is_add_to) values ($1, $2, 'demo', 'Demo', true)", [c.id, priya.id]);
+      const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
+      expect((await queue(b.id)).find((q) => q.kind === "calendar_create")).toBeUndefined();
     });
 
     it("a write that finds the grant revoked fails at once and disconnects the calendar", async () => {

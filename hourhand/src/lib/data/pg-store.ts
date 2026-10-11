@@ -264,7 +264,10 @@ export function createPgStore(pool: pg.Pool): DataStore {
           const { name, email, timezone, phone, answers } = invitee;
           const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId);
           // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
-          await client.query("update notifications set status = 'skipped', last_error = 'booking rescheduled', updated_at = now() where booking_id = $1 and status = 'queued'", [bookingId]);
+          // A calendar write already running for the old booking is left to finish; the move waits for it and then moves its event.
+          await client.query(
+            "update notifications set status = 'skipped', last_error = 'booking rescheduled', updated_at = now() where booking_id = $1 and status = 'queued' and not (channel = 'calendar' and locked_until > now())",
+            [bookingId]);
           await queueBookingNotifications(client, newId, "rescheduled", new Date());
           return newId;
         });

@@ -27,7 +27,7 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
   const { rows } = await db.query(
     `select b.host_id, b.start_at, i.email as guest_email, u.email as host_email,
        (select c.id from calendars c join calendar_connections cc on cc.id = c.connection_id
-        where c.user_id = b.host_id and c.is_add_to and cc.status <> 'disconnected') as add_to_calendar,
+        where c.user_id = b.host_id and c.is_add_to and cc.status <> 'disconnected' and octet_length(cc.credentials_encrypted) > 0) as add_to_calendar,
        exists (select 1 from calendar_connections cc where cc.user_id = b.host_id) as has_calendar
      from bookings b join invitees i on i.booking_id = b.id join users u on u.id = b.host_id where b.id = $1`, [bookingId]);
   const b = rows[0];
@@ -44,7 +44,8 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
     if (notifyHost) now_("cancelled_host", b.host_email);
     await db.query(
       `update notifications set status = 'skipped', last_error = 'booking cancelled', updated_at = $2
-       where booking_id = $1 and status = 'queued' and kind not in ('cancelled_guest', 'cancelled_host')`, [bookingId, now]);
+       where booking_id = $1 and status = 'queued' and kind not in ('cancelled_guest', 'cancelled_host')
+         and not (channel = 'calendar' and locked_until > $2)`, [bookingId, now]); // a running calendar write finishes; the delete waits for it
     if (b.has_calendar) calendarJob("calendar_delete", "event");
   } else {
     now_(event === "booked" ? "booked_guest" : "rescheduled_guest", b.guest_email);
