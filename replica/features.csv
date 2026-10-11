@@ -4,22 +4,22 @@ Connect Google Calendar to read busy times,calendar,must,yes,no,S02 S10; help co
 Connect Outlook / Office 365 calendar,calendar,must,yes,no,S02 S10
 Choose which calendars to check for conflicts,calendar,must,yes,no,S10
 Choose one calendar new bookings are added to,calendar,must,yes,no,S10
-Weekly working hours with time zone,availability,must,yes,partial,slot engine supports it; no host editing screen yet
-Date-specific overrides (custom hours or unavailable),availability,must,yes,partial,slot engine supports it; no host editing screen yet
+Weekly working hours with time zone,availability,must,yes,yes,"S09: per-weekday ranges, on/off, copy Monday to weekdays, validated"
+Date-specific overrides (custom hours or unavailable),availability,must,yes,yes,"S09: add/remove per date, custom hours or unavailable"
 Several named availability schedules,availability,should,yes,no,S09; API list schedules
-"One-on-one event type with name, slug, duration, description",event types,must,yes,no,S05; API EventType
+"One-on-one event type with name, slug, duration, description",event types,must,yes,yes,"S05-S07: create/edit, unique slug, on/off switch; delete blocked while bookings reference it"
 Multiple duration options on one event type,event types,should,yes,no,S05; help multiple durations
 "Event location: video, phone, in person, custom, ask invitee",event types,must,yes,no,S05; API LocationConfiguration
 "Minimum notice, booking window, start increments",event types,must,yes,yes,"slot engine, tested"
 Buffers before and after meetings,event types,must,yes,yes,"slot engine + booking overlap check, tested"
-Daily / weekly booking limits,event types,should,yes,no,S06; help meeting limits
+Daily / weekly booking limits,event types,should,yes,partial,daily limit editable and enforced by slot engine; no weekly limit
 Hidden event types (link only),event types,should,yes,no,S04; API EventType hidden flag
 Custom questions on the booking form,booking,must,yes,yes,required questions enforced; answers saved with question label and shown to host
 "Group event type (one host, many invitees, seat limit)",event types,could,yes,no,S05; API kind=group
 Public profile page listing event types,booking,must,yes,yes,"S13 lists active, non-hidden event types"
 "Booking page: date picker, slots, guest time zone, 12h/24h",booking,must,yes,yes,"S14: calendar, guest zone + picker, 12h/24h toggle remembered per browser"
 Guest details form with add-guests and text-reminder phone,booking,must,yes,partial,S15: phone + answers saved; add-guests not built
-Confirmation page with add-to-calendar and optional redirect,booking,must,yes,partial,S16 summary + manage link; no add-to-calendar file or redirect yet
+Confirmation page with add-to-calendar and optional redirect,booking,must,yes,partial,"S16 summary + manage link, follows guest 12h/24h; no add-to-calendar file or redirect yet"
 "Guest cancel via emailed link, with reason",booking,must,yes,partial,"S17 works with reason + cut-off; link shown on confirmation page, no email sent yet"
 Guest reschedule via emailed link,booking,must,yes,partial,"S18 works (atomic move, new link, retry-safe); no email sent yet"
 Cancellation policy text and cut-off,booking,should,yes,partial,cut-off enforced on cancel; no policy text field in the UI yet
@@ -43,7 +43,7 @@ Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integratio
 Never offer a slot when calendar sync is stale,integrations,must,no,partial,slot engine returns no times when sync is stale (tested); real sync not built yet
 One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,must,no,no,fix 2: billing (14 reviews/2 sources)
 Human support reply under 1 business day; WhatsApp/callback on paid plans,support,should,no,no,fix 3: support (14 reviews/2 sources); ops not code
-Date overrides + block-a-week + recurring + one-off links (web and mobile),availability,must,no,no,fix 4: availability (11 reviews/2 sources)
+Date overrides + block-a-week + recurring + one-off links (web and mobile),availability,must,no,partial,"web: overrides + block a stretch of days (up to 62); no recurring or one-off links, no mobile"
 Mobile app parity with web; save confirmation; crash-free >=99.5%,mobile,must,no,no,fix 5: bugs (26 reviews/2 sources)
 Time zone confirm step and explicit AM/PM or 24h toggle,booking,should,no,no,fix 6: thin (2 reviews/1 source) but cheap
 Low-cost second seat or flat 2-person price,pricing,should,no,no,fix 7: seats (5 reviews/3 sources) -> /replica-launch

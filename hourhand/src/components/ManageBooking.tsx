@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
 import { focusRing } from "@/components/ui/focus";
-import { formatDate, formatTime, zoneName } from "@/lib/format";
+import { formatDate, zoneName } from "@/lib/format";
+import { LocalTime } from "./LocalTime";
 import { SlotPicker } from "./SlotPicker";
 
 interface Props {
@@ -16,7 +17,9 @@ interface Props {
   hostName: string;
 }
 
-const when = (slot: string, tz: string) => `${formatDate(new Date(slot), tz)}, ${formatTime(new Date(slot), tz)} ${zoneName(tz)}`;
+function When({ slot, tz }: { slot: string; tz: string }) {
+  return <>{formatDate(new Date(slot), tz)}, <LocalTime date={slot} tz={tz} /> {zoneName(tz)}</>;
+}
 
 /** The two things a guest can do with a booking: move it, or cancel it. */
 export function ManageBooking({ token, slug, event, bookingWindowDays, hostName }: Props) {
@@ -66,7 +69,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
       </div>
       {picked && (
         <div className="mt-4 grid max-w-md gap-3">
-          <p className="text-text">New time: <span className="font-semibold">{when(picked.slot, picked.tz)}</span></p>
+          <p className="text-text">New time: <span className="font-semibold"><When slot={picked.slot} tz={picked.tz} /></span></p>
           {taken && (
             <div className="rounded-md bg-danger-bg p-4" role="alert">
               <p className="text-danger">That time was just taken. Here are the next open times:</p>
@@ -74,7 +77,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
                 {taken.map((s) => (
                   <li key={s}>
                     <Button variant="secondary" className="w-full" onClick={() => { setTaken(null); setPicked({ slot: s, tz: picked.tz }); }}>
-                      {when(s, picked.tz)}
+                      <When slot={s} tz={picked.tz} />
                     </Button>
                   </li>
                 ))}

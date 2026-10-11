@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LocalTime } from "@/components/LocalTime";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { store, type LocationKind } from "@/lib/data";
-import { formatDate, formatTime, zoneName } from "@/lib/format";
+import { formatDate, zoneName } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function BookedPage({ params }: { params: Promise<{ slug: s
           <div><dt className="text-sm text-text-muted">What</dt><dd className="text-text">{eventType?.name} with {host.name}</dd></div>
           <div>
             <dt className="text-sm text-text-muted">When</dt>
-            <dd className="text-text">{formatDate(booking.startAt, tz)}, {formatTime(booking.startAt, tz)} to {formatTime(booking.endAt, tz)} ({zoneName(tz)})</dd>
+            <dd className="text-text">{formatDate(booking.startAt, tz)}, <LocalTime date={booking.startAt} tz={tz} /> to <LocalTime date={booking.endAt} tz={tz} /> ({zoneName(tz)})</dd>
           </div>
           {booking.locationKind && <div><dt className="text-sm text-text-muted">Where</dt><dd className="text-text">{locationLabels[booking.locationKind]}</dd></div>}
           <div><dt className="text-sm text-text-muted">Booked for</dt><dd className="text-text">{booking.invitee.name}, {booking.invitee.email}</dd></div>

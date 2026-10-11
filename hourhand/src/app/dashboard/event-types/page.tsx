@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ActiveSwitch } from "@/components/ActiveSwitch";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -15,6 +16,8 @@ const locationLabel: Record<LocationKind, string> = {
   custom: "Custom location",
   ask_guest: "Guest picks the place",
 };
+
+export const dynamic = "force-dynamic";
 
 export default async function EventTypesPage() {
   const user = await store.getCurrentUser();
@@ -45,9 +48,12 @@ export default async function EventTypesPage() {
             return (
               <li key={et.id}>
                 <Card className="flex h-full flex-col gap-3">
-                  <h2 className="font-display text-lg text-text">
-                    <Link href={`/dashboard/event-types/${et.id}`} className={`rounded-sm hover:underline ${focusRing}`}>{et.name}</Link>
-                  </h2>
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="font-display text-lg text-text">
+                      <Link href={`/dashboard/event-types/${et.id}`} className={`rounded-sm hover:underline ${focusRing}`}>{et.name}</Link>
+                    </h2>
+                    <ActiveSwitch id={et.id} name={et.name} active={et.active} />
+                  </div>
                   <p className="text-sm text-text-muted">{et.durationMinutes} min · {first ? locationLabel[first.kind] : "No location set"}</p>
                   <div className="mt-auto flex items-center justify-between gap-3">
                     <span className="truncate font-mono text-xs text-text-muted">{path}</span>
