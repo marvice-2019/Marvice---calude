@@ -1,6 +1,6 @@
 import type pg from "pg";
-import { computeSlots, isSyncStale } from "./slots";
-import { RequestKeyConflictError, SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
+import { computeOneOffSlots, computeSlots, isSyncStale } from "./slots";
+import { LinkUnavailableError, LinkUsedError, RequestKeyConflictError, SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
 import { BOOKING_LIMITS, type createRateLimiter } from "./rate-limit";
 import type { Plan } from "./billing/plans";
 import { PaymentStartError, startPaidBooking } from "./payments/booking-payments";
@@ -34,6 +34,18 @@ function parseInstant(value: unknown): Date | null {
  * `movingId` is a booking being rescheduled: its own time doesn't block the slots it could move to.
  */
 export async function freeSlots(store: DataStore, host: User, eventType: EventType, from: Date, to: Date, now: Date, movingId: string | null = null): Promise<Date[]> {
+  if (eventType.kind === "one_off") {
+    const [times, connections, busyBlocks, bookings] = await Promise.all([
+      store.listOneOffTimes(eventType.id),
+      store.listCalendarConnections(host.id),
+      store.listBusyBlocks(host.id, new Date(from.getTime() - DAY), new Date(to.getTime() + DAY)),
+      store.listBookings(host.id),
+    ]);
+    return computeOneOffSlots({
+      times, durationMinutes: eventType.durationMinutes, busyBlocks, bookings: bookings.filter((b) => b.id !== movingId),
+      now, rangeStart: from, rangeEnd: to, syncStale: isSyncStale(connections, now),
+    });
+  }
   const [{ schedule, rules }, connections, busyBlocks, bookings] = await Promise.all([
     store.getDefaultSchedule(host.id),
     store.listCalendarConnections(host.id),
@@ -46,8 +58,32 @@ export async function freeSlots(store: DataStore, host: User, eventType: EventTy
   });
 }
 
+type Target = { host: User; eventType: EventType; linkToken: string | null };
+
 /**
- * GET /api/slots?slug=&event=&from=&to=&tz=&token=
+ * The host and event type a public request is for: a single-use link (`linkToken`), or the public slug pair. A one-off
+ * meeting has no public slug pair (getPublicEventType leaves it out), so it is reachable only by its link. A link that
+ * isn't open answers with its state and nothing about the host.
+ */
+async function resolveTarget(store: DataStore, slug: string, event: string, linkToken: string | null, now: Date): Promise<Target | HandlerResult> {
+  if (linkToken) {
+    const r = await store.resolveBookingLink(linkToken, now);
+    if (r.status !== "open") return linkRefusal(r.status);
+    return { host: r.host, eventType: r.eventType, linkToken };
+  }
+  const found = await store.getPublicEventType(slug, event);
+  return found ? { ...found, linkToken: null } : { status: 404, body: { error: "not_found" } };
+}
+
+const isResult = (t: Target | HandlerResult): t is HandlerResult => "status" in t;
+
+/** used → 409 (someone booked it), unknown → 404, expired or revoked → 410 (it existed and is gone). */
+function linkRefusal(status: "used" | "expired" | "revoked" | "not_found"): HandlerResult {
+  return { status: status === "used" ? 409 : status === "not_found" ? 404 : 410, body: { error: `link_${status}` } };
+}
+
+/**
+ * GET /api/slots?slug=&event=&from=&to=&tz=&token=   (or ?link=<single-use link token> instead of slug and event)
  * `token` is an optional manage token: when it names a confirmed booking for this host and event,
  * that booking's own time doesn't hide slots. Any other token is ignored.
  */
@@ -55,11 +91,12 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
   const errors: Record<string, string> = {};
   const slug = params.get("slug") ?? "";
   const event = params.get("event") ?? "";
+  const link = params.get("link") || null;
   const from = parseInstant(params.get("from"));
   const to = parseInstant(params.get("to"));
   const tz = params.get("tz");
-  if (!slug) errors.slug = "Required.";
-  if (!event) errors.event = "Required.";
+  if (!link && !slug) errors.slug = "Required.";
+  if (!link && !event) errors.event = "Required.";
   if (!from) errors.from = "Must be an ISO date-time.";
   if (!to) errors.to = "Must be an ISO date-time.";
   if (from && to && (to <= from || to.getTime() - from.getTime() > MAX_RANGE_DAYS * DAY)) {
@@ -68,8 +105,8 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
   if (tz !== null && !isIanaTimeZone(tz)) errors.tz = "Must be an IANA time zone.";
   if (Object.keys(errors).length > 0 || !from || !to) return { status: 400, body: { error: "invalid_request", fields: errors } };
 
-  const found = await store.getPublicEventType(slug, event);
-  if (!found) return { status: 404, body: { error: "not_found" } };
+  const found = await resolveTarget(store, slug, event, link, now);
+  if (isResult(found)) return found;
   const token = params.get("token");
   const moving = token ? await store.getBookingByManageToken(token) : null;
   const movingId = moving && moving.status === "confirmed" && moving.hostId === found.host.id && moving.eventTypeId === found.eventType.id ? moving.id : null;
@@ -80,6 +117,8 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
 export interface BookingRequest {
   slug: string;
   event: string;
+  /** A single-use link's token; when set, slug and event aren't needed. */
+  linkToken: string | null;
   start: Date;
   name: string;
   email: string;
@@ -104,8 +143,10 @@ export function validateBookingRequest(input: unknown): Validation {
   const phone = str("phone");
   const start = parseInstant(body.start);
   const idempotencyKey = str("idempotencyKey");
-  if (!str("slug")) fields.slug = "Required.";
-  if (!str("event")) fields.event = "Required.";
+  const linkToken = str("linkToken");
+  if (linkToken.length > 100) fields.linkToken = "That link isn't valid.";
+  if (!linkToken && !str("slug")) fields.slug = "Required.";
+  if (!linkToken && !str("event")) fields.event = "Required.";
   if (!start) fields.start = "Pick a time.";
   if (name.length < 1 || name.length > 100) fields.name = "Enter your name (up to 100 characters).";
   if (!EMAIL.test(email) || email.length > 254) fields.email = "Enter a valid email address.";
@@ -129,7 +170,7 @@ export function validateBookingRequest(input: unknown): Validation {
   if (Object.keys(fields).length > 0 || !start) return { ok: false, fields };
   return {
     ok: true,
-    value: { slug: str("slug"), event: str("event"), start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey },
+    value: { slug: str("slug"), event: str("event"), linkToken: linkToken || null, start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey },
   };
 }
 
@@ -164,8 +205,8 @@ export async function handleCreateBooking(
   if (!v.ok) return { status: 400, body: { error: "invalid_request", fields: v.fields } };
   const req = v.value;
 
-  const found = await store.getPublicEventType(req.slug, req.event);
-  if (!found) return { status: 404, body: { error: "not_found" } };
+  const found = await resolveTarget(store, req.slug, req.event, req.linkToken, now);
+  if (isResult(found)) return found;
   const { host, eventType } = found;
 
   // A repeated submit returns the booking it already made, before the slot re-check (which it would now fail).
@@ -186,6 +227,8 @@ export async function handleCreateBooking(
 
   const bookingInput = {
     eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey,
+    // Used up in the same write as the booking (or its payment hold), so two guests on one link can't both book.
+    ...(found.linkToken ? { bookingLinkToken: found.linkToken } : {}),
     invitee: {
       name: req.name, email: req.email, timezone: req.timezone, phone: req.phone,
       answers: questions.filter((q) => req.answers[q.id]).map((q) => ({ questionId: q.id, label: q.label, answer: req.answers[q.id] })),
@@ -225,6 +268,8 @@ export async function handleCreateBooking(
   } catch (err) {
     if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, req.start, now);
     if (err instanceof RequestKeyConflictError) return { status: 409, body: { error: "key_conflict" } };
+    if (err instanceof LinkUsedError) return linkRefusal("used");
+    if (err instanceof LinkUnavailableError) return linkRefusal(err.status);
     if (err instanceof PaymentStartError) return { status: 502, body: { error: "payment_unavailable" } };
     throw err;
   }
