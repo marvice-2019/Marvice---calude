@@ -1,7 +1,7 @@
 import type { HandlerResult } from "../booking";
-import type { DataStore } from "../data/types";
+import { isNamedError, type DataStore } from "../data/types";
 import { CONFIRM_PAYMENT_LIMIT, type createRateLimiter } from "../rate-limit";
-import { confirmPayment, PaymentVerifyError } from "./booking-payments";
+import { confirmPayment, type PaymentVerifyError } from "./booking-payments";
 import type { PaymentCheckDeps } from "./booking-payments";
 import type pg from "pg";
 
@@ -29,7 +29,7 @@ export async function handleConfirmPayment(
       { pool: deps.pool, auth, orders: deps.ordersFor(auth) }, { bookingId: booking.id, paymentId: body.paymentId as string, signature: body.signature as string }, now);
     return { status: 200, body: { status } };
   } catch (err) {
-    if (err instanceof PaymentVerifyError) return { status: 400, body: { error: err.reason } };
+    if (isNamedError<PaymentVerifyError>(err, "PaymentVerifyError")) return { status: 400, body: { error: err.reason } };
     throw err;
   }
 }

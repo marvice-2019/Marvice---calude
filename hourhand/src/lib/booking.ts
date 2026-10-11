@@ -1,9 +1,9 @@
 import type pg from "pg";
 import { computeOneOffSlots, computeSlots, isSyncStale } from "./slots";
-import { LinkUnavailableError, LinkUsedError, RequestKeyConflictError, SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
+import { isNamedError, type Booking, type DataStore, type EventType, type LinkUnavailableError, type User } from "./data/types";
 import { BOOKING_LIMITS, type createRateLimiter } from "./rate-limit";
 import type { Plan } from "./billing/plans";
-import { PaymentStartError, startPaidBooking } from "./payments/booking-payments";
+import { startPaidBooking } from "./payments/booking-payments";
 import type { HostRazorpayAuth } from "./payments/host-razorpay";
 import type { RazorpayOrders } from "./payments/razorpay-orders";
 
@@ -266,11 +266,11 @@ export async function handleCreateBooking(
     const booking = await store.createBooking(bookingInput);
     return { status: 201, body: { bookingId: booking.id, manageToken: booking.invitee.manageToken } };
   } catch (err) {
-    if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, req.start, now);
-    if (err instanceof RequestKeyConflictError) return { status: 409, body: { error: "key_conflict" } };
-    if (err instanceof LinkUsedError) return linkRefusal("used");
-    if (err instanceof LinkUnavailableError) return linkRefusal(err.status);
-    if (err instanceof PaymentStartError) return { status: 502, body: { error: "payment_unavailable" } };
+    if (isNamedError(err, "SlotTakenError")) return slotTaken(store, host, eventType, req.start, now);
+    if (isNamedError(err, "RequestKeyConflictError")) return { status: 409, body: { error: "key_conflict" } };
+    if (isNamedError(err, "LinkUsedError")) return linkRefusal("used");
+    if (isNamedError<LinkUnavailableError>(err, "LinkUnavailableError")) return linkRefusal(err.status);
+    if (isNamedError(err, "PaymentStartError")) return { status: 502, body: { error: "payment_unavailable" } };
     throw err;
   }
 }

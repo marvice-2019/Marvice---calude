@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { EventTypeInUseError, SlugTakenError, store, type QuestionDraft } from "@/lib/data";
+import { store, type EventTypeInUseError, type QuestionDraft } from "@/lib/data";
+import { isNamedError } from "@/lib/data/types";
 import { SLUG_TAKEN, priceGateError, validateEventType, validateQuestions, type EventTypeErrors, type EventTypeForm, type QuestionErrors } from "@/lib/event-types";
 import { requireUser } from "@/lib/auth/session";
 import { authEnabled } from "@/lib/auth/auth";
@@ -45,7 +46,7 @@ export async function saveEventType(id: string | null, form: EventTypeForm, ques
     refresh(user.slug, saved.id);
     return { ok: true, id: saved.id, slug: saved.slug };
   } catch (e) {
-    if (e instanceof SlugTakenError) return { ok: false, errors: { slug: SLUG_TAKEN }, questionErrors: [] };
+    if (isNamedError(e, "SlugTakenError")) return { ok: false, errors: { slug: SLUG_TAKEN }, questionErrors: [] };
     throw e;
   }
 }
@@ -62,7 +63,7 @@ export async function deleteEventType(id: string): Promise<{ ok: true } | { ok: 
   try {
     await store.deleteEventType(user.id, id);
   } catch (e) {
-    if (e instanceof EventTypeInUseError) return { ok: false, error: e.message };
+    if (isNamedError<EventTypeInUseError>(e, "EventTypeInUseError")) return { ok: false, error: e.message };
     throw e;
   }
   refresh(user.slug);

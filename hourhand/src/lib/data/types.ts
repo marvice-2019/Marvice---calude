@@ -198,6 +198,15 @@ export type ResolvedBookingLink =
   | { status: "used" | "expired" | "revoked" | "not_found" };
 
 /** Someone already booked through this single-use link (or won the race to). */
+/**
+ * True when `err` is the error class named `name`. Matches the name each class sets, not instanceof: a Next production
+ * build bundles a route and the data store separately, each with its own copy of these classes, so instanceof fails across
+ * them (a booking race answered 500 instead of 409 because of it). Names are string literals, so minifying keeps them.
+ */
+export function isNamedError<T extends Error = Error>(err: unknown, name: string): err is T {
+  return err instanceof Error && err.name === name;
+}
+
 export class LinkUsedError extends Error {
   readonly code = "link_used";
   constructor() {

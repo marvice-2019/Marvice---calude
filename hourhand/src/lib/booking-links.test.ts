@@ -85,3 +85,14 @@ describe("single-use links through the public handlers", () => {
     expect(await slotsVia(store, { link: token })).toMatchObject({ status: 409, body: { error: "link_used" } });
   });
 });
+
+describe("store errors from another bundle", () => {
+  it("are recognised by name, so a race on a link answers 409 even when instanceof can't match", async () => {
+    const { isNamedError } = await import("./data/types");
+    // What a production build hands the route: same name, a different class object.
+    class LinkUsedError extends Error { constructor() { super("This link has already been used"); this.name = "LinkUsedError"; } }
+    expect(isNamedError(new LinkUsedError(), "LinkUsedError")).toBe(true);
+    expect(isNamedError(new Error("nope"), "LinkUsedError")).toBe(false);
+    expect(isNamedError("LinkUsedError", "LinkUsedError")).toBe(false);
+  });
+});
