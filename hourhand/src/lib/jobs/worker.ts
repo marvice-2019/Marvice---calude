@@ -138,9 +138,12 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
   const calendarRow = async (calendarId: unknown) => {
     if (typeof calendarId !== "string" || !/^[0-9a-f-]{36}$/i.test(calendarId)) return null;
     const { rows: [cal] } = await pool.query(
-      `select c.external_id, c.connection_id, cc.provider from calendars c join calendar_connections cc on cc.id = c.connection_id
+      `select c.external_id, c.connection_id, c.can_teams, cc.provider from calendars c join calendar_connections cc on cc.id = c.connection_id
        where c.id = $1 and c.user_id = $2 and cc.status <> 'disconnected'`, [calendarId, r.host_id]);
-    return cal ? { externalId: cal.external_id as string, connectionId: cal.connection_id as string, providerId: cal.provider as CalendarProviderId } : null;
+    return cal ? {
+      externalId: cal.external_id as string, connectionId: cal.connection_id as string, providerId: cal.provider as CalendarProviderId,
+      canTeams: cal.can_teams === true,
+    } : null;
   };
   /** The provider for a calendar's connection, or a reason to skip when that provider isn't configured here. */
   const providerOf = (cal: { providerId: CalendarProviderId }): CalendarProvider | { skip: string } =>
@@ -189,9 +192,11 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
       ...ctx.answers.filter((a) => a.answer.trim()).map((a) => `${a.label}: ${a.answer}`),
       "", `Details: ${ctx.dashboardUrl}`,
     ].join("\n");
+    // Only a calendar that allows Teams meetings can make one; asking any other (e.g. a personal Outlook account) can fail the whole write.
+    const conference = r.booking_location_kind === "google_meet" ? "google_meet" : r.booking_location_kind === "teams" && cal.canTeams ? "teams" : null;
     let event = await provider.insertEvent(token, cal.externalId, {
       summary, description, start: ctx.startAt, end: ctx.endAt, timeZone: ctx.hostTimezone, location: where,
-      attendee: { email: ctx.guestEmail, name: ctx.guestName }, conference: r.booking_location_kind === "google_meet" ? "google_meet" : r.booking_location_kind === "teams" ? "teams" : null, bookingId: ctx.bookingId,
+      attendee: { email: ctx.guestEmail, name: ctx.guestName }, conference, bookingId: ctx.bookingId,
     });
     // Meet and Teams links can be created asynchronously; give the provider a moment so the guest's confirmation can carry the link.
     for (let i = 0; i < 3 && event.conferencePending; i++) {

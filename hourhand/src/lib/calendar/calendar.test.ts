@@ -14,8 +14,8 @@ import { MEET_LINK_WAIT_SECONDS, processDueNotifications } from "../jobs/worker"
 import { calendarConfigError, calendarDeps } from "./env";
 import { accessTokenFor, disconnectConnection, saveConnection, setAddToCalendar, setCheckConflicts } from "./connections";
 import { eventIdFor, GoogleApiError, REQUIRED_SCOPES, type BusyRange, type EventInput, type GoogleClient } from "./google";
-import type { CalendarProvider } from "./provider";
-import { ALERT_AFTER_FAILURES, syncDueConnections } from "./sync";
+import { CalendarApiError, type CalendarProvider } from "./provider";
+import { ALERT_AFTER_FAILURES, recordConnectionFailure, syncDueConnections } from "./sync";
 
 const BASE = process.env.TEST_DATABASE_URL;
 const MIN = 60_000;
@@ -211,6 +211,33 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       expect(sealed.toString("latin1")).not.toContain("rt-rotated-1");
       expect(await accessTokenFor(pool, { google: rotating }, key, id, hoursLater(4))).toBe("rot-2");
       expect(sent).toEqual(["rt-for-tests", "rt-rotated-1"]);
+    });
+
+    it("two callers finding the token expired at once refresh it once and keep the rotated refresh token", async () => {
+      const id = await connect(priya);
+      const used = new Set<string>();
+      let refreshes = 0;
+      const rotating = {
+        id: "google",
+        // Like Microsoft: slow, rotates the refresh token, and refuses one that was already redeemed.
+        async refresh(refreshToken: string) {
+          if (used.has(refreshToken)) throw new CalendarApiError("invalid_grant: refresh token already redeemed", { retryable: false, revoked: true });
+          used.add(refreshToken);
+          refreshes++;
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          return { accessToken: `conc-${refreshes}`, expiresAt: new Date(Date.now() + 3 * 3600_000), refreshToken: `rt-conc-${refreshes}` };
+        },
+      } as unknown as CalendarProvider;
+      const later = new Date(Date.now() + 2 * 3600_000);
+      // What sync and the calendar jobs do with a revoked error: disconnect the connection.
+      const call = () => accessTokenFor(pool, { google: rotating }, key, id, later)
+        .catch(async (error) => { await recordConnectionFailure(pool, id, error, later); throw error; });
+      const results = await Promise.allSettled([call(), call()]);
+      expect(results).toEqual([{ status: "fulfilled", value: "conc-1" }, { status: "fulfilled", value: "conc-1" }]);
+      expect(refreshes).toBe(1);
+      const row = await conn(id);
+      expect(unseal<{ refreshToken: string }>(key, row.credentials_encrypted, `google:${priya.id}:priya@gmail.com`).refreshToken).toBe("rt-conc-1");
+      expect(row.status).toBe("ok");
     });
 
     it("another host can't change or remove a host's calendars", async () => {
@@ -555,6 +582,20 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const { mailer, sent } = recordingMailer();
       await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { microsoft }, key } });
       expect(bookedMails(sent)).toHaveLength(1);
+    });
+
+    it.each([[false, null], [true, "teams"]] as const)("a Teams booking's event asks for a Teams meeting only where the calendar allows it (can_teams %s)", async (teams, conference) => {
+      const { microsoft, s } = fakeMicrosoft(teams);
+      s.linkReady = true;
+      const asked: (string | null)[] = [];
+      const insert = microsoft.insertEvent.bind(microsoft);
+      microsoft.insertEvent = (token, calendarId, e) => { asked.push(e.conference); return insert(token, calendarId, e); };
+      await connectMs(teams);
+      const b = await book();
+      const { mailer } = recordingMailer();
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { microsoft }, key } });
+      expect(asked).toEqual([conference]);
+      expect((await queue(b.id)).find((q) => q.kind === "calendar_create")!.status).toBe("sent");
     });
 
     it("stores whether each calendar can make Teams meetings, and a reconnect updates it", async () => {
