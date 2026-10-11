@@ -6,7 +6,7 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 | --- | --- | --- |
 | B1 | Postgres data layer: migrations, `PgStore` behind `DataStore`, seed, second-host isolation tests | **done** (2026-10-11) |
 | B2a | Better Auth: email magic link, Google sign-in (switched on by env), httpOnly sessions, sign out everywhere | **done** (2026-10-11) |
-| B2b | Ownership checks in the nine data methods without a user id, account deletion, rate limits on sign-in | not started |
+| B2b | Ownership checks in the nine data methods without a user id, account deletion, rate limits on sign-in | **done** (2026-10-11) |
 | B3 | Email (Resend) and pg-boss jobs: confirmation and reminder emails, retries, dead-letter log | not started |
 | B4 | Google Calendar: free/busy, writing booked events, push channels and incremental sync, sync health | not started |
 | B5 | Payments in test mode: Razorpay (INR) and Stripe (USD), Checkout and portal, signed and deduplicated webhooks | not started |
@@ -42,6 +42,24 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Accepted for now:** two first-time sign-ups racing for the same slug — the unique constraint holds and the loser asks for a new link. Magic-link slugs come from the email's local part until onboarding lets hosts choose one.
 - After the fixes: 109 tests pass against Postgres, and the 15-check sign-in run passes again.
 
+## B2b evidence (2026-10-11, Postgres 16.15, production build)
+
+- 117 tests pass with `TEST_DATABASE_URL` set (103 without).
+- **Ownership:** the nine methods now take the host id and enforce it in the query, in both stores. Tests show a second host can't read Priya's locations or questions, overwrite her questions, cancel or move her booking, or change her hours. With the host filter removed from `cancelBooking`, the test fails.
+- **Account deletion:** closing an account turns its links off, cancels upcoming bookings, deletes its sessions and blocks it from signing back in (a session hook). Purge removes it with everything it owns only after 30 days. Removing the session hook let a closed account sign in again (e2e failed); removing the 30-day grace made the purge test fail.
+- **Rate limits:** the 6th sign-in link request from one address in 10 minutes gets a 429; other addresses are unaffected; forged addresses to the left of the proxy's entry don't escape the limit. The sign-in page adds 3-per-email and 10-per-address limits of its own, because server actions call Better Auth directly.
+- **Found while testing:** Better Auth trusts `x-forwarded-for` only when it holds a single address and otherwise drops requests into one shared bucket, so a visitor could have exhausted sign-in for everyone. It now trusts only our proxy's networks (`TRUSTED_PROXIES`, default private ranges) and reads the address the proxy appended. Not covered by a negative test: without the setting the forged requests are still limited, just in the shared bucket.
+
+## B2b security review (fresh-context reviewer)
+
+- **Fixed (medium):** replaying another host's request key returned that host's booking and manage link, for new bookings and reschedules. A key now only returns the booking it was first used for (same event type, or same rescheduled booking); anything else is a 409 `key_conflict`. Negative test: with the fix set aside, the cross-host replay test fails.
+- **Fixed (medium):** the per-email sign-in limit now runs inside the magic-link sender, which both the sign-in page and direct `/api/auth` calls go through. IPv6 addresses are grouped by /64 in our limiter (Better Auth does the same by default). E2E: the 4th link for one inbox is refused even from a 4th address.
+- **Fixed (low):** the limiter sweeps expired windows once a minute and never holds more than 50,000 keys.
+- **Checked (low):** purging a host who has payments works (they cascade with the host); the purge test now includes a paid booking.
+- **Found while fixing:** importing `./types.ts` with an extension in one file made the bundler load the module twice, so `instanceof` on data-layer errors (slot taken, key conflict) silently failed in the API. Reverted; the closing and purge SQL now lives in `src/lib/data/account-lifecycle.ts`, which has no runtime imports, for the scripts. A lint rule now rejects `.ts` import extensions under `src/`.
+- **Open (medium, needs production):** check what `x-forwarded-for` looks like behind Coolify's Traefik for IPv6 and (if used) Cloudflare. If IPv6 visitors arrive as a Docker gateway address, the per-address limits would treat them all as one; set `TRUSTED_PROXIES` to the Traefik container's address only.
+- **Follow-ups (low):** a booking or a session created in the same instant as an account closes can survive; the dashboard is still blocked, and B3's emails reach those guests.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
@@ -75,6 +93,7 @@ RESEND_API_KEY=
 EMAIL_FROM=
 HOURHAND_MAIL_TO_LOG=
 HOURHAND_ALLOW_MEMORY=
+TRUSTED_PROXIES=
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
 RAZORPAY_WEBHOOK_SECRET=
@@ -89,8 +108,8 @@ Rounds after B1 add their variables here as they land.
 
 - [ ] secrets only in env vars, nothing in client bundles. All env files except the example are git-ignored since B1
 - [ ] input validated on the server on every route (booking and manage routes: done in the fake-data rounds; host actions: done)
-- [ ] authorisation checked on every read and write, tested with a second user. B1: every data method that takes a user id is tested against a second host (Arun) and returns nothing. **Open:** nine methods take no user id (`listEventLocations`, `listCustomQuestions`, `cancelBooking`, `rescheduleBooking`, `saveWeeklyHours`, `saveDateOverride`, `deleteDateOverride`, `blockDateRange`, `saveQuestions`) and rely on the caller's ownership check; B2 adds that check with the session. Calendar list methods filter by user but have no second-host test yet
-- [ ] rate limits on auth, sign up, and anything that sends email or SMS
+- [x] authorisation checked on every read and write, tested with a second user (B2b closed the nine-method gap). B1: every data method that takes a user id is tested against a second host (Arun) and returns nothing. **Open:** nine methods take no user id (`listEventLocations`, `listCustomQuestions`, `cancelBooking`, `rescheduleBooking`, `saveWeeklyHours`, `saveDateOverride`, `deleteDateOverride`, `blockDateRange`, `saveQuestions`) and rely on the caller's ownership check; B2 adds that check with the session. Calendar list methods filter by user but have no second-host test yet
+- [ ] rate limits on auth, sign up, and anything that sends email or SMS (sign-in: done in B2b; booking and slot endpoints, email and SMS sends: still to do)
 - [ ] webhooks verify signatures and dedupe on `webhook_events`
 - [ ] uploads: size and type limits, served from a separate bucket or domain (avatars only)
 - [ ] no user data in URLs or logs (manage links use an opaque token, not an email)

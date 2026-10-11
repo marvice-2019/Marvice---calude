@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "./pg-store";
-import { SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
+import { NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
 
 const URL_ = process.env.TEST_DATABASE_URL;
 const MIN = 60_000;
@@ -84,11 +84,11 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
   describe("rescheduleBooking", () => {
     it("moves the booking, frees the old slot, and returns the same booking for a repeated key", async () => {
       const old = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-09T04:00:00Z"), idempotencyKey: "pg-move-1", invitee: guest });
-      const moved = await store.rescheduleBooking(old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
+      const moved = await store.rescheduleBooking(priya.id, old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
       expect(moved).toMatchObject({ status: "confirmed", rescheduledFromId: old.id, startAt: at("2030-01-09T08:00:00Z") });
       expect((await store.getBooking(priya.id, old.id))!.status).toBe("cancelled");
 
-      const retry = await store.rescheduleBooking(old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
+      const retry = await store.rescheduleBooking(priya.id, old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
       expect(retry.id).toBe(moved.id);
 
       const reuse = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-09T04:00:00Z"), idempotencyKey: "pg-move-1c", invitee: guest });
@@ -97,14 +97,14 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
 
     it("moves to a slot that overlaps the booking's own old slot", async () => {
       const old = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-10T04:00:00Z"), idempotencyKey: "pg-overlap-1", invitee: guest });
-      const moved = await store.rescheduleBooking(old.id, at("2030-01-10T04:15:00Z"), "pg-overlap-2");
+      const moved = await store.rescheduleBooking(priya.id, old.id, at("2030-01-10T04:15:00Z"), "pg-overlap-2");
       expect(moved).toMatchObject({ status: "confirmed", startAt: at("2030-01-10T04:15:00Z") });
     });
 
     it("a failed reschedule leaves the old booking confirmed", async () => {
       const old = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-11T04:00:00Z"), idempotencyKey: "pg-fail-1", invitee: guest });
       await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-11T08:00:00Z"), idempotencyKey: "pg-fail-other", invitee: guest });
-      await expect(store.rescheduleBooking(old.id, at("2030-01-11T08:00:00Z"), "pg-fail-2")).rejects.toBeInstanceOf(SlotTakenError);
+      await expect(store.rescheduleBooking(priya.id, old.id, at("2030-01-11T08:00:00Z"), "pg-fail-2")).rejects.toBeInstanceOf(SlotTakenError);
       expect((await store.getBooking(priya.id, old.id))!.status).toBe("confirmed");
     });
   });
@@ -137,6 +137,44 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       await expect(store.deleteEventType(arun.id, intro.id)).rejects.toThrow();
       expect(await store.getEventType(priya.id, intro.id)).toEqual(before);
     });
+
+    it("cannot read Priya's locations or questions, nor overwrite her questions", async () => {
+      expect((await store.listCustomQuestions(priya.id, coaching.id)).length).toBeGreaterThan(0);
+      expect(await store.listCustomQuestions(arun.id, coaching.id)).toEqual([]);
+      expect(await store.listEventLocations(arun.id, coaching.id)).toEqual([]);
+      const before = await store.listCustomQuestions(priya.id, coaching.id);
+      await expect(store.saveQuestions(arun.id, coaching.id, [])).rejects.toBeInstanceOf(NotFoundError);
+      expect(await store.listCustomQuestions(priya.id, coaching.id)).toEqual(before);
+    });
+
+    it("cannot cancel or move Priya's booking", async () => {
+      const priyaBooking = (await store.getBookingByManageToken("tok_bkg_1"))!;
+      await expect(store.cancelBooking(arun.id, priyaBooking.id, "host")).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.rescheduleBooking(arun.id, priyaBooking.id, at("2030-02-01T04:00:00Z"), "pg-hijack-1")).rejects.toBeInstanceOf(NotFoundError);
+      const after = (await store.getBooking(priya.id, priyaBooking.id))!;
+      expect(after.status).toBe(priyaBooking.status);
+      expect(after.startAt).toEqual(priyaBooking.startAt);
+    });
+
+    it("cannot get Priya's booking back by replaying its request key", async () => {
+      const priyaBooking = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-02-03T04:00:00Z"), idempotencyKey: "pg-priya-key-1", invitee: guest });
+      const arunType = (await store.listEventTypes(arun.id))[0];
+      const arunBooking = (await store.getBookingByManageToken("tok_bkg_arun_1"))!;
+      await expect(store.createBooking({ eventTypeId: arunType.id, startAt: at("2030-02-04T04:00:00Z"), idempotencyKey: "pg-priya-key-1", invitee: guest }))
+        .rejects.toBeInstanceOf(RequestKeyConflictError);
+      await expect(store.rescheduleBooking(arun.id, arunBooking.id, at("2030-02-05T04:00:00Z"), "pg-priya-key-1")).rejects.toBeInstanceOf(RequestKeyConflictError);
+      expect((await store.getBooking(priya.id, priyaBooking.id))!.status).toBe("confirmed");
+      expect((await store.getBooking(arun.id, arunBooking.id))!.status).toBe(arunBooking.status);
+    });
+
+    it("cannot change Priya's hours or overrides", async () => {
+      const { schedule, rules } = await store.getDefaultSchedule(priya.id);
+      await expect(store.saveWeeklyHours(arun.id, schedule.id, {})).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.saveDateOverride(arun.id, schedule.id, "2030-03-01", [])).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.blockDateRange(arun.id, schedule.id, "2030-03-01", "2030-03-07")).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.deleteDateOverride(arun.id, schedule.id, "2030-03-01")).rejects.toBeInstanceOf(NotFoundError);
+      expect((await store.getDefaultSchedule(priya.id)).rules).toEqual(rules);
+    });
   });
 
   describe("event types and questions", () => {
@@ -147,19 +185,54 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
     });
 
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
-      const [coachingQuestion] = await store.listCustomQuestions(coaching.id);
-      const saved = await store.saveQuestions(intro.id, [
+      const [coachingQuestion] = await store.listCustomQuestions(priya.id, coaching.id);
+      const saved = await store.saveQuestions(priya.id, intro.id, [
         { id: coachingQuestion.id, label: "Company", kind: "short_text", required: false, choices: [] },
         { id: null, label: "What brings you here?", kind: "long_text", required: true, choices: [] },
       ]);
       expect(saved[0].id).not.toBe(coachingQuestion.id);
-      const listed = await store.listCustomQuestions(intro.id);
+      const listed = await store.listCustomQuestions(priya.id, intro.id);
       expect(listed.map((q) => [q.label, q.required, q.position])).toEqual([["Company", false, 0], ["What brings you here?", true, 1]]);
       expect(listed.map((q) => q.id)).toEqual(saved.map((q) => q.id));
-      expect((await store.listCustomQuestions(coaching.id)).map((q) => q.id)).toEqual([coachingQuestion.id]);
+      expect((await store.listCustomQuestions(priya.id, coaching.id)).map((q) => q.id)).toEqual([coachingQuestion.id]);
 
-      const resaved = await store.saveQuestions(intro.id, [...listed].reverse().map(({ id, label, kind, required, choices }) => ({ id, label, kind, required, choices })));
+      const resaved = await store.saveQuestions(priya.id, intro.id, [...listed].reverse().map(({ id, label, kind, required, choices }) => ({ id, label, kind, required, choices })));
       expect(resaved.map((q) => q.id)).toEqual([listed[1].id, listed[0].id]);
+    });
+  });
+
+  // Runs last: it closes and then purges Arun's account.
+  describe("account deletion", () => {
+    it("closes the account at once and purges it only after 30 days", async () => {
+      const now = at("2030-06-01T00:00:00Z");
+      const upcoming = await store.createBooking({
+        eventTypeId: (await store.listEventTypes(arun.id))[0].id, startAt: at("2030-06-05T04:00:00Z"), idempotencyKey: "pg-delete-upcoming", invitee: guest,
+      });
+      await pool.query("insert into auth_sessions (token, user_id, expires_at) values ('pg-delete-session', $1, now() + interval '1 day')", [arun.id]);
+      // A paid booking: payments.booking_id is "on delete restrict", so the purge must still get through it.
+      await pool.query("insert into payments (booking_id, host_id, provider, amount_minor, currency, status) values ($1, $2, 'razorpay', 49900, 'INR', 'paid')",
+        [upcoming.id, arun.id]);
+
+      const cancelled = await store.deleteAccount(arun.id, now);
+      expect(cancelled.map((b) => b.id)).toContain(upcoming.id);
+      expect(cancelled.every((b) => b.status === "cancelled" && b.cancelledBy === "host")).toBe(true);
+      expect(await store.getUserBySlug("arun")).toBeNull();
+      expect(await store.getUser(arun.id)).toBeNull();
+      expect(await store.getPublicEventType("arun", "chat")).toBeNull();
+      expect((await pool.query("select count(*)::int as n from auth_sessions where user_id = $1", [arun.id])).rows[0].n).toBe(0);
+      await expect(store.deleteAccount(arun.id, now)).rejects.toBeInstanceOf(NotFoundError);
+      expect(await store.getUserBySlug("priya")).not.toBeNull();
+
+      expect(await store.purgeDeletedAccounts(at("2030-06-30T00:00:00Z"))).toBe(0); // 29 days: still recoverable
+      expect((await pool.query("select count(*)::int as n from bookings where host_id = $1", [arun.id])).rows[0].n).toBeGreaterThan(0);
+
+      expect(await store.purgeDeletedAccounts(at("2030-07-02T00:00:00Z"))).toBe(1);
+      for (const table of ["users", "event_types", "bookings", "invitees", "availability_schedules"]) {
+        const column = table === "users" ? "id" : table === "bookings" || table === "invitees" ? "host_id" : "user_id";
+        const { rows } = await pool.query(`select count(*)::int as n from ${table} where ${column} = $1`, [arun.id]);
+        expect({ table, n: rows[0].n }).toEqual({ table, n: 0 });
+      }
+      expect((await store.listBookings(priya.id)).length).toBeGreaterThan(0);
     });
   });
 });

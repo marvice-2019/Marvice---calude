@@ -16,7 +16,7 @@ export default async function EventTypePage({ params, searchParams }: {
   const user = await requireUser();
   const eventType = await store.getEventType(user.id, id);
   if (!eventType) notFound();
-  const [locations, questions] = await Promise.all([store.listEventLocations(id), store.listCustomQuestions(id)]);
+  const [locations, questions] = await Promise.all([store.listEventLocations(user.id, id), store.listCustomQuestions(user.id, id)]);
   const ordered = [...questions].sort((a, b) => a.position - b.position);
 
   return (

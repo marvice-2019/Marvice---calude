@@ -26,7 +26,7 @@ export async function saveEventType(id: string | null, form: EventTypeForm, ques
   }
   try {
     const saved = id ? await store.updateEventType(user.id, id, details.value) : await store.createEventType(user.id, details.value);
-    await store.saveQuestions(saved.id, checked.value);
+    await store.saveQuestions(user.id, saved.id, checked.value);
     refresh(user.slug, saved.id);
     return { ok: true, id: saved.id, slug: saved.slug };
   } catch (e) {

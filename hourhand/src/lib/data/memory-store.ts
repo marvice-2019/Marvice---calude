@@ -3,7 +3,7 @@ import { datesInRange } from "../availability";
 import { overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
 import {
-  EventTypeInUseError, SlotTakenError, SlugTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft,
+  EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft,
   type Interval,
 } from "./types";
 
@@ -12,6 +12,7 @@ const MIN = 60_000;
 /** In-memory stand-in for the Postgres store. The "current user" is the first seeded user until auth lands. */
 export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore {
   const db = structuredClone(seed);
+  const deleted = new Map<string, Date>(); // user id -> when the account was closed
   const host = db.users[0];
 
   /** Builds a confirmed booking after the overlap check. `movingId` is the booking being rescheduled, which the check skips. */
@@ -41,7 +42,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
 
   function owned(userId: string, id: string): EventType {
     const eventType = db.eventTypes.find((e) => e.userId === userId && e.id === id);
-    if (!eventType) throw new Error(`Unknown event type ${id}`);
+    if (!eventType) throw new NotFoundError("Event type");
     return eventType;
   }
 
@@ -61,14 +62,16 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   return {
+    deleteAccount,
+    purgeDeletedAccounts,
     async getCurrentUser() {
       return host;
     },
     async getUser(id) {
-      return db.users.find((u) => u.id === id) ?? null;
+      return db.users.find((u) => u.id === id && !deleted.has(u.id)) ?? null;
     },
     async getUserBySlug(slug) {
-      return db.users.find((u) => u.slug === slug) ?? null;
+      return db.users.find((u) => u.slug === slug && !deleted.has(u.id)) ?? null;
     },
     async listEventTypes(userId) {
       return db.eventTypes.filter((e) => e.userId === userId).sort((a, b) => a.position - b.position);
@@ -77,14 +80,16 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       return db.eventTypes.find((e) => e.userId === userId && e.id === id) ?? null;
     },
     async getPublicEventType(hostSlug, eventSlug) {
-      const user = db.users.find((u) => u.slug === hostSlug);
+      const user = db.users.find((u) => u.slug === hostSlug && !deleted.has(u.id));
       const eventType = user && db.eventTypes.find((e) => e.userId === user.id && e.slug === eventSlug && e.active);
       return user && eventType ? { host: user, eventType } : null;
     },
-    async listEventLocations(eventTypeId) {
+    async listEventLocations(userId, eventTypeId) {
+      if (!ownsEventType(userId, eventTypeId)) return [];
       return db.locations.filter((l) => l.eventTypeId === eventTypeId);
     },
-    async listCustomQuestions(eventTypeId) {
+    async listCustomQuestions(userId, eventTypeId) {
+      if (!ownsEventType(userId, eventTypeId)) return [];
       return db.questions.filter((q) => q.eventTypeId === eventTypeId);
     },
     async getDefaultSchedule(userId) {
@@ -112,16 +117,22 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     },
     async createBooking(input: CreateBookingInput) {
       const repeat = db.bookings.find((b) => b.idempotencyKey === input.idempotencyKey);
-      if (repeat) return repeat;
+      if (repeat) {
+        if (repeat.eventTypeId === input.eventTypeId && repeat.rescheduledFromId === null) return repeat;
+        throw new RequestKeyConflictError();
+      }
       const booking = build(input, null);
       db.bookings.push(booking);
       return booking;
     },
-    async rescheduleBooking(bookingId, startAt, idempotencyKey) {
+    async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey) {
       const repeat = db.bookings.find((b) => b.idempotencyKey === idempotencyKey);
-      if (repeat) return repeat;
-      const old = db.bookings.find((b) => b.id === bookingId);
-      if (!old) throw new Error(`Unknown booking ${bookingId}`);
+      if (repeat) {
+        if (repeat.hostId === hostId && repeat.rescheduledFromId === bookingId) return repeat;
+        throw new RequestKeyConflictError();
+      }
+      const old = db.bookings.find((b) => b.hostId === hostId && b.id === bookingId);
+      if (!old) throw new NotFoundError("Booking");
       const { name, email, timezone, phone, answers } = old.invitee;
       // Both steps run synchronously, so no other request can see the half-done state (one transaction in Postgres).
       const booking = build({ eventTypeId: old.eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers: answers.map((a) => ({ ...a })) } }, old.id);
@@ -129,28 +140,32 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       Object.assign(old, { status: "cancelled", cancelledAt: new Date(), cancelledBy: "guest", cancelReason: "Rescheduled" });
       return booking;
     },
-    async cancelBooking(bookingId, by, reason) {
-      const booking = db.bookings.find((b) => b.id === bookingId);
-      if (!booking) throw new Error(`Unknown booking ${bookingId}`);
+    async cancelBooking(hostId, bookingId, by, reason) {
+      const booking = db.bookings.find((b) => b.hostId === hostId && b.id === bookingId);
+      if (!booking) throw new NotFoundError("Booking");
       if (booking.status === "confirmed") {
         Object.assign(booking, { status: "cancelled", cancelledAt: new Date(), cancelledBy: by, cancelReason: reason ?? null });
       }
       return booking;
     },
-    async saveWeeklyHours(scheduleId, byWeekday) {
+    async saveWeeklyHours(userId, scheduleId, byWeekday) {
+      ownedSchedule(userId, scheduleId);
       db.rules = db.rules.filter((r) => !(r.scheduleId === scheduleId && r.kind === "weekly"));
       for (const [day, intervals] of Object.entries(byWeekday)) {
         if (intervals.length === 0) continue;
         db.rules.push({ id: randomUUID(), scheduleId, kind: "weekly", weekday: Number(day), onDate: null, intervals: intervals.map((i) => ({ ...i })) });
       }
     },
-    async saveDateOverride(scheduleId, date, intervals) {
+    async saveDateOverride(userId, scheduleId, date, intervals) {
+      ownedSchedule(userId, scheduleId);
       setOverride(scheduleId, date, intervals);
     },
-    async deleteDateOverride(scheduleId, date) {
+    async deleteDateOverride(userId, scheduleId, date) {
+      ownedSchedule(userId, scheduleId);
       db.rules = db.rules.filter((r) => !(r.scheduleId === scheduleId && r.kind === "date" && r.onDate === date));
     },
-    async blockDateRange(scheduleId, from, to) {
+    async blockDateRange(userId, scheduleId, from, to) {
+      ownedSchedule(userId, scheduleId);
       for (const date of datesInRange(from, to)) setOverride(scheduleId, date, []);
     },
     async createEventType(userId, draft) {
@@ -184,7 +199,8 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       db.locations = db.locations.filter((l) => l.eventTypeId !== id);
       db.questions = db.questions.filter((q) => q.eventTypeId !== id);
     },
-    async saveQuestions(eventTypeId, questions) {
+    async saveQuestions(userId, eventTypeId, questions) {
+      if (!ownsEventType(userId, eventTypeId)) throw new NotFoundError("Event type");
       // Keep a client-sent id only when it already belongs to a question of this event type.
       const own = new Set(db.questions.filter((q) => q.eventTypeId === eventTypeId).map((q) => q.id));
       const saved = questions.map((q, position) => ({
@@ -194,6 +210,41 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       return saved;
     },
   };
+
+  async function deleteAccount(userId: string, now = new Date()) {
+    deleted.set(userId, now);
+    for (const e of db.eventTypes) if (e.userId === userId) e.active = false;
+    const upcoming = db.bookings.filter((b) => b.hostId === userId && b.status === "confirmed" && b.startAt.getTime() > now.getTime());
+    for (const b of upcoming) Object.assign(b, { status: "cancelled", cancelledAt: now, cancelledBy: "host", cancelReason: "The host closed their account" });
+    return upcoming;
+  }
+
+  async function purgeDeletedAccounts(now = new Date()) {
+    const cutoff = now.getTime() - 30 * 24 * 60 * MIN;
+    const gone = new Set([...deleted].filter(([, at]) => at.getTime() < cutoff).map(([id]) => id));
+    const types = new Set(db.eventTypes.filter((e) => gone.has(e.userId)).map((e) => e.id));
+    const schedules = new Set(db.schedules.filter((sc) => gone.has(sc.userId)).map((sc) => sc.id));
+    db.users = db.users.filter((u) => !gone.has(u.id));
+    db.eventTypes = db.eventTypes.filter((e) => !gone.has(e.userId));
+    db.locations = db.locations.filter((l) => !types.has(l.eventTypeId));
+    db.questions = db.questions.filter((q) => !types.has(q.eventTypeId));
+    db.schedules = db.schedules.filter((sc) => !gone.has(sc.userId));
+    db.rules = db.rules.filter((r) => !schedules.has(r.scheduleId));
+    db.bookings = db.bookings.filter((b) => !gone.has(b.hostId));
+    db.connections = db.connections.filter((c) => !gone.has(c.userId));
+    db.calendars = db.calendars.filter((c) => !gone.has(c.userId));
+    db.busyBlocks = db.busyBlocks.filter((b) => !gone.has(b.userId));
+    for (const id of gone) deleted.delete(id);
+    return gone.size;
+  }
+
+  function ownsEventType(userId: string, eventTypeId: string): boolean {
+    return db.eventTypes.some((e) => e.userId === userId && e.id === eventTypeId);
+  }
+
+  function ownedSchedule(userId: string, scheduleId: string) {
+    if (!db.schedules.some((sc) => sc.userId === userId && sc.id === scheduleId)) throw new NotFoundError("Schedule");
+  }
 
   function setOverride(scheduleId: string, date: string, intervals: Interval[]) {
     db.rules = db.rules.filter((r) => !(r.scheduleId === scheduleId && r.kind === "date" && r.onDate === date));

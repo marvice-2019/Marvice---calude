@@ -43,6 +43,9 @@ Sign-in uses [Better Auth](https://www.better-auth.com) and needs `HOURHAND_DATA
 - **Email magic link:** `/sign-in` emails a one-time link that expires after 15 minutes. Until mail is wired up (round B3), the link is printed to the server log as `[dev] magic link for …` in development. In production, a missing `RESEND_API_KEY` makes sending fail loudly. `HOURHAND_MAIL_TO_LOG=1` lets a production build print the link instead; it exists only for end-to-end tests and must never be set on a real deployment.
 - **Google:** the button appears only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Add `https://<your-domain>/api/auth/callback/google` (and `http://localhost:3000/api/auth/callback/google` for local work) as a redirect URI in the Google Cloud console.
 - **Sessions:** an httpOnly, SameSite=Lax cookie, `Secure` on https. Every dashboard page and server action checks the session itself through `requireUser()` in `src/lib/auth/session.ts`; there is no middleware-only check. Settings has "Sign out of all devices".
+- **Ownership:** every data-layer method that touches a host's records takes that host's id and enforces it in the query. Another host's record reads as "not found".
+- **Rate limits:** sign-in links are limited to 3 per email and 10 per address every 10 minutes (sign-in page), and Better Auth limits its own endpoints (5 link requests per address per 10 minutes) in production. Counts are kept in memory, which fits one web container.
+- **Deleting an account:** Settings → Delete your account (type your email to confirm). Links stop at once, upcoming bookings are cancelled, every session ends and the account can't sign back in. `npm run db:purge-deleted` permanently removes accounts closed more than 30 days ago; run it nightly (round B3 moves it into the job queue).
 - **New hosts** get a booking-link slug from their name or email (`src/lib/auth/slug.ts`).
 
 Environment variables for sign-in:
@@ -50,6 +53,7 @@ Environment variables for sign-in:
 | variable | needed for |
 | --- | --- |
 | `BETTER_AUTH_URL` | the public base URL, for example `https://hourhand.app`. **Required in production**: without it sign-in links would be built from the request's Host header, so the app refuses to start |
+| `TRUSTED_PROXIES` | comma-separated networks of your own reverse proxy (default: private ranges, which fits Coolify's Traefik). Rate limits read the client address from the entry the proxy appended, so visitors can't forge it |
 | `HOURHAND_ALLOW_MEMORY` | `1` only for a public demo. A production server refuses `HOURHAND_DATA=memory` (no sign-in) without it |
 | `BETTER_AUTH_SECRET` | signing sessions; a long random string (`openssl rand -hex 32`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in (optional) |

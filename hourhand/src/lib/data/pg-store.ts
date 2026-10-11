@@ -1,7 +1,8 @@
 import pg from "pg";
 import { datesInRange } from "../availability";
+import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
 import {
-  EventTypeInUseError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
+  EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
   type EventType, type EventTypeDraft, type Interval, type User,
 } from "./types";
 
@@ -98,11 +99,17 @@ export function createPgStore(pool: pg.Pool): DataStore {
     return id;
   }
 
-  /** A lost race on the idempotency key returns the winner's booking; a lost race on the slot is SlotTakenError. */
-  async function settle(error: unknown, idempotencyKey: string): Promise<BookingWithInvitee> {
+  /** A key already used for this same request returns its booking; a key used for anything else is a conflict. */
+  function sameRequestOrConflict(existing: BookingWithInvitee, isSameRequest: (b: BookingWithInvitee) => boolean): BookingWithInvitee {
+    if (isSameRequest(existing)) return existing;
+    throw new RequestKeyConflictError();
+  }
+
+  /** A lost race on the idempotency key returns the winner's booking (if it is the same request); a lost race on the slot is SlotTakenError. */
+  async function settle(error: unknown, idempotencyKey: string, isSameRequest: (b: BookingWithInvitee) => boolean): Promise<BookingWithInvitee> {
     if (code(error) === "23505" || code(error) === "23P01") {
       const winner = await byKey(pool, idempotencyKey);
-      if (winner) return winner;
+      if (winner) return sameRequestOrConflict(winner, isSameRequest);
       if (code(error) === "23P01") throw new SlotTakenError();
     }
     throw error;
@@ -110,8 +117,14 @@ export function createPgStore(pool: pg.Pool): DataStore {
 
   async function owned(db: Db, userId: string, id: string): Promise<EventType> {
     const { rows } = isId(userId) && isId(id) ? await db.query(`select ${EVENT} from event_types where user_id = $1 and id = $2`, [userId, id]) : { rows: [] };
-    if (!rows[0]) throw new Error(`Unknown event type ${id}`);
+    if (!rows[0]) throw new NotFoundError("Event type");
     return toEventType(rows[0]);
+  }
+
+  async function ownedSchedule(db: Db, userId: string, scheduleId: string) {
+    const { rowCount } = isId(userId) && isId(scheduleId)
+      ? await db.query("select 1 from availability_schedules where id = $1 and user_id = $2", [scheduleId, userId]) : { rowCount: 0 };
+    if (!rowCount) throw new NotFoundError("Schedule");
   }
 
   async function setLocation(client: pg.PoolClient, eventTypeId: string, draft: EventTypeDraft) {
@@ -142,11 +155,11 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async getUser(id) {
       if (!isId(id)) return null;
-      const { rows } = await pool.query(`select ${USER} from users where id = $1`, [id]);
+      const { rows } = await pool.query(`select ${USER} from users where id = $1 and deleted_at is null`, [id]);
       return rows[0] ? toUser(rows[0]) : null;
     },
     async getUserBySlug(slug) {
-      const { rows } = await pool.query(`select ${USER} from users where slug = $1`, [slug]);
+      const { rows } = await pool.query(`select ${USER} from users where slug = $1 and deleted_at is null`, [slug]);
       return rows[0] ? toUser(rows[0]) : null;
     },
     async listEventTypes(userId) {
@@ -164,14 +177,18 @@ export function createPgStore(pool: pg.Pool): DataStore {
       const { rows } = await pool.query(`select ${EVENT} from event_types where user_id = $1 and slug = $2 and active`, [host.id, eventSlug]);
       return rows[0] ? { host, eventType: toEventType(rows[0]) } : null;
     },
-    async listEventLocations(eventTypeId) {
-      if (!isId(eventTypeId)) return [];
-      const { rows } = await pool.query("select id, event_type_id, kind, value, position from event_locations where event_type_id = $1 order by position", [eventTypeId]);
+    async listEventLocations(userId, eventTypeId) {
+      if (!isId(userId) || !isId(eventTypeId)) return [];
+      const { rows } = await pool.query(
+        "select l.id, l.event_type_id, l.kind, l.value, l.position from event_locations l join event_types e on e.id = l.event_type_id where l.event_type_id = $1 and e.user_id = $2 order by l.position",
+        [eventTypeId, userId]);
       return rows.map((r) => ({ id: r.id, eventTypeId: r.event_type_id, kind: r.kind, value: r.value, position: r.position }));
     },
-    async listCustomQuestions(eventTypeId) {
-      if (!isId(eventTypeId)) return [];
-      const { rows } = await pool.query("select id, event_type_id, label, kind, required, choices, position from custom_questions where event_type_id = $1 order by position", [eventTypeId]);
+    async listCustomQuestions(userId, eventTypeId) {
+      if (!isId(userId) || !isId(eventTypeId)) return [];
+      const { rows } = await pool.query(
+        "select q.id, q.event_type_id, q.label, q.kind, q.required, q.choices, q.position from custom_questions q join event_types e on e.id = q.event_type_id where q.event_type_id = $1 and e.user_id = $2 order by q.position",
+        [eventTypeId, userId]);
       return rows.map((r) => ({ id: r.id, eventTypeId: r.event_type_id, label: r.label, kind: r.kind, required: r.required, choices: r.choices, position: r.position }));
     },
     async getDefaultSchedule(userId) {
@@ -214,23 +231,25 @@ export function createPgStore(pool: pg.Pool): DataStore {
       return bookingWhere(pool, "i.manage_token = $1", [token]);
     },
     async createBooking(input) {
+      const isSameRequest = (b: BookingWithInvitee) => b.eventTypeId === input.eventTypeId && b.rescheduledFromId === null;
       const repeat = await byKey(pool, input.idempotencyKey);
-      if (repeat) return repeat;
+      if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
         const id = await tx((client) => insertBooking(client, input, null));
         return (await bookingWhere(pool, "b.id = $1", [id]))!;
       } catch (error) {
-        return settle(error, input.idempotencyKey);
+        return settle(error, input.idempotencyKey, isSameRequest);
       }
     },
-    async rescheduleBooking(bookingId, startAt, idempotencyKey) {
+    async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey) {
+      if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
+      const isSameRequest = (b: BookingWithInvitee) => b.hostId === hostId && b.rescheduledFromId === bookingId;
       const repeat = await byKey(pool, idempotencyKey);
-      if (repeat) return repeat;
-      if (!isId(bookingId)) throw new Error(`Unknown booking ${bookingId}`);
+      if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
         const id = await tx(async (client) => {
-          const old = await client.query(`${BOOKING} where b.id = $1 for update of b`, [bookingId]);
-          if (!old.rows[0]) throw new Error(`Unknown booking ${bookingId}`);
+          const old = await client.query(`${BOOKING} where b.id = $1 and b.host_id = $2 for update of b`, [bookingId, hostId]);
+          if (!old.rows[0]) throw new NotFoundError("Booking");
           const { eventTypeId, invitee } = toBooking(old.rows[0]);
           // Cancel first: the exclusion constraint only covers confirmed rows, so the new slot may overlap the old one.
           // Both statements commit together or not at all.
@@ -240,19 +259,21 @@ export function createPgStore(pool: pg.Pool): DataStore {
         });
         return (await bookingWhere(pool, "b.id = $1", [id]))!;
       } catch (error) {
-        return settle(error, idempotencyKey);
+        return settle(error, idempotencyKey, isSameRequest);
       }
     },
-    async cancelBooking(bookingId, by, reason) {
-      if (!isId(bookingId)) throw new Error(`Unknown booking ${bookingId}`);
-      await pool.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = $3 where id = $1 and status = 'confirmed'", [bookingId, by, reason ?? null]);
-      const booking = await bookingWhere(pool, "b.id = $1", [bookingId]);
-      if (!booking) throw new Error(`Unknown booking ${bookingId}`);
+    async cancelBooking(hostId, bookingId, by, reason) {
+      if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
+      await pool.query(
+        "update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4 where id = $1 and host_id = $2 and status = 'confirmed'",
+        [bookingId, hostId, by, reason ?? null]);
+      const booking = await bookingWhere(pool, "b.id = $1 and b.host_id = $2", [bookingId, hostId]);
+      if (!booking) throw new NotFoundError("Booking");
       return booking;
     },
-    async saveWeeklyHours(scheduleId, byWeekday) {
-      if (!isId(scheduleId)) return;
+    async saveWeeklyHours(userId, scheduleId, byWeekday) {
       await tx(async (client) => {
+        await ownedSchedule(client, userId, scheduleId);
         await client.query("delete from availability_rules where schedule_id = $1 and kind = 'weekly'", [scheduleId]);
         for (const [day, intervals] of Object.entries(byWeekday)) {
           if (intervals.length === 0) continue;
@@ -260,17 +281,20 @@ export function createPgStore(pool: pg.Pool): DataStore {
         }
       });
     },
-    async saveDateOverride(scheduleId, date, intervals) {
-      if (!isId(scheduleId)) return;
-      await tx((client) => setOverride(client, scheduleId, date, intervals));
+    async saveDateOverride(userId, scheduleId, date, intervals) {
+      await tx(async (client) => {
+        await ownedSchedule(client, userId, scheduleId);
+        await setOverride(client, scheduleId, date, intervals);
+      });
     },
-    async deleteDateOverride(scheduleId, date) {
-      if (!isId(scheduleId) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    async deleteDateOverride(userId, scheduleId, date) {
+      await ownedSchedule(pool, userId, scheduleId);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
       await pool.query("delete from availability_rules where schedule_id = $1 and kind = 'date' and on_date = $2", [scheduleId, date]);
     },
-    async blockDateRange(scheduleId, from, to) {
-      if (!isId(scheduleId)) return;
+    async blockDateRange(userId, scheduleId, from, to) {
       await tx(async (client) => {
+        await ownedSchedule(client, userId, scheduleId);
         for (const date of datesInRange(from, to)) await setOverride(client, scheduleId, date, []);
       });
     },
@@ -313,9 +337,19 @@ export function createPgStore(pool: pg.Pool): DataStore {
         await client.query("delete from event_types where user_id = $1 and id = $2", [userId, id]); // locations and questions cascade
       });
     },
-    async saveQuestions(eventTypeId, questions) {
-      if (!isId(eventTypeId)) throw new Error(`Unknown event type ${eventTypeId}`);
+    async deleteAccount(userId, now = new Date()) {
+      if (!isId(userId)) throw new NotFoundError("Account");
+      const ids = await tx((client) => closeAccount(client, userId, now));
+      if (ids === null) throw new NotFoundError("Account");
+      if (ids.length === 0) return [];
+      return (await pool.query(`${BOOKING} where b.id = any($1::uuid[]) order by b.start_at`, [ids])).rows.map(toBooking);
+    },
+    async purgeDeletedAccounts(now = new Date()) {
+      return tx((client) => purgeClosedAccounts(client, now));
+    },
+    async saveQuestions(userId, eventTypeId, questions) {
       return tx(async (client) => {
+        await owned(client, userId, eventTypeId);
         // Keep a client-sent id only when it already belongs to a question of this event type.
         const own = new Set((await client.query("select id from custom_questions where event_type_id = $1", [eventTypeId])).rows.map((r) => r.id as string));
         await client.query("delete from custom_questions where event_type_id = $1", [eventTypeId]);

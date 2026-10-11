@@ -2,19 +2,26 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { isAPIError } from "better-auth/api";
 import { authEnabled, getAuth, googleEnabled } from "@/lib/auth/auth";
+import { clientIp, rateLimiter, SIGN_IN_LIMITS } from "@/lib/rate-limit";
 
 export type SignInState = { status: "idle" | "sent" | "error"; email?: string; error?: string };
 
+const TOO_MANY = "Too many sign-in links asked for. Wait ten minutes, then try again.";
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function requestMagicLink(_prev: SignInState, form: FormData): Promise<SignInState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!EMAIL.test(email) || email.length > 254) return { status: "error", email, error: "Enter a valid email address." };
   if (!authEnabled()) return { status: "error", email, error: "Sign-in needs the database. Start the app with HOURHAND_DATA=postgres." };
+  const requestHeaders = await headers();
+  // Server actions call Better Auth directly, past its HTTP rate limiter, so the limits are applied here.
+  if (!rateLimiter.take(`ip:${clientIp(requestHeaders)}`, SIGN_IN_LIMITS.perIp)) return { status: "error", email, error: TOO_MANY };
   try {
-    await getAuth().api.signInMagicLink({ body: { email, callbackURL: "/dashboard/event-types", errorCallbackURL: "/sign-in?error=link" }, headers: await headers() });
+    await getAuth().api.signInMagicLink({ body: { email, callbackURL: "/dashboard/event-types", errorCallbackURL: "/sign-in?error=link" }, headers: requestHeaders });
   } catch (error) {
+    if (isAPIError(error) && error.status === "TOO_MANY_REQUESTS") return { status: "error", email, error: TOO_MANY }; // the per-email limit
     console.error("magic link request failed", error instanceof Error ? error.message : error);
     return { status: "error", email, error: "We couldn't send the link just now. Try again in a minute." };
   }

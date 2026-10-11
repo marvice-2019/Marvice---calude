@@ -8,14 +8,19 @@ import { signInWithGoogle } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string; closed?: string }> }) {
+  const { error, closed } = await searchParams;
   if (authEnabled() && (await getSignedInUser())) redirect("/dashboard/event-types");
 
   return (
     <div className="mx-auto max-w-md px-4 py-12">
       <h1 className="font-display text-2xl text-text">Sign in to Hourhand</h1>
       <p className="mt-2 text-text-muted">No password needed. We email you a link that signs you in.</p>
+      {closed && (
+        <p role="status" className="mt-4 rounded-md bg-surface p-3 text-sm text-text">
+          Your account is closed and you&apos;ve been signed out everywhere. Your data will be deleted in 30 days.
+        </p>
+      )}
       {error && (
         <p role="alert" className="mt-4 rounded-md bg-danger-bg p-3 text-sm text-danger">
           That link didn&apos;t work. It may have expired or been used already. Ask for a new one below.

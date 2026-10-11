@@ -1,5 +1,5 @@
 import { computeSlots, isSyncStale } from "./slots";
-import { SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
+import { RequestKeyConflictError, SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -150,7 +150,7 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
   if (existing) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
 
-  const questions = await store.listCustomQuestions(eventType.id);
+  const questions = await store.listCustomQuestions(host.id, eventType.id);
   const missing = questions.filter((q) => q.required && !req.answers[q.id]);
   if (missing.length > 0) {
     return { status: 400, body: { error: "invalid_request", fields: Object.fromEntries(missing.map((q) => [`answers.${q.id}`, "This one is required."])) } };
@@ -171,6 +171,7 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
     return { status: 201, body: { bookingId: booking.id, manageToken: booking.invitee.manageToken } };
   } catch (err) {
     if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, req.start, now);
+    if (err instanceof RequestKeyConflictError) return { status: 409, body: { error: "key_conflict" } };
     throw err;
   }
 }

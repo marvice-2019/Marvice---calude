@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function EventTypesPage() {
   const user = await requireUser();
   const eventTypes = [...(await store.listEventTypes(user.id))].sort((a, b) => a.position - b.position);
-  const locations = await Promise.all(eventTypes.map((et) => store.listEventLocations(et.id)));
+  const locations = await Promise.all(eventTypes.map((et) => store.listEventLocations(user.id, et.id)));
 
   return (
     <div>

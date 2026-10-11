@@ -1,7 +1,9 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { getPool } from "@/lib/data/pg-store";
+import { rateLimiter, SIGN_IN_LIMITS } from "@/lib/rate-limit";
 import { deliverMagicLink } from "./outbox";
 import { uniqueSlug } from "./slug";
 
@@ -25,6 +27,12 @@ export function resolveBaseUrl(env: Record<string, string | undefined> = process
   return url;
 }
 
+/** Networks our own reverse proxy runs on. Default: the private ranges Docker and Coolify use. Override with TRUSTED_PROXIES. */
+export function trustedProxies(env: Record<string, string | undefined> = process.env): string[] {
+  const list = env.TRUSTED_PROXIES ?? "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16";
+  return list.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 function createAuth() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("HOURHAND_DATA=postgres needs DATABASE_URL to be set");
@@ -36,7 +44,19 @@ function createAuth() {
     database: pool,
     baseURL,
     trustedOrigins: baseURL ? [baseURL] : [],
-    advanced: { database: { generateId: false } }, // Postgres fills uuid ids
+    // Better Auth's own limiter guards its HTTP endpoints; the sign-in page's server action adds per-email limits itself.
+    rateLimit: {
+      enabled: process.env.NODE_ENV === "production",
+      window: 60,
+      max: 100,
+      customRules: { "/sign-in/magic-link": { window: 600, max: 5 }, "/sign-in/social": { window: 60, max: 10 } },
+    },
+    advanced: {
+      database: { generateId: false }, // Postgres fills uuid ids
+      // Rate limits key on the client address. Only proxy hops on these networks are skipped when reading
+      // x-forwarded-for, so a visitor can't forge their address or push everyone into one shared bucket.
+      ipAddress: { trustedProxies: trustedProxies() },
+    },
     user: {
       modelName: "users",
       fields: { emailVerified: "email_verified", ...at },
@@ -74,12 +94,28 @@ function createAuth() {
           },
         },
       },
+      session: {
+        create: {
+          // A closed account keeps its row for 30 days before the purge; it must not be able to sign back in.
+          before: async (session) => {
+            const { rows } = await pool.query("select deleted_at from users where id = $1", [session.userId]);
+            return rows[0] && rows[0].deleted_at === null ? { data: session } : false;
+          },
+        },
+      },
     },
     socialProviders: googleEnabled()
       ? { google: { clientId: process.env.GOOGLE_CLIENT_ID as string, clientSecret: process.env.GOOGLE_CLIENT_SECRET as string } }
       : {},
     plugins: [
-      magicLink({ expiresIn: 15 * 60, storeToken: "hashed", sendMagicLink: async ({ email, url }) => deliverMagicLink(email, url) }),
+      magicLink({ expiresIn: 15 * 60, storeToken: "hashed", sendMagicLink: async ({ email, url }) => {
+          // Both the sign-in page and direct calls to /api/auth reach here, so the per-email limit lives here.
+          if (!rateLimiter.take(`email:${email.toLowerCase()}`, SIGN_IN_LIMITS.perEmail)) {
+            throw new APIError("TOO_MANY_REQUESTS", { message: "Too many sign-in links for this email" });
+          }
+          await deliverMagicLink(email, url);
+        },
+      }),
       nextCookies(), // must stay last
     ],
   });
