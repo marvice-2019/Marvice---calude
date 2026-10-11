@@ -184,6 +184,15 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect(created.userId).toBe(arun.id);
     });
 
+    it("stores a price in paise with its currency, and clears both for a free event", async () => {
+      const priced = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), priceMinor: 49950, currency: "INR" });
+      expect([priced.priceMinor, priced.currency]).toEqual([49950, "INR"]);
+      const reread = (await store.getEventType(priya.id, intro.id))!;
+      expect([reread.priceMinor, reread.currency]).toEqual([49950, "INR"]);
+      const free = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), priceMinor: null, currency: null });
+      expect([free.priceMinor, free.currency]).toEqual([null, null]);
+    });
+
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
       const [coachingQuestion] = await store.listCustomQuestions(priya.id, coaching.id);
       const saved = await store.saveQuestions(priya.id, intro.id, [
@@ -226,6 +235,10 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect(await store.purgeDeletedAccounts(at("2030-06-30T00:00:00Z"))).toBe(0); // 29 days: still recoverable
       expect((await pool.query("select count(*)::int as n from bookings where host_id = $1", [arun.id])).rows[0].n).toBeGreaterThan(0);
 
+      // The guest who paid is owed a refund, and the purge waits for it: deleting would lose the payment row.
+      expect((await pool.query("select status from payments where booking_id = $1", [upcoming.id])).rows[0].status).toBe("refund_pending");
+      expect(await store.purgeDeletedAccounts(at("2030-07-02T00:00:00Z"))).toBe(0);
+      await pool.query("update payments set status = 'refunded' where booking_id = $1", [upcoming.id]);
       expect(await store.purgeDeletedAccounts(at("2030-07-02T00:00:00Z"))).toBe(1);
       for (const table of ["users", "event_types", "bookings", "invitees", "availability_schedules"]) {
         const column = table === "users" ? "id" : table === "bookings" || table === "invitees" ? "host_id" : "user_id";
@@ -241,6 +254,6 @@ function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
     startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit,
-    cancelCutoffMinutes: e.cancelCutoffMinutes, location: null,
+    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, location: null,
   };
 }

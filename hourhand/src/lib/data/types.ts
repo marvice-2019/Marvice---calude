@@ -39,6 +39,9 @@ export interface EventType {
   dailyLimit: number | null;
   /** Guests can't cancel online once the start is closer than this. 0 = any time before the start. */
   cancelCutoffMinutes: number;
+  /** What guests pay in paise; null = free. Set only together with currency (price_minor / currency in the schema). */
+  priceMinor: number | null;
+  currency: "INR" | null;
   hidden: boolean;
   active: boolean;
   position: number;
@@ -77,7 +80,9 @@ export interface Booking {
   endAt: Date;
   bufferedStart: Date;
   bufferedEnd: Date;
-  status: "confirmed" | "cancelled";
+  /** pending_payment: a paid booking holding its slot until holdExpiresAt while the guest pays. */
+  status: "confirmed" | "cancelled" | "pending_payment";
+  holdExpiresAt: Date | null;
   locationKind: LocationKind | null;
   /** The video link from the host's calendar (Google Meet), once the calendar event exists. */
   joinUrl: string | null;
@@ -142,6 +147,8 @@ export interface CreateBookingInput {
   eventTypeId: string;
   startAt: Date;
   idempotencyKey: string;
+  /** Set for a paid booking: it starts as pending_payment holding the slot until then, with no emails yet. Postgres only. */
+  holdUntil?: Date;
   invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
 }
 
@@ -224,7 +231,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

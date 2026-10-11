@@ -1,7 +1,11 @@
 import { resolveBaseUrl } from "../auth/auth";
 import { calendarConfigError, calendarDeps } from "../calendar/env";
+import { tokenKey } from "../crypto/seal";
 import { getPool } from "../data/pg-store";
 import { createMailer } from "../mail/mailer";
+import type { PaymentCheckDeps } from "../payments/booking-payments";
+import { loadHostRazorpay } from "../payments/host-razorpay";
+import { razorpayOrders } from "../payments/razorpay-orders";
 import { startJobRunner, type JobRunner } from "./runner";
 
 const shared = globalThis as typeof globalThis & { __hourhandJobs?: JobRunner };
@@ -16,6 +20,15 @@ export function startJobsFromEnv(env: Record<string, string | undefined> = proce
   const configError = calendarConfigError(env);
   if (configError) throw new Error(configError);
   const calendar = calendarDeps(env);
-  shared.__hourhandJobs = startJobRunner({ pool: getPool(env.DATABASE_URL), mailer, baseUrl, calendar });
-  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, Google Calendar ${calendar ? "on" : "off"})`);
+  const pool = getPool(env.DATABASE_URL);
+  // Hosts' Razorpay keys are sealed with TOKEN_ENCRYPTION_KEY; without it no paid booking can exist, so there's nothing to check.
+  let payments: PaymentCheckDeps | null = null;
+  try {
+    const key = tokenKey();
+    payments = { authFor: (hostId) => loadHostRazorpay(pool, key, hostId), ordersFor: (auth) => razorpayOrders(auth) };
+  } catch {
+    payments = null;
+  }
+  shared.__hourhandJobs = startJobRunner({ pool, mailer, baseUrl, calendar, payments });
+  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, Google Calendar ${calendar ? "on" : "off"}, booking payments ${payments ? "on" : "off"})`);
 }

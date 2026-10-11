@@ -49,7 +49,7 @@ export default async function CalendarsPage({ searchParams }: { searchParams: Pr
       </p>
 
       {params.connected && <p role="status" className="mt-4 text-success">Google Calendar connected. Your busy times are syncing now.</p>}
-      {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{MESSAGES[params.error] ?? MESSAGES.google}</p>}
+      {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{(Object.hasOwn(MESSAGES, params.error) && MESSAGES[params.error]) || MESSAGES.google}</p>}
 
       <div className="mt-6 grid max-w-2xl gap-4">
         {connections.length === 0 && (

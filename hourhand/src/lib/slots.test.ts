@@ -25,7 +25,7 @@ function input(over: Partial<Omit<SlotInput, "eventType">> & { eventType?: Parti
 }
 const times = (slots: Date[]) =>
   slots.map((d) => d.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
-const booking = (start: Date, end: Date, eventTypeId = "other") => ({ eventTypeId, status: "confirmed" as const, startAt: start, bufferedStart: start, bufferedEnd: end });
+const booking = (start: Date, end: Date, eventTypeId = "other") => ({ eventTypeId, status: "confirmed" as const, holdExpiresAt: null, startAt: start, bufferedStart: start, bufferedEnd: end });
 
 describe("computeSlots", () => {
   it("expands weekly hours into slots in UTC", () => {
@@ -61,6 +61,24 @@ describe("computeSlots", () => {
     expect(slots).not.toContain("10:45"); // [10:30, 11:15) overlaps
     expect(slots).not.toContain("11:30"); // buffered [11:15, 12:00) overlaps
     expect(slots).toContain("11:45"); // buffered [11:30, 12:15) touches
+  });
+
+  it("a payment hold blocks its slot until it lapses; lapsed holds and cancelled bookings don't", () => {
+    const at = (t: string) => ist("2026-10-12", t);
+    const hold = (start: string, end: string, expires: Date | null, status: "pending_payment" | "cancelled" = "pending_payment") =>
+      ({ ...booking(at(start), at(end)), status, holdExpiresAt: expires });
+    const now = ist("2026-10-11", "00:00");
+    const slots = times(computeSlots(input({
+      now,
+      bookings: [
+        hold("10:00", "10:30", new Date(now.getTime() + 60_000)), // still being paid for
+        hold("11:00", "11:30", new Date(now.getTime() - 60_000)), // lapsed
+        hold("12:00", "12:30", null, "cancelled"),
+      ],
+    })));
+    expect(slots).not.toContain("10:00");
+    expect(slots).toContain("11:00");
+    expect(slots).toContain("12:00");
   });
 
   it("respects minimum notice from now", () => {

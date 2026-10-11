@@ -17,7 +17,7 @@ export interface SlotInput {
   schedule: { timezone: string };
   rules: AvailabilityRule[];
   busyBlocks: Range[];
-  bookings: { eventTypeId: string; status: "confirmed" | "cancelled"; startAt: Date; bufferedStart: Date; bufferedEnd: Date }[];
+  bookings: { eventTypeId: string; status: "confirmed" | "cancelled" | "pending_payment"; holdExpiresAt: Date | null; startAt: Date; bufferedStart: Date; bufferedEnd: Date }[];
   now: Date;
   rangeStart: Date;
   rangeEnd: Date;
@@ -84,7 +84,8 @@ export function computeSlots(input: SlotInput): Date[] {
   const latest = Math.min(rangeEnd.getTime(), now.getTime() + et.bookingWindowDays * DAY);
   if (earliest >= latest) return [];
 
-  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  // A hold the guest is still paying for blocks like a confirmed booking; a lapsed one is about to be expired and doesn't.
+  const confirmed = bookings.filter((b) => b.status === "confirmed" || (b.status === "pending_payment" && b.holdExpiresAt !== null && b.holdExpiresAt > now));
   const blocked: [number, number][] = [
     ...confirmed.map((b): [number, number] => [b.bufferedStart.getTime(), b.bufferedEnd.getTime()]),
     ...busyBlocks.map((b): [number, number] => [b.start.getTime(), b.end.getTime()]),

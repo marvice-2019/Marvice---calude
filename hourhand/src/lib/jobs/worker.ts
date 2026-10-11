@@ -51,6 +51,8 @@ const CONTEXT = `
     prev.join_url as previous_join_url,
     i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.answers, i.manage_token, i.reminders_opt_out,
     e.name as event_name,
+    (select p.amount_minor from payments p where p.booking_id = b.id and p.status in ('paid', 'refund_pending', 'refunded')
+      order by p.created_at desc limit 1) as paid_minor,
     coalesce(u.name, '') as host_name, u.email as host_email, u.timezone as host_timezone, u.time_format as host_time_format,
     loc.kind as location_kind, loc.value as location_value,
     -- a calendar write that hasn't been tried yet or is running right now; one waiting to retry doesn't hold emails back
@@ -79,6 +81,7 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
     joinUrl: (r.join_url as string | null) ?? null,
     answers: (r.answers as InviteeAnswer[]) ?? [],
     cancelledBy: (r.cancelled_by as BookingMailContext["cancelledBy"]) ?? null, cancelReason: (r.cancel_reason as string | null) ?? null,
+    paidMinor: (r.paid_minor as number | null) ?? null,
     previousStartAt: r.previous_start_at ? new Date(r.previous_start_at as Date) : null,
     issuedAt: new Date(r.queued_at as Date),
     manageUrl: `${baseUrl}/b/${r.manage_token as string}`, dashboardUrl: `${baseUrl}/dashboard/bookings/${r.id as string}`,

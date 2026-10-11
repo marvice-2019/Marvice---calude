@@ -44,10 +44,11 @@ export interface BillingProvider {
   portalUrl?(customerId: string, returnUrl: string): Promise<string>;
 }
 
-type Fetch = typeof fetch;
+export type Fetch = typeof fetch;
 const retryableStatus = (s: number) => s === 429 || s >= 500;
 
-async function send(f: Fetch, url: string, init: RequestInit, what: string): Promise<Record<string, unknown>> {
+/** One JSON call to a payment provider, with a timeout and errors classified as retryable or not. */
+export async function send(f: Fetch, url: string, init: RequestInit, what: string): Promise<Record<string, unknown>> {
   let res: Response;
   try {
     res = await f(url, { ...init, signal: AbortSignal.timeout(15_000) });

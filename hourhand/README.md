@@ -116,11 +116,26 @@ Set up, in test mode first. **Razorpay:** create 4 Plans (Solo and Duo, monthly 
 
 A provider shows as "not set up" until its API key and webhook value are both set.
 
+## Payments at booking
+
+Hosts on Solo or Duo can charge guests for an event type, in rupees through Razorpay. **The money goes straight to the host's own Razorpay account; Marvice never holds it.** It needs the Postgres store and `TOKEN_ENCRYPTION_KEY`.
+
+- **Connecting:** Dashboard → Integrations. The host pastes their own Razorpay key pair; Hourhand checks it with Razorpay, then stores it encrypted (AES-256-GCM, bound to the host) and shows only a masked key id and Test/Live. Disconnecting deletes it. Later, Razorpay OAuth can replace pasted keys without changing the payment code (needs Marvice approved as a Razorpay technology partner).
+- **Pricing:** a "Price (₹)" field on the event type, ₹1 to ₹5,00,000. Setting one needs a paid plan and a connected Razorpay account, checked on the server. Razorpay's fee comes out of what the host receives.
+- **Booking:** a priced booking holds its time for 15 minutes as "awaiting payment" (nobody else can take it), and Hourhand creates a Razorpay order on the host's account. The guest pays in Razorpay Checkout (UPI, cards, netbanking). Nothing is emailed or written to the calendar until the payment is confirmed.
+- **Confirming:** the browser's result is only a hint. Hourhand checks the Checkout signature with the host's key against the order it created, then reads the payment from Razorpay (right order, right amount, captured; an authorized payment is captured), and only then confirms.
+- **Background check:** every few seconds the job runner looks at pending payments a minute old or more: a guest who paid and closed the tab is confirmed; an unpaid hold past 15 minutes is released; a payment that lands within 30 minutes after its hold was released is refunded. The Pay button and Razorpay Checkout both close when the hold ends.
+- **Refunds:** cancelling a paid booking (host, or guest within the event's cancellation window) refunds the full amount from the host's Razorpay account; the emails say so. A refund is asked for once per payment (Razorpay receipt `hh-<payment id>`, and existing refunds are checked first), and retried every 5 minutes if Razorpay refuses (for example, low balance); the host's booking page shows it.
+- **Rescheduling** keeps the payment: no refund, no second charge.
+- **Disconnecting Razorpay** is refused while a guest's payment is still being confirmed or refunded. **Closing an account** refunds paid upcoming bookings, and the 30-day purge waits until those refunds have gone through.
+- **Free hosts:** a priced event of a host whose plan lapsed can't be booked; guests are told to contact the host.
+- **Not built:** Stripe for non-INR (Stripe is invite-only for Indian businesses), partial refunds or cancellation fees, deposits, payment links for existing bookings, and the host's own webhook (not needed: Hourhand checks Razorpay itself).
+
 ## What is fake today
 
 - **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Push notifications from Google (instant sync) arrive in round B4b; until then busy times are at most 5 minutes old.
 - **Email in development:** without `RESEND_API_KEY`, every email is printed to the server log instead of sent.
-- **Payments at booking (hosts charging guests), WhatsApp, Microsoft and iCloud calendars:** not wired up yet. Booking payments come in round B5b. The others will need `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
+- **WhatsApp, Microsoft and iCloud calendars:** not wired up yet. They will need `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
 
 ## Layout
 

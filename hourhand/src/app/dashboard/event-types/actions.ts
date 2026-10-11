@@ -2,8 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { EventTypeInUseError, SlugTakenError, store, type QuestionDraft } from "@/lib/data";
-import { SLUG_TAKEN, validateEventType, validateQuestions, type EventTypeErrors, type EventTypeForm, type QuestionErrors } from "@/lib/event-types";
+import { SLUG_TAKEN, priceGateError, validateEventType, validateQuestions, type EventTypeErrors, type EventTypeForm, type QuestionErrors } from "@/lib/event-types";
 import { requireUser } from "@/lib/auth/session";
+import { authEnabled } from "@/lib/auth/auth";
+import { hostPlan } from "@/lib/billing/account";
+import { getPool } from "@/lib/data/pg-store";
+import { razorpayStatus } from "@/lib/payments/host-razorpay";
 
 export type SaveResult =
   | { ok: true; id: string; slug: string }
@@ -15,6 +19,15 @@ function refresh(userSlug: string, id?: string) {
   revalidatePath(`/${userSlug}`, "layout");
 }
 
+/** Why the host can't charge this price, checked here on the server whatever the editor showed. Null when they can. */
+async function priceError(userId: string, priceMinor: number | null): Promise<string | null> {
+  if (priceMinor === null) return null;
+  if (!authEnabled()) return priceGateError({ priceMinor, demo: true, plan: "free", razorpayConnected: false });
+  const pool = getPool(process.env.DATABASE_URL as string);
+  const [plan, razorpay] = await Promise.all([hostPlan(pool, userId), razorpayStatus(pool, userId)]);
+  return priceGateError({ priceMinor, demo: false, plan, razorpayConnected: razorpay !== null });
+}
+
 /** Creates the event type when `id` is null, otherwise updates it. Saves details, rules and questions together. */
 export async function saveEventType(id: string | null, form: EventTypeForm, questions: QuestionDraft[]): Promise<SaveResult> {
   const user = await requireUser();
@@ -24,6 +37,8 @@ export async function saveEventType(id: string | null, form: EventTypeForm, ques
   if (!details.ok || !checked.ok) {
     return { ok: false, errors: details.ok ? {} : details.errors, questionErrors: checked.ok ? [] : checked.errors };
   }
+  const gate = await priceError(user.id, details.value.priceMinor);
+  if (gate) return { ok: false, errors: { price: gate }, questionErrors: [] };
   try {
     const saved = id ? await store.updateEventType(user.id, id, details.value) : await store.createEventType(user.id, details.value);
     await store.saveQuestions(user.id, saved.id, checked.value);

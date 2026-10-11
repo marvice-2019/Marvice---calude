@@ -3,6 +3,7 @@ import type { InviteeAnswer, LocationKind } from "../data/types";
 import type { BookingEmailKind } from "../data/notifications";
 import { formatDate, formatTime, zoneName, type HourCycle } from "../format";
 import { GUEST_LOCATION_LABELS } from "../location-labels";
+import { formatMoney } from "../billing/plans";
 import { buildIcs } from "./ics";
 import type { Attachment } from "./mailer";
 
@@ -24,6 +25,8 @@ export interface BookingMailContext {
   answers: InviteeAnswer[];
   cancelledBy: "host" | "guest" | "system" | null;
   cancelReason: string | null;
+  /** What the guest paid for this booking (paise, INR), or null for a free booking. */
+  paidMinor?: number | null;
   /** For reschedules: when the booking used to be. */
   previousStartAt: Date | null;
   /** When the email was queued. Used as the calendar file's timestamp, so a retried send has exactly the same body. */
@@ -88,6 +91,7 @@ function guestRows(c: BookingMailContext): Row[] {
   const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.guestTimezone, "12h")], ["With", hostLabel(c)]];
   const w = where(c);
   if (w) rows.push(["Where", w]);
+  if (c.paidMinor) rows.push(["Paid", formatMoney(c.paidMinor, "INR")]);
   return rows;
 }
 
@@ -97,6 +101,7 @@ function hostRows(c: BookingMailContext): Row[] {
   const w = where(c);
   if (w) rows.push(["Where", w]);
   for (const a of c.answers) if (a.answer.trim()) rows.push([a.label, a.answer]);
+  if (c.paidMinor) rows.push(["Paid", `${formatMoney(c.paidMinor, "INR")} to your Razorpay account`]);
   return rows;
 }
 
@@ -113,8 +118,13 @@ const hostFooter = "Sent by Hourhand about your booking page.";
 const manageLink = (c: BookingMailContext) => ({ label: "Reschedule or cancel", url: c.manageUrl });
 const dashboardLink = (c: BookingMailContext) => ({ label: "Open in Hourhand", url: c.dashboardUrl });
 
-function cancelNote(c: BookingMailContext): string | undefined {
-  return c.cancelReason ? `Reason given: ${c.cancelReason}` : undefined;
+function cancelNote(c: BookingMailContext, to: "guest" | "host"): string | undefined {
+  const reason = c.cancelReason ? `Reason given: ${c.cancelReason}` : "";
+  // A paid booking is refunded in full on cancellation; say so, since that's what the guest wants to know first.
+  const refund = !c.paidMinor ? "" : to === "guest"
+    ? `Your payment of ${formatMoney(c.paidMinor, "INR")} is being refunded to the way you paid. Banks usually take 5 to 7 working days.`
+    : `The guest's ${formatMoney(c.paidMinor, "INR")} is being refunded from your Razorpay account.`;
+  return [refund, reason].filter(Boolean).join(" ") || undefined;
 }
 
 export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext): RenderedMail {
@@ -138,13 +148,13 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
       return render(`Cancelled: ${c.eventName} with ${host}`, {
         heading: "Your booking is cancelled",
         intro: c.cancelledBy === "guest" ? `Hi ${c.guestName}, you cancelled your time with ${host}.` : `Hi ${c.guestName}, ${host} cancelled your booking.`,
-        rows: guestRows(c), note: cancelNote(c), footer: guestFooter(c),
+        rows: guestRows(c), note: cancelNote(c, "guest"), footer: guestFooter(c),
       }, { replyTo: c.hostEmail });
     case "cancelled_host":
       return render(`Cancelled: ${c.guestName}, ${c.eventName}, ${formatDate(c.startAt, c.hostTimezone)}`, {
         heading: "A booking was cancelled",
         intro: c.cancelledBy === "guest" ? `${c.guestName} cancelled ${c.eventName}.` : `You cancelled ${c.eventName} with ${c.guestName}.`,
-        rows: hostRows(c), note: cancelNote(c), footer: hostFooter,
+        rows: hostRows(c), note: cancelNote(c, "host"), footer: hostFooter,
       }, { replyTo: c.guestEmail });
     case "rescheduled_guest":
       return render(`Moved: ${c.eventName} with ${host}, now ${formatDate(c.startAt, c.guestTimezone)}`, {

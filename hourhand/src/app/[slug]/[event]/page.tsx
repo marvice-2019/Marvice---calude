@@ -2,6 +2,7 @@ import { BookingFooter } from "@/components/BookingFooter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookingFlow } from "@/components/BookingFlow";
+import { formatMoney } from "@/lib/billing/plans";
 import { store } from "@/lib/data";
 
 export default async function PublicEventPage({ params }: { params: Promise<{ slug: string; event: string }> }) {
@@ -16,9 +17,12 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
     <main className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
       <Link href={`/${host.slug}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-accent underline">{host.name}</Link>
       <h1 className="font-display text-xl text-text">{eventType.name}</h1>
-      <p className="mt-2 text-text-muted">{eventType.durationMinutes} min</p>
+      <p className="mt-2 text-text-muted">{eventType.durationMinutes} min{eventType.priceMinor !== null && ` · ${formatMoney(eventType.priceMinor, "INR")}`}</p>
       {eventType.description && <p className="mt-2 text-text">{eventType.description}</p>}
-      <BookingFlow slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} questions={questions} />
+      <BookingFlow
+        slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} questions={questions}
+        paid={eventType.priceMinor !== null ? { price: formatMoney(eventType.priceMinor, "INR"), hostName: host.name, eventName: eventType.name } : null}
+      />
       <BookingFooter hostId={host.id} />
     </main>
   );

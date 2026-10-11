@@ -1,6 +1,11 @@
+import type pg from "pg";
 import { computeSlots, isSyncStale } from "./slots";
 import { RequestKeyConflictError, SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
 import { BOOKING_LIMITS, type createRateLimiter } from "./rate-limit";
+import type { Plan } from "./billing/plans";
+import { PaymentStartError, startPaidBooking } from "./payments/booking-payments";
+import type { HostRazorpayAuth } from "./payments/host-razorpay";
+import type { RazorpayOrders } from "./payments/razorpay-orders";
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -139,11 +144,22 @@ export async function slotTaken(store: DataStore, host: User, eventType: EventTy
 
 type Limiter = Pick<ReturnType<typeof createRateLimiter>, "take">;
 
+/** How a priced booking reaches its host's Razorpay and plan. Injected so tests can use fakes; null where payments aren't set up. */
+export interface PaymentDeps {
+  pool: pg.Pool;
+  authFor(hostId: string): Promise<HostRazorpayAuth | null>;
+  ordersFor(auth: HostRazorpayAuth): RazorpayOrders;
+  planFor(hostId: string): Promise<Plan>;
+}
+
 /**
  * POST /api/bookings. With `limit`, new bookings are rate limited per client address (see clientIp) and per guest
- * email; the route always passes it, unit tests of the booking rules leave it out.
+ * email; the route always passes it, unit tests of the booking rules leave it out. A priced event also needs `payments`:
+ * its booking is held as pending_payment and the response carries what Razorpay Checkout needs.
  */
-export async function handleCreateBooking(store: DataStore, input: unknown, now: Date, limit?: { clientKey: string; limiter: Limiter }): Promise<HandlerResult> {
+export async function handleCreateBooking(
+  store: DataStore, input: unknown, now: Date, limit?: { clientKey: string; limiter: Limiter }, payments?: PaymentDeps | null,
+): Promise<HandlerResult> {
   const v = validateBookingRequest(input);
   if (!v.ok) return { status: 400, body: { error: "invalid_request", fields: v.fields } };
   const req = v.value;
@@ -154,7 +170,13 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
 
   // A repeated submit returns the booking it already made, before the slot re-check (which it would now fail).
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
-  if (existing) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
+  const priceMinor = eventType.priceMinor;
+  // A priced repeat goes through startPaidBooking below instead, so a still-held booking gets its payment details back.
+  if (existing && !priceMinor) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
+  // A priced repeat that is no longer waiting on payment: a confirmed one is simply returned (even if the host has since
+  // downgraded or disconnected), and a released or failed attempt is over, so the guest's page starts a fresh one.
+  if (existing && priceMinor && existing.status === "confirmed") return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
+  if (existing && priceMinor && existing.status === "cancelled") return { status: 409, body: { error: "attempt_expired" } };
 
   const questions = await store.listCustomQuestions(host.id, eventType.id);
   const missing = questions.filter((q) => q.required && !req.answers[q.id]);
@@ -162,27 +184,48 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
     return { status: 400, body: { error: "invalid_request", fields: Object.fromEntries(missing.map((q) => [`answers.${q.id}`, "This one is required."])) } };
   }
 
-  // Server-side re-check: the start must be one the engine offers right now.
-  const offered = await freeSlots(store, host, eventType, req.start, new Date(req.start.getTime() + MIN), now);
-  if (!offered.some((s) => s.getTime() === req.start.getTime())) return slotTaken(store, host, eventType, req.start, now);
+  const bookingInput = {
+    eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey,
+    invitee: {
+      name: req.name, email: req.email, timezone: req.timezone, phone: req.phone,
+      answers: questions.filter((q) => req.answers[q.id]).map((q) => ({ questionId: q.id, label: q.label, answer: req.answers[q.id] })),
+    },
+  };
 
-  // Charged only once the request has passed every check, so a guest fixing a mistake or picking another slot isn't refused.
-  if (limit && (!limit.limiter.take(`booking-ip:${limit.clientKey}`, BOOKING_LIMITS.perIp) || !limit.limiter.take(`booking-email:${req.email.toLowerCase()}`, BOOKING_LIMITS.perEmail))) {
-    return { status: 429, body: { error: "too_many_requests" } };
+  // Paid bookings need a paid plan and the host's own Razorpay; checked before the limiter so a refusal costs nothing.
+  let paid: { auth: HostRazorpayAuth; deps: PaymentDeps } | null = null;
+  if (priceMinor) {
+    const auth = payments && (await payments.planFor(host.id)) !== "free" ? await payments.authFor(host.id) : null;
+    if (!payments || !auth) return { status: 409, body: { error: "payments_unavailable" } };
+    paid = { auth, deps: payments };
   }
 
+  const startPaid = async (p: { auth: HostRazorpayAuth; deps: PaymentDeps }, priceMinor: number, status: number): Promise<HandlerResult> => {
+    const { booking, payment } = await startPaidBooking(
+      { pool: p.deps.pool, store, auth: p.auth, orders: p.deps.ordersFor(p.auth) }, { ...bookingInput, priceMinor }, now);
+    return { status, body: { bookingId: booking.id, manageToken: booking.invitee.manageToken, payment: payment && { ...payment, holdExpiresAt: payment.holdExpiresAt.toISOString() } } };
+  };
+
   try {
-    const booking = await store.createBooking({
-      eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey,
-      invitee: {
-        name: req.name, email: req.email, timezone: req.timezone, phone: req.phone,
-        answers: questions.filter((q) => req.answers[q.id]).map((q) => ({ questionId: q.id, label: q.label, answer: req.answers[q.id] })),
-      },
-    });
+    // The repeat skips the slot re-check and the limiter, as the free repeat above does.
+    if (existing && paid && priceMinor) return await startPaid(paid, priceMinor, 200);
+
+    // Server-side re-check: the start must be one the engine offers right now.
+    const offered = await freeSlots(store, host, eventType, req.start, new Date(req.start.getTime() + MIN), now);
+    if (!offered.some((s) => s.getTime() === req.start.getTime())) return slotTaken(store, host, eventType, req.start, now);
+
+    // Charged only once the request has passed every check, so a guest fixing a mistake or picking another slot isn't refused.
+    if (limit && (!limit.limiter.take(`booking-ip:${limit.clientKey}`, BOOKING_LIMITS.perIp) || !limit.limiter.take(`booking-email:${req.email.toLowerCase()}`, BOOKING_LIMITS.perEmail))) {
+      return { status: 429, body: { error: "too_many_requests" } };
+    }
+
+    if (paid && priceMinor) return await startPaid(paid, priceMinor, 201);
+    const booking = await store.createBooking(bookingInput);
     return { status: 201, body: { bookingId: booking.id, manageToken: booking.invitee.manageToken } };
   } catch (err) {
     if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, req.start, now);
     if (err instanceof RequestKeyConflictError) return { status: 409, body: { error: "key_conflict" } };
+    if (err instanceof PaymentStartError) return { status: 502, body: { error: "payment_unavailable" } };
     throw err;
   }
 }

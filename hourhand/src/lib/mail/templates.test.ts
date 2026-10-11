@@ -49,6 +49,17 @@ describe("booking emails", () => {
     expect(renderBookingMail("booked_host", ctx).text).toContain("Goal: Plan the quarter");
   });
 
+  it("a paid booking shows what was paid, and its cancellation says the refund is on the way", () => {
+    const paid = { ...ctx, paidMinor: 49900, cancelReason: null };
+    expect(renderBookingMail("booked_guest", paid).text).toContain("₹499");
+    expect(renderBookingMail("booked_host", paid).text).toContain("₹499 to your Razorpay account");
+    expect(renderBookingMail("cancelled_guest", paid).text).toContain("Your payment of ₹499 is being refunded");
+    expect(renderBookingMail("cancelled_host", paid).text).toContain("being refunded from your Razorpay account");
+    const free = { ...ctx, paidMinor: null };
+    expect(renderBookingMail("cancelled_guest", free).text).not.toContain("refund");
+    expect(renderBookingMail("booked_guest", free).text).not.toContain("Paid");
+  });
+
   it("shows the Meet link once the calendar event has one", () => {
     const meet = { ...ctx, location: { kind: "google_meet" as const, value: null }, joinUrl: "https://meet.google.com/abc-defg-hij" };
     expect(renderBookingMail("booked_guest", meet).text).toContain("Google Meet: https://meet.google.com/abc-defg-hij");
