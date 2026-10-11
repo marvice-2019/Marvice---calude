@@ -83,9 +83,16 @@ while IFS= read -r line; do [ -n "$line" ] && USERS="$USERS          - \"$line\"
 MIDDLEWARES="agent-terminal-ratelimit, agent-terminal-auth"
 IPALLOW=""
 if [ -n "$ALLOW_IPS" ]; then
+  # Traefik < 2.11 only knows ipWhiteList; an unknown middleware drops the whole route (404).
+  TRAEFIK_VERSION="$(docker exec coolify-proxy traefik version 2>/dev/null | awk '/^Version:/{print $2}')"
+  IPALLOW_KEY=ipAllowList
+  case "$TRAEFIK_VERSION" in
+    1.*|2.[0-9]|2.[0-9].*|2.10|2.10.*) IPALLOW_KEY=ipWhiteList ;;
+  esac
+  echo "  Traefik ${TRAEFIK_VERSION:-unknown}: using $IPALLOW_KEY"
   MIDDLEWARES="agent-terminal-ipallow, $MIDDLEWARES"
   IPALLOW="    agent-terminal-ipallow:
-      ipAllowList:
+      $IPALLOW_KEY:
         sourceRange:"$'\n'
   IFS=',' read -ra RANGES <<< "$ALLOW_IPS"
   for r in "${RANGES[@]}"; do IPALLOW="$IPALLOW          - \"${r// /}\""$'\n'; done
@@ -128,6 +135,14 @@ echo "  Wrote $COOLIFY_PROXY_DIR/dynamic/agent-terminal.yaml (Traefik reloads it
 
 sleep 2
 systemctl is-active -q agent-terminal || die "agent-terminal failed to start: journalctl -u agent-terminal -n 50"
+
+# Confirm Traefik picked up the route: 401 (auth) or 403 (IP allowlist) means it is live.
+CODE="$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/" || true)"
+case "$CODE" in
+  401|403) echo "  Route check: HTTP $CODE (live)" ;;
+  *) echo "  [warn] Route check returned HTTP ${CODE:-none}, expected 401/403. Traefik log:"
+     docker logs coolify-proxy --since 2m 2>&1 | grep -i agent-terminal | tail -5 ;;
+esac
 
 echo
 echo "Done."
