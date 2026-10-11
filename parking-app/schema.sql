@@ -162,6 +162,72 @@ CREATE TABLE favourite_lots (
 -- Drive-up "Park now": each lot has a short code printed on its entrance board.
 ALTER TABLE lots ADD COLUMN code varchar(10) UNIQUE CHECK (code ~ '^[A-Z]{3}[0-9]{3,4}$');
 
+-- ---------- where I parked (on any booking or monthly pass) ----------
+CREATE TABLE parked_spots (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  booking_id      uuid REFERENCES bookings(id) ON DELETE CASCADE,
+  monthly_pass_id uuid,                                  -- FK added after monthly_passes
+  floor           varchar(6),
+  bay             varchar(8),
+  note            varchar(80),
+  photo_url       text,                                  -- object storage key, never inline image data
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  CHECK (num_nonnulls(booking_id, monthly_pass_id) = 1),
+  CHECK (num_nonnulls(floor, bay, note, photo_url) >= 1)
+);
+
+-- ---------- valet ----------
+CREATE TABLE valet_desks (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  operator_id     uuid NOT NULL REFERENCES operators(id),
+  lot_id          uuid REFERENCES lots(id),              -- where cars are parked; NULL if the venue's own basement
+  name            text NOT NULL,                         -- e.g. "UB City Mall entrance"
+  geo             geography(Point, 4326) NOT NULL,
+  fee_paise       int NOT NULL CHECK (fee_paise >= 0),   -- flat per visit, GST extra
+  typical_eta_min smallint NOT NULL DEFAULT 6,
+  is_live         boolean NOT NULL DEFAULT false
+);
+
+-- Venue validation: a restaurant/mall/hospital pays the valet fee for its guests.
+CREATE TABLE valet_validations (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  desk_id      uuid NOT NULL REFERENCES valet_desks(id),
+  validator    text NOT NULL,                             -- "UB City restaurants"
+  code         varchar(12) NOT NULL,
+  valid        tstzrange NOT NULL,                        -- rotate daily so codes don't leak
+  billed_to_operator_id uuid REFERENCES operators(id),   -- who is invoiced for validated visits
+  UNIQUE (desk_id, code, valid)
+);
+
+CREATE TYPE valet_status AS ENUM ('dropped', 'parked', 'requested', 'coming', 'ready', 'closed', 'cancelled');
+
+CREATE TABLE valet_tickets (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code            varchar(8) UNIQUE NOT NULL,             -- VT-XXXX shown to the driver
+  desk_id         uuid NOT NULL REFERENCES valet_desks(id),
+  user_id         uuid NOT NULL REFERENCES users(id),     -- phone-verified driver (guest allowed)
+  vehicle_id      uuid NOT NULL REFERENCES vehicles(id),
+  key_tag         varchar(8) NOT NULL,
+  bay             varchar(12),
+  status          valet_status NOT NULL DEFAULT 'dropped',
+  handover_photos jsonb NOT NULL DEFAULT '[]'::jsonb,     -- 4 object keys: front, rear, left, right
+  dropped_by      uuid REFERENCES users(id),              -- valet staff
+  retrieved_by    uuid REFERENCES users(id),
+  validation_id   uuid REFERENCES valet_validations(id),
+  fee_paise       int NOT NULL,
+  gst_paise       int NOT NULL DEFAULT 0,
+  tip_paise       int NOT NULL DEFAULT 0 CHECK (tip_paise >= 0),   -- 100% to the valet; outside GST (confirm with CA)
+  dropped_at      timestamptz NOT NULL DEFAULT now(),
+  requested_at    timestamptz,
+  ready_at        timestamptz,
+  closed_at       timestamptz,
+  damage_report   jsonb,                                  -- {where, photo_url, reported_at}
+  CHECK (jsonb_typeof(handover_photos) = 'array')
+);
+-- A key tag can hang on only one open ticket per desk: the fraud guard for lost or swapped keys.
+CREATE UNIQUE INDEX valet_open_tag_uq ON valet_tickets (desk_id, key_tag) WHERE status NOT IN ('closed', 'cancelled');
+CREATE INDEX valet_queue_idx ON valet_tickets (desk_id, status, requested_at) WHERE status IN ('requested', 'coming');
+
 -- ---------- money ----------
 CREATE TYPE payment_status AS ENUM ('created', 'authorized', 'captured', 'failed', 'refunded', 'partially_refunded');
 
@@ -209,6 +275,11 @@ CREATE TABLE monthly_passes (
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE payments ADD CONSTRAINT payments_monthly_fk FOREIGN KEY (monthly_pass_id) REFERENCES monthly_passes(id);
+ALTER TABLE parked_spots ADD CONSTRAINT parked_spots_monthly_fk FOREIGN KEY (monthly_pass_id) REFERENCES monthly_passes(id) ON DELETE CASCADE;
+-- Valet payments: one payment row per ticket, raised when the driver requests the car.
+ALTER TABLE payments ADD COLUMN valet_ticket_id uuid REFERENCES valet_tickets(id);
+ALTER TABLE payments DROP CONSTRAINT payments_check;
+ALTER TABLE payments ADD CONSTRAINT payments_one_target CHECK (num_nonnulls(booking_id, monthly_pass_id, valet_ticket_id) = 1);
 
 -- ---------- gate events (QR scan or ANPR camera) ----------
 CREATE TABLE gate_events (

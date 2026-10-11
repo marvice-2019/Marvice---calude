@@ -152,6 +152,40 @@ input[type=range]{accent-color:var(--sign);width:100%}
 .durs button[aria-pressed="true"]{background:var(--sign);color:var(--on-sign);border-color:var(--sign)}
 .near{display:grid;gap:8px}
 .near button{display:flex;justify-content:space-between;gap:10px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px}
+.fchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.fchips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--muted)}
+.fchips button[aria-pressed="true"]{background:var(--sign);color:var(--on-sign);border-color:var(--sign)}
+.recent{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted);grid-column:1/-1}
+.recent button{border:0;background:var(--bg);border-radius:6px;padding:4px 10px;font-size:13px;color:var(--ink)}
+.dest-row{display:flex;gap:8px}
+.dest-row input{flex:1}
+.dest-row button{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:0 12px;font-weight:700;white-space:nowrap}
+.chip.valet{color:var(--sign);border-color:var(--sign)}
+.spot{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:14px;display:flex;gap:10px;align-items:center}
+.spot img{width:56px;height:56px;object-fit:cover;border-radius:6px}
+.tl{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:0}
+.tl li{display:grid;grid-template-columns:22px 1fr;gap:10px;padding-bottom:14px;position:relative;color:var(--muted)}
+.tl li::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid var(--line);background:var(--surface);margin-top:3px;z-index:1}
+.tl li:not(:last-child)::after{content:"";position:absolute;left:8px;top:18px;bottom:0;width:2px;background:var(--line)}
+.tl li.done{color:var(--ink)} .tl li.done::before{background:var(--ok);border-color:var(--ok)}
+.tl li.now{color:var(--ink);font-weight:700} .tl li.now::before{background:var(--kerb);border-color:var(--kerb)}
+.tl small{display:block;font-weight:400;color:var(--muted)}
+.photos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.photos span{aspect-ratio:1;max-width:100%;border-radius:6px;background:var(--bg);border:1px dashed var(--line);display:grid;place-items:center;font-size:11px;color:var(--muted);text-align:center}
+.eta{font-family:var(--f-display);font-stretch:80%;font-size:34px;font-weight:800;line-height:1}
+.tips{display:flex;gap:8px;flex-wrap:wrap}
+.tips button{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 14px;font-weight:700}
+.tips button[aria-pressed="true"]{background:var(--sign);color:var(--on-sign);border-color:var(--sign)}
+.vgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px;margin-top:18px;align-items:start}
+.queue{display:grid;gap:8px}
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--bg);border-radius:8px;padding:10px}
+.qrow b{font-family:var(--f-mono);font-size:13px}
+.qrow .btn{width:auto;padding:8px 12px;font-size:13px}
+.acct{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:18px;align-items:start}
+.list-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.list-row:last-child{border-bottom:0}
+.switch{accent-color:var(--sign);width:20px;height:20px}
+.linkbtn{border:0;background:none;color:var(--sign);font-weight:700;padding:0;text-align:left}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 84px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:700;z-index:60}
 
 nav.bottom{display:none}
@@ -161,8 +195,9 @@ nav.bottom{display:none}
   .find-grid{grid-template-columns:minmax(0,1fr)}
   .mapwrap{position:static;order:-1}
   .owner{grid-template-columns:minmax(0,1fr)}
+  .vgrid{grid-template-columns:minmax(0,1fr)}
   nav.tabs{display:none}
-  nav.bottom{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  nav.bottom{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
   nav.bottom button{background:none;border:0;padding:10px 4px 12px;font-size:12px;font-weight:700;color:var(--muted);display:grid;justify-items:center;gap:3px}
   nav.bottom button[aria-current="page"]{color:var(--sign)}
   nav.bottom i{display:block;width:22px;height:4px;border-radius:2px;background:currentColor;opacity:.35}
@@ -173,14 +208,16 @@ nav.bottom{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
-<div class="notice">Prototype. Sample lots and prices for Bengaluru. No real payment is taken.</div>
+<div class="notice">Prototype. Sample lots, venues and prices for Bengaluru. No real payment is taken; valet times are sped up.</div>
 <header class="top">
   <div class="brand"><span class="p-sign" aria-hidden="true">P</span>Bayline</div>
   <nav class="tabs" aria-label="Main">
     <button data-go="find" aria-current="page">Find parking</button>
+    <button data-go="valet">Valet</button>
     <button data-go="passes">My passes</button>
     <button data-go="monthly">Monthly</button>
     <button data-go="owners">List your space</button>
+    <button data-go="account">Account</button>
   </nav>
 </header>
 
@@ -188,8 +225,10 @@ nav.bottom{display:none}
   <!-- FIND -->
   <section class="view" id="v-find">
     <form class="search" id="search" novalidate>
-      <div class="field f-area"><label for="area">Where are you going?</label>
-        <select id="area"></select></div>
+      <div class="field f-area"><label for="dest">Where are you going?</label>
+        <div class="dest-row"><input id="dest" list="dest-list" autocomplete="off" placeholder="Area, mall, hospital, office…"><button type="button" id="nearme">Near me</button></div>
+        <datalist id="dest-list"></datalist></div>
+      <div class="recent" id="recent"></div>
       <div class="field"><label for="arrive">Arrive</label><input type="datetime-local" id="arrive"></div>
       <div class="field"><label for="leave">Leave</label><input type="datetime-local" id="leave"></div>
       <div class="field"><label id="vlab">Vehicle</label>
@@ -205,17 +244,23 @@ nav.bottom{display:none}
     </div>
     <div class="results-head">
       <h1 id="rhead">Parking near MG Road</h1>
-      <div class="sort"><label class="favtoggle"><input type="checkbox" id="favonly"> Saved lots only</label>
-        <label for="sort">Sort by</label>
+      <div class="sort"><label for="sort">Sort by</label>
         <select id="sort"><option value="dist">Nearest</option><option value="price">Lowest price</option><option value="left">Most spots left</option></select></div>
     </div>
-    <div class="find-grid">
+    <div class="fchips" id="fchips" role="group" aria-label="Filters"></div>
+    <div class="find-grid" style="margin-top:12px">
       <div class="list" id="list"></div>
       <div class="mapwrap">
         <svg viewBox="0 0 400 300" id="map" role="img" aria-label="Schematic map of Bengaluru with parking lots"></svg>
         <div class="mapcap"><span>Schematic map, not to scale</span><span>Tap a price to open the lot</span></div>
       </div>
     </div>
+  </section>
+
+  <!-- VALET -->
+  <section class="view" id="v-valet" hidden>
+    <div class="intro"><h1>Valet, without the paper ticket</h1><p>Hand over your keys, get a digital ticket with photos of your car, and request it from your table. Pay and tip from your phone.</p></div>
+    <div id="valet"></div>
   </section>
 
   <!-- PASSES -->
@@ -253,13 +298,19 @@ nav.bottom{display:none}
       </div>
     </div>
   </section>
+  <!-- ACCOUNT -->
+  <section class="view" id="v-account" hidden>
+    <div class="intro"><h1>Account</h1><p>No passwords. Your phone number is your account, and every pass you buy stays linked to it.</p></div>
+    <div id="account"></div>
+  </section>
 </main>
 
 <nav class="bottom" aria-label="Main">
   <button data-go="find" aria-current="page"><i></i>Find</button>
+  <button data-go="valet"><i></i>Valet</button>
   <button data-go="passes"><i></i>Passes</button>
   <button data-go="monthly"><i></i>Monthly</button>
-  <button data-go="owners"><i></i>List space</button>
+  <button data-go="account"><i></i>Account</button>
 </nav>
 
 <div class="scrim" id="scrim" hidden></div>
@@ -274,20 +325,30 @@ const AREAS = [
   {id:"kor",name:"Koramangala",x:216,y:226},{id:"wf",name:"Whitefield",x:356,y:158},
   {id:"heb",name:"Hebbal",x:192,y:72},{id:"kia",name:"Kempegowda Airport",x:204,y:20}
 ];
+// Destinations people actually type: areas plus venues (positions are approximate on the schematic map).
+const DESTS = AREAS.map(a=>({...a, kind:"Area"})).concat([
+  {id:"ubc",name:"UB City",x:199,y:173,kind:"Mall"},{id:"cbs",name:"Chinnaswamy Stadium",x:194,y:165,kind:"Stadium"},
+  {id:"fkm",name:"Forum Mall, Koramangala",x:217,y:224,kind:"Mall"},{id:"pmw",name:"Phoenix Marketcity, Whitefield",x:340,y:165,kind:"Mall"},
+  {id:"oar",name:"Old Airport Road hospitals",x:262,y:174,kind:"Hospital"},{id:"mtp",name:"Manyata Tech Park",x:214,y:80,kind:"Office"}
+]);
 // Sample lots. Names describe location only; operators and prices are illustrative.
 const LOTS = [
-  {id:"L1",name:"MG Road Metro Multilevel",area:"Central",x:197,y:166,car:40,bike:15,cap:280,monthly:4200,left:46,type:"Multilevel",covered:true,ev:true,h24:false,hours:"06:00–23:30"},
-  {id:"L2",name:"Brigade Road Basement P1",area:"Central",x:207,y:181,car:50,bike:20,cap:350,monthly:5000,left:7,type:"Basement",covered:true,ev:false,h24:true,hours:"Open 24 hours"},
+  {id:"L1",valet:true,name:"MG Road Metro Multilevel",area:"Central",x:197,y:166,car:40,bike:15,cap:280,monthly:4200,left:46,type:"Multilevel",covered:true,ev:true,h24:false,hours:"06:00–23:30"},
+  {id:"L2",valet:true,name:"Brigade Road Basement P1",area:"Central",x:207,y:181,car:50,bike:20,cap:350,monthly:5000,left:7,type:"Basement",covered:true,ev:false,h24:true,hours:"Open 24 hours"},
   {id:"L3",name:"100 Feet Road Open Lot",area:"Indiranagar",x:256,y:160,car:35,bike:10,cap:220,monthly:3500,left:22,type:"Open surface",covered:false,ev:false,h24:false,hours:"08:00–23:00"},
   {id:"L4",name:"Koramangala 5th Block Deck",area:"Koramangala",x:219,y:229,car:30,bike:10,cap:200,monthly:3200,left:31,type:"Covered deck",covered:true,ev:true,h24:true,hours:"Open 24 hours"},
   {id:"L5",name:"HSR Sector 2 Apartment Bays",area:"HSR Layout",x:246,y:262,car:25,bike:10,cap:180,monthly:2600,left:4,type:"Owner-listed",covered:true,ev:false,h24:false,hours:"09:00–20:00"},
   {id:"L6",name:"ITPL Main Road Gate 3",area:"Whitefield",x:352,y:153,car:30,bike:10,cap:220,monthly:3000,left:58,type:"Open surface",covered:false,ev:true,h24:true,hours:"Open 24 hours"},
-  {id:"L7",name:"Manyata Visitor Deck",area:"Hebbal",x:214,y:80,car:40,bike:15,cap:300,monthly:3800,left:19,type:"Multilevel",covered:true,ev:true,h24:false,hours:"07:00–22:00"},
+  {id:"L7",valet:true,name:"Manyata Visitor Deck",area:"Hebbal",x:214,y:80,car:40,bike:15,cap:300,monthly:3800,left:19,type:"Multilevel",covered:true,ev:true,h24:false,hours:"07:00–22:00"},
   {id:"L8",name:"Airport Long-Stay P4",area:"Devanahalli",x:207,y:24,car:60,bike:25,cap:450,monthly:0,left:120,type:"Open surface",covered:false,ev:true,h24:true,hours:"Open 24 hours"}
 ];
 
-LOTS.forEach((l,i)=>l.code="BLR"+(101+i)); // code printed on each lot's entrance board
-const S = {favOnly:false, area:"mg", veh:"car", sort:"dist", sel:null, arrive:null, leave:null, view:"find"};
+LOTS.forEach((l,i)=>l.code="BLR"+(101+i)); // printed on the entrance board as "BLR 101"; drivers type just the digits
+const FILTERS = [
+  {id:"fav",label:"★ Saved",test:l=>favs.has(l.id)},{id:"bike",label:"Two-wheeler bays",test:l=>l.bike>0},
+  {id:"covered",label:"Covered",test:l=>l.covered},{id:"ev",label:"EV charging",test:l=>l.ev},
+  {id:"valet",label:"Valet",test:l=>!!l.valet},{id:"h24",label:"Open 24 h",test:l=>l.h24}];
+const S = {filters:new Set(), dest:null, favOnly:false, area:"mg", veh:"car", sort:"dist", sel:null, arrive:null, leave:null, view:"find"};
 const $ = s => document.querySelector(s);
 const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
 const pad = n => String(n).padStart(2,"0");
@@ -319,16 +380,33 @@ function findPromo(raw, a){
   if(!p.ok(a)) return {err: code==="FIRST50" ? "FIRST50 works on your first booking only." : "WEEKEND20 works only when you arrive on a Saturday or Sunday."};
   return {promo:{...p, code}};
 }
-function dist(l){const a=AREAS.find(x=>x.id===S.area);return Math.hypot(l.x-a.x,l.y-a.y)*KM_PER_UNIT}
+function dist(l){const a=S.dest;return Math.hypot(l.x-a.x,l.y-a.y)*KM_PER_UNIT}
 
 /* ---------- search ---------- */
+function setDest(d, remember=true){
+  S.dest=d; S.sel=null; $("#dest").value=d.name;
+  if(remember){const r=(store("bayline.recent")||[]).filter(x=>x!==d.id);r.unshift(d.id);store("bayline.recent",r.slice(0,4))}
+  renderRecent(); renderFind();
+}
+function renderRecent(){
+  const r=(store("bayline.recent")||[]).map(id=>DESTS.find(d=>d.id===id)).filter(Boolean).filter(d=>d.id!==S.dest.id);
+  $("#recent").innerHTML=r.length?`Recent: ${r.map(d=>`<button type="button" data-recent="${d.id}">${esc(d.name)}</button>`).join("")}`:"";
+  document.querySelectorAll("[data-recent]").forEach(b=>b.onclick=()=>setDest(DESTS.find(d=>d.id===b.dataset.recent)));
+}
+function renderChips(){
+  $("#fchips").innerHTML=FILTERS.map(f=>`<button type="button" data-f="${f.id}" aria-pressed="${S.filters.has(f.id)}">${f.label}</button>`).join("");
+  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{const id=b.dataset.f;S.filters.has(id)?S.filters.delete(id):S.filters.add(id);renderChips();renderFind()});
+}
 function initSearch(){
-  const sel=$("#area");
-  sel.innerHTML = AREAS.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("");
+  $("#dest-list").innerHTML = DESTS.map(d=>`<option value="${esc(d.name)}">${d.kind}</option>`).join("");
+  S.dest=DESTS[0]; $("#dest").value=S.dest.name;
+  $("#dest").onchange=()=>{const v=$("#dest").value.trim().toLowerCase(), d=DESTS.find(x=>x.name.toLowerCase()===v)||DESTS.find(x=>x.name.toLowerCase().includes(v));
+    if(d) setDest(d); else { $("#search-err").textContent=`We don't cover "${$("#dest").value}" yet. Try an area like Indiranagar or a mall like UB City.`; } };
+  $("#nearme").onclick=()=>{setDest(DESTS[0],false);toast("Location isn't available in this preview, so we're showing MG Road.")};
+  renderRecent(); renderChips();
   const now=new Date(); now.setMinutes(0,0,0); now.setHours(now.getHours()+1);
   S.arrive=now; S.leave=new Date(+now+3*36e5);
   $("#arrive").value=toLocal(S.arrive); $("#leave").value=toLocal(S.leave);
-  sel.onchange=()=>{S.area=sel.value;S.sel=null;renderFind()};
   $("#arrive").onchange=$("#leave").onchange=readTimes;
   document.querySelectorAll("[data-veh]").forEach(b=>b.onclick=()=>{
     S.veh=b.dataset.veh;document.querySelectorAll("[data-veh]").forEach(x=>x.setAttribute("aria-pressed",x===b));renderFind()});
@@ -344,23 +422,22 @@ function readTimes(){
 }
 
 function sorted(){
-  const arr=LOTS.filter(l=>!S.favOnly||favs.has(l.id)).map(l=>({l,d:dist(l),q:quote(l,S.veh,S.arrive,S.leave)}));
+  const arr=LOTS.filter(l=>[...S.filters].every(id=>FILTERS.find(f=>f.id===id).test(l))).map(l=>({l,d:dist(l),q:quote(l,S.veh,S.arrive,S.leave)}));
   const k={dist:(a,b)=>a.d-b.d,price:(a,b)=>a.q.total-b.q.total,left:(a,b)=>b.l.left-a.l.left}[S.sort];
   return arr.sort(k);
 }
 function renderFind(){
-  const area=AREAS.find(a=>a.id===S.area);
   const hrs=quote(LOTS[0],S.veh,S.arrive,S.leave).hrs;
-  $("#rhead").textContent=`${S.veh==="bike"?"Bike":"Car"} parking near ${area.name} · ${hrs} h`;
+  $("#rhead").textContent=`${S.veh==="bike"?"Bike":"Car"} parking near ${S.dest.name} · ${hrs} h`;
   const rows=sorted();
-  if(!rows.length){$("#list").innerHTML=`<div class="empty">No saved lots yet. Open a lot and tap Save to keep it here for next time.</div>`;renderMap();return}
+  if(!rows.length){$("#list").innerHTML=S.filters.has("fav")&&S.filters.size===1?`<div class="empty">No saved lots yet. Open a lot and tap Save to keep it here for next time.</div>`:`<div class="empty">No lots match these filters. Turn one off to see more.</div>`;renderMap();return}
   $("#list").innerHTML=rows.map(({l,d,q})=>`
     <button class="lot" data-lot="${l.id}" aria-current="${S.sel===l.id}">
       <span class="p-sign" aria-hidden="true">P</span>
       <span style="min-width:0">
         <h3>${esc(l.name)}</h3>
         <div class="meta"><span class="lotcode">${l.code}</span> ${esc(l.area)} · ${d.toFixed(1)} km · ${esc(l.type)}</div>
-        <div class="chips">${favs.has(l.id)?'<span class="chip fav">★ Saved</span>':''}${l.covered?'<span class="chip">Covered</span>':''}${l.ev?'<span class="chip ev">EV charging</span>':''}<span class="chip">${esc(l.hours)}</span></div>
+        <div class="chips">${favs.has(l.id)?'<span class="chip fav">★ Saved</span>':''}${l.valet?'<span class="chip valet">Valet</span>':''}${l.covered?'<span class="chip">Covered</span>':''}${l.ev?'<span class="chip ev">EV charging</span>':''}<span class="chip">${esc(l.hours)}</span></div>
         <div class="left ${l.left<10?'low':''}">${l.left<10?`Only ${l.left} spots left`:`${l.left} spots left`}</div>
       </span>
       <span class="price"><b class="num">${inr(q.total)}</b><span>total incl. GST</span><br><span class="num">${inr(q.rate)}/hr</span></span>
@@ -371,7 +448,7 @@ function renderFind(){
 
 /* ---------- map ---------- */
 function renderMap(){
-  const area=AREAS.find(a=>a.id===S.area);
+  const area=S.dest;
   const pins=LOTS.map(l=>{const q=quote(l,S.veh,S.arrive,S.leave),t=inr(q.rate),w=t.length*6.4+10;
     return `<g class="pin ${S.sel===l.id?'on':''}" data-pin="${l.id}" tabindex="0" role="button" aria-label="${esc(l.name)}, ${t} per hour">
       <rect x="${l.x-w/2}" y="${l.y-17}" width="${w}" height="15" rx="3"/><text x="${l.x}" y="${l.y-6.5}" text-anchor="middle">${t}</text>
@@ -475,9 +552,9 @@ function openParkNow(){
     <h2 id="sheet-title">Pay at the lot</h2>
     <p style="color:var(--muted);margin:4px 0 0">The lot code is on the yellow board at the entrance.</p>
     <form id="pn" class="stack" novalidate>
-      <div class="field"><label for="pn-code">Lot code</label><input id="pn-code" class="mono" autocomplete="off" placeholder="BLR101" style="text-transform:uppercase"></div>
-      <div class="sec-h" style="margin:0">Or pick a lot near ${esc(AREAS.find(x=>x.id===S.area).name)}</div>
-      <div class="near">${near.map(({l,d})=>`<button type="button" data-near="${l.code}"><span><span class="lotcode">${l.code}</span> ${esc(l.name)}</span><span class="num" style="color:var(--muted)">${d.toFixed(1)} km</span></button>`).join("")}</div>
+      <div class="field"><label for="pn-code">Lot code</label><input id="pn-code" class="mono" autocomplete="off" inputmode="numeric" placeholder="101" aria-describedby="pn-hint"><small id="pn-hint" style="color:var(--muted)">Type the digits after "BLR" on the board.</small></div>
+      <div class="sec-h" style="margin:0">Or pick a lot near ${esc(S.dest.name)}</div>
+      <div class="near">${near.map(({l,d})=>`<button type="button" data-near="${l.code.slice(3)}"><span><span class="lotcode">${l.code}</span> ${esc(l.name)}</span><span class="num" style="color:var(--muted)">${d.toFixed(1)} km</span></button>`).join("")}</div>
       <div class="sec-h" style="margin:0">How long?</div>
       <div class="durs" role="group" aria-label="Duration">${[1,2,3,4,8].map(h=>`<button type="button" data-h="${h}" aria-pressed="${h===hrs}">${h} h</button>`).join("")}</div>
       <div class="err" id="pn-err" role="alert"></div>
@@ -487,13 +564,13 @@ function openParkNow(){
   document.querySelectorAll("[data-near]").forEach(btn=>btn.onclick=()=>{$("#pn-code").value=btn.dataset.near});
   document.querySelectorAll("[data-h]").forEach(btn=>btn.onclick=()=>{hrs=+btn.dataset.h;document.querySelectorAll("[data-h]").forEach(x=>x.setAttribute("aria-pressed",x===btn))});
   $("#pn").onsubmit=e=>{e.preventDefault();
-    const code=$("#pn-code").value.replace(/[\s-]/g,"").toUpperCase(), l=LOTS.find(x=>x.code===code);
+    const raw=$("#pn-code").value.replace(/[\s-]/g,"").toUpperCase(), code=/^\d+$/.test(raw)?"BLR"+raw:raw, l=LOTS.find(x=>x.code===code);
     if(!l){$("#pn-err").textContent=code?`No lot with code ${code}. Check the board at the entrance, or pick a lot above.`:"Enter the lot code, or pick a lot above.";return}
     openLot(l.id,{now:true,hrs});
   };
 }
 $("#pn-open").onclick=openParkNow;
-$("#favonly").onchange=e=>{S.favOnly=e.target.checked;renderFind()};
+
 
 /* ---------- passes ---------- */
 let bookings = store("bayline.bookings") || [];
@@ -521,10 +598,13 @@ function renderPasses(){
       <dl class="kv" style="margin:0"><dt>Pass</dt><dd class="mono">${b.id}</dd><dt>Vehicle</dt><dd class="mono">${esc(b.vno)}</dd>
       <dt>From</dt><dd>${fmt(new Date(b.arrive))}</dd><dt>Until</dt><dd>${fmt(new Date(b.leave))}</dd><dt>Paid</dt><dd class="num">${inr(b.total)} · ${b.pm}${b.promo?` · ${esc(b.promo)}`:''}</dd>
       ${b.mob?`<dt>Sent to</dt><dd class="num">WhatsApp +91 ${esc(b.mob.slice(0,5))} ${esc(b.mob.slice(5))}</dd>`:''}</dl>
+      ${b.spot?`<div class="spot">${b.spot.photo?`<img src="${b.spot.photo}" alt="Photo of your parking spot">`:''}<div><b>Your spot:</b> ${esc([b.spot.floor&&"Floor "+b.spot.floor,b.spot.bay&&"Bay "+b.spot.bay].filter(Boolean).join(" · ")||"Saved")}${b.spot.note?`<br><span style="color:var(--muted)">${esc(b.spot.note)}</span>`:''}<br><button class="linkbtn" data-spot="${b.id}">Edit</button></div></div>`
+        :(now<b.leave?`<button class="btn ghost" data-spot="${b.id}">Mark my spot (floor, bay, photo)</button>`:'')}
       <div class="row2">${now<b.leave?`<button class="btn" data-ext="${b.id}">Extend 1 hour</button>`:''}${now<b.arrive?`<button class="btn ghost" data-cancel="${b.id}">Cancel free</button>`:''}</div></div></article>`}).join("");
   el.querySelectorAll("canvas").forEach(c=>drawCode(c,c.dataset.code));
   el.querySelectorAll("[data-ext]").forEach(btn=>btn.onclick=()=>{const b=bookings.find(x=>x.id===btn.dataset.ext),l=LOTS.find(x=>x.id===b.lot);
     const rate=b.veh==="bike"?l.bike:l.car, add=Math.round(rate*(1+GST));b.leave+=36e5;b.total+=add;save();renderPasses();toast(`Extended by 1 hour for ${inr(add)} incl. GST.`)});
+  el.querySelectorAll("[data-spot]").forEach(btn=>btn.onclick=()=>markSpot(btn.dataset.spot));
   el.querySelectorAll("[data-cancel]").forEach(btn=>btn.onclick=()=>{bookings=bookings.filter(x=>x.id!==btn.dataset.cancel);save();renderPasses();toast("Cancelled. Full refund in 3–5 working days.")});
 }
 
@@ -566,11 +646,214 @@ function renderOwner(){
 }
 ["o-bays","o-rate","o-hours","o-occ"].forEach(id=>$("#"+id).oninput=renderOwner);
 
+
+/* ---------- where I parked ---------- */
+function markSpot(id){
+  const b=bookings.find(x=>x.id===id), sp=b.spot||{};
+  openSheet(`<button class="close" data-close>Close</button><span class="tag" style="color:var(--sign)">Where I parked</span>
+    <h2 id="sheet-title">Mark my spot</h2>
+    <form id="spf" class="stack" novalidate>
+      <div class="row2"><div class="field"><label for="sp-floor">Floor</label><input id="sp-floor" maxlength="6" placeholder="B2" value="${esc(sp.floor||"")}"></div>
+      <div class="field"><label for="sp-bay">Bay</label><input id="sp-bay" maxlength="8" placeholder="47" value="${esc(sp.bay||"")}"></div></div>
+      <div class="field"><label for="sp-note">Note</label><input id="sp-note" maxlength="80" placeholder="Near lift B, blue pillar" value="${esc(sp.note||"")}"></div>
+      <div class="field"><label for="sp-photo">Photo of the pillar or bay sign (optional)</label><input id="sp-photo" type="file" accept="image/*"></div>
+      <div class="err" id="sp-err" role="alert"></div>
+      <button class="btn" type="submit">Save my spot</button>
+      <div style="font-size:12px;color:var(--muted)">Saved on this pass. Valet and monthly bays fill this in for you.</div>
+    </form>`);
+  $("#sheet [data-close]").onclick=closeSheet;
+  let photo=sp.photo||null;
+  $("#sp-photo").onchange=e=>{const f=e.target.files[0]; if(!f) return;
+    if(!f.type.startsWith("image/")){$("#sp-err").textContent="Choose a photo (JPG or PNG).";return}
+    const img=new Image(), r=new FileReader();
+    r.onload=()=>{img.onload=()=>{const k=Math.min(1,320/Math.max(img.width,img.height)),c=document.createElement("canvas");
+      c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);photo=c.toDataURL("image/jpeg",.7)};img.src=r.result};
+    r.readAsDataURL(f)};
+  $("#spf").onsubmit=e=>{e.preventDefault();
+    const floor=$("#sp-floor").value.trim(), bay=$("#sp-bay").value.trim(), note=$("#sp-note").value.trim();
+    if(!floor&&!bay&&!note&&!photo){$("#sp-err").textContent="Add a floor, bay, note or photo so you can find your car later.";return}
+    b.spot={floor,bay,note,photo}; save(); closeSheet(); renderPasses(); toast("Spot saved on your pass.")};
+}
+
+/* ---------- valet ---------- */
+// Sample valet desks. Fees are flat per visit; venues can validate (pay) for their guests.
+const VENUES = [
+  {id:"V1",name:"UB City Mall entrance",dest:"ubc",fee:150,validate:"UBDINE",validator:"UB City restaurants",eta:6},
+  {id:"V2",name:"MG Road Metro Multilevel porch",dest:"mg",fee:100,validate:null,eta:5,lot:"L1"},
+  {id:"V3",name:"Old Airport Road hospital porch",dest:"oar",fee:80,validate:"CARE",validator:"Hospital help desk",eta:7},
+  {id:"V4",name:"Phoenix Marketcity Gate 2",dest:"pmw",fee:120,validate:"PMCSHOP",validator:"Mall stores (spend ₹2,000+)",eta:8}];
+const TIPS=[0,20,50,100];
+// GST 18% on the valet fee; a validated visit costs the driver nothing. Tips pass 100% to the valet, outside GST (confirm with CA).
+function valetQuote(v, validated, tip){const base=validated?0:v.fee, gst=Math.round(base*GST);return {base,gst,tip,total:base+gst+tip}}
+let tickets = store("bayline.valet") || [];
+function saveTickets(){store("bayline.valet",tickets.filter(t=>!t.example))}
+if(!tickets.length) tickets=[{id:"VT-EX4M",venue:"V1",plate:"KA 05 MN 4821",mob:"",tag:"K-23",bay:"B2-14",status:"parked",droppedAt:Date.now()-50*60000,example:true}];
+const STAGES=[["dropped","Keys handed over","Valet photographed all 4 sides"],["parked","Parked","Bay and key tag recorded"],
+  ["requested","You requested your car","Paid in the app"],["coming","On its way","Valet is bringing your car up"],["ready","Ready at the porch","Show this ticket to collect your keys"]];
+let staffView=false;
+function renderValet(){
+  const el=$("#valet"), active=tickets.filter(t=>t.status!=="closed");
+  const desks=VENUES.map(v=>`<div class="mcard"><h3>${esc(v.name)}</h3>
+      <div style="color:var(--muted);font-size:13px">${inr(v.fee)} + GST per visit${v.validate?` · free when ${esc(v.validator)} validate`:''} · usually ready in ${v.eta} min</div>
+      <button class="btn ghost" data-dropoff="${v.id}">I'm handing over my keys here</button></div>`).join("");
+  el.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-top:12px"><label class="favtoggle"><input type="checkbox" id="staffmode" ${staffView?"checked":""}> Valet staff view (preview)</label></div>
+    ${staffView?staffHTML():`<div class="vgrid"><div>${active.length?active.map(ticketHTML).join(""):`<div class="empty">No car with a valet right now. When you hand over your keys at a Bayline valet desk, your digital ticket appears here.</div>`}</div>
+    <div><div class="sec-h" style="margin-top:0">Valet desks near ${esc(S.dest.name)}</div><div class="mgrid" style="margin-top:0">${desks}</div></div></div>`}`;
+  $("#staffmode").onchange=e=>{staffView=e.target.checked;renderValet()};
+  el.querySelectorAll("[data-dropoff]").forEach(b=>b.onclick=()=>dropOff(VENUES.find(v=>v.id===b.dataset.dropoff)));
+  el.querySelectorAll("[data-request]").forEach(b=>b.onclick=()=>requestCar(tickets.find(t=>t.id===b.dataset.request)));
+  el.querySelectorAll("[data-collected]").forEach(b=>b.onclick=()=>{const t=tickets.find(x=>x.id===b.dataset.collected);t.status="closed";saveTickets();renderValet();toast("Enjoy the drive. Your receipt is on WhatsApp.")});
+  el.querySelectorAll("[data-damage]").forEach(b=>b.onclick=()=>reportDamage(tickets.find(t=>t.id===b.dataset.damage)));
+  el.querySelectorAll("[data-staff]").forEach(b=>b.onclick=()=>{const t=tickets.find(x=>x.id===b.dataset.staff);t.status=b.dataset.to;t[b.dataset.to+"At"]=Date.now();saveTickets();renderValet()});
+}
+function ticketHTML(t){
+  const v=VENUES.find(x=>x.id===t.venue), idx=STAGES.findIndex(s=>s[0]===t.status);
+  const eta=t.status==="requested"||t.status==="coming"?Math.max(1,Math.ceil((t.readyAt-Date.now())/60000*10)):0; // demo clock: 1 s = 6 s
+  return `<article class="pass" style="margin-bottom:16px"><div class="ph"><div><h3>${esc(v.name)}</h3><div style="font-size:13px;opacity:.85">Ticket <span class="mono">${t.id}</span> · Key tag <span class="mono">${t.tag}</span></div></div>${t.example?'<span class="tag">Example</span>':''}</div>
+    <div class="pb">
+      ${eta?`<div><div class="sec-h" style="margin:0">Ready in about</div><div class="eta num">${eta} min</div></div>`:''}
+      <ol class="tl">${STAGES.map((s,i)=>`<li class="${i<idx?"done":i===idx?"now":""}"><span></span><span>${s[1]}<small>${i===1&&t.bay?`Bay ${esc(t.bay)}`:s[2]}</small></span></li>`).join("")}</ol>
+      <div><div class="sec-h" style="margin:0 0 6px">Handover photos · ${new Date(t.droppedAt).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit"})}</div>
+        <div class="photos">${["Front","Rear","Left","Right"].map(x=>`<span>${x}<br>✓</span>`).join("")}</div></div>
+      <dl class="kv" style="margin:0"><dt>Vehicle</dt><dd class="mono">${esc(t.plate)}</dd><dt>Fee</dt><dd>${t.paid?inr(t.paid.total)+(t.paid.tip?` incl. ${inr(t.paid.tip)} tip`:""):`${inr(v.fee)} + GST, paid when you request`}</dd></dl>
+      ${t.status==="parked"?`<button class="btn" data-request="${t.id}">Request my car</button>`:''}
+      ${t.status==="ready"?`<button class="btn" data-collected="${t.id}">I've got my car</button><button class="btn ghost" data-damage="${t.id}">Report a scratch or dent</button>`:''}
+    </div></article>`;
+}
+function dropOff(v){
+  const p=profile();
+  openSheet(`<button class="close" data-close>Close</button><span class="tag" style="color:var(--sign)">Valet drop-off</span>
+    <h2 id="sheet-title">${esc(v.name)}</h2>
+    <p style="color:var(--muted);margin:4px 0 0">The valet scans your plate, photographs all four sides and gives you a key tag. Your ticket arrives here and on WhatsApp. No paper.</p>
+    <form id="vf" class="stack" novalidate>
+      <div class="field"><label for="v-plate">Vehicle number</label><input id="v-plate" style="text-transform:uppercase" placeholder="KA 01 AB 1234" value="${p?esc(p.vno):''}"></div>
+      <div class="field"><label for="v-mob">Mobile for WhatsApp ticket</label><input id="v-mob" inputmode="numeric" maxlength="10" placeholder="98765 43210" value="${p?esc(p.mob):''}"></div>
+      <div class="err" id="v-err" role="alert"></div>
+      <button class="btn" type="submit">Hand over keys</button>
+      <div style="font-size:12px;color:var(--muted)">You pay ${inr(v.fee)} + 18% GST only when you request your car${v.validate?`, or nothing if ${esc(v.validator)} validate your ticket`:''}.</div>
+    </form>`);
+  $("#sheet [data-close]").onclick=closeSheet;
+  $("#vf").onsubmit=e=>{e.preventDefault();
+    const plate=$("#v-plate").value.trim().toUpperCase(), mob=$("#v-mob").value.replace(/\D/g,"");
+    if(!VNO.test(plate)){$("#v-err").textContent="Enter a valid number plate, for example KA 01 AB 1234 or 22 BH 1234 AB.";return}
+    if(!/^[6-9]\d{9}$/.test(mob)){$("#v-err").textContent="Enter a 10-digit Indian mobile number starting with 6, 7, 8 or 9.";return}
+    const t={id:"VT-"+Math.random().toString(36).slice(2,6).toUpperCase(),venue:v.id,plate,mob,tag:"K-"+(10+Math.floor(Math.random()*80)),
+      bay:["B1","B2","P3"][Math.floor(Math.random()*3)]+"-"+(10+Math.floor(Math.random()*60)),status:"parked",droppedAt:Date.now()};
+    tickets.unshift(t); store("bayline.profile",{...(p||{}),vno:plate,mob,pm:(p&&p.pm)||"UPI"}); saveTickets(); closeSheet(); go("valet");
+    toast(`Ticket ${t.id} sent to WhatsApp +91 ${mob.slice(0,5)} ${mob.slice(5)}.`)};
+}
+function requestCar(t){
+  const v=VENUES.find(x=>x.id===t.venue); let tip=20, validated=false;
+  const draw=()=>{const q=valetQuote(v,validated,tip);
+    $("#vbill").innerHTML=`<div><span>Valet fee</span><span>${validated?"Validated":inr(q.base)}</span></div><div><span>GST 18%</span><span>${inr(q.gst)}</span></div>
+      <div><span>Tip for your valet (100% to them)</span><span>${inr(q.tip)}</span></div><div class="tot"><span>Total</span><span>${inr(q.total)}</span></div>`;
+    $("#vpay").textContent=q.total?`Pay ${inr(q.total)} and bring my car`:"Bring my car";
+    document.querySelectorAll("[data-tip]").forEach(b=>b.setAttribute("aria-pressed",+b.dataset.tip===tip))};
+  openSheet(`<button class="close" data-close>Close</button><span class="tag" style="color:var(--sign)">Request my car</span>
+    <h2 id="sheet-title">${esc(v.name)}</h2>
+    <p style="color:var(--muted);margin:4px 0 0">Usually ready in ${v.eta} minutes. We'll WhatsApp you when it's at the porch.</p>
+    <form id="rq" class="stack" novalidate>
+      ${v.validate?`<div class="field"><label for="val">Validation code from ${esc(v.validator)}</label><div class="promo"><input id="val" autocomplete="off" placeholder="Ask at the billing counter"><button type="button" id="val-apply">Apply</button></div><div class="err" id="val-err" role="alert"></div></div>`:''}
+      <div class="field"><span class="sec-h" style="margin:0">Add a tip</span><div class="tips" role="group" aria-label="Tip">${TIPS.map(x=>`<button type="button" data-tip="${x}">${x?inr(x):"No tip"}</button>`).join("")}</div></div>
+      <div class="bill num" id="vbill"></div>
+      <div class="sec-h">Pay with</div>
+      <div class="pay"><label><input type="radio" name="vpm" value="UPI" checked> UPI</label><label><input type="radio" name="vpm" value="Card"> Card</label></div>
+      <button class="btn" type="submit" id="vpay"></button>
+    </form>`);
+  $("#sheet [data-close]").onclick=closeSheet;
+  document.querySelectorAll("[data-tip]").forEach(b=>b.onclick=()=>{tip=+b.dataset.tip;draw()});
+  if(v.validate) $("#val-apply").onclick=()=>{const ok=$("#val").value.trim().toUpperCase()===v.validate;validated=ok;
+    $("#val-err").textContent=ok?"":"That code didn't work. Ask the counter for today's validation code.";draw()};
+  draw();
+  $("#rq").onsubmit=e=>{e.preventDefault();const q=valetQuote(v,validated,tip);
+    t.paid=q; t.status="requested"; t.requestedAt=Date.now(); t.readyAt=Date.now()+v.eta*6000; // demo clock: 1 min = 6 s
+    saveTickets(); closeSheet(); renderValet(); toast("Request sent. Your valet is on the way to your car.")};
+}
+function reportDamage(t){
+  openSheet(`<button class="close" data-close>Close</button><span class="tag" style="color:var(--sign)">Report damage</span>
+    <h2 id="sheet-title">Something's not right?</h2>
+    <p style="color:var(--muted);margin:4px 0 0">Report before you drive off. We compare your photo with the 4 handover photos and the operator replies within 24 hours.</p>
+    <form id="dmg" class="stack" novalidate>
+      <div class="field"><label for="d-where">Where on the car?</label><select id="d-where"><option>Front</option><option>Rear</option><option>Left side</option><option>Right side</option><option>Interior</option></select></div>
+      <div class="field"><label for="d-photo">Photo</label><input id="d-photo" type="file" accept="image/*"></div>
+      <div class="err" id="d-err" role="alert"></div>
+      <button class="btn" type="submit">Send report</button></form>`);
+  $("#sheet [data-close]").onclick=closeSheet;
+  $("#dmg").onsubmit=e=>{e.preventDefault(); if(!$("#d-photo").files.length){$("#d-err").textContent="Add a photo of the damage so we can compare it.";return}
+    t.damage=$("#d-where").value; saveTickets(); closeSheet(); toast(`Report sent for ticket ${t.id}. Reference ${t.id}-D.`)};
+}
+function staffHTML(){
+  const sample=[{id:"VT-7Q2M",plate:"KA 03 MM 7788",tag:"K-14",bay:"B1-22",status:"requested",venue:"V1"},{id:"VT-4XZA",plate:"KA 51 Z 9999",tag:"K-31",bay:"B2-08",status:"parked",venue:"V1"}];
+  const rows=tickets.filter(t=>t.status!=="closed").concat(sample.filter(x=>!tickets.some(t=>t.id===x.id)).map(x=>({...x,example:true})));
+  const next={requested:["coming","Start retrieval"],coming:["ready","Car at porch"]};
+  return `<div class="panel" style="margin-top:12px"><div class="sec-h" style="margin:0">Request queue · UB City and nearby desks</div>
+    <div class="queue">${rows.map(t=>`<div class="qrow"><div><b>${t.id}</b> · ${esc(t.plate)} · key ${t.tag} · bay ${esc(t.bay)}<br><span style="color:var(--muted);font-size:13px">${STAGES.find(s=>s[0]===t.status)[1]}${t.example?" · example":""}</span></div>
+      ${next[t.status]&&!t.example?`<button class="btn" data-staff="${t.id}" data-to="${next[t.status][0]}">${next[t.status][1]}</button>`:'<span></span>'}</div>`).join("")}</div>
+    <p class="formula" style="margin:0">Staff scan the driver's plate at drop-off, take 4 photos and tie the key tag to the ticket. A lost key tag can always be traced to a ticket, plate and photo set.</p></div>`;
+}
+setInterval(()=>{let changed=false;for(const t of tickets){if(t.status==="requested"&&Date.now()>t.requestedAt+3000){t.status="coming";changed=true}
+  if(t.status==="coming"&&Date.now()>=t.readyAt){t.status="ready";changed=true;toast(`Your car is at the porch. Show ticket ${t.id}.`)}}
+  if(changed)saveTickets(); if(S.view==="valet"&&!staffView&&tickets.some(t=>t.status==="requested"||t.status==="coming"||changed))renderValet()},1000);
+
+/* ---------- account ---------- */
+function renderAccount(){
+  const p=profile(), signed=store("bayline.signedin");
+  const el=$("#account");
+  if(!signed){
+    el.innerHTML=`<div class="acct"><div class="panel"><h3 style="margin:0">Sign in with your phone</h3>
+      <form id="lg" class="stack" style="margin-top:0" novalidate>
+        <div class="field"><label for="lg-phone">Mobile number</label><input id="lg-phone" inputmode="numeric" maxlength="10" placeholder="98765 43210" value="${p?esc(p.mob||""):""}"></div>
+        <div class="field" id="otpf" hidden><label for="lg-otp">6-digit code sent by SMS</label><input id="lg-otp" inputmode="numeric" maxlength="6" placeholder="Demo code: 123456"></div>
+        <div class="err" id="lg-err" role="alert"></div>
+        <button class="btn" type="submit" id="lg-btn">Send code</button>
+        <div style="font-size:12px;color:var(--muted)">By continuing you agree to the Terms and Privacy Notice. We use your number for passes and parking alerts only.</div>
+      </form></div>
+      <div class="panel"><div class="sec-h" style="margin:0">Don't want an account?</div><p style="margin:0">You don't need one. Book with just your number and plate; every pass stays linked to that number, and signing in later shows them all.</p></div></div>`;
+    let sent=false;
+    $("#lg").onsubmit=e=>{e.preventDefault();const m=$("#lg-phone").value.replace(/\D/g,""),err=$("#lg-err");
+      if(!/^[6-9]\d{9}$/.test(m)){err.textContent="Enter a 10-digit Indian mobile number starting with 6, 7, 8 or 9.";return}
+      if(!sent){sent=true;$("#otpf").hidden=false;$("#lg-btn").textContent="Verify and sign in";err.textContent="";$("#lg-otp").focus();return}
+      if($("#lg-otp").value!=="123456"){err.textContent="That code doesn't match. Check the SMS and try again.";return}
+      store("bayline.signedin",m);store("bayline.profile",{...(p||{}),mob:m});renderAccount();toast("Signed in. Your passes are under this number.")};
+    return;
+  }
+  const prefs=store("bayline.prefs")||{alerts:true,lang:"en"};
+  el.innerHTML=`<div class="acct">
+    <div class="panel"><div class="sec-h" style="margin:0">Profile</div>
+      <div class="list-row"><span>Mobile</span><b class="num">+91 ${esc(signed.slice(0,5))} ${esc(signed.slice(5))}</b></div>
+      <div class="list-row"><span>Vehicle</span><b class="mono">${p&&p.vno?esc(p.vno):"Added at your first booking"}</b></div>
+      <div class="list-row"><span>Pay with</span><b>${p&&p.pm?esc(p.pm):"Chosen at checkout"}</b></div>
+      <div class="list-row"><label for="pf-alerts">WhatsApp alert 15 min before a pass ends</label><input type="checkbox" class="switch" id="pf-alerts" ${prefs.alerts?"checked":""}></div>
+      <div class="list-row"><label for="pf-lang">Language</label><select id="pf-lang"><option value="en">English</option><option value="kn">ಕನ್ನಡ (coming soon)</option><option value="hi">हिंदी (coming soon)</option></select></div>
+      <button class="linkbtn" id="signout">Sign out</button></div>
+    <div class="panel"><div class="sec-h" style="margin:0">More</div>
+      <div class="list-row"><button class="linkbtn" data-go2="monthly">Monthly passes</button><span>›</span></div>
+      <div class="list-row"><button class="linkbtn" data-go2="owners">Own a parking space? Earn from it</button><span>›</span></div>
+      <div class="list-row"><button class="linkbtn" data-go2="passes">Receipts and GST invoices</button><span>›</span></div></div>
+    <div class="panel"><div class="sec-h" style="margin:0">Help</div>
+      <p style="margin:0">Chat with us on WhatsApp, 7 am to 11 pm. The support number goes live at launch; in this prototype there's no live chat.</p>
+      <div class="sec-h" style="margin:4px 0 0">Your data</div>
+      <div class="list-row"><span>Download my data</span><button class="linkbtn" id="dl-data">Request</button></div>
+      <div class="list-row"><span>Delete my account</span><button class="linkbtn" id="del-acct" style="color:var(--warn)">Delete</button></div></div></div>`;
+  $("#pf-lang").value=prefs.lang;
+  $("#pf-alerts").onchange=e=>{prefs.alerts=e.target.checked;store("bayline.prefs",prefs);toast(prefs.alerts?"Expiry alerts on.":"Expiry alerts off.")};
+  $("#pf-lang").onchange=e=>{prefs.lang=e.target.value;store("bayline.prefs",prefs);if(prefs.lang!=="en")toast("Kannada and Hindi arrive before launch. Showing English for now.")};
+  $("#signout").onclick=()=>{store("bayline.signedin",null);renderAccount()};
+  $("#dl-data").onclick=()=>toast("Request logged. Your data export arrives on WhatsApp within 7 days.");
+  $("#del-acct").onclick=()=>{
+    openSheet(`<button class="close" data-close>Close</button><h2 id="sheet-title">Delete your account?</h2>
+      <p>Your profile, vehicles and saved spots are removed within 30 days. Tax invoices are kept as the law requires. Active passes stay valid until they end.</p>
+      <div class="stack"><button class="btn" id="del-yes" style="background:var(--warn)">Delete my account</button><button class="btn ghost" data-close>Keep my account</button></div>`);
+    document.querySelectorAll("#sheet [data-close]").forEach(b=>b.onclick=closeSheet);
+    $("#del-yes").onclick=()=>{["bayline.signedin","bayline.profile","bayline.favs","bayline.recent","bayline.prefs"].forEach(k=>store(k,null));closeSheet();renderAccount();toast("Account deleted.")}};
+  el.querySelectorAll("[data-go2]").forEach(b=>b.onclick=()=>go(b.dataset.go2));
+}
+
 /* ---------- nav ---------- */
 function go(v){S.view=v;
-  ["find","passes","monthly","owners"].forEach(x=>$("#v-"+x).hidden=x!==v);
+  ["find","valet","passes","monthly","owners","account"].forEach(x=>$("#v-"+x).hidden=x!==v);
   document.querySelectorAll("[data-go]").forEach(b=>b.dataset.go===v?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
-  if(v==="passes")renderPasses(); if(v==="monthly")renderMonthly(); if(v==="owners")renderOwner();
+  if(v==="passes")renderPasses(); if(v==="monthly")renderMonthly(); if(v==="owners")renderOwner(); if(v==="valet")renderValet(); if(v==="account")renderAccount();
   window.scrollTo(0,0);
 }
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
@@ -578,6 +861,6 @@ let tt;function toast(t){const e=$("#toast");e.textContent=t;e.hidden=false;clea
 setInterval(()=>{if(S.view==="passes")renderPasses()},60000);
 
 initSearch(); renderFind();
-const h=location.hash.slice(1); if(["passes","monthly","owners"].includes(h))go(h);
+const h=location.hash.slice(1); if(["valet","passes","monthly","owners","account"].includes(h))go(h);
 })();
 </script>

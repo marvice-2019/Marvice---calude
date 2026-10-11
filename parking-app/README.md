@@ -6,7 +6,7 @@ A Parking.com-style product, built for India first, under its own brand. "Baylin
 
 | Path | What it is | Status |
 |---|---|---|
-| `prototype/index.html` | Clickable web prototype of the full driver flow: search by area and time, list + map, lot detail with GST bill, checkout with plate and UPI, passes with entry code, extend and cancel, monthly pass request, and an owner earnings calculator. Mobile-first; on phones it runs with a bottom tab bar, the same layout the native app will use. | Done. Sample data, no real payment |
+| `prototype/index.html` | Clickable web prototype (stage 2, rerun 11 Oct with valet). Driver flow: search by area and time, list + map, lot detail with GST bill, checkout with plate and UPI, passes with entry code, extend and cancel, monthly pass request, an owner earnings calculator, **valet** (drop-off ticket with handover photos, request my car with live arrival time, venue validation, cashless tip, damage report, staff queue), **Mark my spot** (floor, bay, photo), filter chips (saved, two-wheeler, covered, EV, valet, 24 h), destination and venue search with recent searches, digits-only lot codes on a number pad, and phone-OTP account with no passwords. Mobile-first; on phones it runs with a bottom tab bar, the same layout the native app will use. | Done. Sample data, no real payment |
 | `schema.sql` | PostgreSQL 16 + PostGIS data model: users, vehicles, operators, lots, rate cards, bookings with a capacity-safe `book_bay()` function, Razorpay payments, GST invoices, monthly passes, gate events, operator payouts. | Tested on Postgres 16 (geo column stubbed; PostGIS not installed in the test box) |
 
 ## What we copy and what we don't
@@ -45,7 +45,8 @@ Second risk: gate integration. A booked driver must get in without arguing at th
 | 7. Monthly passes | Requests, approvals, recurring billing (due by the 5th) | 30 |
 | 8. Admin | Lot onboarding, KYC, disputes, refunds | 30 |
 | 9. QA + store release | Device testing, App Store / Play review, load test | 50 |
-| **Total** | MVP for one city | **530 h** (about 12–14 weeks with 2 developers + 1 designer part-time) |
+| 10. Valet module | Desks, tickets, key tags, handover photos, request-my-car queue, validations, tips, staff app screens | 90 |
+| **Total** | MVP for one city, self-park + valet | **620 h** (about 14–16 weeks with 2 developers + 1 designer part-time) |
 
 ## Monthly running cost (MVP, one city)
 
@@ -66,11 +67,18 @@ All prices are estimates as of Oct 2026. Check each one before quoting a client.
 
 From the prototype's sample numbers: a 3-hour car booking at ₹40/hr is ₹120 parking + ₹15 platform fee + ₹24 GST = ₹159 total. Platform income = ₹15 fee + 15% commission on ₹120 (₹18) = ₹33 per booking. Razorpay takes about ₹3.75 of that (2% of ₹159 plus GST on the fee), leaving ₹29.25. Break-even on ₹16,000 fixed cost is about 550 bookings a month, roughly 18 a day across the city.
 
+## Valet economics (per visit, sample numbers)
+
+The driver pays a ₹150 fee + ₹27 GST = ₹177, plus an optional tip that goes 100% to the valet. The platform keeps 15% of the fee (₹22.50); Razorpay takes about ₹4.18 (2% of ₹177 plus GST on that fee), leaving **₹18.32 per paid visit**. A **validated** visit is billed monthly to the venue (restaurant, mall or hospital) at the same ₹150 + GST, so the platform still earns ₹22.50 and the driver pays nothing. The platform absorbs the gateway fee on tips (about ₹0.47 on a ₹20 tip).
+
+Why it matters: one valet desk at a busy mall handles 150–300 cars a day [E], which comes to roughly ₹2,700–5,500 a day in platform income at ₹18.32 per visit. That is far more per site than self-park, and venues sign up for valet faster than they list idle bays. **Formula:** daily income = paid visits × (fee × 15% − gateway fee) + validated visits × fee × 15%.
+
 ## Flags for a CA / lawyer
 
 - GST treatment of parking (SAC 9967) and the platform fee. Also whether Section 9(5) or TCS rules for e-commerce operators apply to payouts.
 - TDS (194-O) on operator payouts.
 - Operator agreement: liability for vehicle damage or theft, cancellation and refund policy, bay availability SLA.
+- **Valet:** GST treatment of tips passed through to valets (the prototype assumes tips sit outside GST and the platform is only a collection agent); invoicing venues for validated visits; liability for damage while the car is in the valet's custody, and whether the photo evidence holds up in a claim.
 - DPDP Act 2023: consent for phone, plate and location data; erasure flow (`users.deleted_at` is in the schema).
 
 ## Run the prototype
