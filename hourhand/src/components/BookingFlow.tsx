@@ -19,19 +19,21 @@ interface Props {
   questions: FlowQuestion[];
   /** For a priced event: the price as shown ("₹499") and the names Checkout shows the guest. */
   paid?: { price: string; hostName: string; eventName: string } | null;
+  /** Booking through a single-use link: times and the booking go through the link, which is used up by the booking. */
+  linkToken?: string;
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
       <div hidden={picked !== null}>
-        <SlotPicker slug={slug} event={event} bookingWindowDays={bookingWindowDays} onPick={(slot, tz) => setPicked({ slot, tz })} />
+        <SlotPicker slug={slug} event={event} linkToken={linkToken} bookingWindowDays={bookingWindowDays} onPick={(slot, tz) => setPicked({ slot, tz })} />
       </div>
       {picked && (
         <DetailsForm
-          slug={slug} event={event} tz={picked.tz} slot={picked.slot} questions={questions} paid={paid}
+          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={paid}
           onPick={(slot) => setPicked({ slot, tz: picked.tz })} onBack={() => setPicked(null)}
         />
       )}
@@ -40,11 +42,11 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
 }
 
 interface FormProps {
-  slug: string; event: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"];
+  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"];
   onPick: (slot: string) => void; onBack: () => void;
 }
 
-function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }: FormProps) {
+function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, onPick, onBack }: FormProps) {
   const router = useRouter();
   // A new key starts a fresh attempt; it changes only after an attempt is over (payment couldn't start, or the hold ran out).
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
@@ -54,6 +56,7 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
   const [taken, setTaken] = useState<string[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [limited, setLimited] = useState(false);
+  const [linkGone, setLinkGone] = useState<string | null>(null);
   // Paid events: the order the server made, kept so a guest who closes Checkout can reopen it while the hold lasts.
   const [held, setHeld] = useState<{ bookingId: string; manageToken: string; payment: CheckoutPayment; prefill: { name: string; email: string; contact?: string } } | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -107,7 +110,7 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
     try {
       const res = await fetch("/api/bookings", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ slug, event, start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey }),
+        body: JSON.stringify({ ...(linkToken ? { linkToken } : { slug, event }), start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey }),
       });
       const body = await res.json();
       if ((res.status === 201 || res.status === 200) && body.payment) {
@@ -120,7 +123,8 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
         router.push(`/${slug}/${event}/booked/${body.bookingId}`);
         return;
       }
-      if (res.status === 409 && body.error === "payments_unavailable") setUnavailable(true);
+      if (typeof body.error === "string" && body.error.startsWith("link_")) setLinkGone(body.error);
+      else if (res.status === 409 && body.error === "payments_unavailable") setUnavailable(true);
       else if ((res.status === 409 && body.error === "attempt_expired") || res.status === 502) { freshAttempt(); setFailed(true); }
       else if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
       else if (res.status === 400) setErrors(body.fields ?? {});
@@ -175,6 +179,11 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
           </div>
         );
       })}
+      {linkGone && (
+        <p className="text-danger" role="alert">
+          {linkGone === "link_used" ? "Someone has already booked with this link. If that was you, check your email for the confirmation." : "This link doesn't work any more. Ask the person who sent it for a new one."}
+        </p>
+      )}
       {limited && <p className="text-danger" role="alert">Too many bookings from here in the last hour. Try again later.</p>}
       {failed && <p className="text-danger" role="alert">Something went wrong. Your time isn&apos;t booked yet. Try again.</p>}
       {expired && <p className="text-danger" role="alert">Your hold on this time ran out before payment. Book it again if it&apos;s still free.</p>}

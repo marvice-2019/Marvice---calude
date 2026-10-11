@@ -78,10 +78,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   function fields(draft: EventTypeDraft): Omit<EventTypeDraft, "location"> {
-    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency } = draft;
+    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden } = draft;
     return {
       name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
-      priceMinor, currency: priceMinor === null ? null : currency,
+      priceMinor, currency: priceMinor === null ? null : currency, hidden,
     };
   }
 
@@ -257,7 +257,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       const mine = db.eventTypes.filter((e) => e.userId === userId);
       const eventType: EventType = {
         id: randomUUID(), userId, scheduleId: db.schedules.find((s) => s.userId === userId && s.isDefault)?.id ?? null,
-        ...fields(draft), hidden: false, active: true, position: Math.max(-1, ...mine.map((e) => e.position)) + 1, kind: "one_on_one",
+        ...fields(draft), active: true, position: Math.max(-1, ...mine.map((e) => e.position)) + 1, kind: "one_on_one",
       };
       db.eventTypes.push(eventType);
       setLocation(eventType.id, draft);

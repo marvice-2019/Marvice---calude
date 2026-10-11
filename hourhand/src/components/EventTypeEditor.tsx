@@ -68,7 +68,7 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
   const [deleting, startDeleting] = useTransition();
   const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({});
 
-  const set = (key: keyof EventTypeForm) => (value: string) => {
+  const set = (key: Exclude<keyof EventTypeForm, "hidden">) => (value: string) => {
     setForm((f) => ({ ...f, [key]: value }));
     setStatus("idle");
   };
@@ -145,7 +145,7 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
     });
   }
 
-  const numberField = (key: keyof EventTypeForm, label: string, unit: string, hint?: string) => (
+  const numberField = (key: Exclude<keyof EventTypeForm, "hidden">, label: string, unit: string, hint?: string) => (
     <div>
       <Label htmlFor={`f-${key}`}>{label}</Label>
       <div className="flex items-center gap-2">
@@ -218,6 +218,16 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
               <Link href="/dashboard/integrations" className="inline-flex min-h-11 items-center font-semibold text-accent underline">Connect Razorpay</Link>
             </div>
           )}
+        </div>
+        <div>
+          <label className="flex min-h-11 items-start gap-3">
+            <input
+              type="checkbox" checked={form.hidden} aria-describedby="f-hidden-hint" className="mt-1 size-5 accent-accent"
+              onChange={(e) => { const hidden = e.target.checked; setForm((f) => ({ ...f, hidden })); setStatus("idle"); }}
+            />
+            <span className="font-semibold text-text">Only people with the link can book</span>
+          </label>
+          <p id="f-hidden-hint" className="mt-1 text-sm text-text-muted">It won&apos;t show on your booking page. Anyone you send its link to can still book.</p>
         </div>
         <div>
           <Label htmlFor="f-location">Where you meet</Label>
