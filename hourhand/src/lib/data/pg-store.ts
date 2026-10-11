@@ -45,7 +45,7 @@ const toEventType = (r: Row): EventType => ({
 
 const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
   b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.series_id, b.series_index, b.created_at,
-  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at, i.running_late_minutes, i.running_late_at, i.guests::text[] as guests, i.locale as invitee_locale
+  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at, i.running_late_minutes, i.running_late_at, i.guests::text[] as guests, i.locale as invitee_locale, i.whatsapp_opt_in_at is not null as whatsapp_opt_in
   from bookings b join invitees i on i.booking_id = b.id`;
 const toBooking = (r: Row): BookingWithInvitee => ({
   id: r.id as string, eventTypeId: r.event_type_id as string, hostId: r.host_id as string, startAt: r.start_at as Date, endAt: r.end_at as Date,
@@ -59,7 +59,7 @@ const toBooking = (r: Row): BookingWithInvitee => ({
     id: r.invitee_id as string, bookingId: r.id as string, hostId: r.host_id as string, name: r.invitee_name as string, email: r.invitee_email as string,
     timezone: r.invitee_timezone as string, phone: r.invitee_phone as string | null, answers: r.answers as BookingWithInvitee["invitee"]["answers"], manageToken: r.manage_token as string,
     noShowAt: (r.no_show_at as Date | null) ?? null,
-    runningLateMinutes: (r.running_late_minutes as number | null) ?? null, runningLateAt: (r.running_late_at as Date | null) ?? null, guests: (r.guests as string[] | null) ?? [], locale: (r.invitee_locale as string | null) ?? "en",
+    runningLateMinutes: (r.running_late_minutes as number | null) ?? null, runningLateAt: (r.running_late_at as Date | null) ?? null, guests: (r.guests as string[] | null) ?? [], locale: (r.invitee_locale as string | null) ?? "en", whatsappOptIn: r.whatsapp_opt_in === true,
   },
 });
 
@@ -128,8 +128,10 @@ export function createPgStore(pool: pg.Pool): DataStore {
         et.location_kind, input.idempotencyKey, movingId, input.holdUntil ? "pending_payment" : "confirmed", input.holdUntil ?? null, linkId]);
     const id = inserted.rows[0].id as string;
     const i = input.invitee;
-    await client.query("insert into invitees (booking_id, host_id, name, email, timezone, phone, answers, guests, locale) values ($1,$2,$3,$4,$5,$6,$7,$8::citext[],$9)",
-      [id, et.user_id, i.name, i.email, i.timezone, i.phone, JSON.stringify(i.answers), i.guests ?? [], i.locale ?? "en"]);
+    await client.query(
+      `insert into invitees (booking_id, host_id, name, email, timezone, phone, answers, guests, locale, whatsapp_opt_in_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8::citext[],$9, case when $10::boolean then now() end)`,
+      [id, et.user_id, i.name, i.email, i.timezone, i.phone, JSON.stringify(i.answers), i.guests ?? [], i.locale ?? "en", i.whatsappOptIn === true && i.phone !== null]);
     return id;
   }
 
@@ -401,10 +403,10 @@ export function createPgStore(pool: pg.Pool): DataStore {
           // Cancel first: the exclusion constraint only covers confirmed rows, so the new slot may overlap the old one.
           // Both statements commit together or not at all.
           await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = 'Rescheduled' where id = $1", [bookingId, by]);
-          const { name, email, timezone, phone, answers, guests, locale } = invitee;
+          const { name, email, timezone, phone, answers, guests, locale, whatsappOptIn } = invitee;
           // The move keeps the booking's single-use link, so the link shows the current time.
           const linkId = (await client.query("select booking_link_id from bookings where id = $1", [bookingId])).rows[0].booking_link_id as string | null;
-          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers, guests, locale } }, bookingId, linkId);
+          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers, guests, locale, whatsappOptIn } }, bookingId, linkId);
           // A moved week stays its series' week: same series, same place in it. A package session stays paid for by its
           // package (or its credit would come back while still booked), and can't move past the package's end date.
           await client.query(
