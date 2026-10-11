@@ -30,8 +30,9 @@ export class MailError extends Error {
 type Fetch = typeof fetch;
 
 /** Rate limits, quota, an in-flight request with the same key, and server errors can clear up; any other 4xx will not. */
-export function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 409 || status >= 500;
+export function isRetryableStatus(status: number, name?: string): boolean {
+  if (status === 409) return name !== "invalid_idempotent_request"; // same key, different body: retrying can't fix it
+  return status === 429 || status >= 500;
 }
 
 export function resendMailer(apiKey: string, from: string, fetchImpl: Fetch = fetch): Mailer {
@@ -55,7 +56,7 @@ export function resendMailer(apiKey: string, from: string, fetchImpl: Fetch = fe
       const body = (await res.json().catch(() => ({}))) as { id?: string; name?: string; message?: string };
       if (!res.ok || !body.id) {
         // Resend's error body names the problem; it never echoes the API key.
-        throw new MailError(`Resend ${res.status} ${body.name ?? ""}: ${body.message ?? "no message"}`.trim(), isRetryableStatus(res.status), res.status);
+        throw new MailError(`Resend ${res.status} ${body.name ?? ""}: ${body.message ?? "no message"}`.trim(), isRetryableStatus(res.status, body.name), res.status);
       }
       return { id: body.id };
     },

@@ -8,6 +8,7 @@ const ctx: BookingMailContext = {
   startAt: new Date("2026-11-03T04:30:00Z"), endAt: new Date("2026-11-03T05:00:00Z"),
   location: { kind: "in_person", value: "12 MG Road" }, answers: [{ questionId: "q", label: "Goal", answer: "Plan the quarter" }],
   cancelledBy: "guest", cancelReason: "Sick\nday", previousStartAt: new Date("2026-11-02T04:30:00Z"),
+  issuedAt: new Date("2026-10-11T00:00:00Z"),
   manageUrl: "https://hourhand.test/b/guest-only-manage-token", dashboardUrl: "https://hourhand.test/dashboard/bookings/b1",
 };
 const kinds: NotificationKind[] = ["booked_guest", "booked_host", "reminder_guest", "cancelled_guest", "cancelled_host", "rescheduled_guest", "rescheduled_host"];
@@ -36,6 +37,12 @@ describe("booking emails", () => {
     expect(guest.replyTo).toBe("priya@example.com");
     expect(renderBookingMail("rescheduled_guest", ctx).text).toContain("Was:");
     expect(renderBookingMail("booked_host", ctx).replyTo).toBe("kiran@example.com");
+  });
+
+  it("renders exactly the same email every time, so a retry with the same idempotency key is accepted", () => {
+    expect(renderBookingMail("booked_guest", ctx)).toEqual(renderBookingMail("booked_guest", ctx));
+    const ics = Buffer.from(renderBookingMail("booked_guest", ctx).attachments![0].content, "base64").toString("utf8");
+    expect(ics).toContain("DTSTAMP:20261011T000000Z"); // from when it was queued, not the clock at send time
   });
 
   it("puts the guest's answers to questions in the host email", () => {

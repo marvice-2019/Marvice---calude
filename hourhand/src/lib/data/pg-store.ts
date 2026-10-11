@@ -263,8 +263,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
           await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'guest', cancel_reason = 'Rescheduled' where id = $1", [bookingId]);
           const { name, email, timezone, phone, answers } = invitee;
           const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId);
-          // The old booking's reminders stop; the new one gets its own emails and reminders.
-          await client.query("update notifications set status = 'skipped', last_error = 'booking rescheduled', updated_at = now() where booking_id = $1 and status = 'queued' and kind = 'reminder_guest'", [bookingId]);
+          // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
+          await client.query("update notifications set status = 'skipped', last_error = 'booking rescheduled', updated_at = now() where booking_id = $1 and status = 'queued'", [bookingId]);
           await queueBookingNotifications(client, newId, "rescheduled", new Date());
           return newId;
         });

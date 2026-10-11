@@ -24,6 +24,8 @@ export interface BookingMailContext {
   cancelReason: string | null;
   /** For reschedules: when the booking used to be. */
   previousStartAt: Date | null;
+  /** When the email was queued. Used as the calendar file's timestamp, so a retried send has exactly the same body. */
+  issuedAt: Date;
   /** The guest's cancel / reschedule page. Only ever sent to the guest. */
   manageUrl: string;
   /** The host's view of the booking in the dashboard. */
@@ -97,7 +99,7 @@ function hostRows(c: BookingMailContext): Row[] {
 
 function calendarFile(c: BookingMailContext): Attachment {
   const ics = buildIcs({
-    uid: `${c.bookingId}@hourhand`, start: c.startAt, end: c.endAt, stamp: new Date(),
+    uid: `${c.bookingId}@hourhand`, start: c.startAt, end: c.endAt, stamp: c.issuedAt,
     summary: `${c.eventName} with ${hostLabel(c)}`, description: `Change or cancel: ${c.manageUrl}`, location: where(c), url: c.manageUrl,
   });
   return { filename: "booking.ics", content: Buffer.from(ics, "utf8").toString("base64"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" };

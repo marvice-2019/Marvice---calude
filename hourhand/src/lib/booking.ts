@@ -156,11 +156,6 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
   if (existing) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
 
-  // Checked after the repeat lookup, so a retried submit is never refused.
-  if (limit && (!limit.limiter.take(`booking-ip:${limit.clientKey}`, BOOKING_LIMITS.perIp) || !limit.limiter.take(`booking-email:${req.email.toLowerCase()}`, BOOKING_LIMITS.perEmail))) {
-    return { status: 429, body: { error: "too_many_requests" } };
-  }
-
   const questions = await store.listCustomQuestions(host.id, eventType.id);
   const missing = questions.filter((q) => q.required && !req.answers[q.id]);
   if (missing.length > 0) {
@@ -170,6 +165,11 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   // Server-side re-check: the start must be one the engine offers right now.
   const offered = await freeSlots(store, host, eventType, req.start, new Date(req.start.getTime() + MIN), now);
   if (!offered.some((s) => s.getTime() === req.start.getTime())) return slotTaken(store, host, eventType, req.start, now);
+
+  // Charged only once the request has passed every check, so a guest fixing a mistake or picking another slot isn't refused.
+  if (limit && (!limit.limiter.take(`booking-ip:${limit.clientKey}`, BOOKING_LIMITS.perIp) || !limit.limiter.take(`booking-email:${req.email.toLowerCase()}`, BOOKING_LIMITS.perEmail))) {
+    return { status: 429, body: { error: "too_many_requests" } };
+  }
 
   try {
     const booking = await store.createBooking({

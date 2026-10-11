@@ -28,8 +28,10 @@ describe("resendMailer", () => {
     expect(body.attachments).toEqual([{ filename: "booking.ics", content: "QkVHSU4=", content_type: "text/calendar" }]);
   });
 
-  it.each([[429, true], [500, true], [503, true], [409, true], [422, false], [403, false], [400, false]])("status %i is retryable: %s", async (status, retryable) => {
-    const f = fakeFetch(status, { name: "some_error", message: "nope" });
+  it.each([[429, "rate_limit_exceeded", true], [500, "application_error", true], [503, "service_unavailable", true],
+    [409, "concurrent_idempotent_requests", true], [409, "invalid_idempotent_request", false],
+    [422, "validation_error", false], [403, "validation_error", false], [400, "validation_error", false]])("status %i %s is retryable: %s", async (status, name, retryable) => {
+    const f = fakeFetch(status, { name, message: "nope" });
     const err = await resendMailer(KEY, "a@b.c", f.impl).send(mail).catch((e) => e);
     expect(err).toBeInstanceOf(MailError);
     expect(err.retryable).toBe(retryable);

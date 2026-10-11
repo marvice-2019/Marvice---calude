@@ -32,7 +32,9 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
   if (event === "cancelled") {
     now_("cancelled_guest", b.guest_email);
     if (notifyHost) now_("cancelled_host", b.host_email);
-    await db.query("update notifications set status = 'skipped', last_error = 'booking cancelled', updated_at = $2 where booking_id = $1 and status = 'queued' and kind = 'reminder_guest'", [bookingId, now]);
+    await db.query(
+      `update notifications set status = 'skipped', last_error = 'booking cancelled', updated_at = $2
+       where booking_id = $1 and status = 'queued' and kind not in ('cancelled_guest', 'cancelled_host')`, [bookingId, now]);
   } else {
     now_(event === "booked" ? "booked_guest" : "rescheduled_guest", b.guest_email);
     if (notifyHost) now_(event === "booked" ? "booked_host" : "rescheduled_host", b.host_email);

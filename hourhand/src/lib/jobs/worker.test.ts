@@ -185,6 +185,55 @@ describe.skipIf(!BASE)("email queue (TEST_DATABASE_URL)", () => {
     expect(r.map((x) => x.kind)).toEqual(["cancelled_guest"]);
   });
 
+  it("a confirmation still waiting to retry is not sent once the guest has cancelled", async () => {
+    const b = await book();
+    await processDueNotifications(pool, fakeMailer(() => new MailError("Resend 503", true, 503)).mailer, { baseUrl });
+    await store.cancelBooking(priya.id, b.id, "guest");
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl, now: new Date(Date.now() + 10 * MIN) });
+    expect(sent.map((m) => m.subject).filter((s) => !s.startsWith("Cancelled"))).toEqual([]);
+    expect((await rows(b.id)).find((x) => x.kind === "booked_guest")!.status).toBe("skipped");
+  });
+
+  it("a confirmation for a booking cancelled behind the queue's back is skipped at send time", async () => {
+    const b = await book();
+    await pool.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'host' where id = $1", [b.id]);
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl });
+    expect(sent).toHaveLength(0);
+    expect((await rows(b.id)).filter((x) => x.kind.startsWith("booked_")).every((x) => x.status === "skipped")).toBe(true);
+  });
+
+  it("moving a booking stops the old time's queued confirmation", async () => {
+    const b = await book();
+    await processDueNotifications(pool, fakeMailer(() => new MailError("Resend 503", true, 503)).mailer, { baseUrl });
+    await store.rescheduleBooking(priya.id, b.id, nextStart(), `jobs-move2-${b.id}`);
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl, now: new Date(Date.now() + 10 * MIN) });
+    expect(sent.filter((m) => m.subject.startsWith("Booked"))).toHaveLength(0);
+    expect(sent.filter((m) => m.subject.startsWith("Moved"))).toHaveLength(2);
+  });
+
+  it("a row another worker took over in the middle of a batch is left to that worker", async () => {
+    await book();
+    let first = true;
+    const { mailer, sent } = fakeMailer();
+    const stealing: Mailer = {
+      async send(m) {
+        if (first) {
+          first = false;
+          // While this worker sends its first email, another worker takes over every other row it holds.
+          await pool.query("update notifications set locked_until = locked_until + interval '1 second' where status = 'queued' and locked_until is not null");
+        }
+        return mailer.send(m);
+      },
+    };
+    const r = await processDueNotifications(pool, stealing, { baseUrl });
+    expect(r.claimed).toBe(2);
+    expect(sent).toHaveLength(1);
+    expect(r.sent).toBe(1);
+  });
+
   it("two workers running at once send each email exactly once", async () => {
     const ids = [];
     for (let i = 0; i < 6; i++) ids.push((await book()).id);

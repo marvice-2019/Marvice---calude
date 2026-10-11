@@ -65,13 +65,23 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 
 ## B3 evidence (2026-10-11, Postgres 16.15, production build)
 
-- 163 tests pass with `TEST_DATABASE_URL` set (136 without; 27 Postgres tests skip). Migration 0003 applies on top of 0002.
+- 170 tests pass with `TEST_DATABASE_URL` set (after the review fixes below). Migration 0003 applies on top of 0002.
 - **Queue, against Postgres:** a booking queues the guest confirmation, the host notice and the 24-hour and 1-hour reminders in its own transaction; due rows are sent once; reminders go out when due; a temporary failure is retried 4 times and then ends as `failed`; a permanent error fails at once; cancelling queues both cancellation emails and stops the reminders; rescheduling sends "moved" emails and stops the old reminders; closing an account emails only the guests; three workers at once send each email exactly once; a row held by a dead worker is picked up after its lease.
 - **Negative tests** (fix set aside, test fails): without `SKIP LOCKED`, the parallel-workers test sends duplicates; notifying the host on their own account closure, keeping reminders on cancel, dropping the send-time cancel check and retrying permanent errors each fail their test; removing the booking rate limit fails both limit tests.
 - **Templates:** guest input is escaped in HTML, subjects stay on one line, host emails never contain the guest's manage link, each side sees their own time zone.
 - **Resend contract:** the request carries the key, the idempotency key and Resend's field names (`reply_to`, `content_type`); 429, 409 and 5xx are retried, other 4xx are not; the key never appears in an error. Checked against Resend's API reference (send-email and errors pages, read 2026-10-11). **Not yet sent for real**: needs your `RESEND_API_KEY` and verified domain.
 - **End to end on a production build:** the runner starts with the server; a booking's confirmation reached the (log) mailer 0.2 s after the booking; the host notice, the manage link, the queue state, the guest cancellation, both cancellation emails and the skipped reminders all check out (10 of 10). Sign-in (15 of 15) and B2b (12 of 12) pass again.
 - **Booking rate limits:** 10 new bookings per client address and 5 per guest email per hour, because every booking now sends email to the address the form gives. A repeated submit is never refused.
+
+## B3 review (fresh-context reviewer)
+
+- **Fixed (medium-high):** a confirmation still waiting to retry (Resend down) went out after the guest cancelled or moved the booking, with a calendar file for a meeting that no longer existed. Now nothing but the cancellation emails goes out once a booking is no longer confirmed, checked both when cancelling or moving (queued rows are skipped) and again at send time. Negative test: without the send-time check, two tests fail.
+- **Fixed (medium):** a batch of 20 slow sends could outlive its 5-minute lease, letting a second server take rows over mid-send. Batches are now 10 and each row's lease is renewed right before its send; a row another worker took over is left alone. Negative test: without the renewal, the takeover test sends an email it no longer owns.
+- **Fixed (medium):** the calendar file's timestamp changed on every render, so a retry after a send that had actually gone through hit Resend's "same key, different body" 409, which was treated as retryable and ended as a false `failed`. The timestamp now comes from when the email was queued, that 409 is permanent, and recording "sent" no longer sits inside the send's error handling. Negative tests for both halves fail without them.
+- **Fixed (low-medium):** failed booking attempts (missing answer, slot taken) used up the booking rate limit. Only a request that passed every check is counted now. Negative test fails without it.
+- **Documented (low):** after a Resend outage longer than the ~2.6 hours of retries, failed rows can be requeued with one SQL statement (in the README); stale ones are skipped at send time.
+- **Accepted (low):** the guest's name appears in emails sent to the address the guest typed. It is escaped and kept off header lines; the booking rate limit bounds how much anyone can send this way. Without a proxy header every client shares one rate-limit bucket, which only happens when the app is reached directly instead of through Traefik.
+- After the fixes: 170 tests pass against Postgres; the production-build end-to-end run passes 10 of 10 again.
 
 ## Things only you can do (start the slow ones this week)
 

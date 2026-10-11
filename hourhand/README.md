@@ -66,9 +66,9 @@ Booking emails are queued in the `notifications` table inside the same transacti
 
 - **What is sent:** the guest's confirmation (with a calendar file) and the host's notice on booking; reminders to the guest 24 hours and 1 hour before (only those still in the future when booked); "moved" emails on a reschedule; cancellation emails to both on a cancel. When a host closes their account, only the guests are emailed.
 - **When:** a booking change wakes the runner at once; otherwise it checks every 15 seconds.
-- **Retries:** a temporary failure (rate limit, Resend outage, network) is retried after 1, 5, 30 and 120 minutes. After 5 attempts, or on a permanent error such as a rejected address, the row ends as `failed` with `last_error`. That is the dead-letter log: `select kind, recipient, last_error from notifications where status = 'failed'`.
+- **Retries:** a temporary failure (rate limit, Resend outage, network) is retried after 1, 5, 30 and 120 minutes. After 5 attempts, or on a permanent error such as a rejected address, the row ends as `failed` with `last_error`. That is the dead-letter log: `select kind, recipient, last_error from notifications where status = 'failed'`. After a long outage, send them again with `update notifications set status = 'queued', attempts = 0, send_at = now(), last_error = null where status = 'failed' and updated_at > now() - interval '1 day'`; anything no longer worth sending is skipped at send time.
 - **Never twice:** each row is claimed with `FOR UPDATE SKIP LOCKED` and a 5-minute lease, and its id is sent to Resend as the idempotency key, so several servers can run the runner and a crash mid-send does not email twice.
-- **Never stale:** a reminder for a cancelled or already-started booking, or any booking email after the meeting has ended, is skipped and recorded as `skipped` with the reason.
+- **Never stale:** once a booking is cancelled or moved, nothing but the cancellation emails goes out about it, even an email that was already waiting to retry. Reminders for a started booking, and any booking email after the meeting has ended, are skipped too, each recorded as `skipped` with the reason.
 
 ## What is fake today
 

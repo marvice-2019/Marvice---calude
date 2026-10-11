@@ -14,6 +14,8 @@ export const MAX_ATTEMPTS = 5;
 /** Wait before attempt 2, 3, 4, 5. */
 export const RETRY_DELAYS_MINUTES = [1, 5, 30, 120] as const;
 const LEASE_MINUTES = 5;
+/** Rows claimed per run. Each send is renewed before it starts, so a slow batch can't outlive its lease. */
+export const BATCH_SIZE = 10;
 const MIN = 60_000;
 
 export interface WorkerResult { claimed: number; sent: number; skipped: number; retrying: number; failed: number }
@@ -33,7 +35,7 @@ export async function claimDue(pool: pg.Pool, now: Date, limit: number): Promise
 }
 
 const CONTEXT = `
-  select n.id as notification_id, b.id, b.status, b.start_at, b.end_at, b.cancelled_by, b.cancel_reason,
+  select n.id as notification_id, n.created_at as queued_at, b.id, b.status, b.start_at, b.end_at, b.cancelled_by, b.cancel_reason,
     prev.start_at as previous_start_at,
     i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.answers, i.manage_token, i.reminders_opt_out,
     e.name as event_name,
@@ -60,6 +62,7 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
     answers: (r.answers as InviteeAnswer[]) ?? [],
     cancelledBy: (r.cancelled_by as BookingMailContext["cancelledBy"]) ?? null, cancelReason: (r.cancel_reason as string | null) ?? null,
     previousStartAt: r.previous_start_at ? new Date(r.previous_start_at as Date) : null,
+    issuedAt: new Date(r.queued_at as Date),
     manageUrl: `${baseUrl}/b/${r.manage_token as string}`, dashboardUrl: `${baseUrl}/dashboard/bookings/${r.id as string}`,
   };
 }
@@ -67,8 +70,10 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
 /** Why a claimed row should not be sent any more, or null to send it. */
 export function skipReason(kind: NotificationKind, r: ContextRow, now: Date): string | null {
   const start = new Date(r.start_at as Date);
+  const cancellation = kind === "cancelled_guest" || kind === "cancelled_host";
+  // A confirmation, reminder or "moved" email for a booking that has since been cancelled or moved would be wrong news.
+  if (!cancellation && r.status !== "confirmed") return "booking cancelled";
   if (kind === "reminder_guest") {
-    if (r.status !== "confirmed") return "booking cancelled";
     if (r.reminders_opt_out) return "guest opted out of reminders";
     if (start <= now) return "booking already started";
     return null;
@@ -80,7 +85,7 @@ export function skipReason(kind: NotificationKind, r: ContextRow, now: Date): st
 
 export async function processDueNotifications(pool: pg.Pool, mailer: Mailer, opts: { baseUrl: string; now?: Date; limit?: number }): Promise<WorkerResult> {
   const now = opts.now ?? new Date();
-  const claimed = await claimDue(pool, now, opts.limit ?? 20);
+  const claimed = await claimDue(pool, now, opts.limit ?? BATCH_SIZE);
   const result: WorkerResult = { claimed: claimed.length, sent: 0, skipped: 0, retrying: 0, failed: 0 };
   if (claimed.length === 0) return result;
 
@@ -113,11 +118,17 @@ export async function processDueNotifications(pool: pg.Pool, mailer: Mailer, opt
       result.skipped++;
       continue;
     }
+    // Renew the lease for this row only, right before sending. If another worker took the row over, leave it to them.
+    const renewed = await pool.query(
+      "update notifications set locked_until = $3 where id = $1 and locked_until = $2 returning locked_until",
+      [c.id, c.locked_until, new Date(Math.max(now.getTime(), Date.now()) + LEASE_MINUTES * MIN)]);
+    if (!renewed.rowCount) continue;
+    c.locked_until = renewed.rows[0].locked_until as Date;
+
+    let providerId: string;
     try {
       const mail = renderBookingMail(c.kind, toContext(r, opts.baseUrl));
-      const { id } = await mailer.send({ ...mail, to: c.recipient, idempotencyKey: `notification-${c.id}` });
-      await finish(c, "sent", { providerId: id });
-      result.sent++;
+      ({ id: providerId } = await mailer.send({ ...mail, to: c.recipient, idempotencyKey: `notification-${c.id}` }));
     } catch (error) {
       const retryable = error instanceof MailError ? error.retryable : true;
       const message = (error as Error).message.slice(0, 500);
@@ -133,7 +144,11 @@ export async function processDueNotifications(pool: pg.Pool, mailer: Mailer, opt
         result.retrying++;
         console.warn(`[jobs] notification ${c.id} (${c.kind}) attempt ${c.attempts} failed, retrying in ${delay} min: ${message}`);
       }
+      continue;
     }
+    // Recorded outside the send's try: a database error here must not be mistaken for a failed send and retried.
+    await finish(c, "sent", { providerId });
+    result.sent++;
   }
   return result;
 }

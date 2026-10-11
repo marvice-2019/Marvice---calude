@@ -171,6 +171,18 @@ describe("booking rate limits", () => {
     expect(repeat.status).toBe(200);
   });
 
+  it("does not count requests that fail a check, so a guest fixing a mistake is never refused", async () => {
+    const { createRateLimiter } = await import("./rate-limit");
+    const store = fresh();
+    const [slot] = await spacedSlots(store);
+    const limit = { clientKey: "203.0.113.9", limiter: createRateLimiter(() => now.getTime()) };
+    for (let i = 0; i < 12; i++) {
+      const bad = await handleCreateBooking(store, { ...good(slot, "key-fix-0001"), answers: {} }, now, limit);
+      expect(bad.status).toBe(400);
+    }
+    expect((await handleCreateBooking(store, good(slot, "key-fix-0001"), now, limit)).status).toBe(201);
+  });
+
   it("refuses a 6th booking for one guest email within the hour, from any address", async () => {
     const { createRateLimiter } = await import("./rate-limit");
     const store = fresh();

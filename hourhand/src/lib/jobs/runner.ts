@@ -2,7 +2,7 @@ import type pg from "pg";
 import { purgeClosedAccounts } from "../data/account-lifecycle";
 import type { Mailer } from "../mail/mailer";
 import { setJobKick } from "./kick";
-import { processDueNotifications } from "./worker";
+import { BATCH_SIZE, processDueNotifications } from "./worker";
 
 // The job loop: sends due email every few seconds (or at once when the data layer kicks it) and purges closed accounts
 // once an hour. Both jobs are safe to run on several servers at once.
@@ -43,7 +43,7 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
         // A full batch means more may be due: keep going until a batch comes back short.
         for (;;) {
           const r = await processDueNotifications(opts.pool, opts.mailer, { baseUrl: opts.baseUrl });
-          if (r.claimed < 20) break;
+          if (r.claimed < BATCH_SIZE) break;
         }
         if (Date.now() - lastPurge >= HOUR) {
           lastPurge = Date.now();
