@@ -17,7 +17,7 @@ export function startJobsFromEnv(env: Record<string, string | undefined> = proce
   if (!env.DATABASE_URL) throw new Error("DATABASE_URL is required for the job runner");
   const mailer = createMailer(env);
   const baseUrl = (resolveBaseUrl(env) ?? "http://localhost:3000").replace(/\/+$/, "");
-  // Google Calendar is optional; when it's configured, a missing or bad TOKEN_ENCRYPTION_KEY stops the server here.
+  // Calendars (Google, Microsoft) are optional; when one is configured, a missing or bad TOKEN_ENCRYPTION_KEY stops the server here.
   const configError = calendarConfigError(env);
   if (configError) throw new Error(configError);
   const deps = calendarDeps(env);
@@ -32,5 +32,5 @@ export function startJobsFromEnv(env: Record<string, string | undefined> = proce
     payments = null;
   }
   shared.__hourhandJobs = startJobRunner({ pool, mailer, baseUrl, calendar, payments });
-  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, Google Calendar ${calendar ? (calendar.pushAddress ? "on, instant" : "on, polling") : "off"}, booking payments ${payments ? "on" : "off"})`);
+  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, calendars ${calendar ? `${Object.keys(calendar.providers).join(" + ")} on, Google ${calendar.pushAddress ? "instant" : "polling"}` : "off"}, booking payments ${payments ? "on" : "off"})`);
 }

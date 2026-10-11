@@ -44,11 +44,11 @@ export async function saveConnection(
       if (check) room--;
       const owner = c.accessRole === "owner";
       await client.query(
-        `insert into calendars (connection_id, user_id, external_id, name, check_conflicts, is_add_to, access_role)
-         values ($1, $2, $3, $4, $5, $6, $7)
+        `insert into calendars (connection_id, user_id, external_id, name, check_conflicts, is_add_to, access_role, can_teams)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)
          on conflict (connection_id, external_id) do update set name = excluded.name, access_role = excluded.access_role,
-           is_add_to = calendars.is_add_to and excluded.access_role = 'owner', updated_at = now()`,
-        [conn.id, userId, c.id, c.name, check, c.primary && owner && !has_add_to, c.accessRole]);
+           is_add_to = calendars.is_add_to and excluded.access_role = 'owner', can_teams = excluded.can_teams, updated_at = now()`,
+        [conn.id, userId, c.id, c.name, check, c.primary && owner && !has_add_to, c.accessRole, c.teams ?? null]);
     }
     // Calendars the host no longer has in the account stop counting; their busy times go with them (cascade).
     await client.query("delete from calendars where connection_id = $1 and not (external_id = any($2::text[]))", [conn.id, calendars.map((c) => c.id)]);
