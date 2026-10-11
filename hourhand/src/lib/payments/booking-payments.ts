@@ -142,3 +142,90 @@ export async function confirmPayment(
   if (p.status !== "captured") throw new PaymentVerifyError("not_paid");
   return applyCapturedPayment(pool, input.bookingId, p.id, now);
 }
+
+/** How the reconciler reaches each host's Razorpay. Injected so tests can use fakes. */
+export interface PaymentCheckDeps {
+  authFor(hostId: string): Promise<HostRazorpayAuth | null>;
+  ordersFor(auth: HostRazorpayAuth): RazorpayOrders;
+}
+
+export interface ReconcileResult { claimed: number; confirmed: number; refundPending: number; expired: number; errors: number }
+
+interface DueRow { booking_id: string; host_id: string; provider_order_id: string; booking_status: string; hold_expires_at: Date | null; cancelled_at: Date | null }
+
+// A payment is only checked once it is a minute old and at most once a minute, so a guest still in Checkout isn't polled.
+const RECHECK_MS = 60_000;
+const LATE_PAYMENT_MS = 30 * 60_000;
+
+async function expireHold(pool: pg.Pool, bookingId: string, now: Date): Promise<boolean> {
+  return inTx(pool, async (client) => {
+    // Guarded on the status so a payment confirmed meanwhile keeps its booking.
+    const { rowCount } = await client.query(
+      `update bookings set status = 'cancelled', cancelled_at = $2, cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null
+       where id = $1 and status = 'pending_payment'`, [bookingId, now]);
+    if (!rowCount) return false;
+    await client.query("update payments set status = 'failed', updated_at = $2 where booking_id = $1 and status = 'pending'", [bookingId, now]);
+    return true;
+  });
+}
+
+/**
+ * Settles pending payments with Razorpay: guests who paid and closed the tab before we heard back, payments that were
+ * only authorized, holds that lapsed unpaid, and payments that landed after the system cancelled the booking.
+ */
+export async function reconcilePayments(deps: PaymentCheckDeps & { pool: pg.Pool }, now: Date, limit = 20): Promise<ReconcileResult> {
+  const { pool } = deps;
+  const { rows } = await pool.query<DueRow>(
+    `with due as (
+       select p.id from payments p join bookings b on b.id = p.booking_id
+       where p.provider = 'razorpay' and p.status = 'pending' and p.created_at < $1::timestamptz - $3 * interval '1 millisecond'
+         and (p.checked_at is null or p.checked_at < $1::timestamptz - $3 * interval '1 millisecond')
+         and (b.status = 'pending_payment' or (b.status = 'cancelled' and b.cancelled_by = 'system'))
+       order by p.checked_at nulls first, p.created_at
+       limit $2
+       for update of p skip locked)
+     update payments p set checked_at = $1 from due, bookings b
+     where p.id = due.id and b.id = p.booking_id
+     returning p.booking_id, p.host_id, p.provider_order_id, b.status as booking_status, b.hold_expires_at, b.cancelled_at`,
+    [now, limit, RECHECK_MS]);
+  const result: ReconcileResult = { claimed: rows.length, confirmed: 0, refundPending: 0, expired: 0, errors: 0 };
+  const count = (r: "confirmed" | "already" | "refund_pending") => {
+    if (r === "confirmed") result.confirmed += 1;
+    if (r === "refund_pending") result.refundPending += 1;
+  };
+  const holdLapsed = (row: DueRow) => row.booking_status === "pending_payment" && row.hold_expires_at !== null && row.hold_expires_at <= now;
+  const setError = (row: DueRow, message: string) =>
+    pool.query("update payments set last_error = $2, updated_at = $3 where booking_id = $1 and status = 'pending'", [row.booking_id, message.slice(0, 500), now]);
+
+  for (const row of rows) {
+    try {
+      const auth = await deps.authFor(row.host_id);
+      if (!auth) {
+        await setError(row, "Razorpay disconnected");
+        // Nobody can pay without the host's account, so a lapsed hold still frees its slot.
+        if (holdLapsed(row) && await expireHold(pool, row.booking_id, now)) result.expired += 1;
+        continue;
+      }
+      const orders = deps.ordersFor(auth);
+      const items = await orders.orderPayments(row.provider_order_id);
+      const captured = items.find((p) => p.status === "captured");
+      const authorized = items.find((p) => p.status === "authorized");
+      if (captured) {
+        count(await applyCapturedPayment(pool, row.booking_id, captured.id, now));
+      } else if (authorized) {
+        const p = await orders.capture(authorized.id, authorized.amount, authorized.currency);
+        count(await applyCapturedPayment(pool, row.booking_id, p.id, now));
+      } else if (holdLapsed(row)) {
+        if (await expireHold(pool, row.booking_id, now)) result.expired += 1;
+      } else if (row.booking_status === "cancelled" && row.cancelled_at && now.getTime() - row.cancelled_at.getTime() > LATE_PAYMENT_MS) {
+        // Long enough after the cancel that no payment is still coming.
+        await pool.query("update payments set status = 'failed', updated_at = $2 where booking_id = $1 and status = 'pending'", [row.booking_id, now]);
+      }
+    } catch (error) {
+      // One host's failing account must not stop the others; the row stays pending and is retried next round.
+      result.errors += 1;
+      await setError(row, (error as Error).message ?? String(error)).catch(() => undefined);
+    }
+  }
+  return result;
+}

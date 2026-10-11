@@ -2,14 +2,14 @@
 // dropped and recreated on every run).
 import { createHmac } from "node:crypto";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "../data/pg-store";
 import { SlotTakenError, type DataStore, type User } from "../data/types";
 import { keyPairAuth } from "./host-razorpay";
 import { razorpayOrders } from "./razorpay-orders";
-import { applyCapturedPayment, confirmPayment, PaymentStartError, PaymentVerifyError, startPaidBooking } from "./booking-payments";
+import { applyCapturedPayment, confirmPayment, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, reconcilePayments, startPaidBooking } from "./booking-payments";
 
 const BASE = process.env.TEST_DATABASE_URL;
 const auth = keyPairAuth("rzp_test_abcdefgh12", "k");
@@ -17,9 +17,9 @@ const sign = (order: string, payment: string) => createHmac("sha256", "k").updat
 
 interface FakePayment { id: string; order_id: string; amount: number; currency: string; status: string }
 
-/** Razorpay's orders and payments endpoints, enough for start and confirm. */
+/** Razorpay's orders and payments endpoints, enough for start, confirm and the reconciler. */
 function fakeRazorpay() {
-  const state = { creates: 0, failCreate: false, payments: new Map<string, FakePayment>() };
+  const state = { creates: 0, failCreate: false, failOrderPayments: false, onOrderPayments: null as null | (() => Promise<void>), payments: new Map<string, FakePayment>() };
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetchImpl = (async (url: string, init: RequestInit) => {
     const path = new URL(url).pathname;
@@ -29,6 +29,12 @@ function fakeRazorpay() {
       state.creates += 1;
       const body = JSON.parse(String(init.body));
       return json({ id: `order_${state.creates}_${Math.random().toString(36).slice(2, 8)}`, amount: body.amount, currency: body.currency, status: "created" });
+    }
+    const o = /^\/v1\/orders\/([^/]+)\/payments$/.exec(path);
+    if (o && method === "GET") {
+      if (state.failOrderPayments) return json({ error: { code: "SERVER_ERROR", description: "orders down" } }, 503);
+      await state.onOrderPayments?.();
+      return json({ items: [...state.payments.values()].filter((p) => p.order_id === decodeURIComponent(o[1])) });
     }
     const m = /^\/v1\/payments\/([^/]+)(\/capture)?$/.exec(path);
     const p = m && state.payments.get(decodeURIComponent(m[1]));
@@ -202,5 +208,97 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
     expect(await booking(r.booking.id)).toMatchObject({ status: "cancelled", cancelled_at: expect.any(Date) });
     expect((await payment(r.booking.id))[0]).toMatchObject({ status: "refund_pending", provider_payment_id: pay.id, paid_at: expect.any(Date) });
     expect(await applyCapturedPayment(pool, r.booking.id, pay.id, new Date())).toBe("refund_pending");
+  });
+  describe("reconciler", () => {
+    const later = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+    const run = (fake: ReturnType<typeof fakeRazorpay>, now: Date) =>
+      reconcilePayments({ pool, authFor: async () => auth, ordersFor: () => fake.orders }, now, 100);
+    /** A held booking whose guest never came back to our page; `pay` is what Razorpay holds for its order, if anything. */
+    async function abandoned(fake = fakeRazorpay(), o: Partial<FakePayment> | null = null) {
+      const r = await startPaidBooking({ pool, store, auth, orders: fake.orders }, input(), new Date());
+      const pay = o && { id: `pay_${Math.random().toString(36).slice(2, 10)}`, order_id: r.payment!.orderId, amount: 50_000, currency: "INR", status: "captured", ...o };
+      if (pay) fake.state.payments.set(pay.id, pay);
+      return { fake, id: r.booking.id, pay, startAt: r.booking.startAt };
+    }
+
+    // Each test counts only its own rows: settle whatever earlier tests left pending.
+    beforeEach(async () => {
+      await pool.query("update payments set status = 'failed' where status = 'pending'");
+    });
+
+    it("confirms a guest who paid and closed the tab", async () => {
+      const { fake, id, pay } = await abandoned(undefined, {});
+      expect(await run(fake, later(2))).toMatchObject({ claimed: 1, confirmed: 1, errors: 0 });
+      expect(await booking(id)).toMatchObject({ status: "confirmed", hold_expires_at: null });
+      expect((await payment(id))[0]).toMatchObject({ status: "paid", provider_payment_id: pay!.id });
+      expect(await notifications(id)).toBeGreaterThan(0);
+    });
+
+    it("captures an authorized payment and confirms", async () => {
+      const { fake, id, pay } = await abandoned(undefined, { status: "authorized" });
+      expect(await run(fake, later(2))).toMatchObject({ claimed: 1, confirmed: 1 });
+      expect(fake.state.payments.get(pay!.id)!.status).toBe("captured");
+      expect(await booking(id)).toMatchObject({ status: "confirmed" });
+    });
+
+    it("expires an unpaid hold past its time and frees the slot", async () => {
+      const { fake, id, startAt } = await abandoned();
+      expect(await run(fake, later(HOLD_MINUTES + 1))).toMatchObject({ claimed: 1, expired: 1 });
+      const { rows } = await pool.query("select status, cancelled_by, cancel_reason, hold_expires_at from bookings where id = $1", [id]);
+      expect(rows[0]).toMatchObject({ status: "cancelled", cancelled_by: "system", cancel_reason: "Payment not completed", hold_expires_at: null });
+      expect((await payment(id))[0]).toMatchObject({ status: "failed" });
+      // The hold hasn't lapsed by the database clock, so only the reconciler can have freed the slot.
+      const again = await startPaidBooking({ pool, store, auth, orders: fake.orders }, input({ startAt }), new Date());
+      expect(again.booking.status).toBe("pending_payment");
+    });
+
+    it("leaves an unpaid hold alone while it is still running", async () => {
+      const { fake, id } = await abandoned();
+      expect(await run(fake, later(2))).toMatchObject({ claimed: 1, confirmed: 0, expired: 0 });
+      await unchanged(id);
+    });
+
+    it("an expiring hold doesn't cancel a booking confirmed while Razorpay was being asked", async () => {
+      const { fake, id } = await abandoned();
+      fake.state.onOrderPayments = async () => { await applyCapturedPayment(pool, id, "pay_from_checkout", new Date()); };
+      expect(await run(fake, later(HOLD_MINUTES + 1))).toMatchObject({ claimed: 1, expired: 0 });
+      expect(await booking(id)).toMatchObject({ status: "confirmed" });
+      expect((await payment(id))[0]).toMatchObject({ status: "paid" });
+    });
+
+    it("an API error on one host leaves that row pending and still settles another host's", async () => {
+      const broken = fakeRazorpay();
+      broken.state.failOrderPayments = true;
+      const working = fakeRazorpay();
+      const arunAuth = keyPairAuth("rzp_test_arun1234ab", "k2");
+      const arun = (await store.getUserBySlug("arun"))!;
+      const arunEvent = (await store.listEventTypes(arun.id))[0].id;
+      const a = await abandoned(broken);
+      const b = await startPaidBooking({ pool, store, auth: arunAuth, orders: working.orders }, { ...input(), eventTypeId: arunEvent }, new Date());
+      const pay = { id: "pay_arun_1", order_id: b.payment!.orderId, amount: 50_000, currency: "INR", status: "captured" };
+      working.state.payments.set(pay.id, pay);
+      const r = await reconcilePayments({ pool, authFor: async (hostId) => (hostId === arun.id ? arunAuth : auth), ordersFor: (x) => (x === arunAuth ? working.orders : broken.orders) }, later(2));
+      expect(r).toMatchObject({ claimed: 2, confirmed: 1, errors: 1 });
+      expect((await payment(a.id))[0]).toMatchObject({ status: "pending", last_error: expect.stringContaining("orders down") });
+      expect(await booking(b.booking.id)).toMatchObject({ status: "confirmed" });
+    });
+
+    it("a payment captured after the system cancelled the booking is marked for refund", async () => {
+      const { fake, id, pay } = await abandoned(undefined, {});
+      await pool.query(`update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null
+        where id = $1`, [id]);
+      expect(await run(fake, later(2))).toMatchObject({ claimed: 1, refundPending: 1 });
+      expect(await booking(id)).toMatchObject({ status: "cancelled" });
+      expect((await payment(id))[0]).toMatchObject({ status: "refund_pending", provider_payment_id: pay!.id });
+    });
+
+    it("doesn't check a payment again within a minute", async () => {
+      const { fake, id } = await abandoned();
+      const first = later(2);
+      expect(await run(fake, first)).toMatchObject({ claimed: 1 });
+      expect(await run(fake, new Date(first.getTime() + 30_000))).toMatchObject({ claimed: 0 });
+      expect(await run(fake, new Date(first.getTime() + 61_000))).toMatchObject({ claimed: 1 });
+      await unchanged(id);
+    });
   });
 });
