@@ -1,0 +1,177 @@
+diff --git a/app/agents/[agent_id]/[conversation_id]/page.js b/app/agents/[agent_id]/[conversation_id]/page.js
+index ac6cb91..f35ea01 100644
+--- a/app/agents/[agent_id]/[conversation_id]/page.js
++++ b/app/agents/[agent_id]/[conversation_id]/page.js
+@@ -1,5 +1,6 @@
+ import { cookies } from "next/headers";
+ import AgentChatClient from "../AgentChatClient";
++import { resolveApiKey } from '@/lib/serverKey';
+ 
+ /**
+  * Server component — fetches both agentDetails and initialHistory
+@@ -91,7 +92,7 @@ async function fetchUserData(apiKey) {
+ export default async function AgentConversationPage({ params }) {
+   const { agent_id, conversation_id } = await params;
+   const cookieStore = await cookies();
+-  const apiKey = cookieStore.get("muapi_key")?.value;
++  const apiKey = resolveApiKey(cookieStore.get("muapi_key")?.value);
+ 
+   console.log(`[ConvPage] Loading for agent: ${agent_id}, conv: ${conversation_id}, hasKey: ${!!apiKey}`);
+ 
+diff --git a/app/agents/[agent_id]/page.js b/app/agents/[agent_id]/page.js
+index 06090e9..eb0f9aa 100644
+--- a/app/agents/[agent_id]/page.js
++++ b/app/agents/[agent_id]/page.js
+@@ -1,5 +1,6 @@
+ import { cookies } from "next/headers";
+ import AgentChatClient from "./AgentChatClient";
++import { resolveApiKey } from '@/lib/serverKey';
+ 
+ /**
+  * Server component — fetches agentDetails from the /api/agents proxy
+@@ -70,7 +71,7 @@ async function fetchUserData(apiKey) {
+ export default async function AgentPage({ params }) {
+   const { agent_id } = await params;
+   const cookieStore = await cookies();
+-  const apiKey = cookieStore.get("muapi_key")?.value;
++  const apiKey = resolveApiKey(cookieStore.get("muapi_key")?.value);
+ 
+   console.log(`[AgentPage] Loading page for agent: ${agent_id}, hasKey: ${!!apiKey}`);
+ 
+diff --git a/app/agents/create/page.js b/app/agents/create/page.js
+index 8b2c948..e6c473b 100644
+--- a/app/agents/create/page.js
++++ b/app/agents/create/page.js
+@@ -1,5 +1,6 @@
+ import { cookies } from "next/headers";
+ import AgentCreateClient from "./AgentCreateClient";
++import { resolveApiKey } from '@/lib/serverKey';
+ 
+ const BASE_URL = 'https://api.muapi.ai';
+ 
+@@ -19,7 +20,7 @@ async function fetchUserData(apiKey) {
+ 
+ export default async function CreateAgentPage() {
+   const cookieStore = await cookies();
+-  const apiKey = cookieStore.get("muapi_key")?.value;
++  const apiKey = resolveApiKey(cookieStore.get("muapi_key")?.value);
+ 
+   const userData = await fetchUserData(apiKey);
+ 
+diff --git a/app/agents/edit/[id]/page.js b/app/agents/edit/[id]/page.js
+index 553a635..7646d77 100644
+--- a/app/agents/edit/[id]/page.js
++++ b/app/agents/edit/[id]/page.js
+@@ -1,5 +1,6 @@
+ import { cookies } from "next/headers";
+ import AgentEditClient from "./AgentEditClient";
++import { resolveApiKey } from '@/lib/serverKey';
+ 
+ const BASE_URL = 'https://api.muapi.ai';
+ 
+@@ -20,7 +21,7 @@ async function fetchUserData(apiKey) {
+ export default async function EditAgentPage({ params }) {
+   const { id } = await params; // although we don't use id on server here, it's used by useParams in client
+   const cookieStore = await cookies();
+-  const apiKey = cookieStore.get("muapi_key")?.value;
++  const apiKey = resolveApiKey(cookieStore.get("muapi_key")?.value);
+ 
+   const userData = await fetchUserData(apiKey);
+ 
+diff --git a/app/layout.js b/app/layout.js
+index 6423b6c..697bbfe 100644
+--- a/app/layout.js
++++ b/app/layout.js
+@@ -2,6 +2,7 @@ import './globals.css';
+ import { Inter } from "next/font/google";
+ import { headers } from 'next/headers';
+ import { getLocaleConfig } from '@/lib/locales';
++import { hasServerKey, SERVER_KEY_PLACEHOLDER } from '@/lib/serverKey';
+ 
+ const inter = Inter({
+   variable: "--font-inter",
+@@ -22,7 +23,17 @@ export default async function RootLayout({ children }) {
+ 
+   return (
+     <html lang={htmlLang}>
+-      <body className={inter.variable}>{children}</body>
++      <body className={inter.variable}>
++        {hasServerKey() && (
++          // Marvice: the server holds the MuAPI key, so skip the key prompt by storing a placeholder.
++          <script
++            dangerouslySetInnerHTML={{
++              __html: `try{if(!localStorage.getItem('muapi_key')){localStorage.setItem('muapi_key','${SERVER_KEY_PLACEHOLDER}');document.cookie='muapi_key=${SERVER_KEY_PLACEHOLDER}; path=/; max-age=31536000; SameSite=Lax'}}catch(e){}`,
++            }}
++          />
++        )}
++        {children}
++      </body>
+     </html>
+   );
+ }
+diff --git a/lib/serverKey.js b/lib/serverKey.js
+new file mode 100644
+index 0000000..e966557
+--- /dev/null
++++ b/lib/serverKey.js
+@@ -0,0 +1,16 @@
++// Marvice: optional server-side MuAPI key (MUAPI_API_KEY).
++// When it is set, the browser stores the placeholder SERVER_KEY_PLACEHOLDER
++// instead of a real key, and every /api/* request (and the server-rendered agent
++// pages) swaps it for the real key here, so the key never reaches the browser.
++// A browser that saved its own key keeps using it.
++export const SERVER_KEY_PLACEHOLDER = 'server-managed';
++
++export function hasServerKey() {
++    return Boolean(process.env.MUAPI_API_KEY);
++}
++
++export function resolveApiKey(clientKey) {
++    const serverKey = process.env.MUAPI_API_KEY;
++    if (serverKey && (!clientKey || clientKey === SERVER_KEY_PLACEHOLDER)) return serverKey;
++    return clientKey || null;
++}
+diff --git a/middleware.js b/middleware.js
+index 63ceb57..7a8b183 100644
+--- a/middleware.js
++++ b/middleware.js
+@@ -1,5 +1,6 @@
+ import { NextResponse } from 'next/server';
+ import { getLocaleFromPathname } from './lib/locales';
++import { hasServerKey, resolveApiKey } from './lib/serverKey';
+ 
+ function addSecurityHeaders(response) {
+     // Prevent MIME type sniffing (CWE-693)
+@@ -24,6 +25,14 @@ function addSecurityHeaders(response) {
+ export function middleware(request) {
+     const url = request.nextUrl;
+ 
++    // Marvice: put the server-side MuAPI key on proxied API calls (see lib/serverKey.js).
++    let requestHeaders;
++    if (hasServerKey() && url.pathname.startsWith('/api/')) {
++        requestHeaders = new Headers(request.headers);
++        requestHeaders.set('x-api-key', resolveApiKey(request.headers.get('x-api-key')));
++    }
++    const forward = requestHeaders ? { request: { headers: requestHeaders } } : undefined;
++
+     // Catch requests to /api/workflow, /api/app, and /api/v1
+     const isMuApi = url.pathname.startsWith('/api/workflow') ||
+                     url.pathname.startsWith('/api/app') ||
+@@ -37,7 +46,7 @@ export function middleware(request) {
+ 
+         if (url.pathname.startsWith('/api/v1') && !isHandledByRoute) {
+             const targetUrl = new URL(url.pathname + url.search, 'https://api.muapi.ai');
+-            const rewriteResponse = NextResponse.rewrite(targetUrl);
++            const rewriteResponse = NextResponse.rewrite(targetUrl, forward);
+             return addSecurityHeaders(rewriteResponse);
+         }
+     }
+@@ -45,7 +54,7 @@ export function middleware(request) {
+     // Plain response header carrying the locale derived from the URL path
+     // (same "set in middleware, read via headers() in the root layout"
+     // trick the main muapi client uses — see docs/localization.md).
+-    const response = NextResponse.next();
++    const response = NextResponse.next(forward);
+     response.headers.set('x-locale', getLocaleFromPathname(url.pathname));
+     return addSecurityHeaders(response);
+ }

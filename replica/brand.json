@@ -1,0 +1,15 @@
+{
+  "name": "Hourhand",
+  "avoid": [
+    "Calendly",
+    "Calendly, LLC"
+  ],
+  "domains": [
+    "calendly.com"
+  ],
+  "colors": [
+    "#006bff",
+    "#0ae8f0"
+  ],
+  "_notes": "#006bff is Calendly's primary blue. #0ae8f0 is taken from sweep.py's own example and has not been checked against Calendly's brand guidelines."
+}

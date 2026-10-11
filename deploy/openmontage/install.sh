@@ -37,9 +37,9 @@ apt-get update
 apt-get install -y git make ffmpeg python3 python3-venv python3-pip curl ca-certificates apache2-utils
 [ "$MODE" = nginx ] && apt-get install -y nginx certbot python3-certbot-nginx
 
-if ! command -v node >/dev/null || [ "$(node -v | sed 's/v\([0-9]*\).*/\1/')" -lt 18 ]; then
-  echo "==> Node.js 20"
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+if ! command -v node >/dev/null || [ "$(node -v | sed 's/v\([0-9]*\).*/\1/')" -lt 22 ]; then
+  echo "==> Node.js 22"
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
 fi
 

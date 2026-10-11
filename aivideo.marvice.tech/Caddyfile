@@ -1,0 +1,9 @@
+:8080 {
+	basic_auth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+	# Backlot pushes live updates over Server-Sent Events
+	reverse_proxy openmontage:4750 {
+		flush_interval -1
+	}
+}

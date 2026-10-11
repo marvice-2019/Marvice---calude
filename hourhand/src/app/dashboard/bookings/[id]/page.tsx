@@ -1,0 +1,152 @@
+import { randomUUID } from "node:crypto";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { freeSlots } from "@/lib/booking";
+import { store } from "@/lib/data";
+import { authEnabled } from "@/lib/auth/auth";
+import { requireUser } from "@/lib/auth/session";
+import { formatMoney } from "@/lib/billing/plans";
+import { formatDate, formatTime, zoneName } from "@/lib/format";
+import { getPool } from "@/lib/data/pg-store";
+import { bookingPayment, type BookingPaymentSummary } from "@/lib/payments/booking-payments";
+import { cancelAsHost, rescheduleAsHost, setNoShow } from "./actions";
+
+const PAYMENT_WORDS: Record<BookingPaymentSummary["status"], string> = {
+  pending: "waiting for the guest to pay", paid: "paid to your Razorpay account", failed: "not completed",
+  refund_pending: "being refunded", refunded: "refunded to the guest",
+};
+
+const DONE: Record<string, string> = {
+  cancelled: "Booking cancelled. We've emailed the guest, and a paid booking is refunded in full.",
+  rescheduled: "Booking moved. We've emailed the guest the new time.",
+  no_show: "Marked as a no-show.",
+  no_show_undone: "No-show undone.",
+};
+const ERRORS: Record<string, string> = {
+  not_found: "That booking isn't one of yours, or it no longer exists.",
+  reason_too_long: "Keep the reason under 500 characters.",
+  not_cancellable: "Only upcoming confirmed bookings can be cancelled.",
+  slot_taken: "That time was just taken. Pick another.",
+  not_movable: "This booking can't be moved. Only upcoming confirmed bookings can.",
+  bad_time: "That time didn't come through. Pick one from the list.",
+  not_started: "You can mark a no-show once the booking has started.",
+};
+const DAY = 86_400_000;
+
+export const dynamic = "force-dynamic";
+
+type Query = { done?: string; error?: string; confirm?: string; reschedule?: string };
+
+export default async function BookingDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Query> }) {
+  const { id } = await params;
+  const query = await searchParams;
+  const user = await requireUser();
+  const booking = await store.getBooking(user.id, id);
+  if (!booking) notFound();
+  const now = new Date();
+  const tz = user.timezone;
+  const confirmed = booking.status === "confirmed";
+  const upcoming = confirmed && booking.startAt > now;
+  const started = confirmed && booking.startAt <= now;
+  // Next 14 days of times the host is free, not counting this booking's own slot, grouped by day in the host's zone.
+  const eventType = upcoming && query.reschedule ? await store.getEventType(user.id, booking.eventTypeId) : null;
+  const slots = eventType ? await freeSlots(store, user, eventType, now, new Date(now.getTime() + 14 * DAY), now, booking.id) : [];
+  const byDay = new Map<string, Date[]>();
+  for (const s of slots) byDay.set(formatDate(s, tz), [...(byDay.get(formatDate(s, tz)) ?? []), s]);
+  const key = randomUUID();
+  const done = query.done && Object.hasOwn(DONE, query.done) ? DONE[query.done] : null;
+  const error = query.error && Object.hasOwn(ERRORS, query.error) ? ERRORS[query.error] : null;
+  const payment = authEnabled() ? await bookingPayment(getPool(process.env.DATABASE_URL as string), user.id, booking.id) : null;
+  return (
+    <div>
+      <h1 className="font-display text-xl text-text">Booking with {booking.invitee.name}</h1>
+      {done && <p role="status" className="mt-4 max-w-xl text-success">{done}</p>}
+      {error && <p role="alert" className="mt-4 rounded-md bg-danger-bg p-3 text-sm text-danger">{error}</p>}
+      <dl className="mt-4 grid max-w-md gap-3">
+        <div>
+          <dt className="text-sm text-text-muted">When</dt>
+          <dd className="text-text">
+            {formatDate(booking.startAt, tz)}, {formatTime(booking.startAt, tz)} ({zoneName(tz)})
+            {booking.status === "cancelled" && <span className="ml-2 rounded-md bg-danger-bg px-2 py-0.5 text-sm text-danger">Cancelled</span>}
+            {booking.status === "pending_payment" && <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">Awaiting payment</span>}
+            {booking.invitee.noShowAt && <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">No-show</span>}
+          </dd>
+        </div>
+        <div><dt className="text-sm text-text-muted">Email</dt><dd className="text-text">{booking.invitee.email}</dd></div>
+        {payment && (
+          <div>
+            <dt className="text-sm text-text-muted">Payment</dt>
+            <dd className="text-text">
+              {formatMoney(payment.amountMinor, "INR")}, {PAYMENT_WORDS[payment.status]}
+              {payment.status === "refund_pending" && payment.lastError && (
+                <span className="block text-sm text-danger">Razorpay hasn&apos;t accepted the refund yet ({payment.lastError.slice(0, 120)}). Hourhand keeps retrying; check your Razorpay balance.</span>
+              )}
+            </dd>
+          </div>
+        )}
+        {booking.invitee.phone && <div><dt className="text-sm text-text-muted">Phone</dt><dd className="text-text">{booking.invitee.phone}</dd></div>}
+        {booking.invitee.answers.map((a) => (
+          <div key={a.questionId}><dt className="text-sm text-text-muted">{a.label}</dt><dd className="whitespace-pre-line text-text">{a.answer}</dd></div>
+        ))}
+      </dl>
+      {upcoming && (
+        <section aria-labelledby="actions" className="mt-6 grid max-w-xl gap-4">
+          <h2 id="actions" className="font-display text-lg text-text">Change this booking</h2>
+          {query.confirm === "cancel" ? (
+            <form action={cancelAsHost} className="grid gap-2">
+              <input type="hidden" name="bookingId" value={booking.id} />
+              <label htmlFor="reason" className="text-sm text-text-muted">Reason for {booking.invitee.name} (optional)</label>
+              <textarea id="reason" name="reason" maxLength={500} rows={3} className="rounded-md border border-border bg-card p-2 text-text" />
+              <p className="text-sm text-text-muted">We&apos;ll email {booking.invitee.name} that you cancelled. A paid booking is refunded in full.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant="danger">Yes, cancel</Button>
+                <Link href={`/dashboard/bookings/${booking.id}`} className="inline-flex min-h-11 items-center font-semibold text-accent underline">Keep it</Link>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap gap-4">
+              <Link href={`/dashboard/bookings/${booking.id}?confirm=cancel`} className="inline-flex min-h-11 items-center font-semibold text-danger underline">Cancel booking</Link>
+              <Link href={`/dashboard/bookings/${booking.id}?reschedule=1`} className="inline-flex min-h-11 items-center font-semibold text-accent underline">Move to another time</Link>
+            </div>
+          )}
+          {query.reschedule && (
+            <div>
+              <h3 className="font-semibold text-text">Pick a new time ({zoneName(tz)})</h3>
+              {byDay.size === 0 ? (
+                <p className="mt-2 text-text-muted">No free times in the next 14 days.</p>
+              ) : (
+                [...byDay].map(([day, times]) => (
+                  <div key={day} className="mt-3">
+                    <h4 className="text-sm text-text-muted">{day}</h4>
+                    <ul className="mt-1 flex flex-wrap gap-2">
+                      {times.map((t) => (
+                        <li key={t.toISOString()}>
+                          <form action={rescheduleAsHost}>
+                            <input type="hidden" name="bookingId" value={booking.id} />
+                            <input type="hidden" name="start" value={t.toISOString()} />
+                            {/* One key per time: clicking a second time on a stale page is refused instead of silently repeating the first move. */}
+                            <input type="hidden" name="key" value={`${key}:${t.toISOString()}`} />
+                            <Button type="submit" variant="secondary">{formatTime(t, tz)}</Button>
+                          </form>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </section>
+      )}
+      {started && (
+        <form action={setNoShow} className="mt-6">
+          <input type="hidden" name="bookingId" value={booking.id} />
+          <input type="hidden" name="on" value={booking.invitee.noShowAt ? "0" : "1"} />
+          <Button type="submit" variant="secondary">{booking.invitee.noShowAt ? "Undo no-show" : "Mark as no-show"}</Button>
+        </form>
+      )}
+      <Link href="/dashboard/bookings" className="mt-4 inline-flex min-h-11 items-center font-semibold text-accent underline">Back to bookings</Link>
+    </div>
+  );
+}

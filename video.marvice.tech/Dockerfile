@@ -28,6 +28,11 @@ RUN npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path /r
     && npm install -g hyperframes@${HYPERFRAMES_VERSION} \
     && npm cache clean --force
 
+# Rebrand the Studio UI as "Marvice Editor Studio" (logo, colours, title, favicon).
+COPY studio-brand /app/studio-brand
+COPY creator/public/marvice-logo.svg creator/public/marvice-mark.svg /app/studio-brand/
+RUN node /app/studio-brand/brand.mjs "$(npm root -g)/hyperframes/dist/studio" /app/studio-brand
+
 # Prompt-to-video creator (served at /create); same image, started with `creator`.
 COPY creator/package.json creator/package-lock.json /app/creator/
 RUN cd /app/creator && npm ci --omit=dev && npm cache clean --force
