@@ -1,6 +1,6 @@
 // Hourhand's emails. Every message has a plain-text and an HTML version with the same content.
 import type { InviteeAnswer, LocationKind } from "../data/types";
-import type { NotificationKind } from "../data/notifications";
+import type { BookingEmailKind } from "../data/notifications";
 import { formatDate, formatTime, zoneName, type HourCycle } from "../format";
 import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { buildIcs } from "./ics";
@@ -19,6 +19,8 @@ export interface BookingMailContext {
   startAt: Date;
   endAt: Date;
   location: { kind: LocationKind; value: string | null } | null;
+  /** The video link from the host's calendar event (Google Meet), when there is one. */
+  joinUrl: string | null;
   answers: InviteeAnswer[];
   cancelledBy: "host" | "guest" | "system" | null;
   cancelReason: string | null;
@@ -48,6 +50,7 @@ const hostLabel = (c: BookingMailContext) => c.hostName || c.hostEmail;
 function where(c: BookingMailContext): string | null {
   if (!c.location) return null;
   const label = GUEST_LOCATION_LABELS[c.location.kind];
+  if (c.joinUrl) return `${label}: ${c.joinUrl}`;
   return c.location.value ? `${label}: ${c.location.value}` : label;
 }
 
@@ -114,7 +117,7 @@ function cancelNote(c: BookingMailContext): string | undefined {
   return c.cancelReason ? `Reason given: ${c.cancelReason}` : undefined;
 }
 
-export function renderBookingMail(kind: NotificationKind, c: BookingMailContext): RenderedMail {
+export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext): RenderedMail {
   const host = hostLabel(c);
   switch (kind) {
     case "booked_guest":
@@ -156,6 +159,19 @@ export function renderBookingMail(kind: NotificationKind, c: BookingMailContext)
         link: dashboardLink(c), footer: hostFooter,
       }, { replyTo: c.guestEmail });
   }
+}
+
+/** Tells a host their calendar connection is failing, so Hourhand has stopped offering times. Sent once per outage. */
+export function renderCalendarAlert(a: { accountEmail: string; disconnected: boolean; lastError: string | null; calendarsUrl: string }): RenderedMail {
+  return render(a.disconnected ? "Reconnect your Google Calendar" : "Hourhand can't read your Google Calendar", {
+    heading: a.disconnected ? "Your calendar is disconnected" : "Your calendar isn't syncing",
+    intro: a.disconnected
+      ? `Google no longer lets Hourhand use ${a.accountEmail}. Until you reconnect it, your booking pages show no times, so nobody can book over your meetings.`
+      : `Hourhand hasn't been able to read ${a.accountEmail} for a few minutes. Until it can, your booking pages show no times, so nobody can book over your meetings. It keeps retrying.`,
+    rows: a.lastError ? [["Last error", a.lastError.slice(0, 200)]] : [],
+    link: { label: a.disconnected ? "Reconnect your calendar" : "Check your calendars", url: a.calendarsUrl },
+    footer: "Sent by Hourhand about your booking page.",
+  });
 }
 
 export function renderMagicLink(url: string): RenderedMail {

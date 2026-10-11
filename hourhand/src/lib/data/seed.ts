@@ -50,7 +50,7 @@ export function buildSeed(now: Date): Seed {
     { id: "con_google", userId: priya.id, provider: "google", accountEmail: "priya.raman@example.in", status: "ok", lastSyncedAt: new Date(now.getTime() - 2 * MIN), lastError: null },
   ];
   const calendars: Calendar[] = [
-    { id: "cal_work", connectionId: "con_google", userId: priya.id, name: "Work", checkConflicts: true, isAddTo: true },
+    { id: "cal_work", connectionId: "con_google", userId: priya.id, name: "Work", checkConflicts: true, isAddTo: true, canWrite: true },
   ];
   const busyBlocks: BusyBlock[] = [
     { id: "busy_1", calendarId: "cal_work", userId: priya.id, start: at(0, 16), end: at(0, 17) },
@@ -64,7 +64,7 @@ export function buildSeed(now: Date): Seed {
       id, eventTypeId: et.id, hostId: priya.id, startAt: start, endAt: end,
       bufferedStart: new Date(start.getTime() - et.bufferBeforeMinutes * MIN),
       bufferedEnd: new Date(end.getTime() + et.bufferAfterMinutes * MIN),
-      status: cancelled ? "cancelled" : "confirmed", locationKind: et.id === "evt_coaching" ? "google_meet" : null,
+      status: cancelled ? "cancelled" : "confirmed", locationKind: et.id === "evt_coaching" ? "google_meet" : null, joinUrl: null,
       idempotencyKey: `seed-${id}`, cancelledAt: cancelled ? now : null, cancelledBy: cancelled ? "guest" : null,
       cancelReason: cancelled ? "Travelling that week." : null, rescheduledFromId: null, createdAt: now,
       invitee: { id: `inv_${id}`, bookingId: id, hostId: priya.id, name: guest[0], email: guest[1], timezone: guest[2], phone: null, answers: [], manageToken: `tok_${id}` },

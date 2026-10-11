@@ -65,6 +65,8 @@ describe.skipIf(!BASE)("email queue (TEST_DATABASE_URL)", () => {
     store = createPgStore(pool);
     priya = (await store.getUserBySlug("priya"))!;
     coaching = (await store.listEventTypes(priya.id)).find((e) => e.slug === "coaching")!;
+    // These tests are about email alone; the calendar suite covers bookings for a host with a connected calendar.
+    await pool.query("delete from calendar_connections");
   });
 
   afterAll(async () => {
