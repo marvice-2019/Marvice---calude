@@ -40,7 +40,9 @@ describe("DRV-03 sign in with OTP", () => {
 });
 
 describe("DRV-01 search", () => {
-  const url = (extra = "") => `/v1/lots/search?lat=12.9757&lng=77.6066&from=${encodeURIComponent(iso(3_600_000))}&to=${encodeURIComponent(iso(4 * 3_600_000))}${extra}`;
+  // One base instant: two separate iso() calls can straddle a millisecond and bill a 4th started hour.
+  const url = (extra = "") => { const t = Date.now(), at = (ms: number) => encodeURIComponent(new Date(t + ms).toISOString());
+    return `/v1/lots/search?lat=12.9757&lng=77.6066&from=${at(3_600_000)}&to=${at(4 * 3_600_000)}${extra}`; };
   it("returns lots within 3 km nearest first, with code, quote and spots left", async () => {
     const r = await ctx.app.inject({ method: "GET", url: url() });
     expect(r.statusCode).toBe(200);
@@ -48,6 +50,7 @@ describe("DRV-01 search", () => {
     expect(rows.map((x: any) => x.lot.code)).toEqual(["BLR101", "BLR103", "BLR102"]);
     expect(rows[0].quote.totalPaise).toBe(15_930);
     expect(rows[0].spots_left).toBe(20);
+    expect(rows[0].lot).toMatchObject({ lat: 12.9757, lng: 77.6066 }); // web map plots true positions
   });
   it("sorts by price and hides closed lots", async () => {
     await ctx.db.query("UPDATE lots SET status = 'closed' WHERE id = $1", [s.lot2]);
@@ -98,5 +101,21 @@ describe("DRV-09 lot code lookup and OWN-01 lead", () => {
     const r = await ctx.app.inject({ method: "POST", url: "/v1/leads/owners", payload: { name: "Asha", phone: "9845012345", address: "Koramangala 5th Block", bays: 30 } });
     expect(r.statusCode).toBe(201);
     expect((await ctx.db.query("SELECT bays FROM owner_leads")).rows[0].bays).toBe(30);
+  });
+});
+
+describe("MON-01 monthly lots (S06)", () => {
+  it("lists nearby lots that offer monthly passes, with price and GST", async () => {
+    await ctx.db.query("UPDATE lot_rates SET monthly_paise = NULL WHERE lot_id = $1", [s.lot2]);
+    const r = await ctx.app.inject({ method: "GET", url: "/v1/lots/monthly?lat=12.9757&lng=77.6066" });
+    expect(r.statusCode).toBe(200);
+    const rows = r.json();
+    const mg = rows.find((x: any) => x.lot.id === s.lot);
+    expect(mg).toMatchObject({ monthly_paise: 420000, gst_paise: 75600, total_paise: 495600 });
+    expect(rows.some((x: any) => x.lot.id === s.lot2)).toBe(false);
+    expect(rows[0].distance_m).toBeLessThanOrEqual(rows[rows.length - 1].distance_m);
+  });
+  it("rejects a missing location", async () => {
+    expect((await ctx.app.inject({ method: "GET", url: "/v1/lots/monthly" })).statusCode).toBe(400);
   });
 });

@@ -30,6 +30,14 @@ With `RAZORPAY_KEY_ID` unset, the API uses a built-in fake gateway. Production r
 | `PLATFORM_FEE_PAISE` / `COMMISSION_BPS` / `TDS_BPS` | no | 1500 / 1500 / 100; confirm TDS with a CA |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_SCALE` | no | global per-IP limit per minute / multiplier for per-route limits (keep 1 in production) |
 
+## Sample data
+
+`seed/dev-seed.sql` loads 8 sample Bengaluru lots (codes BLR101–BLR108, the prototype's prices) and the FIRST50 and WEEKEND20 promos. It can be re-run safely. It is for development and the web e2e suite; never load it into production.
+
+```bash
+psql "$DATABASE_URL" -f seed/dev-seed.sql
+```
+
 ## Tests
 
 They need a Postgres 16 + PostGIS server; set `TEST_PG_URL` to its admin database (default `postgres://postgres@127.0.0.1:54329/postgres`). The global setup builds a migrated template database, and each test file gets its own copy.
@@ -56,6 +64,7 @@ npm run build && npm test
 | DRV-12 | bookings › DRV-12 cancel |
 | DRV-13, OPS-01, OPS-02 | ops-admin › check in / check out with overstay |
 | MON-01, MON-02, MON-03 | me-monthly › MON-01..03 monthly passes |
+| MON-01 (S06 lot list) | auth-public › MON-01 monthly lots (S06) |
 | OPS-03 | ops-admin › OPS-03 rate cards |
 | OPS-04 | ops-admin › OPS-04 lot status |
 | OPS-05 | ops-admin › OPS-05 dashboard and payouts |

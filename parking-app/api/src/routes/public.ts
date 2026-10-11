@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Deps } from "../app.js";
 import { HttpError, IsoDate, parse, Phone10, Uuid } from "../http.js";
+import { gstOn } from "../pricing.js";
 import { promoFor, quoteFor, spotsLeft, type VehicleKind } from "../services.js";
 
 const Vehicle = z.enum(["car", "bike", "ev_car", "suv"]).default("car");
@@ -20,6 +21,7 @@ export function publicRoutes(app: FastifyInstance, deps: Deps) {
     }).and(Range), req.query);
     const { rows } = await deps.db.query(
       `SELECT l.id, l.name, l.code, l.address, l.kind, l.covered, l.ev_chargers, l.open_24h, l.status,
+              ST_Y(l.geo::geometry) AS lat, ST_X(l.geo::geometry) AS lng,
               ST_Distance(l.geo, ST_MakePoint($2, $1)::geography)::int AS distance_m
        FROM lots l
        WHERE l.is_live AND l.status <> 'closed' AND ST_DWithin(l.geo, ST_MakePoint($2, $1)::geography, 3000)
@@ -34,6 +36,22 @@ export function publicRoutes(app: FastifyInstance, deps: Deps) {
     const key = { dist: (a: any, b: any) => a.distance_m - b.distance_m, price: (a: any, b: any) => a.quote.totalPaise - b.quote.totalPaise,
       left: (a: any, b: any) => b.spots_left - a.spots_left }[q.sort];
     return out.sort(key);
+  });
+
+  // MON-01 / S06: nearby lots that sell monthly passes (car rate card in force today), with GST shown separately.
+  app.get("/v1/lots/monthly", { config: { rateLimit: { max: 60 * deps.cfg.RATE_LIMIT_SCALE, timeWindow: "1 minute" } } }, async (req) => {
+    const q = parse(z.object({ lat: z.coerce.number().min(-90).max(90), lng: z.coerce.number().min(-180).max(180) }), req.query);
+    const { rows } = await deps.db.query(
+      `SELECT l.id, l.name, l.code, l.address, l.kind, l.covered, l.open_24h, l.opens_at, l.closes_at,
+              ST_Distance(l.geo, ST_MakePoint($2, $1)::geography)::int AS distance_m, r.monthly_paise
+       FROM lots l JOIN lot_rates r ON r.lot_id = l.id AND r.vehicle = 'car' AND r.valid @> now()
+       WHERE l.is_live AND l.status <> 'closed' AND r.monthly_paise IS NOT NULL
+         AND ST_DWithin(l.geo, ST_MakePoint($2, $1)::geography, 3000)
+       ORDER BY distance_m LIMIT 30`, [q.lat, q.lng]);
+    return rows.map(({ monthly_paise, distance_m, ...lot }) => {
+      const gst_paise = gstOn(monthly_paise);
+      return { lot, distance_m, monthly_paise, gst_paise, total_paise: monthly_paise + gst_paise };
+    });
   });
 
   // DRV-09: Park now looks up the code printed on the entrance board.

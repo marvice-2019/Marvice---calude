@@ -182,8 +182,9 @@ Base path `/v1`. JSON throughout, with zod validation. Money is in paise. Every 
 | POST | /auth/otp | public | `{phone}` | `{sent:true}` | 400 bad phone, 429 | – | DRV-03 |
 | POST | /auth/verify | public | `{phone, otp}` | `{access, refresh, user}` | 401 wrong OTP | – | DRV-03, GST-01, GST-02 |
 | POST | /auth/refresh | refresh | `{refresh}` | `{access}` | 401 | – | DRV-03 |
-| GET | /lots/search | public | `?lat&lng&from&to&vehicle&sort` | `[{lot, distance_m, quote}]` | 400 invalid range | – | DRV-01 |
+| GET | /lots/search | public | `?lat&lng&from&to&vehicle&sort` | `[{lot (incl. lat, lng), distance_m, quote, spots_left}]` | 400 invalid range | – | DRV-01 |
 | GET | /lots/by-code/:code | public | – | `{lot}` | 404 | – | DRV-09 |
+| GET | /lots/monthly | public | `?lat&lng` | `[{lot, distance_m, monthly_paise, gst_paise, total_paise}]` | 400 | – | MON-01 (S06; added in stage 5) |
 | GET | /lots/:id | public | `?from&to&vehicle` | `{lot, quote}` | 404 | – | DRV-02 |
 | POST | /quotes | public | `{lot_id, from, to, vehicle, promo?}` | `{base, discount, fee, gst, total, promo_error?}` | 400, 404 | – | DRV-02, DRV-06 |
 | POST | /bookings | driver/guest | `{lot_id, from, to, vehicle_id\|plate, promo?, source}` | `{booking, razorpay_order}` | 409 lot_full, 422 promo | ✓ | DRV-04, DRV-05, DRV-06, DRV-09, GST-01 |
