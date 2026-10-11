@@ -229,3 +229,64 @@ export async function reconcilePayments(deps: PaymentCheckDeps & { pool: pg.Pool
   }
   return result;
 }
+
+export interface RefundResult { claimed: number; refunded: number; errors: number }
+
+interface RefundRow { id: string; booking_id: string; host_id: string; provider_payment_id: string }
+
+// A refund that failed is retried at most every five minutes.
+const REFUND_RETRY_MS = 5 * 60_000;
+
+/**
+ * Refunds payments marked refund_pending (a cancelled paid booking, or a payment that landed after the system cancelled
+ * the booking), in full, on the host's own Razorpay account.
+ */
+export async function processRefunds(deps: PaymentCheckDeps & { pool: pg.Pool }, now: Date, limit = 10): Promise<RefundResult> {
+  const { pool } = deps;
+  const { rows } = await pool.query<RefundRow>(
+    `with due as (
+       select id from payments
+       where provider = 'razorpay' and status = 'refund_pending'
+         and (checked_at is null or checked_at < $1::timestamptz - $3 * interval '1 millisecond')
+       order by checked_at nulls first, updated_at
+       limit $2
+       for update skip locked)
+     update payments p set checked_at = $1 from due where p.id = due.id
+     returning p.id, p.booking_id, p.host_id, p.provider_payment_id`,
+    [now, limit, REFUND_RETRY_MS]);
+  const result: RefundResult = { claimed: rows.length, refunded: 0, errors: 0 };
+  const setError = (row: RefundRow, message: string) =>
+    pool.query("update payments set last_error = $2, updated_at = $3 where id = $1 and status = 'refund_pending'", [row.id, message.slice(0, 500), now]);
+  const markRefunded = async (row: RefundRow, refundId: string, amount: number) => {
+    await pool.query(
+      "update payments set status = 'refunded', refund_id = $2, refunded_minor = $3, last_error = null, updated_at = $4 where id = $1 and status = 'refund_pending'",
+      [row.id, refundId, amount, now]);
+    result.refunded += 1;
+  };
+
+  for (const row of rows) {
+    try {
+      const auth = await deps.authFor(row.host_id);
+      if (!auth) {
+        await setError(row, "Razorpay disconnected");
+        continue;
+      }
+      const orders = deps.ordersFor(auth);
+      // An earlier attempt may have gone through before we could record it: never refund the same payment twice.
+      const earlier = (await orders.listRefunds(row.provider_payment_id)).filter((r) => r.status !== "failed");
+      if (earlier.length) {
+        await markRefunded(row, earlier[0].id, earlier.reduce((sum, r) => sum + r.amount, 0));
+        continue;
+      }
+      // The receipt is fixed per payment, so a repeat request is refused ("Duplicate receipt") and the next round
+      // finds the refund in the list above. A refund Razorpay reports as pending has started and counts as done.
+      const refund = await orders.refund(row.provider_payment_id, { receipt: `hh-${row.id}`, notes: { booking_id: row.booking_id } });
+      await markRefunded(row, refund.id, refund.amount);
+    } catch (error) {
+      // One host's failing account must not stop the others; the row stays refund_pending and is retried later.
+      result.errors += 1;
+      await setError(row, (error as Error).message ?? String(error)).catch(() => undefined);
+    }
+  }
+  return result;
+}

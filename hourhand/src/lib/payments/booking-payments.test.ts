@@ -13,17 +13,21 @@ import type { Plan } from "../billing/plans";
 import { handleConfirmPayment } from "./confirm-handler";
 import { keyPairAuth } from "./host-razorpay";
 import { razorpayOrders } from "./razorpay-orders";
-import { applyCapturedPayment, confirmPayment, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, reconcilePayments, startPaidBooking } from "./booking-payments";
+import { applyCapturedPayment, confirmPayment, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, processRefunds, reconcilePayments, startPaidBooking } from "./booking-payments";
 
 const BASE = process.env.TEST_DATABASE_URL;
 const auth = keyPairAuth("rzp_test_abcdefgh12", "k");
 const sign = (order: string, payment: string) => createHmac("sha256", "k").update(`${order}|${payment}`).digest("hex");
 
 interface FakePayment { id: string; order_id: string; amount: number; currency: string; status: string }
+interface FakeRefund { id: string; status: string; amount: number; receipt?: string }
 
 /** Razorpay's orders and payments endpoints, enough for start, confirm and the reconciler. */
 function fakeRazorpay() {
-  const state = { creates: 0, failCreate: false, failOrderPayments: false, onOrderPayments: null as null | (() => Promise<void>), payments: new Map<string, FakePayment>() };
+  const state = {
+    creates: 0, failCreate: false, failOrderPayments: false, onOrderPayments: null as null | (() => Promise<void>), payments: new Map<string, FakePayment>(),
+    failRefund: false, refundCalls: [] as { paymentId: string; body: { amount?: number; receipt: string } }[], refunds: new Map<string, FakeRefund[]>(),
+  };
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
   const fetchImpl = (async (url: string, init: RequestInit) => {
     const path = new URL(url).pathname;
@@ -39,6 +43,20 @@ function fakeRazorpay() {
       if (state.failOrderPayments) return json({ error: { code: "SERVER_ERROR", description: "orders down" } }, 503);
       await state.onOrderPayments?.();
       return json({ items: [...state.payments.values()].filter((p) => p.order_id === decodeURIComponent(o[1])) });
+    }
+    const rf = /^\/v1\/payments\/([^/]+)\/(refund|refunds)$/.exec(path);
+    if (rf) {
+      const pay = state.payments.get(decodeURIComponent(rf[1]));
+      if (!pay) return json({ error: { code: "BAD_REQUEST_ERROR", description: "no such payment" } }, 400);
+      const list = state.refunds.get(pay.id) ?? [];
+      if (rf[2] === "refunds") return json({ items: list });
+      const body = JSON.parse(String(init.body));
+      state.refundCalls.push({ paymentId: pay.id, body });
+      if (state.failRefund) return json({ error: { code: "SERVER_ERROR", description: "refunds down" } }, 503);
+      if (list.some((r) => r.receipt === body.receipt)) return json({ error: { code: "BAD_REQUEST_ERROR", description: "Duplicate receipt" } }, 400);
+      const refund = { id: `rfnd_${Math.random().toString(36).slice(2, 10)}`, status: "pending", amount: body.amount ?? pay.amount, receipt: body.receipt };
+      state.refunds.set(pay.id, [...list, refund]);
+      return json(refund);
     }
     const m = /^\/v1\/payments\/([^/]+)(\/capture)?$/.exec(path);
     const p = m && state.payments.get(decodeURIComponent(m[1]));
@@ -318,6 +336,94 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
       expect(await run(fake, new Date(first.getTime() + 30_000))).toMatchObject({ claimed: 0 });
       expect(await run(fake, new Date(first.getTime() + 61_000))).toMatchObject({ claimed: 1 });
       await unchanged(id);
+    });
+  });
+  describe("refunds", () => {
+    const later = (minutes: number) => new Date(Date.now() + minutes * 60_000);
+    const run = (fake: ReturnType<typeof fakeRazorpay>, now: Date, connected = true) =>
+      processRefunds({ pool, authFor: async () => (connected ? auth : null), ordersFor: () => fake.orders }, now, 100);
+    /** A confirmed, paid booking. */
+    async function confirmed(fake = fakeRazorpay()) {
+      const p = await paid(fake);
+      await confirmPayment(p.deps, { bookingId: p.r.booking.id, paymentId: p.pay.id, signature: sign(p.order, p.pay.id) }, new Date());
+      return { ...p, id: p.r.booking.id };
+    }
+    const cancelled = async (fake?: ReturnType<typeof fakeRazorpay>) => {
+      const c = await confirmed(fake);
+      await store.cancelBooking(priya.id, c.id, "host", "Away");
+      return c;
+    };
+
+    // Each test counts only its own rows: settle whatever earlier tests left awaiting a refund.
+    beforeEach(async () => {
+      await pool.query("update payments set status = 'refunded' where status = 'refund_pending'");
+    });
+
+    it("a host cancelling a paid booking refunds it in full, once", async () => {
+      const { fake, id, pay } = await cancelled();
+      const [row] = await payment(id);
+      expect(row).toMatchObject({ status: "refund_pending", checked_at: null });
+      expect(await run(fake, new Date())).toEqual({ claimed: 1, refunded: 1, errors: 0 });
+      const refund = fake.state.refunds.get(pay.id)![0];
+      expect((await payment(id))[0]).toMatchObject({ status: "refunded", refund_id: refund.id, refunded_minor: 50_000, last_error: null });
+      expect(fake.state.refundCalls).toEqual([{ paymentId: pay.id, body: expect.objectContaining({ receipt: `hh-${row.id}`, notes: { booking_id: id } }) }]);
+      expect(fake.state.refundCalls[0].body.amount).toBeUndefined();
+      expect(await run(fake, later(10))).toMatchObject({ claimed: 0 });
+      expect(fake.state.refundCalls).toHaveLength(1);
+    });
+
+    it("a failed refund stays pending with its error and is retried after five minutes", async () => {
+      const fake = fakeRazorpay();
+      const { id } = await cancelled(fake);
+      fake.state.failRefund = true;
+      const first = new Date();
+      expect(await run(fake, first)).toMatchObject({ claimed: 1, refunded: 0, errors: 1 });
+      expect((await payment(id))[0]).toMatchObject({ status: "refund_pending", last_error: expect.stringContaining("refunds down") });
+      fake.state.failRefund = false;
+      expect(await run(fake, new Date(first.getTime() + 60_000))).toMatchObject({ claimed: 0 });
+      expect(await run(fake, new Date(first.getTime() + 6 * 60_000))).toMatchObject({ claimed: 1, refunded: 1 });
+      expect((await payment(id))[0]).toMatchObject({ status: "refunded", refunded_minor: 50_000, last_error: null });
+    });
+
+    it("a refund already made at Razorpay is recorded without refunding again", async () => {
+      const fake = fakeRazorpay();
+      const { id, pay } = await cancelled(fake);
+      fake.state.refunds.set(pay.id, [{ id: "rfnd_old_failed", status: "failed", amount: 50_000 }, { id: "rfnd_earlier", status: "processed", amount: 50_000 }]);
+      expect(await run(fake, new Date())).toMatchObject({ claimed: 1, refunded: 1 });
+      expect((await payment(id))[0]).toMatchObject({ status: "refunded", refund_id: "rfnd_earlier", refunded_minor: 50_000 });
+      expect(fake.state.refundCalls).toHaveLength(0);
+    });
+
+    it("a disconnected host's refund stays pending", async () => {
+      const { fake, id } = await cancelled();
+      expect(await run(fake, new Date(), false)).toMatchObject({ claimed: 1, refunded: 0 });
+      expect((await payment(id))[0]).toMatchObject({ status: "refund_pending", last_error: "Razorpay disconnected" });
+      expect(fake.state.refundCalls).toHaveLength(0);
+    });
+
+    it("refunds a payment that landed after the system cancelled the booking", async () => {
+      const { fake, r, pay } = await paid();
+      await pool.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system', hold_expires_at = null where id = $1", [r.booking.id]);
+      expect(await applyCapturedPayment(pool, r.booking.id, pay.id, new Date())).toBe("refund_pending");
+      expect(await run(fake, new Date())).toMatchObject({ claimed: 1, refunded: 1 });
+      expect((await payment(r.booking.id))[0]).toMatchObject({ status: "refunded", refunded_minor: 50_000 });
+    });
+
+    it("rescheduling a paid booking moves the payment to the new booking, with no refund", async () => {
+      const { fake, id, pay } = await confirmed();
+      const moved = await store.rescheduleBooking(priya.id, id, nextStart(), `bp-move-${Math.random()}`);
+      expect(await payment(id)).toEqual([]);
+      expect(await payment(moved.id)).toEqual([expect.objectContaining({ status: "paid", provider_payment_id: pay.id })]);
+      expect(await run(fake, new Date())).toMatchObject({ claimed: 0 });
+      expect(fake.state.refundCalls).toHaveLength(0);
+    });
+
+    it("cancelling a free booking touches no payments", async () => {
+      const before = (await pool.query("select id, status, updated_at from payments order by id")).rows;
+      const free = await store.createBooking({ eventTypeId, startAt: nextStart(), idempotencyKey: `bp-free-${Math.random()}`, invitee: guest });
+      await store.cancelBooking(priya.id, free.id, "host");
+      expect((await booking(free.id)).status).toBe("cancelled");
+      expect((await pool.query("select id, status, updated_at from payments order by id")).rows).toEqual(before);
     });
   });
   describe("booking routes", () => {

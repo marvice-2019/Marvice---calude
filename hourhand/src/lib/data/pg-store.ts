@@ -285,6 +285,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
             "update notifications set status = 'skipped', last_error = 'booking rescheduled', updated_at = now() where booking_id = $1 and status = 'queued' and not (channel = 'calendar' and locked_until > now())",
             [bookingId]);
           await queueBookingNotifications(client, newId, "rescheduled", new Date());
+          // The guest already paid for the old time: the payment follows the booking, with no refund and no new charge.
+          await client.query("update payments set booking_id = $2, updated_at = now() where booking_id = $1 and status = 'paid'", [bookingId, newId]);
           return newId;
         });
         kickJobs();
@@ -299,7 +301,11 @@ export function createPgStore(pool: pg.Pool): DataStore {
         const { rowCount } = await client.query(
           "update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4 where id = $1 and host_id = $2 and status = 'confirmed'",
           [bookingId, hostId, by, reason ?? null]);
-        if (rowCount) await queueBookingNotifications(client, bookingId, "cancelled", new Date());
+        if (rowCount) {
+          await queueBookingNotifications(client, bookingId, "cancelled", new Date());
+          // A paid booking is refunded in full (the guest cancel cutoff is enforced before this); the job runner does the refund.
+          await client.query("update payments set status = 'refund_pending', updated_at = now(), checked_at = null where booking_id = $1 and status = 'paid'", [bookingId]);
+        }
         return Boolean(rowCount);
       });
       if (cancelled) kickJobs();
