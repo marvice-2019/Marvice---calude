@@ -86,6 +86,270 @@ iCloud calendars need no server keys: each host connects with their own Apple ID
 
 **Batches A–C (2026-10-11):** migrations now run to `0020` (0019 is skipped on purpose); the container applies them on start, as before. No new required variables. Monthly earnings emails, waitlist emails, Duo invitations and waitlist cleanup run inside the existing job runner. Profile photos are stored in Postgres (up to 2 MB each), so they are in your database backups.
 
+**Batch D (2026-10-11):** migrations run to `0023`. No new variables. Booking pages can now be embedded on other sites through `/embed.js`; the dashboard, sign-in, API and legal pages refuse to be framed. Only https redirect links are kept on event types (any other stored value was cleared by `0023`).
+
+**Security fixes (2026-10-11):** if you put Cloudflare (or any other proxy) in front of Coolify, add its address ranges to `TRUSTED_PROXIES`, or every visitor shares one rate-limit bucket. Keep the app's own port closed to the internet so all traffic comes through Coolify's proxy.
+
+## 5b. WhatsApp (D7: automatic confirmations and reminders)
+
+Off until all four variables below are set. With them unset nothing is queued, the booking form doesn't offer WhatsApp, and the wa.me buttons on each booking work as before. Migration `0024` adds the opt-in and opt-out tables either way.
+
+| Variable | Value | Required for WhatsApp |
+| --- | --- | --- |
+| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp Manager → your number → Phone number ID | yes |
+| `WHATSAPP_ACCESS_TOKEN` | the permanent system-user token (step 4 below) | yes |
+| `WHATSAPP_APP_SECRET` | Meta app → App settings → Basic → App secret (signs the webhook) | yes |
+| `WHATSAPP_VERIFY_TOKEN` | any long random string you make up; type the same one in step 5 | yes |
+
+Steps (you; Claude never signs in to Meta or handles the token):
+
+1. Meta Business Suite → Settings → Business info: verify Marvice Media Private Limited.
+2. WhatsApp Manager: create the WhatsApp Business account with **INR** as its currency (Meta stops delivering non-INR messages for Indian accounts from 1 January 2027). Add a number that is not on the WhatsApp app, display name "Hourhand".
+3. Add a payment method.
+4. Business settings → Users → System users: add one (Admin), assign it the WhatsApp account and the app, generate a token that never expires with `whatsapp_business_messaging` and `whatsapp_business_management`. Paste it straight into Coolify as `WHATSAPP_ACCESS_TOKEN`.
+5. Meta app → WhatsApp → Configuration → Webhook: callback URL `https://hourhand.cloud/api/webhooks/whatsapp`, verify token = your `WHATSAPP_VERIFY_TOKEN`, then subscribe to `messages`. This works only after the variables are set and the app redeployed.
+6. WhatsApp Manager → Message templates: create the six templates below, category **Utility**, exactly as written (the app sends these names and languages). Approval takes from minutes to a few days. Sends fail as "template not found" until each is approved; email still goes meanwhile.
+
+Plan limits per host per calendar month (IST): Free 0, Solo 300, Duo 600 WhatsApp messages. Over the limit, email still goes. Cost at about ₹0.136 a message including GST (check your INR rate card): roughly ₹0.27 per booking.
+
+Check after go-live: book on your own page with your phone and the WhatsApp tick; the confirmation arrives within a minute and the booking page in the dashboard says "Confirmation: sent automatically". Reply STOP from that phone: you get one reply, and the dashboard shows the reminder won't go.
+
+### Templates to submit
+
+#### hh_booking_confirmed (en)
+
+```json
+{
+  "name": "hh_booking_confirmed",
+  "language": "en",
+  "category": "utility",
+  "components": [
+    {
+      "type": "body",
+      "text": "Hi {{1}}, your {{2}} with {{3}} is booked for {{4}}. Use the button below to reschedule or cancel.",
+      "example": {
+        "body_text": [
+          [
+            "Kiran",
+            "Coaching",
+            "Priya Raman",
+            "Tuesday, 3 November 2026, 10:00 am IST"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "buttons",
+      "buttons": [
+        {
+          "type": "url",
+          "text": "Manage booking",
+          "url": "https://hourhand.cloud/b/{{1}}",
+          "example": [
+            "https://hourhand.cloud/b/3f9c2a7d41e8b6c0"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### hh_booking_confirmed (hi)
+
+```json
+{
+  "name": "hh_booking_confirmed",
+  "language": "hi",
+  "category": "utility",
+  "components": [
+    {
+      "type": "body",
+      "text": "नमस्ते {{1}}, {{3}} के साथ आपका {{2}} {{4}} के लिए बुक हो गया है। समय बदलने या रद्द करने के लिए नीचे का बटन दबाएँ।",
+      "example": {
+        "body_text": [
+          [
+            "Kiran",
+            "Coaching",
+            "Priya Raman",
+            "मंगलवार, 3 नवंबर 2026, 10:00 am IST"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "buttons",
+      "buttons": [
+        {
+          "type": "url",
+          "text": "बुकिंग देखें",
+          "url": "https://hourhand.cloud/b/{{1}}",
+          "example": [
+            "https://hourhand.cloud/b/3f9c2a7d41e8b6c0"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### hh_booking_reminder (en)
+
+```json
+{
+  "name": "hh_booking_reminder",
+  "language": "en",
+  "category": "utility",
+  "components": [
+    {
+      "type": "body",
+      "text": "Hi {{1}}, a reminder: your {{2}} with {{3}} is on {{4}}. Use the button below to reschedule or cancel.",
+      "example": {
+        "body_text": [
+          [
+            "Kiran",
+            "Coaching",
+            "Priya Raman",
+            "Tuesday, 3 November 2026, 10:00 am IST"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "buttons",
+      "buttons": [
+        {
+          "type": "url",
+          "text": "Manage booking",
+          "url": "https://hourhand.cloud/b/{{1}}",
+          "example": [
+            "https://hourhand.cloud/b/3f9c2a7d41e8b6c0"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### hh_booking_reminder (hi)
+
+```json
+{
+  "name": "hh_booking_reminder",
+  "language": "hi",
+  "category": "utility",
+  "components": [
+    {
+      "type": "body",
+      "text": "नमस्ते {{1}}, याद दिला दें: {{3}} के साथ आपका {{2}} {{4}} को है। समय बदलने या रद्द करने के लिए नीचे का बटन दबाएँ।",
+      "example": {
+        "body_text": [
+          [
+            "Kiran",
+            "Coaching",
+            "Priya Raman",
+            "मंगलवार, 3 नवंबर 2026, 10:00 am IST"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "buttons",
+      "buttons": [
+        {
+          "type": "url",
+          "text": "बुकिंग देखें",
+          "url": "https://hourhand.cloud/b/{{1}}",
+          "example": [
+            "https://hourhand.cloud/b/3f9c2a7d41e8b6c0"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### hh_booking_changed (en)
+
+```json
+{
+  "name": "hh_booking_changed",
+  "language": "en",
+  "category": "utility",
+  "components": [
+    {
+      "type": "body",
+      "text": "Hi {{1}}, your {{2}} with {{3}} has changed: {{4}}. Use the button below for details.",
+      "example": {
+        "body_text": [
+          [
+            "Kiran",
+            "Coaching",
+            "Priya Raman",
+            "it is now on Tuesday, 3 November 2026, 10:00 am IST"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "buttons",
+      "buttons": [
+        {
+          "type": "url",
+          "text": "View booking",
+          "url": "https://hourhand.cloud/b/{{1}}",
+          "example": [
+            "https://hourhand.cloud/b/3f9c2a7d41e8b6c0"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### hh_booking_changed (hi)
+
+```json
+{
+  "name": "hh_booking_changed",
+  "language": "hi",
+  "category": "utility",
+  "components": [
+    {
+      "type": "body",
+      "text": "नमस्ते {{1}}, {{3}} के साथ आपके {{2}} में बदलाव हुआ है: {{4}}। जानकारी के लिए नीचे का बटन दबाएँ।",
+      "example": {
+        "body_text": [
+          [
+            "Kiran",
+            "Coaching",
+            "Priya Raman",
+            "अब यह मंगलवार, 3 नवंबर 2026, 10:00 am IST को है"
+          ]
+        ]
+      }
+    },
+    {
+      "type": "buttons",
+      "buttons": [
+        {
+          "type": "url",
+          "text": "बुकिंग देखें",
+          "url": "https://hourhand.cloud/b/{{1}}",
+          "example": [
+            "https://hourhand.cloud/b/3f9c2a7d41e8b6c0"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
 ## 6. Microsoft Entra (for B6: Outlook, Teams links, Sign in with Microsoft)
 
 1. [entra.microsoft.com](https://entra.microsoft.com) → App registrations → New registration. Name `Hourhand`. Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**.

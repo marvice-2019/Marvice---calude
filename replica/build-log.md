@@ -41,6 +41,7 @@ One line per screen or unit. "Done" means built and checked: build, types, lint,
 | D4 embed and prefill | 2026-10-11 | done | — | framing had to be allowed on guest pages only; the embed script trusts messages from its own origin only |
 | D5 policy text, weekly limit | 2026-10-11 | done | — | the week has to be counted in the host's zone, including past days of the current week |
 | D6 e2e in CI | 2026-10-11 | done | first green run on GitHub (in progress on PR #53) | the deposit script had a race (moved the no-show into the past before marking it); two groups shared a port |
+| D7 automatic WhatsApp | 2026-10-11 | done (off until Meta approval) | Meta account, templates approved, ta/te/kn templates | queued in the booking's own transaction like email; the plan limit is checked at send time so a downgrade takes effect at once; STOP covers every host because the number is shared |
 
 **Feature parity after round 3**: 42.0 / 100, must-haves 9 of 22 done (round 2: 33.9 and 6). Not shippable yet: calendar connection and sync, emails, payments and auth are the big must-haves left.
 

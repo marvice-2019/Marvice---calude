@@ -1,6 +1,6 @@
 # D7: automatic WhatsApp confirmations and reminders (Meta Cloud API)
 
-Status: plan, waiting on Meta approval and four decisions (end of file). Written 2026-10-11.
+Status: built 2026-10-11 with the recommended decisions (one shared number; Free 0, Solo 300, Duo 600 a month; English and Hindi; confirmation, 24-hour reminder, cancelled/moved). Off until the Meta account and templates exist: see replica/deploy.md section 5b.
 
 ## Verdict
 
