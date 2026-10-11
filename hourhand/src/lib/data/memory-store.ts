@@ -70,7 +70,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     return {
       id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed", holdExpiresAt: null,
       locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null, joinUrl: null,
-      idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, createdAt: new Date(),
+      idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, seriesId: null, seriesIndex: null, createdAt: new Date(),
       invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", ""), noShowAt: null, runningLateMinutes: null, runningLateAt: null },
     };
   }
@@ -87,10 +87,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   function fields(draft: EventTypeDraft): Omit<EventTypeDraft, "location"> {
-    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden } = draft;
+    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden, maxRepeats } = draft;
     return {
       name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
-      priceMinor, currency: priceMinor === null ? null : currency, hidden,
+      priceMinor, currency: priceMinor === null ? null : currency, hidden, maxRepeats,
     };
   }
 
@@ -162,7 +162,11 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       }
       const link = input.bookingLinkToken === undefined ? null : openLink(input.bookingLinkToken, input.eventTypeId, input.idempotencyKey);
       const booking = build(input, null);
-      db.bookings.push(booking);
+      // A weekly series is built in full before any of it is saved, so a clash in a later week saves nothing.
+      const later = Array.from({ length: (input.weeks ?? 1) - 1 }, (_, i) =>
+        build({ ...input, startAt: new Date(input.startAt.getTime() + (i + 1) * 7 * 24 * 60 * MIN), idempotencyKey: `${input.idempotencyKey}#${i + 2}` }, null));
+      if (later.length > 0) [booking, ...later].forEach((b, i) => { b.seriesId = booking.id; b.seriesIndex = i + 1; });
+      db.bookings.push(booking, ...later);
       if (link) linkOfBooking.set(booking.id, link.id);
       return booking;
     },
@@ -197,7 +201,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
         id: randomUUID(), userId: hostId, scheduleId: db.schedules.find((s) => s.userId === hostId && s.isDefault)?.id ?? null,
         name: input.name.trim(), slug: oneOffSlug(), description: input.description ?? null, durationMinutes: input.durationMinutes,
         minNoticeMinutes: 0, bookingWindowDays: 730, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null,
-        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off",
+        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off", maxRepeats: 1,
       };
       db.eventTypes.push(eventType);
       db.locations.push({ id: randomUUID(), eventTypeId: eventType.id, kind: input.location.kind, value: input.location.value ?? null, position: 0 });
@@ -219,6 +223,8 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       const { name, email, timezone, phone, answers } = old.invitee;
       // Both steps run synchronously, so no other request can see the half-done state (one transaction in Postgres).
       const booking = build({ eventTypeId: old.eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers: answers.map((a) => ({ ...a })) } }, old.id);
+      // A moved week stays its series' week.
+      Object.assign(booking, { seriesId: old.seriesId, seriesIndex: old.seriesIndex });
       db.bookings.push(booking);
       // The move keeps the booking's single-use link, so the link shows the current time.
       const linkId = linkOfBooking.get(old.id);
@@ -226,11 +232,15 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       Object.assign(old, { status: "cancelled", cancelledAt: new Date(), cancelledBy: by, cancelReason: "Rescheduled" });
       return booking;
     },
-    async cancelBooking(hostId, bookingId, by, reason) {
+    async cancelBooking(hostId, bookingId, by, reason, opts = {}) {
       const booking = db.bookings.find((b) => b.hostId === hostId && b.id === bookingId);
       if (!booking) throw new NotFoundError("Booking");
       if (booking.status === "confirmed") {
-        Object.assign(booking, { status: "cancelled", cancelledAt: new Date(), cancelledBy: by, cancelReason: reason ?? null });
+        const at = new Date();
+        const later = opts.laterWeeks && booking.seriesId
+          ? db.bookings.filter((w) => w.seriesId === booking.seriesId && (w.seriesIndex ?? 0) > (booking.seriesIndex ?? 0) && w.status === "confirmed" && w.startAt > at)
+          : [];
+        for (const b of [booking, ...later]) Object.assign(b, { status: "cancelled", cancelledAt: at, cancelledBy: by, cancelReason: reason ?? null });
       }
       return booking;
     },

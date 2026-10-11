@@ -62,6 +62,8 @@ export default async function BookingDetailPage({ params, searchParams }: { para
   const error = query.error && Object.hasOwn(ERRORS, query.error) ? ERRORS[query.error] : null;
   const payment = authEnabled() ? await bookingPayment(getPool(process.env.DATABASE_URL as string), user.id, booking.id) : null;
   const whatsapp = upcoming ? await whatsappLinks(user, booking) : null;
+  const series = booking.seriesId ? (await store.listBookings(user.id)).filter((b) => b.seriesId === booking.seriesId) : [];
+  const laterWeeks = series.filter((b) => (b.seriesIndex ?? 0) > (booking.seriesIndex ?? 0) && b.status === "confirmed" && b.startAt > now).length;
   return (
     <div>
       <h1 className="font-display text-xl text-text">Booking with {booking.invitee.name}</h1>
@@ -81,6 +83,7 @@ export default async function BookingDetailPage({ params, searchParams }: { para
               </span>
             )}
           </dd>
+          {series.length > 1 && <dd className="text-sm text-text-muted">Week {booking.seriesIndex} of {new Set(series.map((b) => b.seriesIndex)).size}, every week at this time</dd>}
         </div>
         <div><dt className="text-sm text-text-muted">Email</dt><dd className="text-text">{booking.invitee.email}</dd></div>
         {payment && (
@@ -130,6 +133,12 @@ export default async function BookingDetailPage({ params, searchParams }: { para
               <input type="hidden" name="bookingId" value={booking.id} />
               <label htmlFor="reason" className="text-sm text-text-muted">Reason for {booking.invitee.name} (optional)</label>
               <textarea id="reason" name="reason" maxLength={500} rows={3} className="rounded-md border border-border bg-card p-2 text-text" />
+              {laterWeeks > 0 && (
+                <label className="flex min-h-11 items-center gap-3 text-text">
+                  <input type="checkbox" name="laterWeeks" className="h-5 w-5 accent-accent" />
+                  Also cancel the {laterWeeks === 1 ? "next week" : `${laterWeeks} later weeks`} in this series
+                </label>
+              )}
               <p className="text-sm text-text-muted">We&apos;ll email {booking.invitee.name} that you cancelled. A paid booking is refunded in full.</p>
               <div className="flex flex-wrap gap-2">
                 <Button type="submit" variant="danger">Yes, cancel</Button>

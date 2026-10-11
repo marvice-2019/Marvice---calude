@@ -47,6 +47,8 @@ export interface EventType {
   position: number;
   /** A one_off type is a one-off meeting: offered only at its own times, through its single-use link. */
   kind: "one_on_one" | "group" | "one_off";
+  /** Guests may book the same time weekly for up to this many weeks in one go; 1 = no repeats. Free event types only. */
+  maxRepeats: number;
 }
 
 /** What the host enters for a one-off meeting. */
@@ -112,6 +114,9 @@ export interface Booking {
   cancelReason: string | null;
   /** The booking this one replaced when a guest rescheduled. */
   rescheduledFromId: string | null;
+  /** A weekly series: the first week's booking id, and this week's place in it (1 = first). Both null otherwise. */
+  seriesId: string | null;
+  seriesIndex: number | null;
   createdAt: Date;
 }
 
@@ -176,6 +181,8 @@ export interface CreateBookingInput {
   holdUntil?: Date;
   /** Book through a single-use link: it must be open and for this event type, and is used up in the same transaction. */
   bookingLinkToken?: string;
+  /** Book the same time this many weeks running (2+), all or none. The returned booking is the first week. */
+  weeks?: number;
   invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
 }
 
@@ -276,8 +283,11 @@ export interface DataStore {
   getBooking(userId: string, id: string): Promise<BookingWithInvitee | null>;
   getBookingByManageToken(token: string): Promise<BookingWithInvitee | null>;
   createBooking(input: CreateBookingInput): Promise<BookingWithInvitee>;
-  /** Throws NotFoundError unless the booking belongs to `hostId`. */
-  cancelBooking(hostId: string, bookingId: string, by: "host" | "guest", reason?: string): Promise<BookingWithInvitee>;
+  /**
+   * Throws NotFoundError unless the booking belongs to `hostId`. With `laterWeeks`, a week of a series also cancels the
+   * series' later upcoming weeks in the same write; one pair of cancellation emails covers them all.
+   */
+  cancelBooking(hostId: string, bookingId: string, by: "host" | "guest", reason?: string, opts?: { laterWeeks?: boolean }): Promise<BookingWithInvitee>;
   /** Atomically books `startAt` for the same guest and cancels the old booking. The overlap check ignores the old booking. */
   /** `by` is recorded as who cancelled the old booking. */
   rescheduleBooking(hostId: string, bookingId: string, startAt: Date, idempotencyKey: string, by?: "host" | "guest"): Promise<BookingWithInvitee>;
@@ -329,7 +339,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

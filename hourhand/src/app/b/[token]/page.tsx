@@ -25,6 +25,10 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
   const pending = booking.status === "pending_payment";
   // A hold that ran out before the guest paid: say so plainly rather than "cancelled".
   const unpaid = cancelled && isUnpaidRelease(booking.cancelReason);
+  // A week of a weekly series: its place, and how many later weeks are still to come (they can be cancelled with it).
+  const series = booking.seriesId ? (await store.listBookings(booking.hostId)).filter((b) => b.seriesId === booking.seriesId) : [];
+  const now = new Date();
+  const laterWeeks = series.filter((b) => (b.seriesIndex ?? 0) > (booking.seriesIndex ?? 0) && b.status === "confirmed" && b.startAt > now).length;
 
   return (
     <main className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
@@ -37,6 +41,7 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
             <dd className={cancelled ? "text-text-muted line-through" : "text-text"}>
               {formatDate(booking.startAt, tz)}, <LocalTime date={booking.startAt} tz={tz} /> to <LocalTime date={booking.endAt} tz={tz} /> ({zoneName(tz)})
             </dd>
+            {series.length > 1 && <dd className="text-sm text-text-muted">Week {booking.seriesIndex} of {new Set(series.map((b) => b.seriesIndex)).size}, every week at this time</dd>}
           </div>
           {booking.locationKind && <div><dt className="text-sm text-text-muted">Where</dt><dd className="text-text">{locationLabels[booking.locationKind]}{booking.joinUrl && booking.status === "confirmed" && <> · <a href={booking.joinUrl} className="font-semibold text-accent underline" rel="noopener noreferrer" target="_blank">Join the call</a></>}</dd></div>}
           <div><dt className="text-sm text-text-muted">Booked for</dt><dd className="text-text">{booking.invitee.name}, {booking.invitee.email}</dd></div>
@@ -58,7 +63,7 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
       ) : (
         <>
         {canSayRunningLate(booking.startAt, new Date()) && <RunningLate token={token} hostName={host.name} told={booking.invitee.runningLateMinutes} />}
-        <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} />
+        <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} laterWeeks={laterWeeks} />
         </>
       )}
     </main>

@@ -27,10 +27,12 @@ interface Props {
   initialAt?: string;
   /** Whose page this is, so the form can show the time on their clock too. */
   host: { name: string; timezone: string };
+  /** The most weeks the guest can book this time for in one go; 1 = no repeat choice. */
+  maxWeeks?: number;
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host, maxWeeks = 1 }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
@@ -39,7 +41,7 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
       </div>
       {picked && (
         <DetailsForm
-          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={paid} host={host}
+          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={paid} host={host} maxWeeks={maxWeeks}
           onPick={(slot) => setPicked({ slot, tz: picked.tz })} onBack={() => setPicked(null)}
         />
       )}
@@ -48,11 +50,11 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
 }
 
 interface FormProps {
-  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"]; host: Props["host"];
+  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"]; host: Props["host"]; maxWeeks: number;
   onPick: (slot: string) => void; onBack: () => void;
 }
 
-function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, onPick, onBack }: FormProps) {
+function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, maxWeeks, onPick, onBack }: FormProps) {
   const router = useRouter();
   // A new key starts a fresh attempt; it changes only after an attempt is over (payment couldn't start, or the hold ran out).
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
@@ -112,17 +114,19 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
   const zone = zoneCheck(start, tz, device, host, cycle);
   const [zoneConfirmed, setZoneConfirmed] = useState(false);
   const [zoneError, setZoneError] = useState(false);
+  const [weeks, setWeeks] = useState(1);
+  const [weeksTaken, setWeeksTaken] = useState<string[] | null>(null);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (zone.confirm && !zoneConfirmed) { setZoneError(true); document.getElementById("zone-confirm")?.focus(); return; }
     const data = new FormData(e.currentTarget);
     const answers = Object.fromEntries(questions.map((q) => [q.id, String(data.get(`q_${q.id}`) ?? "")]));
-    setBusy(true); setFailed(false); setLimited(false); setExpired(false);
+    setBusy(true); setFailed(false); setLimited(false); setExpired(false); setWeeksTaken(null);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...(linkToken ? { linkToken } : { slug, event }), start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey }),
+        body: JSON.stringify({ ...(linkToken ? { linkToken } : { slug, event }), start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey, ...(weeks > 1 ? { weeks } : {}) }),
       });
       const body = await res.json();
       if ((res.status === 201 || res.status === 200) && body.payment) {
@@ -137,6 +141,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
       }
       if (typeof body.error === "string" && body.error.startsWith("link_")) setLinkGone(body.error);
       else if (res.status === 409 && body.error === "payments_unavailable") setUnavailable(true);
+      else if (res.status === 409 && body.error === "weeks_unavailable") setWeeksTaken(body.unavailable ?? []);
       else if ((res.status === 409 && body.error === "attempt_expired") || res.status === 502) { freshAttempt(); setFailed(true); }
       else if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
       else if (res.status === 400) setErrors(body.fields ?? {});
@@ -183,6 +188,27 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {maxWeeks > 1 && (
+        <div>
+          <Label htmlFor="weeks">Repeat</Label>
+          <select
+            id="weeks" value={weeks} onChange={(e) => { setWeeks(Number(e.target.value)); setWeeksTaken(null); }}
+            className={`mt-1 block h-11 w-full rounded-md border border-border-input bg-card px-3 text-base text-text ${focusRing}`}
+          >
+            <option value={1}>Just this once</option>
+            {Array.from({ length: maxWeeks - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>Every week for {n} weeks</option>)}
+          </select>
+        </div>
+      )}
+      {weeksTaken && (
+        <div className="rounded-md bg-danger-bg p-4" role="alert">
+          <p className="text-danger">Nothing is booked yet: {weeksTaken.length === 1 ? "this week isn't" : "these weeks aren't"} free at this time.</p>
+          <ul className="mt-2 list-disc pl-5 text-text">
+            {weeksTaken.map((s) => <li key={s}>{formatDate(new Date(s), tz)}</li>)}
+          </ul>
+          <p className="mt-2 text-text">Pick fewer weeks, or another time.</p>
         </div>
       )}
       <div><Label htmlFor="name">Your name</Label><Input id="name" name="name" autoComplete="name" required maxLength={100} error={errors.name} /></div>

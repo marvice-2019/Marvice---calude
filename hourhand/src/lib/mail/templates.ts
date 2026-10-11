@@ -41,6 +41,10 @@ export interface BookingMailContext {
   runningLateMinutes?: number | null;
   /** For cancelled_guest after the host cancelled: free times to book instead, nearest the cancelled one. */
   rebook?: { at: Date; url: string }[];
+  /** For the first week's confirmations of a weekly series: every week still booked, in order, the first included. */
+  series?: { bookingId: string; startAt: Date; endAt: Date; manageUrl: string }[];
+  /** For cancellations: later weeks of the same series cancelled in the same step. */
+  alsoCancelled?: Date[];
 }
 
 export interface RenderedMail { subject: string; text: string; html: string; attachments?: Attachment[]; replyTo?: string }
@@ -98,8 +102,14 @@ function toHtml(b: Block): string {
 const render = (subject: string, b: Block, extra: Partial<RenderedMail> = {}): RenderedMail =>
   ({ subject: oneLine(subject), text: toText(b), html: toHtml(b), ...extra });
 
+/** "Every week": the series' dates, one line each, when this is a series confirmation. */
+const seriesRow = (c: BookingMailContext, tz: string, cycle: HourCycle): Row[] => [
+  ...(c.series && c.series.length > 1 ? [[`Every week (${c.series.length})`, c.series.map((s) => when(s.startAt, tz, cycle)).join("\n")] as Row] : []),
+  ...(c.alsoCancelled?.length ? [[`Also cancelled (${c.alsoCancelled.length})`, c.alsoCancelled.map((d) => when(d, tz, cycle)).join("\n")] as Row] : []),
+];
+
 function guestRows(c: BookingMailContext): Row[] {
-  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.guestTimezone, "12h")], ["With", hostLabel(c)]];
+  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.guestTimezone, "12h")], ...seriesRow(c, c.guestTimezone, "12h"), ["With", hostLabel(c)]];
   const w = where(c);
   if (w) rows.push(["Where", w]);
   if (c.paidMinor) rows.push(["Paid", formatMoney(c.paidMinor, "INR")]);
@@ -107,7 +117,7 @@ function guestRows(c: BookingMailContext): Row[] {
 }
 
 function hostRows(c: BookingMailContext): Row[] {
-  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.hostTimezone, c.hostTimeFormat)],
+  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.hostTimezone, c.hostTimeFormat)], ...seriesRow(c, c.hostTimezone, c.hostTimeFormat),
     ["Guest", `${c.guestName} <${c.guestEmail}>`], ["Guest's time zone", zoneName(c.guestTimezone)]];
   const w = where(c);
   if (w) rows.push(["Where", w]);
@@ -117,10 +127,11 @@ function hostRows(c: BookingMailContext): Row[] {
 }
 
 function calendarFile(c: BookingMailContext): Attachment {
-  const ics = buildIcs({
-    uid: `${c.bookingId}@hourhand`, start: c.startAt, end: c.endAt, stamp: c.issuedAt,
-    summary: `${c.eventName} with ${hostLabel(c)}`, description: `Change or cancel: ${c.manageUrl}`, location: where(c), url: c.manageUrl,
-  });
+  const weeks = c.series && c.series.length > 1 ? c.series : [{ bookingId: c.bookingId, startAt: c.startAt, endAt: c.endAt, manageUrl: c.manageUrl }];
+  const ics = buildIcs(weeks.map((w) => ({
+    uid: `${w.bookingId}@hourhand`, start: w.startAt, end: w.endAt, stamp: c.issuedAt,
+    summary: `${c.eventName} with ${hostLabel(c)}`, description: `Change or cancel: ${w.manageUrl}`, location: where(c), url: w.manageUrl,
+  })));
   return { filename: "booking.ics", content: Buffer.from(ics, "utf8").toString("base64"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" };
 }
 
@@ -144,7 +155,10 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
     case "booked_guest":
       return render(`Booked: ${c.eventName} with ${host}, ${formatDate(c.startAt, c.guestTimezone)}`, {
         heading: "You're booked", intro: `Hi ${c.guestName}, your time with ${host} is confirmed.`,
-        rows: guestRows(c), link: manageLink(c), note: "The attached file adds this to your calendar.", footer: guestFooter(c),
+        rows: guestRows(c), link: manageLink(c), footer: guestFooter(c),
+        note: c.series && c.series.length > 1
+          ? "The attached file adds every week to your calendar. Each week's reminder has its own link to move or cancel that week."
+          : "The attached file adds this to your calendar.",
       }, { attachments: [calendarFile(c)], replyTo: c.hostEmail });
     case "booked_host":
       return render(`New booking: ${c.guestName}, ${c.eventName}, ${formatDate(c.startAt, c.hostTimezone)}`, {

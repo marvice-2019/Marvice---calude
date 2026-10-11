@@ -273,6 +273,7 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
         {numberField("bufferAfterMinutes", "Free time after", "minutes", "Kept clear after each meeting, up to 240 minutes.")}
         {numberField("dailyLimit", "Most bookings per day", "bookings", "Leave blank for no limit.")}
         {numberField("cancelCutoffMinutes", "Online cancelling closes", "minutes before", "Guests can't cancel or reschedule online after this. 0 means any time before the start.")}
+        {numberField("maxRepeats", "Weekly repeats", "weeks at most", "Let guests book the same time every week, up to this many weeks in one go. 1 means no repeats. Free event types only.")}
       </Panel>
 
       <Panel id="form" active={tab}>

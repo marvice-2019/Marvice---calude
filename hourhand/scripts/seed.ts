@@ -18,12 +18,12 @@ function arunSeed(now: Date): Seed {
     rules: [1, 2, 3, 4, 5].map((d) => ({ id: `rule_a${d}`, scheduleId: "sch_arun", kind: "weekly" as const, weekday: d, onDate: null, intervals: [{ from: "09:00", to: "17:00" }] })),
     eventTypes: [{
       id: "evt_arun_chat", userId, scheduleId: "sch_arun", name: "30-min chat", slug: "chat", description: null, durationMinutes: 30, minNoticeMinutes: 60,
-      bookingWindowDays: 30, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null, cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: false, active: true, position: 0, kind: "one_on_one",
+      bookingWindowDays: 30, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null, cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: false, active: true, position: 0, kind: "one_on_one", maxRepeats: 1,
     }],
     locations: [], questions: [], connections: [], calendars: [], busyBlocks: [],
     bookings: [{
       id: "bkg_arun_1", eventTypeId: "evt_arun_chat", hostId: userId, startAt: start, endAt: end, bufferedStart: start, bufferedEnd: end, status: "confirmed", holdExpiresAt: null,
-      locationKind: null, joinUrl: null, idempotencyKey: "seed-bkg_arun_1", cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: null, createdAt: now,
+      locationKind: null, joinUrl: null, idempotencyKey: "seed-bkg_arun_1", cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: null, seriesId: null, seriesIndex: null, createdAt: now,
       invitee: { id: "inv_arun_1", bookingId: "bkg_arun_1", hostId: userId, name: "Divya Menon", email: "divya.menon@example.com", timezone: "Asia/Kolkata", phone: null, answers: [], manageToken: "tok_bkg_arun_1", noShowAt: null, runningLateMinutes: null, runningLateAt: null },
     }],
   };

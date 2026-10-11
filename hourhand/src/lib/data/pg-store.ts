@@ -11,6 +11,7 @@ import {
 } from "./types";
 
 const MIN = 60_000;
+const WEEK = 7 * 24 * 60 * MIN;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Ids come from URLs and forms; anything that is not a uuid cannot match a row (and would make Postgres raise 22P02). */
 const isId = (id: string) => UUID.test(id);
@@ -29,18 +30,18 @@ const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format
 const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"] });
 
 const EVENT = `id, user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
-  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind`;
+  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind, max_repeats`;
 const toEventType = (r: Row): EventType => ({
   id: r.id as string, userId: r.user_id as string, scheduleId: r.schedule_id as string | null, name: r.name as string, slug: r.slug as string,
   description: r.description as string | null, durationMinutes: r.duration_minutes as number, minNoticeMinutes: r.min_notice_minutes as number,
   bookingWindowDays: r.booking_window_days as number, startIncrementMinutes: r.start_increment_minutes as number, bufferBeforeMinutes: r.buffer_before_minutes as number,
   bufferAfterMinutes: r.buffer_after_minutes as number, dailyLimit: r.daily_limit as number | null, cancelCutoffMinutes: r.cancel_cutoff_minutes as number,
   priceMinor: r.price_minor as number | null, currency: r.currency as EventType["currency"], hidden: r.hidden as boolean, active: r.active as boolean, position: r.position as number,
-  kind: r.kind as EventType["kind"],
+  kind: r.kind as EventType["kind"], maxRepeats: r.max_repeats as number,
 });
 
 const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
-  b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.created_at,
+  b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.series_id, b.series_index, b.created_at,
   i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at, i.running_late_minutes, i.running_late_at
   from bookings b join invitees i on i.booking_id = b.id`;
 const toBooking = (r: Row): BookingWithInvitee => ({
@@ -49,6 +50,7 @@ const toBooking = (r: Row): BookingWithInvitee => ({
   holdExpiresAt: (r.hold_expires_at as Date | null) ?? null,
   locationKind: r.location_kind as BookingWithInvitee["locationKind"], joinUrl: (r.join_url as string | null) ?? null, idempotencyKey: r.idempotency_key as string, cancelledAt: r.cancelled_at as Date | null,
   cancelledBy: r.cancelled_by as BookingWithInvitee["cancelledBy"], cancelReason: r.cancel_reason as string | null, rescheduledFromId: r.rescheduled_from_id as string | null,
+  seriesId: (r.series_id as string | null) ?? null, seriesIndex: (r.series_index as number | null) ?? null,
   createdAt: r.created_at as Date,
   invitee: {
     id: r.invitee_id as string, bookingId: r.id as string, hostId: r.host_id as string, name: r.invitee_name as string, email: r.invitee_email as string,
@@ -197,7 +199,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
   }
 
   const draftValues = (d: EventTypeDraft) => [d.name, d.slug, d.description, d.durationMinutes, d.minNoticeMinutes, d.bookingWindowDays, d.startIncrementMinutes,
-    d.bufferBeforeMinutes, d.bufferAfterMinutes, d.dailyLimit, d.cancelCutoffMinutes, d.priceMinor, d.priceMinor === null ? null : d.currency, d.hidden];
+    d.bufferBeforeMinutes, d.bufferAfterMinutes, d.dailyLimit, d.cancelCutoffMinutes, d.priceMinor, d.priceMinor === null ? null : d.currency, d.hidden, d.maxRepeats];
 
   async function slugSafe<T>(work: () => Promise<T>): Promise<T> {
     try {
@@ -304,6 +306,17 @@ export function createPgStore(pool: pg.Pool): DataStore {
           const newId = await insertBooking(client, input, null, linkId);
           // A held booking says nothing yet: its emails and calendar write go out once the payment is confirmed.
           if (!input.holdUntil) await queueBookingNotifications(client, newId, "booked", new Date());
+          // A weekly series: the later weeks commit with the first or not at all. The first week's confirmation lists
+          // every date; each week still gets its own reminders and calendar event.
+          const weeks = input.weeks ?? 1;
+          if (weeks > 1) {
+            await client.query("update bookings set series_id = id, series_index = 1 where id = $1", [newId]);
+            for (let i = 2; i <= weeks; i++) {
+              const weekId = await insertBooking(client, { ...input, startAt: new Date(input.startAt.getTime() + (i - 1) * WEEK), idempotencyKey: `${input.idempotencyKey}#${i}` }, null, null);
+              await client.query("update bookings set series_id = $2, series_index = $3 where id = $1", [weekId, newId, i]);
+              await queueBookingNotifications(client, weekId, "booked", new Date(), { confirm: false });
+            }
+          }
           return newId;
         });
         kickJobs();
@@ -352,6 +365,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
           // The move keeps the booking's single-use link, so the link shows the current time.
           const linkId = (await client.query("select booking_link_id from bookings where id = $1", [bookingId])).rows[0].booking_link_id as string | null;
           const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId, linkId);
+          // A moved week stays its series' week: same series, same place in it.
+          await client.query("update bookings n set series_id = o.series_id, series_index = o.series_index from bookings o where n.id = $1 and o.id = $2", [newId, bookingId]);
           // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
           // A calendar write already running for the old booking is left to finish; the move waits for it and then moves its event.
           await client.query(
@@ -368,12 +383,21 @@ export function createPgStore(pool: pg.Pool): DataStore {
         return settle(error, idempotencyKey, isSameRequest);
       }
     },
-    async cancelBooking(hostId, bookingId, by, reason) {
+    async cancelBooking(hostId, bookingId, by, reason, opts = {}) {
       if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
       const cancelled = await tx(async (client) => {
         const { rowCount } = await client.query(
           "update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4 where id = $1 and host_id = $2 and status = 'confirmed'",
           [bookingId, hostId, by, reason ?? null]);
+        if (rowCount && opts.laterWeeks) {
+          // The series' later weeks still to come, cancelled at the same instant (now() is fixed per transaction), which
+          // is how the cancellation email finds them. Each still loses its reminders and calendar event.
+          const { rows: later } = await client.query(
+            `update bookings w set status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4
+             from bookings b where b.id = $1 and b.host_id = $2 and b.series_id is not null and w.series_id = b.series_id and w.series_index > b.series_index
+               and w.status = 'confirmed' and w.start_at > now() returning w.id`, [bookingId, hostId, by, reason ?? null]);
+          for (const w of later) await queueBookingNotifications(client, w.id, "cancelled", new Date(), { confirm: false });
+        }
         if (rowCount) {
           await queueBookingNotifications(client, bookingId, "cancelled", new Date());
           // A paid booking is refunded in full (the guest cancel cutoff is enforced before this); the job runner does the refund.
@@ -445,8 +469,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
       return slugSafe(() => tx(async (client) => {
         const { rows } = await client.query(
           `insert into event_types (user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
-             buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, position)
-           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+             buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, max_repeats, position)
+           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
              (select coalesce(max(position), -1) + 1 from event_types where user_id = $1))
            returning ${EVENT}`, [userId, ...draftValues(draft)]);
         const eventType = toEventType(rows[0]);
@@ -460,7 +484,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
         const { rows } = await client.query(
           `update event_types set name = $3, slug = $4, description = $5, duration_minutes = $6, min_notice_minutes = $7, booking_window_days = $8,
              start_increment_minutes = $9, buffer_before_minutes = $10, buffer_after_minutes = $11, daily_limit = $12, cancel_cutoff_minutes = $13,
-             price_minor = $14, currency = $15, hidden = $16
+             price_minor = $14, currency = $15, hidden = $16, max_repeats = $17
            where user_id = $1 and id = $2 returning ${EVENT}`, [userId, id, ...draftValues(draft)]);
         await setLocation(client, id, draft);
         return toEventType(rows[0]);

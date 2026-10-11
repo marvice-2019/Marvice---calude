@@ -307,6 +307,35 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
     });
   });
 
+  describe("weekly series", () => {
+    const WEEK = 7 * 86_400_000;
+    it("books every week in one write; only the first week sends confirmations, every week gets reminders", async () => {
+      const first = await store.createBooking({
+        eventTypeId: coaching.id, startAt: at("2034-03-06T04:00:00Z"), idempotencyKey: "pg-series-1", weeks: 3, invitee: { ...guest, name: "Series Guest" },
+      });
+      expect([first.seriesId, first.seriesIndex]).toEqual([first.id, 1]);
+      const { rows } = await pool.query(
+        `select b.id, b.series_index, b.start_at, array(select n.kind from notifications n where n.booking_id = b.id and n.channel = 'email' order by n.kind) as kinds
+         from bookings b where b.series_id = $1 order by b.series_index`, [first.id]);
+      expect(rows.map((r) => r.series_index)).toEqual([1, 2, 3]);
+      expect(rows.map((r) => new Date(r.start_at).getTime() - first.startAt.getTime())).toEqual([0, WEEK, 2 * WEEK]);
+      expect(rows[0].kinds).toEqual(["booked_guest", "booked_host", "reminder_guest", "reminder_guest"]);
+      expect(rows[1].kinds).toEqual(["reminder_guest", "reminder_guest"]);
+      // The same request again returns the first week and adds nothing.
+      const again = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2034-03-06T04:00:00Z"), idempotencyKey: "pg-series-1", weeks: 3, invitee: guest });
+      expect(again.id).toBe(first.id);
+      expect((await pool.query("select count(*)::int as n from bookings where series_id = $1", [first.id])).rows[0].n).toBe(3);
+    });
+
+    it("a clash in a later week books nothing at all", async () => {
+      await store.createBooking({ eventTypeId: coaching.id, startAt: at("2034-04-17T04:00:00Z"), idempotencyKey: "pg-series-blocker", invitee: guest });
+      await expect(store.createBooking({
+        eventTypeId: coaching.id, startAt: at("2034-04-03T04:00:00Z"), idempotencyKey: "pg-series-2", weeks: 3, invitee: guest,
+      })).rejects.toMatchObject({ name: "SlotTakenError" });
+      expect((await pool.query("select count(*)::int as n from bookings where idempotency_key like 'pg-series-2%'")).rows[0].n).toBe(0);
+    });
+  });
+
   describe("single-use booking links", () => {
     const now = () => new Date();
     let n = 0;
@@ -453,6 +482,6 @@ function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
     startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit, hidden: e.hidden,
-    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, location: null,
+    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, location: null,
   };
 }

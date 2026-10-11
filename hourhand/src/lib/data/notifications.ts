@@ -21,9 +21,10 @@ const MIN = 60_000;
 
 /**
  * Queues the emails for one booking change. `notifyHost: false` is for a host closing their own account: their guests
- * hear about it, the host does not get one email per booking. Each row has a dedupe key, so queueing twice sends once.
+ * hear about it, the host does not get one email per booking. `confirm: false` queues a booking's reminders and
+ * calendar write but not its confirmations. Each row has a dedupe key, so queueing twice sends once.
  */
-export async function queueBookingNotifications(db: Db, bookingId: string, event: Event, now: Date, { notifyHost = true } = {}): Promise<void> {
+export async function queueBookingNotifications(db: Db, bookingId: string, event: Event, now: Date, { notifyHost = true, confirm = true } = {}): Promise<void> {
   const { rows } = await db.query(
     `select b.host_id, b.start_at, i.email as guest_email, u.email as host_email,
        (select c.id from calendars c join calendar_connections cc on cc.id = c.connection_id
@@ -40,16 +41,18 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
     queued.push({ kind, channel: "calendar", to: calendarId, sendAt: now, key: `booking:${bookingId}:${kind}` });
 
   if (event === "cancelled") {
-    now_("cancelled_guest", b.guest_email);
-    if (notifyHost) now_("cancelled_host", b.host_email);
+    // `confirm: false`: a later week cancelled along with an earlier one, whose email lists it.
+    if (confirm) now_("cancelled_guest", b.guest_email);
+    if (confirm && notifyHost) now_("cancelled_host", b.host_email);
     await db.query(
       `update notifications set status = 'skipped', last_error = 'booking cancelled', updated_at = $2
        where booking_id = $1 and status = 'queued' and kind not in ('cancelled_guest', 'cancelled_host')
          and not (channel = 'calendar' and locked_until > $2)`, [bookingId, now]); // a running calendar write finishes; the delete waits for it
     if (b.has_calendar) calendarJob("calendar_delete", "event");
   } else {
-    now_(event === "booked" ? "booked_guest" : "rescheduled_guest", b.guest_email);
-    if (notifyHost) now_(event === "booked" ? "booked_host" : "rescheduled_host", b.host_email);
+    // `confirm: false` is a later week of a series: the first week's confirmation already lists it.
+    if (confirm) now_(event === "booked" ? "booked_guest" : "rescheduled_guest", b.guest_email);
+    if (confirm && notifyHost) now_(event === "booked" ? "booked_host" : "rescheduled_host", b.host_email);
     if (event === "booked" && b.add_to_calendar) calendarJob("calendar_create", b.add_to_calendar);
     // A move updates the old booking's event wherever it is; with no old event it creates one in the add-to calendar.
     if (event === "rescheduled" && (b.add_to_calendar || b.has_calendar)) calendarJob("calendar_move", b.add_to_calendar ?? "event");

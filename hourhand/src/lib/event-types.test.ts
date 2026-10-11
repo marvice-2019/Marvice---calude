@@ -9,7 +9,7 @@ const NOW = new Date("2026-10-10T06:00:00Z");
 const valid: EventTypeForm = {
   name: "30-min strategy call", slug: "strategy", durationMinutes: "30", description: "  Plan the next quarter.  ",
   locationKind: "zoom", locationValue: "", minNoticeMinutes: "240", bookingWindowDays: "60", startIncrementMinutes: "15",
-  bufferBeforeMinutes: "0", bufferAfterMinutes: "10", dailyLimit: "", cancelCutoffMinutes: "120", price: "", hidden: false,
+  bufferBeforeMinutes: "0", bufferAfterMinutes: "10", dailyLimit: "", cancelCutoffMinutes: "120", maxRepeats: "1", price: "", hidden: false,
 };
 
 function draft(overrides: Partial<EventTypeForm> = {}): EventTypeDraft {
@@ -51,7 +51,7 @@ describe("validateEventType", () => {
       value: {
         name: "30-min strategy call", slug: "strategy", description: "Plan the next quarter.", durationMinutes: 30, minNoticeMinutes: 240,
         bookingWindowDays: 60, startIncrementMinutes: 15, bufferBeforeMinutes: 0, bufferAfterMinutes: 10, dailyLimit: null,
-        cancelCutoffMinutes: 120, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
+        cancelCutoffMinutes: 120, maxRepeats: 1, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
       },
     });
   });

@@ -51,7 +51,7 @@ export async function claimDue(pool: pg.Pool, now: Date, limit: number): Promise
 }
 
 const CONTEXT = `
-  select n.id as notification_id, n.created_at as queued_at, n.dedupe_key, b.id, b.host_id, b.status, b.start_at, b.end_at, b.cancelled_by, b.cancel_reason,
+  select n.id as notification_id, n.created_at as queued_at, n.dedupe_key, b.id, b.host_id, b.series_id, b.status, b.start_at, b.end_at, b.cancelled_by, b.cancel_reason,
     b.location_kind as booking_location_kind, b.join_url, b.external_event_id, b.external_calendar_id,
     prev.start_at as previous_start_at, prev.external_event_id as previous_event_id, prev.external_calendar_id as previous_calendar_id,
     prev.join_url as previous_join_url, prev.cancelled_by as previous_cancelled_by,
@@ -104,6 +104,22 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
 }
 
 const REBOOK_DAYS = 21;
+
+/** Later weeks of the same series cancelled in the same transaction as this one (same cancelled_at). */
+async function cancelledWith(pool: pg.Pool, bookingId: string): Promise<Date[]> {
+  const { rows } = await pool.query(
+    `select w.start_at from bookings b join bookings w on w.series_id = b.series_id and w.id <> b.id and w.cancelled_at = b.cancelled_at and w.series_index > b.series_index
+     where b.id = $1 order by w.series_index`, [bookingId]);
+  return rows.map((w) => new Date(w.start_at));
+}
+
+/** The weeks of a series still booked, read at send time, so a week cancelled before the confirmation went out isn't listed. */
+async function seriesWeeks(pool: pg.Pool, seriesId: string, baseUrl: string): Promise<NonNullable<BookingMailContext["series"]>> {
+  const { rows } = await pool.query(
+    `select b.id, b.start_at, b.end_at, i.manage_token from bookings b join invitees i on i.booking_id = b.id
+     where b.series_id = $1 and b.status = 'confirmed' order by b.series_index`, [seriesId]);
+  return rows.map((w) => ({ bookingId: w.id, startAt: new Date(w.start_at), endAt: new Date(w.end_at), manageUrl: `${baseUrl}/b/${w.manage_token}` }));
+}
 
 /**
  * When the host cancels, the guest's email offers the three free times nearest the one that was cancelled, each opening
@@ -359,6 +375,8 @@ export async function processDueNotifications(
           : renderBookingMail(c.kind as BookingEmailKind, {
             ...toContext(r, opts.baseUrl),
             ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),
+            ...((c.kind === "booked_guest" || c.kind === "booked_host") && r.series_id === r.id ? { series: await seriesWeeks(pool, r.id as string, opts.baseUrl) } : {}),
+            ...((c.kind === "cancelled_guest" || c.kind === "cancelled_host") && r.series_id ? { alsoCancelled: await cancelledWith(pool, r.id as string) } : {}),
           });
         if ("skip" in mail) { await skip(c, mail.skip); continue; }
         ({ id: providerId } = await mailer.send({ ...mail, to: c.recipient, idempotencyKey: `notification-${c.id}` }));

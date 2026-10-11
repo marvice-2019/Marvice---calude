@@ -7,7 +7,7 @@ const MAX_REASON = 500;
 const notFound: HandlerResult = { status: 404, body: { error: "not_found" } };
 
 /** POST /api/b/[token]/cancel. Cancelling an already-cancelled booking succeeds again. */
-export async function handleCancel(store: DataStore, token: string, reason: unknown, now: Date): Promise<HandlerResult> {
+export async function handleCancel(store: DataStore, token: string, reason: unknown, now: Date, opts: { laterWeeks?: boolean } = {}): Promise<HandlerResult> {
   const booking = await store.getBookingByManageToken(token);
   if (!booking) return notFound;
   if (booking.status === "cancelled") return { status: 200, body: { status: "cancelled" } };
@@ -24,7 +24,7 @@ export async function handleCancel(store: DataStore, token: string, reason: unkn
   const cutoffMs = (eventType?.cancelCutoffMinutes ?? 0) * MIN;
   if (booking.startAt.getTime() - now.getTime() < cutoffMs) return { status: 409, body: { error: "past_cutoff" } };
 
-  await store.cancelBooking(booking.hostId, booking.id, "guest", text || undefined);
+  await store.cancelBooking(booking.hostId, booking.id, "guest", text || undefined, { laterWeeks: opts.laterWeeks === true && booking.seriesId !== null });
   return { status: 200, body: { status: "cancelled" } };
 }
 

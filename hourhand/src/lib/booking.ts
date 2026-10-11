@@ -135,6 +135,8 @@ export interface BookingRequest {
   phone: string | null;
   answers: Record<string, string>;
   idempotencyKey: string;
+  /** The same time this many weeks running; 1 = just this once. */
+  weeks: number;
 }
 
 export type Validation = { ok: true; value: BookingRequest } | { ok: false; fields: Record<string, string> };
@@ -161,6 +163,8 @@ export function validateBookingRequest(input: unknown): Validation {
   if (!EMAIL.test(email) || email.length > 254) fields.email = "Enter a valid email address.";
   if (!isIanaTimeZone(body.timezone)) fields.timezone = "Pick a valid time zone.";
   if (phone && !/^\+?[0-9 ()-]{7,20}$/.test(phone)) fields.phone = "Enter a phone number with country code, like +91 98765 43210.";
+  const weeks = body.weeks === undefined ? 1 : body.weeks;
+  if (!Number.isInteger(weeks) || (weeks as number) < 1 || (weeks as number) > 12) fields.weeks = "Pick 1 to 12 weeks.";
   if (!idempotencyKey) fields.idempotencyKey = "Missing request key.";
   else if (idempotencyKey.length < 8 || idempotencyKey.length > 100) fields.idempotencyKey = "Request key must be 8–100 characters.";
 
@@ -179,8 +183,16 @@ export function validateBookingRequest(input: unknown): Validation {
   if (Object.keys(fields).length > 0 || !start) return { ok: false, fields };
   return {
     ok: true,
-    value: { slug: str("slug"), event: str("event"), linkToken: linkToken || null, start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey },
+    value: { slug: str("slug"), event: str("event"), linkToken: linkToken || null, start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey, weeks: weeks as number },
   };
+}
+
+/** The later weeks of a series (the 2nd onward) whose time isn't offered, e.g. a day off, a clash, or past the booking window. */
+export async function unavailableWeeks(store: DataStore, host: User, eventType: EventType, start: Date, weeks: number, now: Date): Promise<Date[]> {
+  const later = Array.from({ length: weeks - 1 }, (_, i) => new Date(start.getTime() + (i + 1) * 7 * DAY));
+  const offered = await freeSlots(store, host, eventType, later[0], new Date(later[later.length - 1].getTime() + MIN), now);
+  const open = new Set(offered.map((s) => s.getTime()));
+  return later.filter((d) => !open.has(d.getTime()));
 }
 
 /** The 409 a guest sees when their time is gone, with the next three open times after it. */
@@ -217,6 +229,9 @@ export async function handleCreateBooking(
   const found = await resolveTarget(store, req.slug, req.event, req.linkToken, now, req.idempotencyKey);
   if (isResult(found)) return found;
   const { host, eventType } = found;
+  if (req.weeks > 1 && (req.weeks > eventType.maxRepeats || found.linkToken || eventType.priceMinor)) {
+    return { status: 400, body: { error: "invalid_request", fields: { weeks: eventType.maxRepeats > 1 ? `Book up to ${eventType.maxRepeats} weeks at a time.` : "This event can't be repeated." } } };
+  }
 
   // A repeated submit returns the booking it already made, before the slot re-check (which it would now fail).
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
@@ -235,7 +250,7 @@ export async function handleCreateBooking(
   }
 
   const bookingInput = {
-    eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey,
+    eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey, ...(req.weeks > 1 ? { weeks: req.weeks } : {}),
     // Used up in the same write as the booking (or its payment hold), so two guests on one link can't both book.
     ...(found.linkToken ? { bookingLinkToken: found.linkToken } : {}),
     invitee: {
@@ -265,6 +280,11 @@ export async function handleCreateBooking(
     // Server-side re-check: the start must be one the engine offers right now.
     const offered = await freeSlots(store, host, eventType, req.start, new Date(req.start.getTime() + MIN), now);
     if (!offered.some((s) => s.getTime() === req.start.getTime())) return slotTaken(store, host, eventType, req.start, now);
+    // A weekly series books all its weeks or none: each later week must be offered too, and the guest is told which aren't.
+    if (req.weeks > 1) {
+      const unavailable = await unavailableWeeks(store, host, eventType, req.start, req.weeks, now);
+      if (unavailable.length > 0) return { status: 409, body: { error: "weeks_unavailable", unavailable: unavailable.map((d) => d.toISOString()) } };
+    }
 
     // Charged only once the request has passed every check, so a guest fixing a mistake or picking another slot isn't refused.
     if (limit && (!limit.limiter.take(`booking-ip:${limit.clientKey}`, BOOKING_LIMITS.perIp) || !limit.limiter.take(`booking-email:${req.email.toLowerCase()}`, BOOKING_LIMITS.perEmail))) {
