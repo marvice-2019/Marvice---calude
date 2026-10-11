@@ -279,6 +279,15 @@ export function renderEarningsMail(e: { monthLabel: string; netMinor: number; bo
   });
 }
 
+export function renderWaitlistMail(c: { guestName: string; hostName: string; eventName: string; start: Date; timezone: string; url: string }): RenderedMail {
+  return render(`A time opened up with ${c.hostName}`, {
+    heading: "A time opened up", intro: `Hi ${c.guestName}, a ${c.eventName} time with ${c.hostName} just became free on the day you asked about.`,
+    rows: [["Time", when(c.start, c.timezone, "12h")]], link: { label: "Book it", url: c.url },
+    note: "Everyone on the waitlist for that day gets this email, so it goes to whoever books first. We only send it once.",
+    footer: `Sent by Hourhand for ${c.hostName}.`,
+  });
+}
+
 export function renderMagicLink(url: string): RenderedMail {
   return render("Your Hourhand sign-in link", {
     heading: "Sign in to Hourhand", intro: "Use the button below to sign in. The link works once and expires in 15 minutes.",

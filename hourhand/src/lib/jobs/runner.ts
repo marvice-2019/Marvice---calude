@@ -7,6 +7,7 @@ import type { Mailer } from "../mail/mailer";
 import { processRefunds, reconcilePayments, releaseDeposits, type PaymentCheckDeps } from "../payments/booking-payments";
 import { reconcilePurchases } from "../packages/packages";
 import { queueMonthlyReports } from "../earnings";
+import { pruneWaitlist } from "../waitlist";
 import { setJobKick } from "./kick";
 import { BATCH_SIZE, processDueNotifications, type CalendarDeps } from "./worker";
 
@@ -58,6 +59,7 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
         if (Date.now() - lastReports > 3_600_000) {
           lastReports = Date.now();
           await queueMonthlyReports(opts.pool, new Date()).catch((error) => console.error("[jobs] monthly reports failed", error));
+          await pruneWaitlist(opts.pool, new Date()).catch((error) => console.error("[jobs] waitlist cleanup failed", error));
         }
         // A full batch means more may be due: keep going until a batch comes back short.
         for (;;) {

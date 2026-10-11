@@ -11,6 +11,7 @@ import { LocalTime } from "./LocalTime";
 import { payWithRazorpay, type CheckoutPayment } from "./razorpay-checkout";
 import { SlotPicker, useDeviceZone } from "./SlotPicker";
 import { useTimeFormat } from "./useTimeFormat";
+import { WaitlistForm } from "./WaitlistForm";
 
 export interface FlowQuestion { id: string; label: string; kind: string; required: boolean }
 
@@ -31,15 +32,18 @@ interface Props {
   maxWeeks?: number;
   /** Booking with a session package (the buyer's token): no payment, one session used per booking. */
   packageToken?: string;
+  /** Offer the waitlist (needs Postgres; not for single-use links or packages). */
+  waitlist?: boolean;
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host, maxWeeks = 1, packageToken }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host, maxWeeks = 1, packageToken, waitlist = false }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
       <div hidden={picked !== null}>
         <SlotPicker slug={slug} event={event} linkToken={linkToken} initialAt={initialAt} bookingWindowDays={bookingWindowDays} onPick={(slot, tz) => setPicked({ slot, tz })} />
+        {waitlist && <WaitlistForm slug={slug} event={event} hostName={host.name} />}
       </div>
       {picked && (
         <DetailsForm

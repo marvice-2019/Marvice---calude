@@ -10,7 +10,7 @@ import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { MailError, type Mailer } from "../mail/mailer";
 import { invoiceById } from "../gst/invoices";
 import { monthlyEarnings } from "../earnings";
-import { renderBookingMail, renderCalendarAlert, renderEarningsMail, renderInvoiceMail, renderPackageMail, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
+import { renderBookingMail, renderCalendarAlert, renderEarningsMail, renderInvoiceMail, renderPackageMail, renderRenewalReminder, renderWaitlistMail, type BookingMailContext, type RenderedMail } from "../mail/templates";
 import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
 import { freeSlots } from "../booking";
 import { createPgStore } from "../data/pg-store";
@@ -303,6 +303,21 @@ async function renderEarnings(pool: pg.Pool, c: Claimed, baseUrl: string, now: D
     sessionsHeld: e.sessions.held, noShows: e.sessions.noShows, url: `${baseUrl}/dashboard/earnings?month=${e.month}` });
 }
 
+/** A time opened on a day the guest waited for. The booking is the cancelled one; its start is the freed time. */
+async function renderWaitlist(pool: pg.Pool, c: Claimed, baseUrl: string, now: Date): Promise<RenderedMail | { skip: string }> {
+  const m = /^waitlist:([0-9a-f-]{36})$/.exec(c.dedupe_key);
+  if (!m) return { skip: "not a waitlist email" };
+  const { rows: [w] } = await pool.query(
+    `select w.name, w.timezone, b.start_at, e.name as event_name, e.slug as event_slug, e.active, u.name as host_name, u.slug as host_slug, u.deleted_at
+     from waitlist w join bookings b on b.id = $2 join event_types e on e.id = w.event_type_id join users u on u.id = w.host_id where w.id = $1`, [m[1], c.booking_id]);
+  if (!w) return { skip: "waitlist entry gone" };
+  if (new Date(w.start_at).getTime() <= now.getTime()) return { skip: "the time has passed" };
+  if (!w.active || w.deleted_at || !w.host_slug) return { skip: "event no longer bookable" };
+  const start = new Date(w.start_at);
+  return renderWaitlistMail({ guestName: w.name, hostName: w.host_name, eventName: w.event_name, start, timezone: w.timezone,
+    url: `${baseUrl}/${w.host_slug}/${w.event_slug}?at=${encodeURIComponent(start.toISOString())}` });
+}
+
 async function renderInvoice(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
   const m = /^invoice:([0-9a-f-]{36})$/.exec(c.dedupe_key);
   const v = m ? await invoiceById(pool, m[1]) : null;
@@ -368,7 +383,7 @@ export async function processDueNotifications(
       continue;
     }
     // Host emails about their account rather than a booking.
-    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host" || c.kind === "invoice_guest" || c.kind === "earnings_host";
+    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host" || c.kind === "invoice_guest" || c.kind === "earnings_host" || c.kind === "waitlist_guest";
     if (!isAccountMail) {
       if (!r?.id) { await skip(c, "booking no longer exists"); continue; }
       const why = skipReason(c.kind, r, now);
@@ -413,6 +428,7 @@ export async function processDueNotifications(
           : c.kind === "package_guest" || c.kind === "package_host" ? await renderPackage(pool, c, opts.baseUrl)
           : c.kind === "invoice_guest" ? await renderInvoice(pool, c, opts.baseUrl)
           : c.kind === "earnings_host" ? await renderEarnings(pool, c, opts.baseUrl, now)
+          : c.kind === "waitlist_guest" ? await renderWaitlist(pool, c, opts.baseUrl, now)
           : renderBookingMail(c.kind as BookingEmailKind, {
             ...toContext(r, opts.baseUrl),
             ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),
