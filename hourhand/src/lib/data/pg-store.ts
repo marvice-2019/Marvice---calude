@@ -429,6 +429,18 @@ export function createPgStore(pool: pg.Pool): DataStore {
       if (!rowCount) throw new NotFoundError("Booking");
       return (await bookingWhere(pool, "b.id = $1 and b.host_id = $2", [bookingId, hostId]))!;
     },
+    async getClientNote(hostId, email) {
+      if (!isId(hostId)) return "";
+      const { rows: [r] } = await pool.query("select note from client_notes where host_id = $1 and email = $2", [hostId, email]);
+      return (r?.note as string | undefined) ?? "";
+    },
+    async saveClientNote(hostId, email, note) {
+      if (!isId(hostId)) throw new NotFoundError("User");
+      if (note.trim() === "") await pool.query("delete from client_notes where host_id = $1 and email = $2", [hostId, email]);
+      else await pool.query(
+        `insert into client_notes (host_id, email, note) values ($1, $2, $3)
+         on conflict (host_id, email) do update set note = $3, updated_at = now()`, [hostId, email, note]);
+    },
     async markRunningLate(manageToken, minutes, now) {
       return tx(async (client) => {
         // Only a confirmed booking. The host is emailed in the same write whenever the answer changes, so a double tap

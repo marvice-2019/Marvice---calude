@@ -331,6 +331,10 @@ export interface DataStore {
   resolveBookingLink(token: string, now: Date, opts?: { idempotencyKey?: string }): Promise<ResolvedBookingLink>;
   /** Records that the guest is running `minutes` late on a confirmed booking and emails the host. NotFoundError otherwise. */
   markRunningLate(manageToken: string, minutes: number, now: Date): Promise<BookingWithInvitee>;
+  /** The host's private note about a client (by email, any case); "" when none. */
+  getClientNote(hostId: string, email: string): Promise<string>;
+  /** Saves it; an empty note removes it. */
+  saveClientNote(hostId: string, email: string, note: string): Promise<void>;
   /**
    * A hidden one_off event type at the given times, with a single-use link to it that expires at the last time; all in one
    * write. Throws InvalidOneOffError unless there are 1–20 distinct future times and the duration is 5–720 minutes.

@@ -307,6 +307,18 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
     });
   });
 
+  describe("client notes", () => {
+    it("keeps one private note per client per host, matched in any email case; empty removes it", async () => {
+      const { rows: [other] } = await pool.query("insert into users (email, name, slug) values ('notes-other@example.com', 'Other Host', 'notes-other') returning id");
+      await store.saveClientNote(priya.id, "Meera@Example.com", "Interview prep; prefers mornings.");
+      await store.saveClientNote(priya.id, "meera@example.com", "Interview prep; prefers mornings. Paid for 5.");
+      expect(await store.getClientNote(priya.id, "MEERA@example.com")).toBe("Interview prep; prefers mornings. Paid for 5.");
+      expect(await store.getClientNote(other.id, "meera@example.com")).toBe("");
+      await store.saveClientNote(priya.id, "meera@example.com", "");
+      expect(await store.getClientNote(priya.id, "meera@example.com")).toBe("");
+    });
+  });
+
   describe("weekly series", () => {
     const WEEK = 7 * 86_400_000;
     it("books every week in one write; only the first week sends confirmations, every week gets reminders", async () => {
