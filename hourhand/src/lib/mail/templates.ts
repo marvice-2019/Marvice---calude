@@ -174,6 +174,17 @@ export function renderCalendarAlert(a: { accountEmail: string; disconnected: boo
   });
 }
 
+export function renderRenewalReminder(a: { planName: string; price: string; renewsOn: Date; timezone: string; planUrl: string }): RenderedMail {
+  const on = formatDate(a.renewsOn, a.timezone);
+  return render(`Your Hourhand ${a.planName} plan renews on ${on}`, {
+    heading: `${a.planName} renews in 7 days`,
+    intro: `Your ${a.planName} plan renews automatically on ${on}. Nothing to do if you want to keep it. To stop it, cancel or pause from your plan page before then.`,
+    rows: [["Plan", a.planName], ["Price", a.price], ["Renews", on]],
+    link: { label: "Manage your plan", url: a.planUrl },
+    footer: "Sent by Hourhand about your subscription.",
+  });
+}
+
 export function renderMagicLink(url: string): RenderedMail {
   return render("Your Hourhand sign-in link", {
     heading: "Sign in to Hourhand", intro: "Use the button below to sign in. The link works once and expires in 15 minutes.",

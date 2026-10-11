@@ -7,7 +7,8 @@ import type { InviteeAnswer, LocationKind } from "../data/types";
 import type { HourCycle } from "../format";
 import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { MailError, type Mailer } from "../mail/mailer";
-import { renderBookingMail, renderCalendarAlert, type BookingMailContext, type RenderedMail } from "../mail/templates";
+import { renderBookingMail, renderCalendarAlert, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
+import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
 
 // Runs due rows of the notifications queue: emails, and writes to the host's Google Calendar. Several workers can run
 // at once: each claims rows with FOR UPDATE SKIP LOCKED and a lease (locked_until), so a row is never run by two
@@ -29,7 +30,7 @@ const MIN = 60_000;
 export interface WorkerResult { claimed: number; sent: number; skipped: number; retrying: number; failed: number; deferred: number; released: number }
 export interface CalendarDeps { google: GoogleClient; key: Buffer }
 
-interface Claimed { id: string; booking_id: string | null; kind: NotificationKind; channel: string; recipient: string; attempts: number; locked_until: Date; dedupe_key: string }
+interface Claimed { id: string; booking_id: string | null; user_id: string; kind: NotificationKind; channel: string; recipient: string; attempts: number; locked_until: Date; dedupe_key: string }
 
 /** Claims up to `limit` due rows. Each claim counts as an attempt, so a row that keeps crashing its worker still runs out. */
 export async function claimDue(pool: pg.Pool, now: Date, limit: number): Promise<Claimed[]> {
@@ -39,7 +40,7 @@ export async function claimDue(pool: pg.Pool, now: Date, limit: number): Promise
            where status = 'queued' and channel in ('email', 'calendar') and send_at <= $1 and (locked_until is null or locked_until < $1)
            order by send_at limit $2 for update skip locked) due
      where n.id = due.id
-     returning n.id, n.booking_id, n.kind, n.channel, n.recipient, n.attempts, n.locked_until, n.dedupe_key`, [now, limit, LEASE_MINUTES]);
+     returning n.id, n.booking_id, n.user_id, n.kind, n.channel, n.recipient, n.attempts, n.locked_until, n.dedupe_key`, [now, limit, LEASE_MINUTES]);
   return rows as Claimed[];
 }
 
@@ -191,6 +192,23 @@ async function renderAlert(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<
   return renderCalendarAlert({ accountEmail: conn.account_email, disconnected: conn.status === "disconnected", lastError: conn.last_error, calendarsUrl: `${baseUrl}/dashboard/calendars` });
 }
 
+/** The renewal reminder goes only if that same period is still about to renew: not after a cancel, pause or renewal. */
+async function renderRenewal(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
+  const m = /^renewal:([^:]+):(\d+)$/.exec(c.dedupe_key);
+  const { rows: [s] } = await pool.query(
+    `select s.plan, s.interval, s.provider, s.provider_subscription_id, s.status, s.current_period_end, s.cancel_at_period_end, u.timezone
+       from subscriptions s join users u on u.id = s.user_id where s.user_id = $1`,
+    [c.user_id]);
+  if (!m || !s || s.provider_subscription_id !== m[1]) return { skip: "subscription changed" };
+  if (s.status !== "active" || s.cancel_at_period_end) return { skip: "subscription no longer renewing" };
+  if (!s.current_period_end || s.current_period_end.getTime() !== Number(m[2])) return { skip: "period already renewed" };
+  if (!(s.plan in PRICES)) return { skip: "not a paid plan" };
+  return renderRenewalReminder({
+    planName: PLAN_NAMES[s.plan as PaidPlan], price: priceLine(s.plan as PaidPlan, s.interval as BillingInterval, s.provider === "stripe" ? "USD" : "INR"),
+    renewsOn: s.current_period_end, timezone: s.timezone, planUrl: `${baseUrl}/dashboard/plan`,
+  });
+}
+
 export async function processDueNotifications(
   pool: pg.Pool, mailer: Mailer, opts: { baseUrl: string; now?: Date; limit?: number; calendar?: CalendarDeps | null },
 ): Promise<WorkerResult> {
@@ -230,8 +248,9 @@ export async function processDueNotifications(
       result.failed++;
       continue;
     }
-    const isAlert = c.kind === "calendar_alert_host";
-    if (!isAlert) {
+    // Host emails about their account rather than a booking.
+    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host";
+    if (!isAccountMail) {
       if (!r?.id) { await skip(c, "booking no longer exists"); continue; }
       const why = skipReason(c.kind, r, now);
       if (why) { await skip(c, why); continue; }
@@ -270,7 +289,9 @@ export async function processDueNotifications(
         if ("skip" in out) { await skip(c, out.skip); await release(c); continue; }
         providerId = out.eventId;
       } else {
-        const mail = isAlert ? await renderAlert(pool, c, opts.baseUrl) : renderBookingMail(c.kind as BookingEmailKind, toContext(r, opts.baseUrl));
+        const mail = c.kind === "calendar_alert_host" ? await renderAlert(pool, c, opts.baseUrl)
+          : c.kind === "renewal_reminder_host" ? await renderRenewal(pool, c, opts.baseUrl)
+          : renderBookingMail(c.kind as BookingEmailKind, toContext(r, opts.baseUrl));
         if ("skip" in mail) { await skip(c, mail.skip); continue; }
         ({ id: providerId } = await mailer.send({ ...mail, to: c.recipient, idempotencyKey: `notification-${c.id}` }));
       }

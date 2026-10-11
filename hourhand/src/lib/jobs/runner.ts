@@ -1,12 +1,13 @@
 import type pg from "pg";
 import { syncDueConnections } from "../calendar/sync";
+import { queueRenewalReminders } from "../billing/reminders";
 import { purgeClosedAccounts } from "../data/account-lifecycle";
 import type { Mailer } from "../mail/mailer";
 import { setJobKick } from "./kick";
 import { BATCH_SIZE, processDueNotifications, type CalendarDeps } from "./worker";
 
 // The job loop: every few seconds (or at once when kicked) it syncs due Google calendars, then runs due queue rows
-// (email and calendar writes); once an hour it purges closed accounts. All of it is safe on several servers at once.
+// (email and calendar writes); once an hour it queues plan renewal reminders and purges closed accounts. All of it is safe on several servers at once.
 
 const HOUR = 3_600_000;
 
@@ -49,6 +50,8 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
         }
         if (Date.now() - lastPurge >= HOUR) {
           lastPurge = Date.now();
+          const reminders = await queueRenewalReminders(opts.pool, new Date());
+          if (reminders) console.info(`[jobs] queued ${reminders} renewal ${reminders === 1 ? "reminder" : "reminders"}`);
           await purge(new Date());
         }
       } while (again);

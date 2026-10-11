@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { checkedCalendarLimit } from "../billing/account";
 import { seal, unseal } from "../crypto/seal";
 import { GoogleApiError, type GoogleCalendarEntry, type GoogleClient, type TokenSet } from "./google";
 
@@ -30,15 +31,21 @@ export async function saveGoogleConnection(pool: pg.Pool, key: Buffer, userId: s
          granted_scopes = excluded.granted_scopes, next_sync_at = excluded.next_sync_at, error_count = 0, last_error = null, alert_sent_at = null, updated_at = $5
        returning id`,
       [userId, tokens.email, sealed, tokens.scope, now]);
-    const { rows: [{ has_add_to }] } = await client.query("select exists (select 1 from calendars where user_id = $1 and is_add_to) as has_add_to", [userId]);
+    const { rows: [{ has_add_to, checked }] } = await client.query(
+      "select exists (select 1 from calendars where user_id = $1 and is_add_to) as has_add_to, (select count(*)::int from calendars where user_id = $1 and check_conflicts and connection_id <> $2) as checked",
+      [userId, conn.id]);
+    // A new primary calendar is checked for conflicts, unless that would go over the plan's limit.
+    let room = (await checkedCalendarLimit(client, userId)) - checked;
     for (const c of calendars) {
+      const check = c.primary && room > 0;
+      if (check) room--;
       const owner = c.accessRole === "owner";
       await client.query(
         `insert into calendars (connection_id, user_id, external_id, name, check_conflicts, is_add_to, access_role)
          values ($1, $2, $3, $4, $5, $6, $7)
          on conflict (connection_id, external_id) do update set name = excluded.name, access_role = excluded.access_role,
            is_add_to = calendars.is_add_to and excluded.access_role = 'owner', updated_at = now()`,
-        [conn.id, userId, c.id, c.name, c.primary, c.primary && owner && !has_add_to, c.accessRole]);
+        [conn.id, userId, c.id, c.name, check, c.primary && owner && !has_add_to, c.accessRole]);
     }
     // Calendars the host no longer has in Google stop counting; their busy times go with them (cascade).
     await client.query("delete from calendars where connection_id = $1 and not (external_id = any($2::text[]))", [conn.id, calendars.map((c) => c.id)]);
@@ -81,9 +88,16 @@ export async function disconnectConnection(pool: Db, google: GoogleClient | null
   return true;
 }
 
-/** Turns conflict checking on or off for one of the host's calendars. */
+/**
+ * Turns conflict checking on or off for one of the host's calendars. Turning one on fails (returns false) when the
+ * host's plan already checks as many calendars as it allows; turning one off always works.
+ */
 export async function setCheckConflicts(pool: Db, userId: string, calendarId: string, on: boolean): Promise<boolean> {
-  const { rowCount } = await pool.query("update calendars set check_conflicts = $3, updated_at = now() where id = $1 and user_id = $2", [calendarId, userId, on]);
+  const limit = on ? await checkedCalendarLimit(pool, userId) : Infinity;
+  const { rowCount } = await pool.query(
+    `update calendars set check_conflicts = $3, updated_at = now() where id = $1 and user_id = $2
+       and (not $3 or $4::int is null or (select count(*) from calendars o where o.user_id = $2 and o.check_conflicts and o.id <> $1) < $4::int)`,
+    [calendarId, userId, on, Number.isFinite(limit) ? limit : null]);
   return Boolean(rowCount);
 }
 

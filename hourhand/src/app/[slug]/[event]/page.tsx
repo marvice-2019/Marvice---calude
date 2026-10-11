@@ -1,3 +1,4 @@
+import { BookingFooter } from "@/components/BookingFooter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookingFlow } from "@/components/BookingFlow";
@@ -18,6 +19,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
       <p className="mt-2 text-text-muted">{eventType.durationMinutes} min</p>
       {eventType.description && <p className="mt-2 text-text">{eventType.description}</p>}
       <BookingFlow slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} questions={questions} />
+      <BookingFooter hostId={host.id} />
     </main>
   );
 }

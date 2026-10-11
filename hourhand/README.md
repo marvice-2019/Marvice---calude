@@ -88,11 +88,39 @@ Add these as authorized redirect URIs on the OAuth client: `https://<your-domain
 | `TOKEN_ENCRYPTION_KEY` | encrypting calendar tokens: 64 hex characters (`openssl rand -hex 32`). **Required when Google is configured**; keep it safe, changing it means every host reconnects |
 | `GOOGLE_API_BASE_URL`, `HOURHAND_E2E` | end-to-end tests against a fake Google only. A production server ignores the first unless the second is `1`; never set either on a real deployment |
 
+## Plans and billing
+
+Hosts choose a plan from Dashboard → Plan. Rupees go through Razorpay subscriptions (UPI AutoPay or card), US dollars through Stripe Checkout. It needs the Postgres store.
+
+- **Free:** 2 calendars checked for conflicts and a "Booked with Hourhand" footer on the booking pages. **Solo** and **Duo** remove both. Prices are in `src/lib/billing/plans.ts`; INR prices show 18% GST separately. Duo's second person isn't built yet, and the page says so.
+- **Plan state comes only from the provider.** A webhook only tells Hourhand which subscription changed; Hourhand re-reads that subscription from Razorpay or Stripe (under a lock, so two events can't interleave) and saves what it finds. Events arriving late, twice or out of order still end correct. Nothing the browser sends changes a plan.
+- **Webhooks** check the signature on the raw body (Stripe: refused if older than 5 minutes), are recorded once in `webhook_events`, and answer 500 when saving fails so the provider retries. A repeated event is acknowledged and ignored.
+- **Paid features** count while the subscription is active, or while a failed renewal is being retried. Paused or ended means Free.
+- **One subscription per host:** checkout is refused while one is live or paused. A late "cancelled" for an old subscription never takes away the plan a newer one pays for.
+- **Cancel** stops renewal and keeps the plan to the end of the paid period. **Pause** stops charges and paid features until the host resumes. Stripe hosts also get "Card and invoices" (Stripe's billing portal).
+- **Renewal reminder:** an email 7 days before each renewal, once per period, and not sent if the host cancelled or paused in the meantime.
+- **Downgrades** don't switch calendars off: a host who drops to Free keeps the calendars already checked (so nothing gets double-booked), but can't turn on more than 2.
+- **Not built yet:** switching between Solo and Duo on a live subscription (cancel, then choose again), and extra Duo seats.
+
+Set up, in test mode first. **Razorpay:** create 4 Plans (Solo and Duo, monthly and yearly: ₹399, ₹3,990, ₹599, ₹5,990 before GST) and a webhook to `https://<your-domain>/api/webhooks/razorpay` with the `subscription.*` events. **Stripe:** one Product per plan with a monthly and a yearly Price ($7, $70, $11, $110), the Customer Portal turned on, and a webhook to `https://<your-domain>/api/webhooks/stripe` with `checkout.session.completed`, `customer.subscription.*` and `invoice.*`.
+
+| variable | needed for |
+| --- | --- |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay API keys |
+| `RAZORPAY_WEBHOOK_SECRET` | the value you type when creating the Razorpay webhook |
+| `RAZORPAY_PLAN_SOLO_MONTH`, `RAZORPAY_PLAN_SOLO_YEAR`, `RAZORPAY_PLAN_DUO_MONTH`, `RAZORPAY_PLAN_DUO_YEAR` | the Razorpay Plan ids (`plan_…`) |
+| `STRIPE_SECRET_KEY` | Stripe API key (`sk_test_…` first) |
+| `STRIPE_WEBHOOK_SECRET` | the signing value Stripe shows for the webhook (`whsec_…`) |
+| `STRIPE_PRICE_SOLO_MONTH`, `STRIPE_PRICE_SOLO_YEAR`, `STRIPE_PRICE_DUO_MONTH`, `STRIPE_PRICE_DUO_YEAR` | the Stripe Price ids (`price_…`) |
+| `RAZORPAY_API_BASE_URL`, `STRIPE_API_BASE_URL` | end-to-end tests against fakes only; ignored in production unless `HOURHAND_E2E=1`. Never set on a real deployment |
+
+A provider shows as "not set up" until its API key and webhook value are both set.
+
 ## What is fake today
 
 - **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Push notifications from Google (instant sync) arrive in round B4b; until then busy times are at most 5 minutes old.
 - **Email in development:** without `RESEND_API_KEY`, every email is printed to the server log instead of sent.
-- **Payments, WhatsApp, Microsoft and iCloud calendars:** not wired up. They will need: `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
+- **Payments at booking (hosts charging guests), WhatsApp, Microsoft and iCloud calendars:** not wired up yet. Booking payments come in round B5b. The others will need `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
 
 ## Layout
 

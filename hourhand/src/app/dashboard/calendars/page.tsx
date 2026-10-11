@@ -20,6 +20,7 @@ const MESSAGES: Record<string, string> = {
   google: "Google didn't respond as expected. Try again in a minute.",
   not_configured: "Google Calendar isn't set up on this server yet.",
   demo: "The demo data can't connect a real calendar. Sign in with the database set up to connect one.",
+  calendar_limit: "The Free plan checks 2 calendars for conflicts. Stop checking one first, or move to Solo for unlimited calendars.",
 };
 
 function health(c: CalendarConnection, now: Date): { tone: string; words: string } {
