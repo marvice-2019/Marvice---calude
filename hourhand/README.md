@@ -57,7 +57,7 @@ Environment variables for sign-in:
 | `HOURHAND_ALLOW_MEMORY` | `1` only for a public demo. A production server refuses `HOURHAND_DATA=memory` (no sign-in) without it |
 | `BETTER_AUTH_SECRET` | signing sessions; a long random string (`openssl rand -hex 32`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in (optional) |
-| `RESEND_API_KEY`, `EMAIL_FROM` | sending email. `EMAIL_FROM` is a sender on your verified Resend domain, for example `Hourhand <bookings@mail.hourhand.app>`. **Required in production** |
+| `RESEND_API_KEY`, `EMAIL_FROM` | sending email. `EMAIL_FROM` is a sender on your verified Resend domain, for example `Hourhand <booking@hourhand.cloud>`. **Required in production** |
 | `HOURHAND_WORKER` | `0` to run a server without the job runner (only if another process runs it) |
 
 ## Email and jobs

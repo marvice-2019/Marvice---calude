@@ -184,7 +184,7 @@ Set `BETTER_AUTH_URL=https://hourhand.cloud` in Coolify. Register exactly these:
 | Razorpay Dashboard → Webhooks (your plans) | `https://hourhand.cloud/api/webhooks/razorpay`, events `subscription.*` |
 | Stripe Dashboard → Webhooks (if you get Stripe) | `https://hourhand.cloud/api/webhooks/stripe` |
 | Google Calendar instant sync | nothing to register: Hourhand tells Google `https://hourhand.cloud/api/webhooks/google-calendar` itself |
-| Resend → Domains | `mail.hourhand.cloud`, then `EMAIL_FROM=Hourhand <bookings@mail.hourhand.cloud>`; add the SPF, DKIM and DMARC records Resend shows to the domain's DNS |
+| Resend → Domains | `hourhand.cloud`, then `EMAIL_FROM=Hourhand <booking@hourhand.cloud>`; add the SPF, DKIM and DMARC records Resend shows to the domain's DNS. Replies from guests and hosts go to each other (Reply-To), not to this address; if you also want mail sent to booking@ to arrive somewhere, add a mailbox (Google Workspace or Zoho) with its own MX records |
 | DNS | an A record for `hourhand.cloud` (and `www`) pointing at the Coolify server; Coolify issues the certificate |
 
 ## Things only you can do (start the slow ones this week)
@@ -193,7 +193,7 @@ Set `BETTER_AUTH_URL=https://hourhand.cloud` in Coolify. Register exactly these:
 | --- | --- | --- |
 | Create a Google Cloud project with an OAuth client (web), redirect URI `https://<domain>/api/auth/callback/google`, plus `http://localhost:3000/...` for dev | 30 min | B2 |
 | Enable the Google Calendar API and **submit OAuth verification** for the `calendar.calendarlist.readonly`, `calendar.events.freebusy` and `calendar.events.owned` scopes (add exactly these on the consent screen first; B4b swapped `calendar.freebusy` for `calendar.events.freebusy`). Until it is approved, the app is limited to 100 test users | **2–6 weeks** | B4, public launch |
-| Resend account, domain `mail.<domain>` with SPF, DKIM, DMARC `p=none` | 1 day for DNS | B3 |
+| Resend account, domain `hourhand.cloud` with SPF, DKIM, DMARC `p=none`; sender `booking@hourhand.cloud` | 1 day for DNS | B3 |
 | Razorpay account (test mode keys) and KYC for live; turn on Subscriptions; create the 4 Plans and the webhook (see README → Plans and billing) | KYC takes days | B5 |
 | Stripe account (test mode keys); 2 Products with monthly and yearly Prices, Customer Portal on, webhook (see README) | 30 min | B5 |
 | In Razorpay (test mode first), set the business and GST invoice details: **Marvice Media Private Limited**, GSTIN **33AAMCM6642H1ZB** (Tamil Nadu), 37, Veeraragavapuram, Ekkadu Post, Tiruvallur, Tamil Nadu 602021; GST invoices at 18% on plan amounts set before tax. Decided 2026-10-11: invoices are issued from the Tamil Nadu registration | 15 min | B5 |
