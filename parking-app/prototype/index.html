@@ -1,0 +1,489 @@
+<title>Bayline Parking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: signage-led app shell. Search strip on top, list + schematic map side by side on desktop, stacked with a bottom nav on phones. Detail opens as a drawer (desktop) or sheet (phone). */
+:root{
+  --bg:#F3F5F9; --surface:#FFFFFF; --ink:#0F1B33; --muted:#5B6680; --line:#D8DEEA;
+  --sign:#1446A0; --on-sign:#FFFFFF; --kerb:#F2B705; --ok:#1F8A4C; --warn:#B4540A;
+  --map:#E6EBF3; --road:#FFFFFF; --water:#C9D9F0; --green:#D3E4CF; --shade:rgba(15,27,51,.45);
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0C1220; --surface:#141C2E; --ink:#E7ECF6; --muted:#94A0BA; --line:#26314A;
+  --sign:#5B8DEF; --on-sign:#0C1220; --kerb:#F5C534; --ok:#4CC27F; --warn:#F0A050;
+  --map:#111A2B; --road:#22304A; --water:#1A2E4D; --green:#1B2E24; --shade:rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1220; --surface:#141C2E; --ink:#E7ECF6; --muted:#94A0BA; --line:#26314A;
+  --sign:#5B8DEF; --on-sign:#0C1220; --kerb:#F5C534; --ok:#4CC27F; --warn:#F0A050;
+  --map:#111A2B; --road:#22304A; --water:#1A2E4D; --green:#1B2E24; --shade:rgba(0,0,0,.6); color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--kerb);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+
+.notice{background:var(--kerb);color:#0F1B33;font-size:13px;text-align:center;padding:6px 16px}
+header.top{display:flex;align-items:center;gap:20px;padding-inline:16px;padding-block:12px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:20}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-stretch:75%;font-weight:800;font-size:24px;letter-spacing:.01em}
+.p-sign{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:5px;background:var(--sign);color:var(--on-sign);font-family:var(--f-display);font-weight:800;font-size:20px;line-height:1}
+nav.tabs{display:flex;gap:4px;margin-left:auto}
+nav.tabs button{background:none;border:0;padding:8px 12px;border-radius:6px;color:var(--muted);font-weight:700}
+nav.tabs button[aria-current="page"]{color:var(--ink);background:var(--bg)}
+
+main{padding-inline:16px;padding-block:16px 96px;max-width:1240px;margin-inline:auto}
+.view[hidden]{display:none}
+
+/* search strip */
+.search{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.field input,.field select{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:9px 10px;min-width:0;width:100%}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--bg)}
+.seg button{border:0;background:none;padding:9px 14px;font-weight:700;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--sign);color:var(--on-sign)}
+.err{color:var(--warn);font-size:13px;min-height:1em}
+
+.results-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-block:16px 10px}
+.results-head h1{font-family:var(--f-display);font-stretch:85%;font-size:26px;margin:0;text-wrap:balance}
+.results-head .sort{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+.results-head select{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 8px}
+
+.find-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start}
+.list{display:flex;flex-direction:column;gap:10px;min-width:0}
+.lot{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:start;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+.lot:hover{border-color:var(--sign)}
+.lot[aria-current="true"]{border-color:var(--sign);box-shadow:0 0 0 2px var(--sign) inset}
+.lot .p-sign{width:44px;height:44px;font-size:26px}
+.lot h3{margin:0;font-size:16px;line-height:1.25}
+.lot .meta{color:var(--muted);font-size:13px;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted)}
+.chip.ev{color:var(--ok);border-color:var(--ok)}
+.price{text-align:right}
+.price b{font-family:var(--f-display);font-stretch:80%;font-size:22px;display:block;line-height:1.1}
+.price span{font-size:12px;color:var(--muted)}
+.left{font-size:12px;font-weight:700;color:var(--ok);margin-top:6px}
+.left.low{color:var(--warn)}
+
+.mapwrap{position:sticky;top:calc(env(safe-area-inset-top,0px) + 76px);background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.mapwrap svg{display:block;width:100%;height:auto;max-width:100%}
+.mapcap{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+svg .bg{fill:var(--map)} svg .rd{stroke:var(--road);fill:none;stroke-linecap:round}
+svg .wt{fill:var(--water)} svg .gr{fill:var(--green)}
+svg .lbl{fill:var(--muted);font:600 9px var(--f-body);letter-spacing:.06em;text-transform:uppercase}
+svg .pin rect{fill:var(--surface);stroke:var(--sign);stroke-width:1.5}
+svg .pin text{fill:var(--ink);font:700 10px var(--f-body)}
+svg .pin.on rect{fill:var(--sign)} svg .pin.on text{fill:var(--on-sign)}
+svg .pin{cursor:pointer}
+svg .me{fill:var(--kerb);stroke:var(--ink);stroke-width:1.5}
+
+/* drawer / sheet */
+.scrim{position:fixed;inset:0;background:var(--shade);z-index:40}
+.sheet{position:fixed;z-index:41;background:var(--surface);color:var(--ink);top:0;right:0;bottom:0;width:min(440px,100%);overflow-y:auto;box-shadow:-8px 0 30px rgba(0,0,0,.18);padding-inline:20px;padding-block:calc(env(safe-area-inset-top,0px) + 18px) calc(env(safe-area-inset-bottom,0px) + 24px)}
+.sheet h2{font-family:var(--f-display);font-stretch:80%;font-size:28px;line-height:1.1;margin:6px 0 4px;text-wrap:balance}
+.close{float:right;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:4px 10px;font-weight:700}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:14px 0;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right}
+.bill{border-top:1px dashed var(--line);margin-top:14px;padding-top:12px;display:grid;gap:6px}
+.bill div{display:flex;justify-content:space-between;gap:12px}
+.bill .tot{font-weight:700;font-size:17px;border-top:1px solid var(--line);padding-top:8px}
+.btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;border:0;border-radius:8px;padding:12px 16px;font-weight:700;background:var(--sign);color:var(--on-sign);width:100%}
+.btn.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.stack{display:grid;gap:10px;margin-top:16px}
+.pay{display:grid;gap:8px;margin-top:6px}
+.pay label{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.pay input{accent-color:var(--sign)}
+.sec-h{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin:18px 0 6px}
+
+/* passes */
+.passes{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.pass{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.pass .ph{background:var(--sign);color:var(--on-sign);padding:14px 16px;display:flex;justify-content:space-between;gap:10px;align-items:start}
+.pass .ph h3{margin:0;font-family:var(--f-display);font-stretch:80%;font-size:22px;line-height:1.1}
+.pass .pb{padding:14px 16px;display:grid;gap:10px}
+.pass canvas{width:132px;height:132px;image-rendering:pixelated;background:#fff;border-radius:6px;padding:6px;align-self:center;justify-self:center}
+.status{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;background:var(--bg);color:var(--ink)}
+.status.live{background:var(--ok);color:var(--surface)}
+.tag{font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid currentColor;border-radius:4px;padding:1px 6px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--muted)}
+
+/* monthly + owners */
+.intro{max-width:62ch}
+.intro h1{font-family:var(--f-display);font-stretch:85%;font-size:30px;margin:4px 0 6px;text-wrap:balance}
+.intro p{color:var(--muted);margin:0}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:18px}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:8px}
+.mcard h3{margin:0;font-size:16px}
+.mcard b{font-family:var(--f-display);font-stretch:80%;font-size:24px}
+.owner{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;margin-top:18px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px}
+.big{font-family:var(--f-display);font-stretch:80%;font-size:40px;font-weight:800;line-height:1}
+.formula{font-size:13px;color:var(--muted)}
+.steps{margin:0;padding-left:20px;display:grid;gap:8px}
+input[type=range]{accent-color:var(--sign);width:100%}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 84px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:700;z-index:60}
+
+nav.bottom{display:none}
+@media (max-width:900px){
+  .search{grid-template-columns:1fr 1fr}
+  .search .f-area{grid-column:1/-1}
+  .find-grid{grid-template-columns:minmax(0,1fr)}
+  .mapwrap{position:static;order:-1}
+  .owner{grid-template-columns:minmax(0,1fr)}
+  nav.tabs{display:none}
+  nav.bottom{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  nav.bottom button{background:none;border:0;padding:10px 4px 12px;font-size:12px;font-weight:700;color:var(--muted);display:grid;justify-items:center;gap:3px}
+  nav.bottom button[aria-current="page"]{color:var(--sign)}
+  nav.bottom i{display:block;width:22px;height:4px;border-radius:2px;background:currentColor;opacity:.35}
+  nav.bottom button[aria-current="page"] i{opacity:1}
+  .sheet{top:auto;left:0;width:100%;max-height:92%;border-radius:16px 16px 0 0;padding-top:18px}
+}
+@media (max-width:480px){.search{grid-template-columns:1fr}.seg{width:100%}.seg button{flex:1}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="notice">Prototype. Sample lots and prices for Bengaluru. No real payment is taken.</div>
+<header class="top">
+  <div class="brand"><span class="p-sign" aria-hidden="true">P</span>Bayline</div>
+  <nav class="tabs" aria-label="Main">
+    <button data-go="find" aria-current="page">Find parking</button>
+    <button data-go="passes">My passes</button>
+    <button data-go="monthly">Monthly</button>
+    <button data-go="owners">List your space</button>
+  </nav>
+</header>
+
+<main>
+  <!-- FIND -->
+  <section class="view" id="v-find">
+    <form class="search" id="search" novalidate>
+      <div class="field f-area"><label for="area">Where are you going?</label>
+        <select id="area"></select></div>
+      <div class="field"><label for="arrive">Arrive</label><input type="datetime-local" id="arrive"></div>
+      <div class="field"><label for="leave">Leave</label><input type="datetime-local" id="leave"></div>
+      <div class="field"><label id="vlab">Vehicle</label>
+        <div class="seg" role="group" aria-labelledby="vlab">
+          <button type="button" data-veh="car" aria-pressed="true">Car</button>
+          <button type="button" data-veh="bike" aria-pressed="false">Bike</button>
+        </div></div>
+    </form>
+    <div class="err" id="search-err" role="alert"></div>
+    <div class="results-head">
+      <h1 id="rhead">Parking near MG Road</h1>
+      <div class="sort"><label for="sort">Sort by</label>
+        <select id="sort"><option value="dist">Nearest</option><option value="price">Lowest price</option><option value="left">Most spots left</option></select></div>
+    </div>
+    <div class="find-grid">
+      <div class="list" id="list"></div>
+      <div class="mapwrap">
+        <svg viewBox="0 0 400 300" id="map" role="img" aria-label="Schematic map of Bengaluru with parking lots"></svg>
+        <div class="mapcap"><span>Schematic map, not to scale</span><span>Tap a price to open the lot</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PASSES -->
+  <section class="view" id="v-passes" hidden>
+    <div class="intro"><h1>My passes</h1><p>Show the entry code at the gate. You can extend a live pass or cancel free before it starts.</p></div>
+    <div class="passes" id="passes" style="margin-top:18px"></div>
+  </section>
+
+  <!-- MONTHLY -->
+  <section class="view" id="v-monthly" hidden>
+    <div class="intro"><h1>Monthly parking</h1><p>One fixed fee for unlimited entries at one lot. Request a pass and the lot operator confirms your bay within one working day.</p></div>
+    <div class="mgrid" id="monthly"></div>
+  </section>
+
+  <!-- OWNERS -->
+  <section class="view" id="v-owners" hidden>
+    <div class="intro"><h1>Earn from empty bays</h1><p>Offices, apartments, malls and hospitals list idle bays by the hour or month. You set the price and the hours; we send the drivers.</p></div>
+    <div class="owner">
+      <div class="panel">
+        <div class="field"><label for="o-bays">Bays you can list: <span id="o-bays-v" class="num"></span></label><input type="range" id="o-bays" min="1" max="200" value="20"></div>
+        <div class="field"><label for="o-rate">Hourly rate (car): ₹<span id="o-rate-v" class="num"></span></label><input type="range" id="o-rate" min="10" max="150" step="5" value="40"></div>
+        <div class="field"><label for="o-hours">Hours open per day: <span id="o-hours-v" class="num"></span></label><input type="range" id="o-hours" min="4" max="24" value="12"></div>
+        <div class="field"><label for="o-occ">Expected occupancy: <span id="o-occ-v" class="num"></span>%</label><input type="range" id="o-occ" min="5" max="90" step="5" value="35"></div>
+      </div>
+      <div class="panel">
+        <div class="sec-h" style="margin:0">Estimated monthly payout</div>
+        <div class="big num" id="o-out">₹0</div>
+        <div class="formula" id="o-formula"></div>
+        <div class="sec-h" style="margin:4px 0 0">How listing works</div>
+        <ol class="steps">
+          <li>Share bay count, timings and gate photos.</li>
+          <li>We verify the site and set up QR or number-plate entry.</li>
+          <li>Bookings go live. Payouts reach your bank every Monday.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="bottom" aria-label="Main">
+  <button data-go="find" aria-current="page"><i></i>Find</button>
+  <button data-go="passes"><i></i>Passes</button>
+  <button data-go="monthly"><i></i>Monthly</button>
+  <button data-go="owners"><i></i>List space</button>
+</nav>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden aria-modal="true" role="dialog" aria-labelledby="sheet-title"></aside>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+(function(){
+const GST = 0.18, FEE = 15, KM_PER_UNIT = 0.14;
+const AREAS = [
+  {id:"mg",name:"MG Road",x:200,y:170},{id:"ind",name:"Indiranagar",x:252,y:166},
+  {id:"kor",name:"Koramangala",x:216,y:226},{id:"wf",name:"Whitefield",x:356,y:158},
+  {id:"heb",name:"Hebbal",x:192,y:72},{id:"kia",name:"Kempegowda Airport",x:204,y:20}
+];
+// Sample lots. Names describe location only; operators and prices are illustrative.
+const LOTS = [
+  {id:"L1",name:"MG Road Metro Multilevel",area:"Central",x:197,y:166,car:40,bike:15,cap:280,monthly:4200,left:46,type:"Multilevel",covered:true,ev:true,h24:false,hours:"06:00–23:30"},
+  {id:"L2",name:"Brigade Road Basement P1",area:"Central",x:207,y:181,car:50,bike:20,cap:350,monthly:5000,left:7,type:"Basement",covered:true,ev:false,h24:true,hours:"Open 24 hours"},
+  {id:"L3",name:"100 Feet Road Open Lot",area:"Indiranagar",x:256,y:160,car:35,bike:10,cap:220,monthly:3500,left:22,type:"Open surface",covered:false,ev:false,h24:false,hours:"08:00–23:00"},
+  {id:"L4",name:"Koramangala 5th Block Deck",area:"Koramangala",x:219,y:229,car:30,bike:10,cap:200,monthly:3200,left:31,type:"Covered deck",covered:true,ev:true,h24:true,hours:"Open 24 hours"},
+  {id:"L5",name:"HSR Sector 2 Apartment Bays",area:"HSR Layout",x:246,y:262,car:25,bike:10,cap:180,monthly:2600,left:4,type:"Owner-listed",covered:true,ev:false,h24:false,hours:"09:00–20:00"},
+  {id:"L6",name:"ITPL Main Road Gate 3",area:"Whitefield",x:352,y:153,car:30,bike:10,cap:220,monthly:3000,left:58,type:"Open surface",covered:false,ev:true,h24:true,hours:"Open 24 hours"},
+  {id:"L7",name:"Manyata Visitor Deck",area:"Hebbal",x:214,y:80,car:40,bike:15,cap:300,monthly:3800,left:19,type:"Multilevel",covered:true,ev:true,h24:false,hours:"07:00–22:00"},
+  {id:"L8",name:"Airport Long-Stay P4",area:"Devanahalli",x:207,y:24,car:60,bike:25,cap:450,monthly:0,left:120,type:"Open surface",covered:false,ev:true,h24:true,hours:"Open 24 hours"}
+];
+
+const S = {area:"mg", veh:"car", sort:"dist", sel:null, arrive:null, leave:null, view:"find"};
+const $ = s => document.querySelector(s);
+const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
+const pad = n => String(n).padStart(2,"0");
+const toLocal = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmt = d => d.toLocaleString("en-IN",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function store(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||"null");localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+
+/* ---------- pricing ---------- */
+// Hourly rate per started hour, capped at 8x rate per 24h block. GST 18% on parking + platform fee.
+function quote(lot, veh, a, b){
+  const rate = veh==="bike" ? lot.bike : lot.car, dayCap = rate*8;
+  let hrs = Math.max(1, Math.ceil((b-a)/36e5)), base = 0;
+  for(let left=hrs; left>0; left-=24) base += Math.min(Math.min(left,24)*rate, dayCap);
+  const gst = Math.round((base+FEE)*GST);
+  return {hrs, rate, base, fee:FEE, gst, total:base+FEE+gst};
+}
+function dist(l){const a=AREAS.find(x=>x.id===S.area);return Math.hypot(l.x-a.x,l.y-a.y)*KM_PER_UNIT}
+
+/* ---------- search ---------- */
+function initSearch(){
+  const sel=$("#area");
+  sel.innerHTML = AREAS.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join("");
+  const now=new Date(); now.setMinutes(0,0,0); now.setHours(now.getHours()+1);
+  S.arrive=now; S.leave=new Date(+now+3*36e5);
+  $("#arrive").value=toLocal(S.arrive); $("#leave").value=toLocal(S.leave);
+  sel.onchange=()=>{S.area=sel.value;S.sel=null;renderFind()};
+  $("#arrive").onchange=$("#leave").onchange=readTimes;
+  document.querySelectorAll("[data-veh]").forEach(b=>b.onclick=()=>{
+    S.veh=b.dataset.veh;document.querySelectorAll("[data-veh]").forEach(x=>x.setAttribute("aria-pressed",x===b));renderFind()});
+  $("#sort").onchange=e=>{S.sort=e.target.value;renderFind()};
+  $("#search").onsubmit=e=>e.preventDefault();
+}
+function readTimes(){
+  const a=new Date($("#arrive").value), b=new Date($("#leave").value), err=$("#search-err");
+  if(isNaN(a)||isNaN(b)){err.textContent="Enter both arrival and leaving times.";return}
+  if(b<=a){err.textContent="Leaving time must be after arrival. Move it later.";return}
+  if(b-a>30*864e5){err.textContent="Bookings run up to 30 days. For longer stays, use Monthly.";return}
+  err.textContent="";S.arrive=a;S.leave=b;renderFind();
+}
+
+function sorted(){
+  const arr=LOTS.map(l=>({l,d:dist(l),q:quote(l,S.veh,S.arrive,S.leave)}));
+  const k={dist:(a,b)=>a.d-b.d,price:(a,b)=>a.q.total-b.q.total,left:(a,b)=>b.l.left-a.l.left}[S.sort];
+  return arr.sort(k);
+}
+function renderFind(){
+  const area=AREAS.find(a=>a.id===S.area);
+  const hrs=quote(LOTS[0],S.veh,S.arrive,S.leave).hrs;
+  $("#rhead").textContent=`${S.veh==="bike"?"Bike":"Car"} parking near ${area.name} · ${hrs} h`;
+  $("#list").innerHTML=sorted().map(({l,d,q})=>`
+    <button class="lot" data-lot="${l.id}" aria-current="${S.sel===l.id}">
+      <span class="p-sign" aria-hidden="true">P</span>
+      <span style="min-width:0">
+        <h3>${esc(l.name)}</h3>
+        <div class="meta">${esc(l.area)} · ${d.toFixed(1)} km · ${esc(l.type)}</div>
+        <div class="chips">${l.covered?'<span class="chip">Covered</span>':''}${l.ev?'<span class="chip ev">EV charging</span>':''}<span class="chip">${esc(l.hours)}</span></div>
+        <div class="left ${l.left<10?'low':''}">${l.left<10?`Only ${l.left} spots left`:`${l.left} spots left`}</div>
+      </span>
+      <span class="price"><b class="num">${inr(q.total)}</b><span>total incl. GST</span><br><span class="num">${inr(q.rate)}/hr</span></span>
+    </button>`).join("");
+  document.querySelectorAll("[data-lot]").forEach(b=>b.onclick=()=>openLot(b.dataset.lot));
+  renderMap();
+}
+
+/* ---------- map ---------- */
+function renderMap(){
+  const area=AREAS.find(a=>a.id===S.area);
+  const pins=LOTS.map(l=>{const q=quote(l,S.veh,S.arrive,S.leave),t=inr(q.rate),w=t.length*6.4+10;
+    return `<g class="pin ${S.sel===l.id?'on':''}" data-pin="${l.id}" tabindex="0" role="button" aria-label="${esc(l.name)}, ${t} per hour">
+      <rect x="${l.x-w/2}" y="${l.y-17}" width="${w}" height="15" rx="3"/><text x="${l.x}" y="${l.y-6.5}" text-anchor="middle">${t}</text>
+      <path d="M${l.x-3} ${l.y-2.5} L${l.x} ${l.y+1} L${l.x+3} ${l.y-2.5}" class="${S.sel===l.id?'':'rd'}" style="stroke:var(--sign);fill:var(--sign)"/></g>`}).join("");
+  $("#map").innerHTML=`
+    <rect class="bg" width="400" height="300"/>
+    <ellipse class="wt" cx="300" cy="215" rx="26" ry="14"/><ellipse class="wt" cx="150" cy="120" rx="18" ry="10"/><ellipse class="wt" cx="270" cy="95" rx="14" ry="8"/>
+    <rect class="gr" x="170" y="135" width="30" height="22" rx="4"/><rect class="gr" x="150" y="200" width="22" height="30" rx="4"/>
+    <path class="rd" stroke-width="7" d="M200 0 L200 300"/>
+    <path class="rd" stroke-width="6" d="M60 170 L400 160"/>
+    <path class="rd" stroke-width="5" d="M120 120 Q 200 40 300 110 Q 360 170 300 250 Q 200 300 120 230 Q 80 170 120 120"/>
+    <path class="rd" stroke-width="4" d="M210 180 L320 260"/><path class="rd" stroke-width="4" d="M250 170 L260 300"/>
+    <text class="lbl" x="206" y="12">NH 44 · Airport</text><text class="lbl" x="300" y="152">Old Airport Rd</text><text class="lbl" x="66" y="162">Mysore Rd</text><text class="lbl" x="315" y="105">Outer Ring Rd</text>
+    <circle class="me" cx="${area.x}" cy="${area.y}" r="6"/><text class="lbl" x="${area.x+9}" y="${area.y+16}">${esc(area.name)}</text>
+    ${pins}`;
+  document.querySelectorAll("[data-pin]").forEach(p=>{p.onclick=()=>openLot(p.dataset.pin);p.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openLot(p.dataset.pin)}}});
+}
+
+/* ---------- sheet ---------- */
+function openSheet(html){$("#sheet").innerHTML=html;$("#sheet").hidden=false;$("#scrim").hidden=false;$("#sheet").querySelector(".close")?.focus()}
+function closeSheet(){$("#sheet").hidden=true;$("#scrim").hidden=true}
+$("#scrim").onclick=closeSheet;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#sheet").hidden)closeSheet()});
+
+function billHTML(q){return `<div class="bill num">
+  <div><span>Parking · ${q.hrs} h at ${inr(q.rate)}/hr${q.base<q.hrs*q.rate?' (daily cap applied)':''}</span><span>${inr(q.base)}</span></div>
+  <div><span>Platform fee</span><span>${inr(q.fee)}</span></div>
+  <div><span>GST 18%</span><span>${inr(q.gst)}</span></div>
+  <div class="tot"><span>Total</span><span>${inr(q.total)}</span></div></div>`}
+
+function openLot(id){
+  S.sel=id; renderFind();
+  const l=LOTS.find(x=>x.id===id), q=quote(l,S.veh,S.arrive,S.leave);
+  openSheet(`<button class="close" data-close>Close</button>
+    <span class="tag" style="color:var(--sign)">${esc(l.type)}</span>
+    <h2 id="sheet-title">${esc(l.name)}</h2>
+    <div style="color:var(--muted)">${esc(l.area)} · ${dist(l).toFixed(1)} km from ${esc(AREAS.find(a=>a.id===S.area).name)}</div>
+    <dl class="kv">
+      <dt>Arrive</dt><dd>${fmt(S.arrive)}</dd><dt>Leave</dt><dd>${fmt(S.leave)}</dd>
+      <dt>Vehicle</dt><dd>${S.veh==="bike"?"Two-wheeler":"Car"}</dd><dt>Timings</dt><dd>${esc(l.hours)}</dd>
+      <dt>Spots left</dt><dd class="num">${l.left} of ${l.cap}</dd>
+      <dt>Facilities</dt><dd>${[l.covered&&"Covered",l.ev&&"EV charging","CCTV","Attendant"].filter(Boolean).join(", ")}</dd>
+    </dl>
+    ${billHTML(q)}
+    <form id="co" class="stack" novalidate>
+      <div class="field"><label for="vno">Vehicle number</label><input id="vno" autocomplete="off" placeholder="KA 01 AB 1234" style="text-transform:uppercase"></div>
+      <div class="field"><label for="mob">Mobile for WhatsApp pass</label><input id="mob" inputmode="numeric" maxlength="10" placeholder="98765 43210"></div>
+      <div class="sec-h">Pay with</div>
+      <div class="pay">
+        <label><input type="radio" name="pm" value="UPI" checked> UPI (GPay, PhonePe, Paytm)</label>
+        <label><input type="radio" name="pm" value="Card"> Debit or credit card</label>
+        <label><input type="radio" name="pm" value="Netbanking"> Netbanking</label>
+      </div>
+      <div class="err" id="co-err" role="alert"></div>
+      <button class="btn" type="submit">Pay ${inr(q.total)} and get pass</button>
+      <div style="font-size:12px;color:var(--muted)">Free cancellation until your arrival time. Overstay is charged at ${inr(q.rate)}/hr at exit.</div>
+    </form>`);
+  $("#sheet [data-close]").onclick=closeSheet;
+  $("#co").onsubmit=e=>{e.preventDefault();checkout(l,q)};
+}
+
+const VNO=/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{0,3}\s?\d{4}$|^\d{2}\s?BH\s?\d{4}\s?[A-Z]{1,2}$/;
+function checkout(l,q){
+  const v=$("#vno").value.trim().toUpperCase(), m=$("#mob").value.replace(/\D/g,""), err=$("#co-err");
+  if(!VNO.test(v)){err.textContent="Enter a valid number plate, for example KA 01 AB 1234 or 22 BH 1234 AB.";return}
+  if(!/^[6-9]\d{9}$/.test(m)){err.textContent="Enter a 10-digit Indian mobile number starting with 6, 7, 8 or 9.";return}
+  const id="BL-"+Math.random().toString(36).slice(2,7).toUpperCase();
+  const pm=document.querySelector("input[name=pm]:checked").value;
+  bookings.unshift({id,lot:l.id,veh:S.veh,vno:v,arrive:+S.arrive,leave:+S.leave,total:q.total,pm,example:false});
+  save(); closeSheet(); go("passes"); toast(`Booked. Pass ${id} is ready.`);
+}
+
+/* ---------- passes ---------- */
+let bookings = store("bayline.bookings") || [];
+if(!bookings.length){const a=new Date();a.setMinutes(0,0,0);a.setHours(a.getHours()-1);
+  bookings=[{id:"BL-EX4MP",lot:"L4",veh:"car",vno:"KA 05 MN 4821",arrive:+a,leave:+a+4*36e5,total:quote(LOTS[3],"car",a,new Date(+a+4*36e5)).total,pm:"UPI",example:true}]}
+function save(){store("bayline.bookings",bookings.filter(b=>!b.example))}
+
+function drawCode(cv,id){ // illustrative entry code, not a real QR
+  const n=21,c=cv.getContext("2d");cv.width=cv.height=n;c.fillStyle="#fff";c.fillRect(0,0,n,n);c.fillStyle="#0F1B33";
+  let h=0;for(const ch of id)h=(h*31+ch.charCodeAt(0))>>>0;
+  const rnd=()=>(h=(h*1103515245+12345)>>>0)/4294967296;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(rnd()>.52)c.fillRect(x,y,1,1);
+  [[0,0],[n-7,0],[0,n-7]].forEach(([x,y])=>{c.fillStyle="#0F1B33";c.fillRect(x,y,7,7);c.fillStyle="#fff";c.fillRect(x+1,y+1,5,5);c.fillStyle="#0F1B33";c.fillRect(x+2,y+2,3,3)});
+}
+function rel(ms){const m=Math.round(Math.abs(ms)/6e4),h=Math.floor(m/60);return h?`${h} h ${m%60} min`:`${m} min`}
+function renderPasses(){
+  const now=Date.now(), el=$("#passes");
+  if(!bookings.length){el.innerHTML=`<div class="empty">No passes yet. Find a lot and book; your pass shows up here and on WhatsApp.</div>`;return}
+  el.innerHTML=bookings.map(b=>{const l=LOTS.find(x=>x.id===b.lot);
+    const st=now<b.arrive?["Starts in "+rel(b.arrive-now),""]:now<b.leave?["Live · ends in "+rel(b.leave-now),"live"]:["Completed",""];
+    return `<article class="pass"><div class="ph"><div><h3>${esc(l.name)}</h3><div style="font-size:13px;opacity:.85">${esc(l.area)}</div></div>
+      ${b.example?'<span class="tag">Example</span>':''}</div>
+      <div class="pb"><span class="status ${st[1]}">${st[0]}</span>
+      <canvas data-code="${b.id}" aria-label="Entry code for ${b.id}"></canvas>
+      <dl class="kv" style="margin:0"><dt>Pass</dt><dd class="mono">${b.id}</dd><dt>Vehicle</dt><dd class="mono">${esc(b.vno)}</dd>
+      <dt>From</dt><dd>${fmt(new Date(b.arrive))}</dd><dt>Until</dt><dd>${fmt(new Date(b.leave))}</dd><dt>Paid</dt><dd class="num">${inr(b.total)} · ${b.pm}</dd></dl>
+      <div class="row2">${now<b.leave?`<button class="btn" data-ext="${b.id}">Extend 1 hour</button>`:''}${now<b.arrive?`<button class="btn ghost" data-cancel="${b.id}">Cancel free</button>`:''}</div></div></article>`}).join("");
+  el.querySelectorAll("canvas").forEach(c=>drawCode(c,c.dataset.code));
+  el.querySelectorAll("[data-ext]").forEach(btn=>btn.onclick=()=>{const b=bookings.find(x=>x.id===btn.dataset.ext),l=LOTS.find(x=>x.id===b.lot);
+    const rate=b.veh==="bike"?l.bike:l.car, add=Math.round(rate*(1+GST));b.leave+=36e5;b.total+=add;save();renderPasses();toast(`Extended by 1 hour for ${inr(add)} incl. GST.`)});
+  el.querySelectorAll("[data-cancel]").forEach(btn=>btn.onclick=()=>{bookings=bookings.filter(x=>x.id!==btn.dataset.cancel);save();renderPasses();toast("Cancelled. Full refund in 3–5 working days.")});
+}
+
+/* ---------- monthly ---------- */
+function renderMonthly(){
+  $("#monthly").innerHTML=LOTS.filter(l=>l.monthly).map(l=>`<div class="mcard">
+    <h3>${esc(l.name)}</h3><div style="color:var(--muted);font-size:13px">${esc(l.area)} · ${esc(l.type)} · ${esc(l.hours)}</div>
+    <div><b class="num">${inr(l.monthly)}</b> <span style="color:var(--muted);font-size:13px">/ month + 18% GST (${inr(l.monthly*GST)})</span></div>
+    <button class="btn ghost" data-req="${l.id}">Request monthly pass</button></div>`).join("");
+  document.querySelectorAll("[data-req]").forEach(b=>b.onclick=()=>{const l=LOTS.find(x=>x.id===b.dataset.req);
+    const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+1);
+    openSheet(`<button class="close" data-close>Close</button><span class="tag" style="color:var(--sign)">Monthly pass</span>
+      <h2 id="sheet-title">${esc(l.name)}</h2>
+      <form id="mf" class="stack" novalidate>
+        <div class="field"><label for="m-name">Full name</label><input id="m-name" autocomplete="name"></div>
+        <div class="field"><label for="m-vno">Vehicle number</label><input id="m-vno" style="text-transform:uppercase" placeholder="KA 01 AB 1234"></div>
+        <div class="field"><label for="m-start">Start date</label><input type="date" id="m-start" value="${toLocal(d).slice(0,10)}"></div>
+        ${billHTML({hrs:0,rate:0,base:l.monthly,fee:0,gst:Math.round(l.monthly*GST),total:Math.round(l.monthly*(1+GST))}).replace(/Parking · 0 h at ₹0\/hr/,"Monthly fee")}
+        <div class="err" id="mf-err" role="alert"></div>
+        <button class="btn" type="submit">Send request to operator</button>
+        <div style="font-size:12px;color:var(--muted)">You pay only after the operator confirms a bay. Billing is due by the 5th of each month.</div>
+      </form>`);
+    $("#sheet [data-close]").onclick=closeSheet;
+    $("#mf").onsubmit=e=>{e.preventDefault();
+      if($("#m-name").value.trim().length<2){$("#mf-err").textContent="Enter the name on your vehicle registration.";return}
+      if(!VNO.test($("#m-vno").value.trim().toUpperCase())){$("#mf-err").textContent="Enter a valid number plate, for example KA 01 AB 1234.";return}
+      closeSheet();toast("Request sent. The operator replies within one working day.")};
+  });
+}
+
+/* ---------- owners ---------- */
+const COMMISSION=0.15;
+function renderOwner(){
+  const g=id=>+$("#"+id).value, bays=g("o-bays"),rate=g("o-rate"),hrs=g("o-hours"),occ=g("o-occ")/100;
+  ["o-bays","o-rate","o-hours","o-occ"].forEach(id=>$("#"+id+"-v").textContent=$("#"+id).value);
+  const gross=bays*rate*hrs*30*occ, out=gross*(1-COMMISSION);
+  $("#o-out").textContent=inr(out);
+  $("#o-formula").textContent=`${bays} bays × ₹${rate}/hr × ${hrs} h × 30 days × ${Math.round(occ*100)}% occupancy = ${inr(gross)} gross, less 15% platform commission. Before GST and TDS, which apply to your payout separately.`;
+}
+["o-bays","o-rate","o-hours","o-occ"].forEach(id=>$("#"+id).oninput=renderOwner);
+
+/* ---------- nav ---------- */
+function go(v){S.view=v;
+  ["find","passes","monthly","owners"].forEach(x=>$("#v-"+x).hidden=x!==v);
+  document.querySelectorAll("[data-go]").forEach(b=>b.dataset.go===v?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
+  if(v==="passes")renderPasses(); if(v==="monthly")renderMonthly(); if(v==="owners")renderOwner();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
+let tt;function toast(t){const e=$("#toast");e.textContent=t;e.hidden=false;clearTimeout(tt);tt=setTimeout(()=>e.hidden=true,3200)}
+setInterval(()=>{if(S.view==="passes")renderPasses()},60000);
+
+initSearch(); renderFind();
+const h=location.hash.slice(1); if(["passes","monthly","owners"].includes(h))go(h);
+})();
+</script>
