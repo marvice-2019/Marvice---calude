@@ -8,6 +8,7 @@ import { focusRing } from "./ui/focus";
 const items = [
   { href: "/dashboard/bookings", label: "Bookings" },
   { href: "/dashboard/clients", label: "Clients" },
+  { href: "/dashboard/profile", label: "Your page" },
   { href: "/dashboard/event-types", label: "Event types" },
   { href: "/dashboard/links", label: "Links" },
   { href: "/dashboard/packages", label: "Packages" },
