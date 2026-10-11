@@ -32,5 +32,5 @@ export function startJobsFromEnv(env: Record<string, string | undefined> = proce
     payments = null;
   }
   shared.__hourhandJobs = startJobRunner({ pool, mailer, baseUrl, calendar, payments });
-  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, calendars ${calendar ? `${Object.keys(calendar.providers).join(" + ")} on, Google ${calendar.pushAddress ? "instant" : "polling"}` : "off"}, booking payments ${payments ? "on" : "off"})`);
+  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, calendars ${calendar ? `${Object.keys(calendar.providers).join(" + ")} on${calendar.providers.google ? `, Google ${calendar.pushAddress ? "instant" : "polling"}` : ""}` : "off"}, booking payments ${payments ? "on" : "off"})`);
 }
