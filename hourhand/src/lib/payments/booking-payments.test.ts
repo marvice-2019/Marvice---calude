@@ -1,12 +1,15 @@
 // Paid bookings against real Postgres and a fake Razorpay (only with TEST_DATABASE_URL; uses its own database <name>_bp,
 // dropped and recreated on every run).
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "../data/pg-store";
-import { SlotTakenError, type DataStore, type User } from "../data/types";
+import { SlotTakenError, type DataStore, type EventType, type User } from "../data/types";
+import { freeSlots, handleCreateBooking, type PaymentDeps } from "../booking";
+import type { Plan } from "../billing/plans";
+import { handleConfirmPayment } from "./confirm-handler";
 import { keyPairAuth } from "./host-razorpay";
 import { razorpayOrders } from "./razorpay-orders";
 import { applyCapturedPayment, confirmPayment, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, reconcilePayments, startPaidBooking } from "./booking-payments";
@@ -299,6 +302,80 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
       expect(await run(fake, new Date(first.getTime() + 30_000))).toMatchObject({ claimed: 0 });
       expect(await run(fake, new Date(first.getTime() + 61_000))).toMatchObject({ claimed: 1 });
       await unchanged(id);
+    });
+  });
+  describe("booking routes", () => {
+    const now = () => new Date();
+    let et: EventType;
+    const setPrice = async (minor: number | null) => {
+      await pool.query("update event_types set price_minor = $2, currency = $3 where id = $1", [eventTypeId, minor, minor === null ? null : "INR"]);
+      et = (await store.listEventTypes(priya.id)).find((e) => e.id === eventTypeId)!;
+    };
+    const deps = (fake = fakeRazorpay(), o: { plan?: Plan; connected?: boolean } = {}): PaymentDeps =>
+      ({ pool, authFor: async () => (o.connected === false ? null : auth), ordersFor: () => fake.orders, planFor: async () => o.plan ?? "solo" });
+    /** A booking request for the next time the engine offers, with every required question answered. */
+    async function request(key = randomUUID()) {
+      const start = (await freeSlots(store, priya, et, now(), new Date(Date.now() + 14 * 86_400_000), now()))[0];
+      const questions = await store.listCustomQuestions(priya.id, eventTypeId);
+      const answers = Object.fromEntries(questions.filter((q) => q.required).map((q) => [q.id, "yes"]));
+      return { slug: "priya", event: et.slug, start: start.toISOString(), name: "Asha", email: "asha@example.in", timezone: "Asia/Kolkata", answers, idempotencyKey: key };
+    }
+    type Created = { bookingId: string; manageToken: string; payment: { orderId: string; holdExpiresAt: string } | null };
+
+    beforeEach(() => setPrice(50_000));
+    afterAll(() => setPrice(null));
+
+    it("refuses a priced event when the host is on Free, has no Razorpay, or payments aren't set up", async () => {
+      const req = await request();
+      expect(await handleCreateBooking(store, req, now(), undefined, deps(undefined, { plan: "free" }))).toEqual({ status: 409, body: { error: "payments_unavailable" } });
+      expect(await handleCreateBooking(store, req, now(), undefined, deps(undefined, { connected: false }))).toEqual({ status: 409, body: { error: "payments_unavailable" } });
+      expect(await handleCreateBooking(store, req, now(), undefined, null)).toEqual({ status: 409, body: { error: "payments_unavailable" } });
+      expect((await store.listBookings(priya.id)).some((b) => b.idempotencyKey === req.idempotencyKey)).toBe(false);
+    });
+
+    it("holds a priced booking and returns its payment; a repeat returns the same order", async () => {
+      const fake = fakeRazorpay();
+      const req = await request();
+      const first = await handleCreateBooking(store, req, now(), undefined, deps(fake));
+      expect(first.status).toBe(201);
+      const body = first.body as Created;
+      expect(body.payment).toMatchObject({ keyId: auth.keyId, amount: 50_000, currency: "INR" });
+      expect(new Date(body.payment!.holdExpiresAt).getTime()).toBeGreaterThan(Date.now());
+      expect((await booking(body.bookingId)).status).toBe("pending_payment");
+      const again = await handleCreateBooking(store, req, now(), undefined, deps(fake));
+      expect(again.status).toBe(200);
+      expect((again.body as Created).payment!.orderId).toBe(body.payment!.orderId);
+      expect(fake.state.creates).toBe(1);
+    });
+
+    it("answers 502 when the order can't be created", async () => {
+      const fake = fakeRazorpay();
+      fake.state.failCreate = true;
+      expect(await handleCreateBooking(store, await request(), now(), undefined, deps(fake))).toEqual({ status: 502, body: { error: "payment_unavailable" } });
+    });
+
+    it("confirms a good payment by manage token, and rejects a bad signature or unknown token", async () => {
+      const fake = fakeRazorpay();
+      const body = (await handleCreateBooking(store, await request(), now(), undefined, deps(fake))).body as Created;
+      const pay: FakePayment = { id: "pay_route1", order_id: body.payment!.orderId, amount: 50_000, currency: "INR", status: "captured" };
+      fake.state.payments.set(pay.id, pay);
+      const d = deps(fake);
+      expect(await handleConfirmPayment(store, d, { manageToken: body.manageToken, paymentId: pay.id, signature: "nope" }, now()))
+        .toEqual({ status: 400, body: { error: "bad_signature" } });
+      expect(await handleConfirmPayment(store, d, { manageToken: "no-such-token", paymentId: pay.id, signature: sign(pay.order_id, pay.id) }, now()))
+        .toEqual({ status: 404, body: { error: "not_found" } });
+      expect(await handleConfirmPayment(store, d, { manageToken: body.manageToken, paymentId: 5 }, now())).toMatchObject({ status: 400 });
+      expect(await handleConfirmPayment(store, d, { manageToken: body.manageToken, paymentId: pay.id, signature: sign(pay.order_id, pay.id) }, now()))
+        .toEqual({ status: 200, body: { status: "confirmed" } });
+      expect((await booking(body.bookingId)).status).toBe("confirmed");
+    });
+
+    it("a free event still books and confirms straight away, with or without payments", async () => {
+      await setPrice(null);
+      const r = await handleCreateBooking(store, await request(), now(), undefined, deps(undefined, { plan: "free" }));
+      expect(r.status).toBe(201);
+      expect((r.body as Created).payment).toBeUndefined();
+      expect((await booking((r.body as Created).bookingId)).status).toBe("confirmed");
     });
   });
 });

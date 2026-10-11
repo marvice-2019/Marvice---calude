@@ -70,6 +70,9 @@ export const BOOKING_LIMITS = {
   perIp: { max: 10, windowMs: 60 * 60_000 },
 } satisfies Record<string, Limit>;
 
+/** Payment confirmations, per client address: generous for a guest retrying, tight enough to stop probing tokens. */
+export const CONFIRM_PAYMENT_LIMIT: Limit = { max: 20, windowMs: 60 * 60_000 };
+
 /**
  * The client's address as our reverse proxy saw it. Coolify's Traefik appends the real address to x-forwarded-for,
  * so the rightmost entry is the trustworthy one; anything to its left was sent by the client and can be forged.
