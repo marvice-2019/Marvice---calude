@@ -13,7 +13,7 @@ Recon: S19 "One-off / single-use link" (S04 → New → One-off): a meeting with
   - Only its SHA-256 hash is stored, so the raw token is shown once, when created, with a copy button.
 - Opening `/l/{token}` shows that event type's normal booking page (times, form, payment if priced). Booking through it uses the link up.
   - Use the link in the **same transaction** as creating the booking. Two guests racing on one link means exactly one booking, and the other sees "This link has already been used".
-  - A booking that fails or expires unpaid (B5b pending_payment hold that lapses) gives the link back, i.e. the link is consumed by a confirmed booking or an unexpired hold.
+  - **Used** is derived, not stored: a link is used when a booking with its `booking_link_id` exists that is not `cancelled` with `cancelled_by = 'system'`. So a lapsed or failed payment hold frees the link with no extra code, while a guest or host cancel, or a reschedule, keeps it used.
   - Rescheduling a booking made through a link keeps working through the manage link and does not need the single-use link.
 - Link states, shown on the Links page:
   - **Open**: not used, not expired, not revoked.
@@ -34,7 +34,7 @@ Recon: S19 "One-off / single-use link" (S04 → New → One-off): a meeting with
 
 ## Data (migration 0009)
 - `booking_links`:
-  - columns: id, user_id, event_type_id, token_hash (unique), label, expires_at null, revoked_at null, used_booking_id null references bookings on delete set null, created_at;
+  - columns: id, user_id, event_type_id, token_hash (unique), label, expires_at null, revoked_at null, created_at;
   - index on user_id.
 - `one_off_times`: event_type_id references event_types on delete cascade, start_at; primary key on both.
 - A booking made through a link records `bookings.booking_link_id` (nullable, references booking_links on delete set null).
