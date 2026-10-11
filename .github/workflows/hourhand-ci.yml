@@ -1,4 +1,5 @@
-# Hourhand: types, lint, unit tests (with a real Postgres for the database tests) and a production build on every PR.
+# Hourhand: types, lint, unit tests (with a real Postgres for the database tests), a production build,
+# and the end-to-end scripts against that build (local fake Google, Microsoft, Razorpay, Stripe and CalDAV servers) on every PR.
 name: Hourhand CI
 
 on:
@@ -18,7 +19,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: hourhand
@@ -52,3 +53,15 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: End-to-end
+        # Drops and recreates hourhand_e2e for each group; any FAIL, or a script that crashes, fails the step.
+        env:
+          E2E_PG: postgres://postgres:postgres@localhost:5432
+        run: sh e2e/run-all.sh
+      - name: Keep e2e logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: hourhand/e2e/.out/
+          retention-days: 7
