@@ -58,11 +58,11 @@ async function inTx<T>(pool: pg.Pool, work: (client: pg.PoolClient) => Promise<T
 
 export async function startPaidBooking(
   deps: { pool: pg.Pool; store: Pick<DataStore, "createBooking">; auth: HostRazorpayAuth; orders: RazorpayOrders },
-  input: CreateBookingInput & { priceMinor: number },
+  input: CreateBookingInput & { priceMinor: number; kind?: "payment" | "deposit" },
   now: Date,
 ): Promise<{ booking: BookingWithInvitee; payment: CheckoutPayment | null }> {
   const { pool, store, auth, orders } = deps;
-  const { priceMinor, ...bookingInput } = input;
+  const { priceMinor, kind = "payment", ...bookingInput } = input;
   const booking = await store.createBooking({ ...bookingInput, holdUntil: new Date(now.getTime() + HOLD_MINUTES * 60_000) });
   // A repeat of a request whose booking already settled (paid, expired, cancelled): nothing left to pay.
   if (booking.status !== "pending_payment" || !booking.holdExpiresAt) return { booking, payment: null };
@@ -89,8 +89,8 @@ export async function startPaidBooking(
     const raced = await paymentFor(client, booking.id);
     if (raced) return raced;
     await client.query(
-      `insert into payments (booking_id, host_id, provider, provider_order_id, amount_minor, currency, status) values ($1, $2, 'razorpay', $3, $4, $5, 'pending')`,
-      [booking.id, booking.hostId, order.id, priceMinor, CURRENCY]);
+      `insert into payments (booking_id, host_id, provider, provider_order_id, amount_minor, currency, status, kind) values ($1, $2, 'razorpay', $3, $4, $5, 'pending', $6)`,
+      [booking.id, booking.hostId, order.id, priceMinor, CURRENCY, kind]);
     return { provider_order_id: order.id, amount_minor: priceMinor, currency: CURRENCY };
   });
   return { booking, payment: checkout(row) };
@@ -249,6 +249,24 @@ export async function reconcilePayments(deps: PaymentCheckDeps & { pool: pg.Pool
   return result;
 }
 
+/** How long after a session ends the host has to mark a no-show before the guest's deposit goes back. */
+export const DEPOSIT_HOLD_MS = 24 * 60 * 60_000;
+
+/**
+ * Deposits whose session ended over a day ago with no no-show marked: queued for a full refund (processRefunds does it).
+ * A deposit kept for a no-show stays paid. Returns how many were released.
+ */
+export async function releaseDeposits(pool: pg.Pool, now: Date, limit = 50): Promise<number> {
+  const { rowCount } = await pool.query(
+    `update payments p set status = 'refund_pending', checked_at = null, updated_at = $1
+     where p.id in (
+       select p2.id from payments p2 join bookings b on b.id = p2.booking_id join invitees i on i.booking_id = b.id
+       where p2.kind = 'deposit' and p2.status = 'paid' and b.status = 'confirmed' and i.no_show_at is null
+         and b.end_at < $1::timestamptz - $2 * interval '1 millisecond'
+       limit $3 for update of p2 skip locked)`, [now, DEPOSIT_HOLD_MS, limit]);
+  return rowCount ?? 0;
+}
+
 export interface RefundResult { claimed: number; refunded: number; errors: number }
 
 interface RefundRow { id: string; booking_id: string; host_id: string; provider_payment_id: string }
@@ -310,11 +328,11 @@ export async function processRefunds(deps: PaymentCheckDeps & { pool: pg.Pool },
   return result;
 }
 
-export interface BookingPaymentSummary { amountMinor: number; status: "pending" | "paid" | "failed" | "refunded" | "refund_pending"; lastError: string | null }
+export interface BookingPaymentSummary { amountMinor: number; status: "pending" | "paid" | "failed" | "refunded" | "refund_pending"; lastError: string | null; kind: "payment" | "deposit" }
 
 /** The latest payment on one of the host's own bookings, for the host's dashboard. Another host's booking reads as null. */
 export async function bookingPayment(db: Pick<pg.Pool, "query">, hostId: string, bookingId: string): Promise<BookingPaymentSummary | null> {
   const { rows: [p] } = await db.query(
-    `select amount_minor, status, last_error from payments where booking_id = $1 and host_id = $2 order by created_at desc limit 1`, [bookingId, hostId]);
-  return p ? { amountMinor: p.amount_minor, status: p.status, lastError: p.last_error } : null;
+    `select amount_minor, status, last_error, kind from payments where booking_id = $1 and host_id = $2 order by created_at desc limit 1`, [bookingId, hostId]);
+  return p ? { amountMinor: p.amount_minor, status: p.status, lastError: p.last_error, kind: p.kind } : null;
 }

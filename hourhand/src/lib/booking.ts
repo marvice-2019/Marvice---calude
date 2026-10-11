@@ -235,16 +235,18 @@ export async function handleCreateBooking(
   if (isResult(found)) return found;
   const { host, eventType } = found;
   if (req.packageToken && found.linkToken) return { status: 400, body: { error: "invalid_request", fields: { packageToken: "Use your package link or the single-use link, not both." } } };
-  // A package buyer may book their sessions weekly (up to what's left, checked in the write); otherwise the host's setting rules.
+  // A package buyer may book their sessions weekly (up to what's left, checked in the write); otherwise the host's setting
+  // rules, and a price or deposit holds one booking at a time.
   const maxWeeks = req.packageToken ? 12 : eventType.maxRepeats;
-  if (req.weeks > 1 && (req.weeks > maxWeeks || found.linkToken || (!req.packageToken && eventType.priceMinor))) {
+  if (req.weeks > 1 && (req.weeks > maxWeeks || found.linkToken || (!req.packageToken && (eventType.priceMinor || eventType.depositMinor)))) {
     return { status: 400, body: { error: "invalid_request", fields: { weeks: maxWeeks > 1 ? `Book up to ${maxWeeks} weeks at a time.` : "This event can't be repeated." } } };
   }
 
   // A repeated submit returns the booking it already made, before the slot re-check (which it would now fail).
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
-  // Paid for with a package: no payment at booking, whatever the event type's price.
-  const priceMinor = req.packageToken ? null : eventType.priceMinor;
+  // What the guest pays now: the price, or else a refundable no-show deposit. Paid for with a package: nothing at booking.
+  const priceMinor = req.packageToken ? null : eventType.priceMinor ?? eventType.depositMinor;
+  const paymentKind = eventType.priceMinor === null ? "deposit" as const : "payment" as const;
   // A priced repeat goes through startPaidBooking below instead, so a still-held booking gets its payment details back.
   if (existing && !priceMinor) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
   // A priced repeat that is no longer waiting on payment: a confirmed one is simply returned (even if the host has since
@@ -279,7 +281,7 @@ export async function handleCreateBooking(
 
   const startPaid = async (p: { auth: HostRazorpayAuth; deps: PaymentDeps }, priceMinor: number, status: number): Promise<HandlerResult> => {
     const { booking, payment } = await startPaidBooking(
-      { pool: p.deps.pool, store, auth: p.auth, orders: p.deps.ordersFor(p.auth) }, { ...bookingInput, priceMinor }, now);
+      { pool: p.deps.pool, store, auth: p.auth, orders: p.deps.ordersFor(p.auth) }, { ...bookingInput, priceMinor, kind: paymentKind }, now);
     return { status, body: { bookingId: booking.id, manageToken: booking.invitee.manageToken, payment: payment && { ...payment, holdExpiresAt: payment.holdExpiresAt.toISOString() } } };
   };
 

@@ -27,6 +27,8 @@ export interface BookingMailContext {
   cancelReason: string | null;
   /** What the guest paid for this booking (paise, INR), or null for a free booking. */
   paidMinor?: number | null;
+  /** The payment was a refundable no-show deposit, not a price. */
+  paidIsDeposit?: boolean;
   /** For reschedules: when the booking used to be. */
   previousStartAt: Date | null;
   /** For a rescheduled booking: who moved it (who cancelled the old one). */
@@ -112,7 +114,7 @@ function guestRows(c: BookingMailContext): Row[] {
   const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.guestTimezone, "12h")], ...seriesRow(c, c.guestTimezone, "12h"), ["With", hostLabel(c)]];
   const w = where(c);
   if (w) rows.push(["Where", w]);
-  if (c.paidMinor) rows.push(["Paid", formatMoney(c.paidMinor, "INR")]);
+  if (c.paidMinor) rows.push(c.paidIsDeposit ? ["Deposit", `${formatMoney(c.paidMinor, "INR")}, refunded a day after your session. Kept only if you don't turn up.`] : ["Paid", formatMoney(c.paidMinor, "INR")]);
   return rows;
 }
 
@@ -122,7 +124,9 @@ function hostRows(c: BookingMailContext): Row[] {
   const w = where(c);
   if (w) rows.push(["Where", w]);
   for (const a of c.answers) if (a.answer.trim()) rows.push([a.label, a.answer]);
-  if (c.paidMinor) rows.push(["Paid", `${formatMoney(c.paidMinor, "INR")} to your Razorpay account`]);
+  if (c.paidMinor) rows.push(c.paidIsDeposit
+    ? ["Deposit", `${formatMoney(c.paidMinor, "INR")} in your Razorpay account. Refunded a day after the session unless you mark a no-show.`]
+    : ["Paid", `${formatMoney(c.paidMinor, "INR")} to your Razorpay account`]);
   return rows;
 }
 
@@ -144,7 +148,7 @@ function cancelNote(c: BookingMailContext, to: "guest" | "host"): string | undef
   const reason = c.cancelReason ? `Reason given: ${c.cancelReason}` : "";
   // A paid booking is refunded in full on cancellation; say so, since that's what the guest wants to know first.
   const refund = !c.paidMinor ? "" : to === "guest"
-    ? `Your payment of ${formatMoney(c.paidMinor, "INR")} is being refunded to the way you paid. Banks usually take 5 to 7 working days.`
+    ? `Your ${c.paidIsDeposit ? "deposit" : "payment"} of ${formatMoney(c.paidMinor, "INR")} is being refunded to the way you paid. Banks usually take 5 to 7 working days.`
     : `The guest's ${formatMoney(c.paidMinor, "INR")} is being refunded from your Razorpay account.`;
   return [refund, reason].filter(Boolean).join(" ") || undefined;
 }

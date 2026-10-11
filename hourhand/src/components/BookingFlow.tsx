@@ -20,7 +20,7 @@ interface Props {
   bookingWindowDays: number;
   questions: FlowQuestion[];
   /** For a priced event: the price as shown ("₹499") and the names Checkout shows the guest. */
-  paid?: { price: string; hostName: string; eventName: string } | null;
+  paid?: { price: string; hostName: string; eventName: string; deposit?: boolean } | null;
   /** Booking through a single-use link: times and the booking go through the link, which is used up by the booking. */
   linkToken?: string;
   /** Open the picker on this suggested time's day. */
@@ -87,7 +87,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
     setCheckoutFailed(false); setNotPaid(false);
     let result;
     try {
-      result = await payWithRazorpay(h.payment, { name: paid?.hostName ?? "", description: paid?.eventName ?? "", prefill: h.prefill });
+      result = await payWithRazorpay(h.payment, { name: paid?.hostName ?? "", description: paid?.deposit ? `${paid.eventName} (refundable deposit)` : paid?.eventName ?? "", prefill: h.prefill });
     } catch {
       setHeld(h);
       setCheckoutFailed(true);
@@ -263,7 +263,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
           <Button type="button" loading={busy} onClick={() => { const h = held; setHeld(null); void pay(h); }}>Pay {paid?.price}</Button>
         </div>
       ) : (
-        <Button type="submit" loading={busy}>{busy ? "Booking…" : paid ? `Continue to pay ${paid.price}` : packageToken ? (weeks > 1 ? `Book ${weeks} sessions` : "Book with your package") : "Book this time"}</Button>
+        <Button type="submit" loading={busy}>{busy ? "Booking…" : paid ? `Continue to pay ${paid.price}${paid.deposit ? " deposit" : ""}` : packageToken ? (weeks > 1 ? `Book ${weeks} sessions` : "Book with your package") : "Book this time"}</Button>
       )}
     </form>
   );

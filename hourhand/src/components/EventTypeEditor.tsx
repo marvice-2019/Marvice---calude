@@ -18,7 +18,7 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-const DETAIL_FIELDS: (keyof EventTypeForm)[] = ["name", "slug", "durationMinutes", "price", "description", "locationKind", "locationValue"];
+const DETAIL_FIELDS: (keyof EventTypeForm)[] = ["name", "slug", "durationMinutes", "price", "deposit", "description", "locationKind", "locationValue"];
 const PRESET_DURATIONS = [15, 30, 45, 60];
 
 const LOCATIONS: { kind: LocationKind | ""; label: string }[] = [
@@ -218,6 +218,16 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
               <Link href="/dashboard/integrations" className="inline-flex min-h-11 items-center font-semibold text-accent underline">Connect Razorpay</Link>
             </div>
           )}
+        </div>
+        <div>
+          <Label htmlFor="f-deposit">No-show deposit (₹)</Label>
+          <Input
+            id="f-deposit" inputMode="decimal" value={form.deposit} onChange={(e) => set("deposit")(e.target.value)} error={errors.deposit}
+            aria-describedby="f-deposit-hint" className="max-w-32" placeholder="None"
+          />
+          <p id="f-deposit-hint" className="mt-1 text-sm text-text-muted">
+            For a free event. Guests pay it to book; it&apos;s refunded a day after the session, unless you mark them a no-show by then. Cancelling in time refunds it too.
+          </p>
         </div>
         <div>
           <label className="flex min-h-11 items-start gap-3">

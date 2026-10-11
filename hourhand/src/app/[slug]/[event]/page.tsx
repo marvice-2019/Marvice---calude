@@ -29,6 +29,12 @@ export default async function PublicEventPage({ params, searchParams }: { params
       <h1 className="font-display text-xl text-text">{eventType.name}</h1>
       <p className="mt-2 text-text-muted">{eventType.durationMinutes} min{eventType.priceMinor !== null && ` · ${formatMoney(eventType.priceMinor, "INR")}`}</p>
       {eventType.description && <p className="mt-2 text-text">{eventType.description}</p>}
+      {eventType.priceMinor === null && eventType.depositMinor !== null && (
+        <p className="mt-2 max-w-xl rounded-md bg-surface p-3 text-sm text-text">
+          Free, with a {formatMoney(eventType.depositMinor, "INR")} refundable deposit to hold your time. It comes back to you a day after the session, or
+          when you cancel in time. {host.name} keeps it only if you don&apos;t turn up.
+        </p>
+      )}
       {packages.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-x-6">
           {packages.map((p) => (
@@ -42,7 +48,8 @@ export default async function PublicEventPage({ params, searchParams }: { params
       )}
       <BookingFlow
         slug={host.slug} event={eventType.slug} host={{ name: host.name, timezone: host.timezone }} maxWeeks={eventType.priceMinor === null ? eventType.maxRepeats : 1} initialAt={typeof at === "string" ? at : undefined} bookingWindowDays={eventType.bookingWindowDays} questions={questions}
-        paid={eventType.priceMinor !== null ? { price: formatMoney(eventType.priceMinor, "INR"), hostName: host.name, eventName: eventType.name } : null}
+        paid={eventType.priceMinor !== null ? { price: formatMoney(eventType.priceMinor, "INR"), hostName: host.name, eventName: eventType.name }
+          : eventType.depositMinor !== null ? { price: formatMoney(eventType.depositMinor, "INR"), hostName: host.name, eventName: eventType.name, deposit: true } : null}
       />
       <BookingFooter hostId={host.id} />
     </main>

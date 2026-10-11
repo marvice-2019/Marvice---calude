@@ -49,6 +49,8 @@ export interface EventType {
   kind: "one_on_one" | "group" | "one_off";
   /** Guests may book the same time weekly for up to this many weeks in one go; 1 = no repeats. Free event types only. */
   maxRepeats: number;
+  /** A refundable no-show deposit in paise, on a free event type; null = none. Refunded after the session unless marked a no-show. */
+  depositMinor: number | null;
 }
 
 /** What the host enters for a one-off meeting. */
@@ -341,7 +343,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 
