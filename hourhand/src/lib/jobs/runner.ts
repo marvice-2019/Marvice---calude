@@ -44,7 +44,7 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
     try {
       do {
         again = false;
-        if (opts.calendar) await syncDueConnections(opts.pool, opts.calendar.google, opts.calendar.key);
+        if (opts.calendar) await syncDueConnections(opts.pool, opts.calendar.providers, opts.calendar.key);
         // Its own catch: a payment check that fails must not hold up the emails below.
         if (opts.payments) await reconcilePayments({ pool: opts.pool, ...opts.payments }, new Date()).catch((error) => console.error("[jobs] payment check failed", error));
         if (opts.payments) await processRefunds({ pool: opts.pool, ...opts.payments }, new Date()).catch((error) => console.error("[jobs] refunds failed", error));
@@ -54,7 +54,7 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
           if (r.claimed < BATCH_SIZE && r.released === 0) break;
         }
         // Watch channels are a nice-to-have on top of polling: run after the emails, and a failure stops nothing.
-        if (opts.calendar?.pushAddress) {
+        if (opts.calendar?.pushAddress && opts.calendar.google) {
           await maintainChannels(opts.pool, opts.calendar.google, opts.calendar.key, opts.calendar.pushAddress)
             .catch((error) => console.warn("[jobs] calendar watch upkeep failed; polling continues", error));
         }

@@ -3,6 +3,9 @@
 
 export type CalendarProviderId = "google" | "microsoft";
 
+/** How a provider is named in messages a host may read. */
+export const PROVIDER_NAMES: Record<CalendarProviderId, string> = { google: "Google", microsoft: "Microsoft" };
+
 /** Thrown by every provider. `revoked`: only a reconnect fixes it (grant revoked, permission removed). */
 export class CalendarApiError extends Error {
   readonly status: number | null;

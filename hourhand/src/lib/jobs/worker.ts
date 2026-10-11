@@ -1,6 +1,7 @@
 import type pg from "pg";
 import { accessTokenFor } from "../calendar/connections";
-import { GoogleApiError, type GoogleClient } from "../calendar/google";
+import type { GoogleClient } from "../calendar/google";
+import { CalendarApiError, PROVIDER_NAMES, type CalendarProvider, type CalendarProviderId, type CalendarProviders } from "../calendar/provider";
 import { recordConnectionFailure } from "../calendar/sync";
 import type { BookingEmailKind, CalendarJobKind, NotificationKind } from "../data/notifications";
 import type { InviteeAnswer, LocationKind } from "../data/types";
@@ -29,7 +30,8 @@ const MIN = 60_000;
 /** `released`: emails a calendar write just unblocked, which are due now (the runner goes round again for them). */
 export interface WorkerResult { claimed: number; sent: number; skipped: number; retrying: number; failed: number; deferred: number; released: number }
 /** `pushAddress`: where Google sends change pings, or null when push can't work (no public https URL). */
-export interface CalendarDeps { google: GoogleClient; key: Buffer; pushAddress?: string | null }
+/** `providers`: the calendar providers configured here. `google`: the Google client, for watch channels only. */
+export interface CalendarDeps { providers: CalendarProviders; google?: GoogleClient; key: Buffer; pushAddress?: string | null }
 
 interface Claimed { id: string; booking_id: string | null; user_id: string; kind: NotificationKind; channel: string; recipient: string; attempts: number; locked_until: Date; dedupe_key: string }
 
@@ -121,18 +123,21 @@ export function deferReason(kind: NotificationKind, r: ContextRow, now: Date, ca
   return null;
 }
 
-/** Writes one booking change to the host's Google Calendar. Returns the event id, or a reason to skip. */
+/** Writes one booking change to the host's calendar. Returns the event id, or a reason to skip. */
 async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: ContextRow, baseUrl: string, now: Date): Promise<{ eventId: string } | { skip: string }> {
   const calendarRow = async (calendarId: unknown) => {
     if (typeof calendarId !== "string" || !/^[0-9a-f-]{36}$/i.test(calendarId)) return null;
     const { rows: [cal] } = await pool.query(
-      `select c.external_id, c.connection_id from calendars c join calendar_connections cc on cc.id = c.connection_id
+      `select c.external_id, c.connection_id, cc.provider from calendars c join calendar_connections cc on cc.id = c.connection_id
        where c.id = $1 and c.user_id = $2 and cc.status <> 'disconnected'`, [calendarId, r.host_id]);
-    return cal ? { externalId: cal.external_id as string, connectionId: cal.connection_id as string } : null;
+    return cal ? { externalId: cal.external_id as string, connectionId: cal.connection_id as string, providerId: cal.provider as CalendarProviderId } : null;
   };
+  /** The provider for a calendar's connection, or a reason to skip when that provider isn't configured here. */
+  const providerOf = (cal: { providerId: CalendarProviderId }): CalendarProvider | { skip: string } =>
+    deps.providers[cal.providerId] ?? { skip: `${PROVIDER_NAMES[cal.providerId] ?? cal.providerId} calendars are not configured on this server` };
   const kind = c.kind as CalendarJobKind;
   const ctx = toContext(r, baseUrl);
-  const where = ctx.location && ctx.location.kind !== "google_meet"
+  const where = ctx.location && ctx.location.kind !== "google_meet" && ctx.location.kind !== "teams"
     ? (ctx.location.value ? `${GUEST_LOCATION_LABELS[ctx.location.kind]}: ${ctx.location.value}` : GUEST_LOCATION_LABELS[ctx.location.kind]) : null;
   const summary = `${ctx.eventName} with ${ctx.guestName}`;
 
@@ -142,7 +147,9 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
       const cal = await calendarRow(r.external_calendar_id);
       if (!r.external_event_id || !cal) return { skip: "no calendar event to remove" };
       connectionId = cal.connectionId;
-      await deps.google.deleteEvent(await accessTokenFor(pool, deps.google, deps.key, cal.connectionId, now), cal.externalId, r.external_event_id as string);
+      const provider = providerOf(cal);
+      if ("skip" in provider) return provider;
+      await provider.deleteEvent(await accessTokenFor(pool, deps.providers, deps.key, cal.connectionId, now), cal.externalId, r.external_event_id as string);
       return { eventId: r.external_event_id as string };
     }
 
@@ -150,8 +157,10 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
       const cal = await calendarRow(r.previous_calendar_id);
       if (cal) {
         connectionId = cal.connectionId;
-        const token = await accessTokenFor(pool, deps.google, deps.key, cal.connectionId, now);
-        const moved = await deps.google.moveEvent(token, cal.externalId, r.previous_event_id as string, ctx.startAt, ctx.endAt, ctx.hostTimezone, summary);
+        const provider = providerOf(cal);
+        if ("skip" in provider) return provider;
+        const token = await accessTokenFor(pool, deps.providers, deps.key, cal.connectionId, now);
+        const moved = await provider.moveEvent(token, cal.externalId, r.previous_event_id as string, ctx.startAt, ctx.endAt, ctx.hostTimezone, summary);
         await pool.query("update bookings set external_event_id = $2, external_calendar_id = $3, join_url = $4, updated_at = now() where id = $1",
           [r.id, moved.id, r.previous_calendar_id, moved.joinUrl ?? r.previous_join_url ?? null]);
         return { eventId: moved.id };
@@ -162,27 +171,29 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
     const cal = await calendarRow(c.recipient);
     if (!cal) return { skip: "no calendar to add the event to" };
     connectionId = cal.connectionId;
-    const token = await accessTokenFor(pool, deps.google, deps.key, cal.connectionId, now);
+    const provider = providerOf(cal);
+    if ("skip" in provider) return provider;
+    const token = await accessTokenFor(pool, deps.providers, deps.key, cal.connectionId, now);
     const description = [
       `Booked through Hourhand by ${ctx.guestName} <${ctx.guestEmail}>, time zone ${ctx.guestTimezone}.`,
       ...ctx.answers.filter((a) => a.answer.trim()).map((a) => `${a.label}: ${a.answer}`),
       "", `Details: ${ctx.dashboardUrl}`,
     ].join("\n");
-    let event = await deps.google.insertEvent(token, cal.externalId, {
+    let event = await provider.insertEvent(token, cal.externalId, {
       summary, description, start: ctx.startAt, end: ctx.endAt, timeZone: ctx.hostTimezone, location: where,
-      attendee: { email: ctx.guestEmail, name: ctx.guestName }, withMeet: r.booking_location_kind === "google_meet", bookingId: ctx.bookingId,
+      attendee: { email: ctx.guestEmail, name: ctx.guestName }, conference: r.booking_location_kind === "google_meet" ? "google_meet" : r.booking_location_kind === "teams" ? "teams" : null, bookingId: ctx.bookingId,
     });
     // Google creates Meet links asynchronously; give it a moment so the guest's confirmation can carry the link.
     for (let i = 0; i < 3 && event.conferencePending; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      event = await deps.google.getEvent(token, cal.externalId, event.id);
+      event = await provider.getEvent(token, cal.externalId, event.id);
     }
     await pool.query("update bookings set external_event_id = $2, external_calendar_id = $3, join_url = coalesce($4, join_url), updated_at = now() where id = $1",
       [r.id, event.id, c.recipient, event.joinUrl]);
     return { eventId: event.id };
   } catch (error) {
     // A revoked grant or missing permission disconnects the connection (and tells the host) right away.
-    if (connectionId && error instanceof GoogleApiError && error.revoked) await recordConnectionFailure(pool, connectionId, error, now);
+    if (connectionId && error instanceof CalendarApiError && error.revoked) await recordConnectionFailure(pool, connectionId, error, now);
     throw error;
   }
 }
@@ -301,7 +312,7 @@ export async function processDueNotifications(
         ({ id: providerId } = await mailer.send({ ...mail, to: c.recipient, idempotencyKey: `notification-${c.id}` }));
       }
     } catch (error) {
-      const retryable = error instanceof MailError || error instanceof GoogleApiError ? error.retryable : true;
+      const retryable = error instanceof MailError || error instanceof CalendarApiError ? error.retryable : true;
       const message = (error as Error).message.slice(0, 500);
       if (!retryable || c.attempts >= MAX_ATTEMPTS) {
         await finish(c, "failed", { error: message });

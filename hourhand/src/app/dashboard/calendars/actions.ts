@@ -39,7 +39,7 @@ export async function disconnectCalendar(form: FormData): Promise<void> {
   const user = await requireUser();
   if (!authEnabled()) return;
   const deps = calendarDeps();
-  await disconnectConnection(pool(), deps?.google ?? null, deps?.key ?? null, user.id, String(form.get("connectionId")));
+  await disconnectConnection(pool(), deps?.providers ?? {}, deps?.key ?? null, user.id, String(form.get("connectionId")));
   revalidatePath("/dashboard/calendars");
   revalidatePath("/dashboard", "layout");
 }

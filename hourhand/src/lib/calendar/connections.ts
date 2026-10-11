@@ -1,37 +1,39 @@
 import type pg from "pg";
 import { checkedCalendarLimit } from "../billing/account";
 import { seal, unseal } from "../crypto/seal";
-import { GoogleApiError, type GoogleCalendarEntry, type GoogleClient, type TokenSet } from "./google";
-import { stopConnectionChannels } from "./push";
+import { CalendarApiError, PROVIDER_NAMES, type CalendarEntry, type CalendarProviderId, type CalendarProviders, type TokenSet } from "./provider";
+import { stopConnectionChannels, watchCapable } from "./push";
 
-// Stored Google connections. Tokens are sealed with TOKEN_ENCRYPTION_KEY and bound to their connection, so neither a
+// Stored calendar connections (Google, Microsoft). Tokens are sealed with TOKEN_ENCRYPTION_KEY and bound to their connection, so neither a
 // database dump nor a row copied into another account's connection can be used.
 
 type Db = Pick<pg.Pool, "query">;
 interface Credentials { refreshToken: string; accessToken: string | null; expiresAt: string | null }
 
 /** The sealed credentials are bound to the account they belong to, not to a row id that isn't known before insert. */
-const aadFor = (userId: string, accountEmail: string) => `google:${userId}:${accountEmail.toLowerCase()}`;
+const aadFor = (provider: string, userId: string, accountEmail: string) => `${provider}:${userId}:${accountEmail.toLowerCase()}`;
 
 /**
- * Saves a new or renewed Google connection and its calendars. New connections check the primary calendar for conflicts
+ * Saves a new or renewed connection and its calendars. New connections check the primary calendar for conflicts
  * and use it for booked events, unless the host already has a calendar for booked events.
  */
-export async function saveGoogleConnection(pool: pg.Pool, key: Buffer, userId: string, tokens: TokenSet, calendars: GoogleCalendarEntry[], now: Date): Promise<string> {
-  if (!tokens.email) throw new Error("Google did not say which account was connected");
-  if (!tokens.refreshToken) throw new Error("Google did not return a refresh token");
+export async function saveConnection(
+  pool: pg.Pool, key: Buffer, userId: string, provider: CalendarProviderId, tokens: TokenSet, calendars: CalendarEntry[], now: Date,
+): Promise<string> {
+  if (!tokens.email) throw new Error(`${PROVIDER_NAMES[provider]} did not say which account was connected`);
+  if (!tokens.refreshToken) throw new Error(`${PROVIDER_NAMES[provider]} did not return a refresh token`);
   const creds: Credentials = { refreshToken: tokens.refreshToken, accessToken: tokens.accessToken, expiresAt: tokens.expiresAt.toISOString() };
-  const sealed = seal(key, creds, aadFor(userId, tokens.email));
+  const sealed = seal(key, creds, aadFor(provider, userId, tokens.email));
   const client = await pool.connect();
   try {
     await client.query("begin");
     const { rows: [conn] } = await client.query(
       `insert into calendar_connections (user_id, provider, account_email, credentials_encrypted, status, granted_scopes, next_sync_at, error_count, last_error, alert_sent_at)
-       values ($1, 'google', $2, $3, 'ok', $4, $5, 0, null, null)
+       values ($1, $6, $2, $3, 'ok', $4, $5, 0, null, null)
        on conflict (user_id, provider, account_email) do update set credentials_encrypted = excluded.credentials_encrypted, status = 'ok',
          granted_scopes = excluded.granted_scopes, next_sync_at = excluded.next_sync_at, error_count = 0, last_error = null, alert_sent_at = null, updated_at = $5
        returning id`,
-      [userId, tokens.email, sealed, tokens.scope, now]);
+      [userId, tokens.email, sealed, tokens.scope, now, provider]);
     const { rows: [{ has_add_to, checked }] } = await client.query(
       "select exists (select 1 from calendars where user_id = $1 and is_add_to) as has_add_to, (select count(*)::int from calendars where user_id = $1 and check_conflicts and connection_id <> $2) as checked",
       [userId, conn.id]);
@@ -48,7 +50,7 @@ export async function saveGoogleConnection(pool: pg.Pool, key: Buffer, userId: s
            is_add_to = calendars.is_add_to and excluded.access_role = 'owner', updated_at = now()`,
         [conn.id, userId, c.id, c.name, check, c.primary && owner && !has_add_to, c.accessRole]);
     }
-    // Calendars the host no longer has in Google stop counting; their busy times go with them (cascade).
+    // Calendars the host no longer has in the account stop counting; their busy times go with them (cascade).
     await client.query("delete from calendars where connection_id = $1 and not (external_id = any($2::text[]))", [conn.id, calendars.map((c) => c.id)]);
     await client.query("commit");
     return conn.id as string;
@@ -61,28 +63,34 @@ export async function saveGoogleConnection(pool: pg.Pool, key: Buffer, userId: s
 }
 
 /** An access token for the connection, refreshed and re-sealed when it has less than a minute left. */
-export async function accessTokenFor(pool: Db, google: GoogleClient, key: Buffer, connectionId: string, now = new Date()): Promise<string> {
-  const { rows: [row] } = await pool.query("select user_id, account_email, credentials_encrypted from calendar_connections where id = $1", [connectionId]);
-  if (!row) throw new GoogleApiError("Calendar connection no longer exists", { retryable: false, revoked: true });
-  const aad = aadFor(row.user_id, row.account_email);
+export async function accessTokenFor(pool: Db, providers: CalendarProviders, key: Buffer, connectionId: string, now = new Date()): Promise<string> {
+  const { rows: [row] } = await pool.query("select user_id, provider, account_email, credentials_encrypted from calendar_connections where id = $1", [connectionId]);
+  if (!row) throw new CalendarApiError("Calendar connection no longer exists", { retryable: false, revoked: true });
+  const providerId = row.provider as CalendarProviderId;
+  const provider = providers[providerId];
+  if (!provider) throw new CalendarApiError(`${PROVIDER_NAMES[providerId] ?? row.provider} calendars are not configured on this server`, { retryable: false });
+  const aad = aadFor(row.provider, row.user_id, row.account_email);
   const creds = unseal<Credentials>(key, row.credentials_encrypted, aad);
   if (creds.accessToken && creds.expiresAt && new Date(creds.expiresAt).getTime() - now.getTime() > 60_000) return creds.accessToken;
-  const fresh = await google.refresh(creds.refreshToken, now);
+  const fresh = await provider.refresh(creds.refreshToken, now);
   const next: Credentials = { ...creds, accessToken: fresh.accessToken, expiresAt: fresh.expiresAt.toISOString() };
+  // Microsoft rotates refresh tokens and the old one stops working, so a new one replaces it.
+  if (fresh.refreshToken) next.refreshToken = fresh.refreshToken;
   await pool.query("update calendar_connections set credentials_encrypted = $2, updated_at = $3 where id = $1", [connectionId, seal(key, next, aad), now]);
   return fresh.accessToken;
 }
 
-/** Disconnects a host's own connection: asks Google to drop the grant, then deletes it with its calendars and busy times. */
-export async function disconnectConnection(pool: Db, google: GoogleClient | null, key: Buffer | null, userId: string, connectionId: string): Promise<boolean> {
+/** Disconnects a host's own connection: asks the provider to drop the grant, then deletes it with its calendars and busy times. */
+export async function disconnectConnection(pool: Db, providers: CalendarProviders, key: Buffer | null, userId: string, connectionId: string): Promise<boolean> {
   const { rows: [row] } = await pool.query(
-    "select user_id, account_email, credentials_encrypted from calendar_connections where id = $1 and user_id = $2", [connectionId, userId]);
+    "select user_id, provider, account_email, credentials_encrypted from calendar_connections where id = $1 and user_id = $2", [connectionId, userId]);
   if (!row) return false;
-  if (google && key && row.credentials_encrypted.length > 0) {
+  const provider = providers[row.provider as CalendarProviderId];
+  if (provider && key && row.credentials_encrypted.length > 0) {
     // Stop the watch channels while the token still works; revoking it next would leave them pinging for up to a week.
-    await stopConnectionChannels(pool, google, key, connectionId).catch(() => undefined);
+    if (row.provider === "google" && watchCapable(provider)) await stopConnectionChannels(pool, provider, key, connectionId).catch(() => undefined);
     try {
-      await google.revoke(unseal<Credentials>(key, row.credentials_encrypted, aadFor(row.user_id, row.account_email)).refreshToken);
+      await provider.revoke(unseal<Credentials>(key, row.credentials_encrypted, aadFor(row.provider, row.user_id, row.account_email)).refreshToken);
     } catch {
       // A token that can't be opened can't be used either; deleting the row is what matters.
     }
