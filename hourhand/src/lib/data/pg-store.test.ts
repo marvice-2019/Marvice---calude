@@ -206,6 +206,13 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect([cleared.weeklyLimit, cleared.cancelPolicy]).toEqual([null, null]);
     });
 
+    it("keeps only https redirect links and policies of up to 1,000 characters in the database itself", async () => {
+      for (const bad of ["javascript:alert(1)", "http://priya.coach", `https://x.in/${"a".repeat(500)}`]) {
+        await expect(pool.query("update event_types set redirect_url = $1 where id = $2", [bad, intro.id])).rejects.toThrow(/event_types_redirect_url_https/);
+      }
+      await expect(pool.query("update event_types set cancellation_policy = $1 where id = $2", ["x".repeat(1001), intro.id])).rejects.toThrow(/cancellation_policy_length/);
+    });
+
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
       const [coachingQuestion] = await store.listCustomQuestions(priya.id, coaching.id);
       const saved = await store.saveQuestions(priya.id, intro.id, [

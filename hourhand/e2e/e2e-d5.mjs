@@ -57,7 +57,7 @@ async function submitForm(j, path, marker, fields) {
 await sleep(2500);
 const pool = new pg.Pool({ connectionString: databaseUrl });
 const { rows: [priya] } = await pool.query("select id from users where slug = 'priya'");
-await pool.query("update event_types set cancel_policy = 'Free to cancel up to 24 hours before.', weekly_limit = 1 where slug = 'coaching' and user_id = $1", [priya.id]);
+await pool.query("update event_types set cancellation_policy = 'Free to cancel up to 24 hours before.', weekly_limit = 1 where slug = 'coaching' and user_id = $1", [priya.id]);
 // Clear the seed's coaching bookings so the weekly count starts at zero.
 await pool.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'host' where host_id = $1 and event_type_id = (select id from event_types where slug = 'coaching' and user_id = $1) and status = 'confirmed'", [priya.id]);
 const pq = await pool.query("select q.id from custom_questions q join event_types e on e.id = q.event_type_id where e.slug = 'coaching' and e.user_id = $1", [priya.id]);

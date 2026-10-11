@@ -27,5 +27,7 @@ describe("redirect after booking", () => {
     for (const bad of ["http://priya.coach", "javascript:alert(1)", "data:text/html,x", "priya.coach/thanks", `https://x.in/${"a".repeat(500)}`]) {
       expect(cleanRedirectUrl(bad)).toBeUndefined();
     }
+    // Short as typed, over 500 once spaces are encoded: the stored form is what's measured.
+    expect(cleanRedirectUrl(`https://x.in/${"a b".repeat(120)}`)).toBeUndefined();
   });
 });

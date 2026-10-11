@@ -11,6 +11,7 @@ import { formatDate, zoneName } from "@/lib/format";
 import { LOCATION_KEYS, resolveLocale, t, tNodes } from "@/lib/i18n/guest";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { AutoRedirect } from "@/components/AutoRedirect";
+import { cleanRedirectUrl } from "@/lib/calendar-links";
 import { resolveBaseUrl } from "@/lib/auth/auth";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
   const booking = host && (await store.getBooking(host.id, bookingId));
   if (!host || !booking) notFound();
   const eventType = await store.getEventType(host.id, booking.eventTypeId);
+  // Checked again here: a stored value from before the https rule must never become a link or a redirect.
+  const redirectUrl = eventType?.redirectUrl ? cleanRedirectUrl(eventType.redirectUrl) : null;
   const tz = booking.invitee.timezone;
   const locale = resolveLocale(lang, host.locale);
   const q = typeof lang === "string" && lang === locale ? `?lang=${locale}` : "";
@@ -75,8 +78,8 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
       )}
       <p className="mt-4 text-text-muted">{t(locale, "keepLink")}</p>
       <Link href={`/b/${booking.invitee.manageToken}${q}`} className={`mt-2 ${buttonClasses({ variant: "secondary" })}`}>{t(locale, "manageBooking")}</Link>
-      {eventType?.redirectUrl && (
-        <AutoRedirect url={eventType.redirectUrl} waiting={t(locale, "redirecting")} label={t(locale, "continueTo", { site: new URL(eventType.redirectUrl).hostname })} />
+      {redirectUrl && (
+        <AutoRedirect url={redirectUrl} waiting={t(locale, "redirecting")} label={t(locale, "continueTo", { site: new URL(redirectUrl).hostname })} />
       )}
     </main>
   );

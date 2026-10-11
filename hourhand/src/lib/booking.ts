@@ -190,6 +190,7 @@ export function validateBookingRequest(input: unknown): Validation {
       for (const g of (list as string[]).map((x) => x.trim()).filter(Boolean)) {
         if (!EMAIL.test(g) || g.length > 254) { fields.guests = `${g.slice(0, 60)} isn't a valid email address.`; break; }
         if (g.toLowerCase() !== email.toLowerCase() && !guests.some((x) => x.toLowerCase() === g.toLowerCase())) guests.push(g);
+        if (guests.length > MAX_GUESTS) break;
       }
       if (!fields.guests && guests.length > MAX_GUESTS) fields.guests = `Add up to ${MAX_GUESTS} guests.`;
     }

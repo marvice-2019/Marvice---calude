@@ -12,7 +12,7 @@ fresh() {
   DATABASE_URL=$DB node scripts/migrate.ts > /dev/null && DATABASE_URL=$DB node scripts/seed.ts > /dev/null || exit 1
 }
 # Waits for the server on port $1 to answer, up to 60 seconds.
-up() { i=0; until curl -s -o /dev/null "http://localhost:$1/"; do i=$((i + 1)); [ $i -gt 120 ] && echo "server on $1 never came up" && return 1; sleep 0.5; done; }
+up() { i=0; until curl -s -o /dev/null "http://localhost:$1/"; do i=$((i + 1)); [ $i -gt 120 ] && echo "FAILED: server on $1 never came up" && FAILED=1 && return 1; sleep 0.5; done; }
 # A group fails on any FAIL line, or when it printed no OK line at all (the script crashed).
 summary() {
   ok=$(grep -c '^OK' "$2"); bad=$(grep -c '^FAIL' "$2")
@@ -81,9 +81,9 @@ sleep 2
 fresh
 node e2e/fake-microsoft.mjs 3497 > $OUT/fakems.log 2>&1 & FM=$!
 : > $OUT/srv-b6.log
-node e2e/start-e2e-b6.mjs 3180 $DB 3497 > $OUT/srv-b6.log 2>&1 & SRV=$!
-up 3180
-node e2e/e2e-b6.mjs 3180 $OUT/srv-b6.log $DB 3497 > $OUT/out-b6.txt 2>&1
+node e2e/start-e2e-b6.mjs 3181 $DB 3497 > $OUT/srv-b6.log 2>&1 & SRV=$!
+up 3181
+node e2e/e2e-b6.mjs 3181 $OUT/srv-b6.log $DB 3497 > $OUT/out-b6.txt 2>&1
 kill $SRV $FM
 summary B6 $OUT/out-b6.txt
 sleep 2

@@ -19,7 +19,8 @@ const SCRIPT = `(function () {
     el.appendChild(frame(u));
   });
   var overlay = null, opener = null;
-  function close() { if (overlay) { overlay.remove(); overlay = null; document.documentElement.style.overflow = ""; if (opener) opener.focus(); } }
+  function esc(e) { if (e.key === "Escape") close(); }
+  function close() { document.removeEventListener("keydown", esc); if (overlay) { overlay.remove(); overlay = null; document.documentElement.style.overflow = ""; if (opener) opener.focus(); } }
   function open(u, from) {
     close(); opener = from;
     overlay = document.createElement("div");
@@ -34,7 +35,7 @@ const SCRIPT = `(function () {
     var f = frame(u); f.style.minHeight = "100%"; f.style.height = "100%";
     box.appendChild(x); box.appendChild(f); overlay.appendChild(box);
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
-    document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
+    document.addEventListener("keydown", esc);
     document.body.appendChild(overlay); document.documentElement.style.overflow = "hidden"; x.focus();
   }
   document.addEventListener("click", function (e) {

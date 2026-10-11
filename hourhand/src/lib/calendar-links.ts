@@ -27,7 +27,8 @@ export function cleanRedirectUrl(raw: string): string | null | undefined {
   if (v === "") return null;
   try {
     const u = new URL(v);
-    return u.protocol === "https:" && v.length <= 500 ? u.toString() : undefined;
+    const out = u.toString();
+    return u.protocol === "https:" && out.length <= 500 ? out : undefined;
   } catch {
     return undefined;
   }

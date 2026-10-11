@@ -61,6 +61,8 @@ describe("validateEventType", () => {
     expect(validateEventType({ ...valid, weeklyLimit: "5", cancelPolicy: " Cancel 24 hours ahead for a refund. " }, []))
       .toMatchObject({ ok: true, value: { weeklyLimit: 5, cancelPolicy: "Cancel 24 hours ahead for a refund." } });
     expect(validateEventType({ ...valid, dailyLimit: "3", weeklyLimit: "2" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
+    // Past what the database column holds: a field error, not a failed save.
+    expect(validateEventType({ ...valid, weeklyLimit: "3000000000" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
     expect(validateEventType({ ...valid, weeklyLimit: "0" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
     expect(validateEventType({ ...valid, cancelPolicy: "x".repeat(1001) }, [])).toMatchObject({ ok: false, errors: { cancelPolicy: expect.any(String) } });
   });

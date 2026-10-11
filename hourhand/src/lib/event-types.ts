@@ -168,7 +168,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
   const locationValue = form.locationValue.trim();
   if (valueLabel && !locationValue) errors.locationValue = `Add the ${valueLabel.toLowerCase()} so guests know where to go.`;
 
-  const weeklyLimit = (form.weeklyLimit ?? "").trim() ? number("weeklyLimit", 1, Number.MAX_SAFE_INTEGER, "Enter 1 or more, or leave it blank for no limit.") : null;
+  const weeklyLimit = (form.weeklyLimit ?? "").trim() ? number("weeklyLimit", 1, 2147483647, "Enter 1 or more, or leave it blank for no limit.") : null;
   if (!errors.weeklyLimit && !errors.dailyLimit && weeklyLimit !== null && dailyLimit !== null && weeklyLimit < dailyLimit) errors.weeklyLimit = "Make the weekly limit at least the daily one.";
   const cancelPolicy = (form.cancelPolicy ?? "").trim().replace(/\r\n/g, "\n");
   if (cancelPolicy.length > 1000) errors.cancelPolicy = "Keep the policy to 1,000 characters.";
