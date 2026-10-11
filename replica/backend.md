@@ -8,7 +8,8 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 | B2a | Better Auth: email magic link, Google sign-in (switched on by env), httpOnly sessions, sign out everywhere | **done** (2026-10-11) |
 | B2b | Ownership checks in the nine data methods without a user id, account deletion, rate limits on sign-in | **done** (2026-10-11) |
 | B3 | Email (Resend) and the job queue: confirmation, reminder, reschedule and cancellation emails, retries, dead-letter log, hourly purge, booking rate limits | **done** (2026-10-11) |
-| B4 | Google Calendar: free/busy, writing booked events, push channels and incremental sync, sync health | not started |
+| B4a | Google Calendar: connect (OAuth + PKCE), encrypted tokens, free/busy sync every 5 min, sync health and alerts, booked events with Meet links | **done** (2026-10-11) |
+| B4b | Google push channels and incremental sync (instant updates), renewing channels | not started |
 | B5 | Payments in test mode: Razorpay (INR) and Stripe (USD), Checkout and portal, signed and deduplicated webhooks | not started |
 | later | Microsoft Graph, iCloud CalDAV, WhatsApp Cloud API, DLT SMS, Zoom | not started |
 
@@ -22,6 +23,9 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **No pg-boss: the `notifications` table is the queue.** The schema already had it, with a dedupe key per email. Rows are queued in the same transaction as the booking change (outbox pattern), claimed with `FOR UPDATE SKIP LOCKED` and a 5-minute lease, retried with backoff, and left as `failed` with `last_error` when they run out (the dead-letter log). One less dependency and one less set of tables to run and back up.
 - **The job runner lives in the web process** (`src/instrumentation.ts`), not a separate service: one container on the VPS, and a booking wakes it at once so confirmations go out in under a second. It is safe to run on several servers; `HOURHAND_WORKER=0` turns it off on a server.
 - **Resend's idempotency key is the notification id**, so a crash between sending and recording the send can't email anyone twice (Resend drops the repeat for 24 hours).
+- **Free/busy, not event lists, for conflicts.** It needs only the `calendar.freebusy` scope and returns exactly what the slot engine needs. Events are written with `calendar.events.owned`, which can't touch calendars shared with the host. No full `calendar` scope anywhere.
+- **Hourhand sends the guest emails, not Google** (`sendUpdates=none`): one consistent message with the manage link, instead of two. The guest is still on the event as an attendee.
+- **Calendar writes go through the email queue** (`channel = 'calendar'`), so they get the same claiming, retries and dead-letter log, and commit with the booking.
 - **Double booking is impossible at the database.** The `no_double_booking` exclusion constraint is the guard. The app maps its violation to "slot taken" with the next free slots.
 
 ## B1 evidence (2026-10-11, Postgres 16.15)
@@ -83,6 +87,15 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Accepted (low):** the guest's name appears in emails sent to the address the guest typed. It is escaped and kept off header lines; the booking rate limit bounds how much anyone can send this way. Without a proxy header every client shares one rate-limit bucket, which only happens when the app is reached directly instead of through Traefik.
 - After the fixes: 170 tests pass against Postgres; the production-build end-to-end run passes 10 of 10 again.
 
+## B4a evidence (2026-10-11, Postgres 16.15, production build, fake Google)
+
+- 206 tests pass with `TEST_DATABASE_URL` set. Migration 0004 applies on top of 0003.
+- **Google client** checked against Google's docs (OAuth web-server flow, freeBusy, events.insert, Meet conference creation, scopes; read 2026-10-11) and tested against a fake: narrow scopes, offline access, consent, PKCE; `invalid_grant` means reconnect, outages and rate limits retry; a missing permission means reconnect; free/busy errors are errors; event creation uses a fixed id and treats 409 as "already created"; deleting a gone event is fine; a fake-Google URL is ignored in production.
+- **Against Postgres:** tokens are never stored readable; another host can't change, pick or disconnect a host's calendars; only owned calendars take bookings; expired access tokens refresh and re-seal; sync copies busy times from checked calendars only and replaces them atomically; failures go degraded, alert once after 3, recover cleanly; a revoked grant disconnects and alerts at once; demo connections are skipped; bookings create a Meet event and the confirmation carries the link; a failing write never holds the confirmation; reschedules move the same event; cancellations delete it; a revoked grant during a write disconnects.
+- **Negative tests** (guard set aside, test fails): the Meet wait, disconnect on a revoked write, the owner check for the bookings calendar, the owner check on conflict toggles, one alert per outage, skipping demo connections, moving instead of re-creating, and failing a sync when Google can't read a calendar.
+- **End to end on a production build against a fake Google (19 of 19):** connect redirects to the consent screen with narrow scopes and sets the handshake cookie; a forged state and a callback with no session are refused; the code is exchanged with the PKCE verifier; tokens aren't readable in the database; the first sync runs at once and the Google-busy slot disappears from the booking page; the Calendars page shows "In sync"; a booking creates the event with the guest and a Meet link and Google sends nothing; the guest's confirmation carries the link; cancelling removes the event. B3 (10 of 10), B2b (12 of 12) and sign-in (15 of 15) pass again.
+- **Not yet run against real Google:** needs your OAuth client values in `.env.local`, the redirect URI added, and your Google account as a test user.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
@@ -117,6 +130,8 @@ EMAIL_FROM=
 HOURHAND_MAIL_TO_LOG=
 HOURHAND_ALLOW_MEMORY=
 HOURHAND_WORKER=
+HOURHAND_E2E=
+GOOGLE_API_BASE_URL=
 TRUSTED_PROXIES=
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=

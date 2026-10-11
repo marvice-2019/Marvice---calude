@@ -1,17 +1,18 @@
 import type pg from "pg";
+import { syncDueConnections } from "../calendar/sync";
 import { purgeClosedAccounts } from "../data/account-lifecycle";
 import type { Mailer } from "../mail/mailer";
 import { setJobKick } from "./kick";
-import { BATCH_SIZE, processDueNotifications } from "./worker";
+import { BATCH_SIZE, processDueNotifications, type CalendarDeps } from "./worker";
 
-// The job loop: sends due email every few seconds (or at once when the data layer kicks it) and purges closed accounts
-// once an hour. Both jobs are safe to run on several servers at once.
+// The job loop: every few seconds (or at once when kicked) it syncs due Google calendars, then runs due queue rows
+// (email and calendar writes); once an hour it purges closed accounts. All of it is safe on several servers at once.
 
 const HOUR = 3_600_000;
 
 export interface JobRunner { tick(): Promise<void>; stop(): void }
 
-export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: string; intervalMs?: number }): JobRunner {
+export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: string; calendar?: CalendarDeps | null; intervalMs?: number }): JobRunner {
   let busy = false;
   let again = false;
   let lastPurge = 0;
@@ -40,10 +41,11 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
     try {
       do {
         again = false;
+        if (opts.calendar) await syncDueConnections(opts.pool, opts.calendar.google, opts.calendar.key);
         // A full batch means more may be due: keep going until a batch comes back short.
         for (;;) {
-          const r = await processDueNotifications(opts.pool, opts.mailer, { baseUrl: opts.baseUrl });
-          if (r.claimed < BATCH_SIZE) break;
+          const r = await processDueNotifications(opts.pool, opts.mailer, { baseUrl: opts.baseUrl, calendar: opts.calendar });
+          if (r.claimed < BATCH_SIZE && r.released === 0) break;
         }
         if (Date.now() - lastPurge >= HOUR) {
           lastPurge = Date.now();

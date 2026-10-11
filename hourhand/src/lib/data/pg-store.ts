@@ -36,14 +36,14 @@ const toEventType = (r: Row): EventType => ({
   hidden: r.hidden as boolean, active: r.active as boolean, position: r.position as number,
 });
 
-const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.location_kind, b.idempotency_key,
+const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.location_kind, b.join_url, b.idempotency_key,
   b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.created_at,
   i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token
   from bookings b join invitees i on i.booking_id = b.id`;
 const toBooking = (r: Row): BookingWithInvitee => ({
   id: r.id as string, eventTypeId: r.event_type_id as string, hostId: r.host_id as string, startAt: r.start_at as Date, endAt: r.end_at as Date,
   bufferedStart: r.buffered_start as Date, bufferedEnd: r.buffered_end as Date, status: r.status as BookingWithInvitee["status"],
-  locationKind: r.location_kind as BookingWithInvitee["locationKind"], idempotencyKey: r.idempotency_key as string, cancelledAt: r.cancelled_at as Date | null,
+  locationKind: r.location_kind as BookingWithInvitee["locationKind"], joinUrl: (r.join_url as string | null) ?? null, idempotencyKey: r.idempotency_key as string, cancelledAt: r.cancelled_at as Date | null,
   cancelledBy: r.cancelled_by as BookingWithInvitee["cancelledBy"], cancelReason: r.cancel_reason as string | null, rescheduledFromId: r.rescheduled_from_id as string | null,
   createdAt: r.created_at as Date,
   invitee: {
@@ -212,8 +212,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async listCalendars(userId) {
       if (!isId(userId)) return [];
-      const { rows } = await pool.query("select id, connection_id, user_id, name, check_conflicts, is_add_to from calendars where user_id = $1 order by created_at", [userId]);
-      return rows.map((r) => ({ id: r.id, connectionId: r.connection_id, userId: r.user_id, name: r.name, checkConflicts: r.check_conflicts, isAddTo: r.is_add_to }));
+      const { rows } = await pool.query("select id, connection_id, user_id, name, check_conflicts, is_add_to, access_role from calendars where user_id = $1 order by created_at", [userId]);
+      return rows.map((r) => ({ id: r.id, connectionId: r.connection_id, userId: r.user_id, name: r.name, checkConflicts: r.check_conflicts, isAddTo: r.is_add_to, canWrite: r.access_role === "owner" }));
     },
     async listBusyBlocks(userId, from, to) {
       if (!isId(userId)) return [];

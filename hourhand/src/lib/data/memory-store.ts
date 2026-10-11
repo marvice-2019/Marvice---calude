@@ -34,7 +34,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     const id = randomUUID();
     return {
       id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed",
-      locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null,
+      locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null, joinUrl: null,
       idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, createdAt: new Date(),
       invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", "") },
     };

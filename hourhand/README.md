@@ -70,9 +70,27 @@ Booking emails are queued in the `notifications` table inside the same transacti
 - **Never twice:** each row is claimed with `FOR UPDATE SKIP LOCKED` and a 5-minute lease, and its id is sent to Resend as the idempotency key, so several servers can run the runner and a crash mid-send does not email twice.
 - **Never stale:** once a booking is cancelled or moved, nothing but the cancellation emails goes out about it, even an email that was already waiting to retry. Reminders for a started booking, and any booking email after the meeting has ended, are skipped too, each recorded as `skipped` with the reason.
 
+## Google Calendar
+
+Hosts connect Google Calendar from Dashboard → Calendars. It needs the Postgres store, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (the same OAuth client as Google sign-in) and `TOKEN_ENCRYPTION_KEY`.
+
+- **Permissions:** the calendar list (read-only), free/busy, and events on calendars the host owns, plus the account's email. Never full calendar access. If the host unticks one on Google's screen, Hourhand says so and keeps nothing.
+- **Handshake:** a sealed 10-minute cookie ties Google's callback to the host who started it, with PKCE. A forged or replayed callback is refused.
+- **Tokens** are encrypted with AES-256-GCM using `TOKEN_ENCRYPTION_KEY` and bound to their account; a database dump or backup can't use them. Disconnecting asks Google to revoke the grant and deletes the tokens.
+- **Busy times:** the job runner reads free/busy from each checked calendar every 5 minutes (2 while failing), far enough ahead to cover the host's longest booking window, and replaces the cached busy times in one transaction. A calendar Google can't read fails the sync; it is never treated as free.
+- **Health:** if a connection hasn't synced for 15 minutes, its host's pages offer no times (so nobody books over a meeting) and the header shows it. After 3 failures in a row, or at once when the host revoked access, the host gets one email per outage with a link to fix it.
+- **Booked events:** each booking is written to the calendar the host picks (only calendars they own), with the guest as an attendee and, for Google Meet event types, a Meet link. Google sends no email (`sendUpdates=none`); Hourhand's own emails carry the link. A guest's confirmation waits up to 3 minutes for the link, and goes without it if the calendar write fails. Reschedules move the same event; cancellations delete it. The event id is fixed per booking, so a retry never creates a second event.
+
+Add these as authorized redirect URIs on the OAuth client: `https://<your-domain>/api/calendars/google/callback`, and `http://localhost:3000/api/calendars/google/callback` for local work (alongside the sign-in one).
+
+| variable | needed for |
+| --- | --- |
+| `TOKEN_ENCRYPTION_KEY` | encrypting calendar tokens: 64 hex characters (`openssl rand -hex 32`). **Required when Google is configured**; keep it safe, changing it means every host reconnects |
+| `GOOGLE_API_BASE_URL`, `HOURHAND_E2E` | end-to-end tests against a fake Google only. A production server ignores the first unless the second is `1`; never set either on a real deployment |
+
 ## What is fake today
 
-- **Calendar sync:** none. Busy times and the sync status come from the seed.
+- **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Push notifications from Google (instant sync) arrive in round B4b; until then busy times are at most 5 minutes old.
 - **Email in development:** without `RESEND_API_KEY`, every email is printed to the server log instead of sent.
 - **Payments, WhatsApp, Microsoft and iCloud calendars:** not wired up. They will need: `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
 

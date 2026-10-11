@@ -79,6 +79,8 @@ export interface Booking {
   bufferedEnd: Date;
   status: "confirmed" | "cancelled";
   locationKind: LocationKind | null;
+  /** The video link from the host's calendar (Google Meet), once the calendar event exists. */
+  joinUrl: string | null;
   idempotencyKey: string;
   cancelledAt: Date | null;
   cancelledBy: "host" | "guest" | "system" | null;
@@ -124,6 +126,8 @@ export interface Calendar {
   name: string;
   checkConflicts: boolean;
   isAddTo: boolean;
+  /** Whether booked events can go into it: only calendars the host owns. */
+  canWrite: boolean;
 }
 
 export interface BusyBlock {
