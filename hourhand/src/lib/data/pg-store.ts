@@ -1,9 +1,10 @@
 import pg from "pg";
-import { datesInRange } from "../availability.ts";
+import { datesInRange } from "../availability";
+import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
 import {
-  EventTypeInUseError, NotFoundError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
+  EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
   type EventType, type EventTypeDraft, type Interval, type User,
-} from "./types.ts";
+} from "./types";
 
 const MIN = 60_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -98,11 +99,17 @@ export function createPgStore(pool: pg.Pool): DataStore {
     return id;
   }
 
-  /** A lost race on the idempotency key returns the winner's booking; a lost race on the slot is SlotTakenError. */
-  async function settle(error: unknown, idempotencyKey: string): Promise<BookingWithInvitee> {
+  /** A key already used for this same request returns its booking; a key used for anything else is a conflict. */
+  function sameRequestOrConflict(existing: BookingWithInvitee, isSameRequest: (b: BookingWithInvitee) => boolean): BookingWithInvitee {
+    if (isSameRequest(existing)) return existing;
+    throw new RequestKeyConflictError();
+  }
+
+  /** A lost race on the idempotency key returns the winner's booking (if it is the same request); a lost race on the slot is SlotTakenError. */
+  async function settle(error: unknown, idempotencyKey: string, isSameRequest: (b: BookingWithInvitee) => boolean): Promise<BookingWithInvitee> {
     if (code(error) === "23505" || code(error) === "23P01") {
       const winner = await byKey(pool, idempotencyKey);
-      if (winner) return winner;
+      if (winner) return sameRequestOrConflict(winner, isSameRequest);
       if (code(error) === "23P01") throw new SlotTakenError();
     }
     throw error;
@@ -224,19 +231,21 @@ export function createPgStore(pool: pg.Pool): DataStore {
       return bookingWhere(pool, "i.manage_token = $1", [token]);
     },
     async createBooking(input) {
+      const isSameRequest = (b: BookingWithInvitee) => b.eventTypeId === input.eventTypeId && b.rescheduledFromId === null;
       const repeat = await byKey(pool, input.idempotencyKey);
-      if (repeat) return repeat;
+      if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
         const id = await tx((client) => insertBooking(client, input, null));
         return (await bookingWhere(pool, "b.id = $1", [id]))!;
       } catch (error) {
-        return settle(error, input.idempotencyKey);
+        return settle(error, input.idempotencyKey, isSameRequest);
       }
     },
     async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey) {
       if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
+      const isSameRequest = (b: BookingWithInvitee) => b.hostId === hostId && b.rescheduledFromId === bookingId;
       const repeat = await byKey(pool, idempotencyKey);
-      if (repeat && repeat.hostId === hostId) return repeat;
+      if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
         const id = await tx(async (client) => {
           const old = await client.query(`${BOOKING} where b.id = $1 and b.host_id = $2 for update of b`, [bookingId, hostId]);
@@ -250,7 +259,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
         });
         return (await bookingWhere(pool, "b.id = $1", [id]))!;
       } catch (error) {
-        return settle(error, idempotencyKey);
+        return settle(error, idempotencyKey, isSameRequest);
       }
     },
     async cancelBooking(hostId, bookingId, by, reason) {
@@ -330,28 +339,13 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async deleteAccount(userId, now = new Date()) {
       if (!isId(userId)) throw new NotFoundError("Account");
-      const ids = await tx(async (client) => {
-        const { rowCount } = await client.query("update users set deleted_at = $2, updated_at = $2 where id = $1 and deleted_at is null", [userId, now]);
-        if (!rowCount) throw new NotFoundError("Account");
-        await client.query("update event_types set active = false where user_id = $1", [userId]);
-        await client.query("delete from auth_sessions where user_id = $1", [userId]); // signs out every device
-        const cancelled = await client.query(
-          `update bookings set status = 'cancelled', cancelled_at = $2, cancelled_by = 'host', cancel_reason = 'The host closed their account'
-           where host_id = $1 and status = 'confirmed' and start_at > $2 returning id`, [userId, now]);
-        return cancelled.rows.map((r) => r.id as string);
-      });
+      const ids = await tx((client) => closeAccount(client, userId, now));
+      if (ids === null) throw new NotFoundError("Account");
       if (ids.length === 0) return [];
       return (await pool.query(`${BOOKING} where b.id = any($1::uuid[]) order by b.start_at`, [ids])).rows.map(toBooking);
     },
     async purgeDeletedAccounts(now = new Date()) {
-      // Everything a host owns (event types, bookings, invitees, schedules, calendars, sessions) cascades from users.
-      return tx(async (client) => {
-        const { rows } = await client.query("select id from users where deleted_at < $1::timestamptz - interval '30 days' for update", [now]);
-        const ids = rows.map((r) => r.id as string);
-        if (ids.length === 0) return 0;
-        await client.query("delete from users where id = any($1::uuid[])", [ids]);
-        return ids.length;
-      });
+      return tx((client) => purgeClosedAccounts(client, now));
     },
     async saveQuestions(userId, eventTypeId, questions) {
       return tx(async (client) => {

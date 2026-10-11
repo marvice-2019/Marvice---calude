@@ -50,6 +50,16 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Rate limits:** the 6th sign-in link request from one address in 10 minutes gets a 429; other addresses are unaffected; forged addresses to the left of the proxy's entry don't escape the limit. The sign-in page adds 3-per-email and 10-per-address limits of its own, because server actions call Better Auth directly.
 - **Found while testing:** Better Auth trusts `x-forwarded-for` only when it holds a single address and otherwise drops requests into one shared bucket, so a visitor could have exhausted sign-in for everyone. It now trusts only our proxy's networks (`TRUSTED_PROXIES`, default private ranges) and reads the address the proxy appended. Not covered by a negative test: without the setting the forged requests are still limited, just in the shared bucket.
 
+## B2b security review (fresh-context reviewer)
+
+- **Fixed (medium):** replaying another host's request key returned that host's booking and manage link, for new bookings and reschedules. A key now only returns the booking it was first used for (same event type, or same rescheduled booking); anything else is a 409 `key_conflict`. Negative test: with the fix set aside, the cross-host replay test fails.
+- **Fixed (medium):** the per-email sign-in limit now runs inside the magic-link sender, which both the sign-in page and direct `/api/auth` calls go through. IPv6 addresses are grouped by /64 in our limiter (Better Auth does the same by default). E2E: the 4th link for one inbox is refused even from a 4th address.
+- **Fixed (low):** the limiter sweeps expired windows once a minute and never holds more than 50,000 keys.
+- **Checked (low):** purging a host who has payments works (they cascade with the host); the purge test now includes a paid booking.
+- **Found while fixing:** importing `./types.ts` with an extension in one file made the bundler load the module twice, so `instanceof` on data-layer errors (slot taken, key conflict) silently failed in the API. Reverted; the closing and purge SQL now lives in `src/lib/data/account-lifecycle.ts`, which has no runtime imports, for the scripts. A lint rule now rejects `.ts` import extensions under `src/`.
+- **Open (medium, needs production):** check what `x-forwarded-for` looks like behind Coolify's Traefik for IPv6 and (if used) Cloudflare. If IPv6 visitors arrive as a Docker gateway address, the per-address limits would treat them all as one; set `TRUSTED_PROXIES` to the Traefik container's address only.
+- **Follow-ups (low):** a booking or a session created in the same instant as an account closes can survive; the dashboard is still blocked, and B3's emails reach those guests.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |

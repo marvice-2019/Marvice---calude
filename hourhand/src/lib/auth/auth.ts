@@ -1,7 +1,9 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { getPool } from "@/lib/data/pg-store";
+import { rateLimiter, SIGN_IN_LIMITS } from "@/lib/rate-limit";
 import { deliverMagicLink } from "./outbox";
 import { uniqueSlug } from "./slug";
 
@@ -106,7 +108,14 @@ function createAuth() {
       ? { google: { clientId: process.env.GOOGLE_CLIENT_ID as string, clientSecret: process.env.GOOGLE_CLIENT_SECRET as string } }
       : {},
     plugins: [
-      magicLink({ expiresIn: 15 * 60, storeToken: "hashed", sendMagicLink: async ({ email, url }) => deliverMagicLink(email, url) }),
+      magicLink({ expiresIn: 15 * 60, storeToken: "hashed", sendMagicLink: async ({ email, url }) => {
+          // Both the sign-in page and direct calls to /api/auth reach here, so the per-email limit lives here.
+          if (!rateLimiter.take(`email:${email.toLowerCase()}`, SIGN_IN_LIMITS.perEmail)) {
+            throw new APIError("TOO_MANY_REQUESTS", { message: "Too many sign-in links for this email" });
+          }
+          await deliverMagicLink(email, url);
+        },
+      }),
       nextCookies(), // must stay last
     ],
   });

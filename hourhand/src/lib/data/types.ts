@@ -150,6 +150,15 @@ export class SlotTakenError extends Error {
   }
 }
 
+/** A request key that was already used for a different booking (another event type, host or reschedule). */
+export class RequestKeyConflictError extends Error {
+  readonly code = "key_conflict";
+  constructor() {
+    super("That request key was already used for a different booking");
+    this.name = "RequestKeyConflictError";
+  }
+}
+
 /** A record that doesn't exist, or belongs to someone else (the caller can't tell which, by design). */
 export class NotFoundError extends Error {
   readonly code = "not_found";

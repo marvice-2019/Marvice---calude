@@ -3,7 +3,7 @@ import { datesInRange } from "../availability";
 import { overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
 import {
-  EventTypeInUseError, NotFoundError, SlotTakenError, SlugTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft,
+  EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft,
   type Interval,
 } from "./types";
 
@@ -117,14 +117,20 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     },
     async createBooking(input: CreateBookingInput) {
       const repeat = db.bookings.find((b) => b.idempotencyKey === input.idempotencyKey);
-      if (repeat) return repeat;
+      if (repeat) {
+        if (repeat.eventTypeId === input.eventTypeId && repeat.rescheduledFromId === null) return repeat;
+        throw new RequestKeyConflictError();
+      }
       const booking = build(input, null);
       db.bookings.push(booking);
       return booking;
     },
     async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey) {
-      const repeat = db.bookings.find((b) => b.hostId === hostId && b.idempotencyKey === idempotencyKey);
-      if (repeat) return repeat;
+      const repeat = db.bookings.find((b) => b.idempotencyKey === idempotencyKey);
+      if (repeat) {
+        if (repeat.hostId === hostId && repeat.rescheduledFromId === bookingId) return repeat;
+        throw new RequestKeyConflictError();
+      }
       const old = db.bookings.find((b) => b.hostId === hostId && b.id === bookingId);
       if (!old) throw new NotFoundError("Booking");
       const { name, email, timezone, phone, answers } = old.invitee;

@@ -1,5 +1,5 @@
 import { freeSlots, slotTaken, type HandlerResult } from "./booking";
-import { SlotTakenError, type DataStore } from "./data/types";
+import { RequestKeyConflictError, SlotTakenError, type DataStore } from "./data/types";
 
 const MIN = 60_000;
 const MAX_REASON = 500;
@@ -59,6 +59,7 @@ export async function handleReschedule(store: DataStore, token: string, input: u
     return { status: 201, body: { bookingId: moved.id, manageToken: moved.invitee.manageToken } };
   } catch (err) {
     if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, start, now, booking.id);
+    if (err instanceof RequestKeyConflictError) return { status: 409, body: { error: "key_conflict" } };
     throw err;
   }
 }

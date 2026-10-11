@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "./pg-store";
-import { NotFoundError, SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
+import { NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
 
 const URL_ = process.env.TEST_DATABASE_URL;
 const MIN = 60_000;
@@ -156,6 +156,17 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect(after.startAt).toEqual(priyaBooking.startAt);
     });
 
+    it("cannot get Priya's booking back by replaying its request key", async () => {
+      const priyaBooking = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-02-03T04:00:00Z"), idempotencyKey: "pg-priya-key-1", invitee: guest });
+      const arunType = (await store.listEventTypes(arun.id))[0];
+      const arunBooking = (await store.getBookingByManageToken("tok_bkg_arun_1"))!;
+      await expect(store.createBooking({ eventTypeId: arunType.id, startAt: at("2030-02-04T04:00:00Z"), idempotencyKey: "pg-priya-key-1", invitee: guest }))
+        .rejects.toBeInstanceOf(RequestKeyConflictError);
+      await expect(store.rescheduleBooking(arun.id, arunBooking.id, at("2030-02-05T04:00:00Z"), "pg-priya-key-1")).rejects.toBeInstanceOf(RequestKeyConflictError);
+      expect((await store.getBooking(priya.id, priyaBooking.id))!.status).toBe("confirmed");
+      expect((await store.getBooking(arun.id, arunBooking.id))!.status).toBe(arunBooking.status);
+    });
+
     it("cannot change Priya's hours or overrides", async () => {
       const { schedule, rules } = await store.getDefaultSchedule(priya.id);
       await expect(store.saveWeeklyHours(arun.id, schedule.id, {})).rejects.toBeInstanceOf(NotFoundError);
@@ -198,6 +209,9 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
         eventTypeId: (await store.listEventTypes(arun.id))[0].id, startAt: at("2030-06-05T04:00:00Z"), idempotencyKey: "pg-delete-upcoming", invitee: guest,
       });
       await pool.query("insert into auth_sessions (token, user_id, expires_at) values ('pg-delete-session', $1, now() + interval '1 day')", [arun.id]);
+      // A paid booking: payments.booking_id is "on delete restrict", so the purge must still get through it.
+      await pool.query("insert into payments (booking_id, host_id, provider, amount_minor, currency, status) values ($1, $2, 'razorpay', 49900, 'INR', 'paid')",
+        [upcoming.id, arun.id]);
 
       const cancelled = await store.deleteAccount(arun.id, now);
       expect(cancelled.map((b) => b.id)).toContain(upcoming.id);
