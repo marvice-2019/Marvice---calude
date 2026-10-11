@@ -9,7 +9,7 @@ export type BookingEmailKind =
   | "cancelled_guest" | "cancelled_host" | "rescheduled_guest" | "rescheduled_host";
 /** Writes to the host's calendar (channel 'calendar'). */
 export type CalendarJobKind = "calendar_create" | "calendar_move" | "calendar_delete";
-export type NotificationKind = BookingEmailKind | CalendarJobKind | "calendar_alert_host";
+export type NotificationKind = BookingEmailKind | CalendarJobKind | "calendar_alert_host" | "renewal_reminder_host";
 
 /** Guest reminders, in minutes before the start. A reminder whose time has already passed at booking is not queued. */
 export const REMINDER_OFFSETS_MINUTES = [1440, 60] as const;

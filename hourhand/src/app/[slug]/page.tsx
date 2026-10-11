@@ -1,3 +1,4 @@
+import { BookingFooter } from "@/components/BookingFooter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -28,6 +29,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
           </li>
         ))}
       </ul>
+      <BookingFooter hostId={host.id} />
     </main>
   );
 }

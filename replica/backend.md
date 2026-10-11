@@ -106,6 +106,27 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Accepted (low):** if a host removes a calendar in Google and reconnects, bookings whose events were in it lose the link to them; later moves or cancellations can't update those events. Rare, and the host's own Google change caused it.
 - **Checked:** closing an account queues the calendar deletes at once and keeps the tokens until the 30-day purge, so the deletes run before the tokens go.
 
+## B5a evidence (2026-10-11, Postgres 16.15, production build, fake Razorpay and Stripe)
+
+- 238 tests pass with `TEST_DATABASE_URL` set (after the review fixes below). Migration 0005 applies on top of 0004.
+- **Provider calls** checked against Razorpay's and Stripe's docs (subscriptions create/fetch/cancel/pause/resume, Checkout Sessions, billing portal, webhook signatures; read 2026-10-11). Razorpay's resume body (`resume_at: now`) is the one detail not confirmed in the docs; check it in test mode.
+- **Unit:** Razorpay and Stripe clients against a fake fetch (auth, request bodies, status mapping, period end on the Stripe item, a collection pause read as paused, retryable vs permanent errors); signatures (wrong key, changed body, missing header; Stripe tolerance both ways, several v1 values); which subscription each event is about.
+- **Against Postgres:** an active subscription becomes the plan; an unknown price, unknown host or unstarted subscription grants nothing; a late cancellation of an old subscription doesn't take away a newer one's plan; a new subscription replaces a cancelled one; Razorpay's cancel-at-period-end is kept; the renewal reminder resets each period; each event is processed once and a failed one again on retry; out-of-order events end on the provider's current state; two events for one subscription run one after the other; checkout is refused while live, retrying or paused; paused means Free; Free checks at most 2 calendars, a paid plan any number; one renewal reminder per period, skipped after a cancel.
+- **Negative tests** (fix set aside, test fails): the old-subscription guard, the per-subscription lock, the checkout guard, the calendar limit on toggles, the calendar limit on connect, the reminder skip after cancel, recording Razorpay's cancel.
+- **End to end on a production build against fake Razorpay and Stripe (26 of 26):** a Free page shows the footer; the Plan page shows `₹399 + 18% GST = ₹470.82 a month` and `$70 a year`; Choose Solo creates a Razorpay subscription with the host in its notes and redirects to its payment link; a badly signed webhook is refused and grants nothing; a signed one activates Solo; the same event again is a duplicate; the footer goes; no second checkout is offered; pause, resume and cancel go to Razorpay and the page reflects each; a USD Duo yearly checkout goes to Stripe with the host in metadata and an idempotency key; a 10-minute-old Stripe webhook is refused; a signed one puts the host on Duo; Card and invoices opens Stripe's portal. B4 (19), B3 (10), B2b (12) and sign-in (15) pass again.
+- **Not yet run against real Razorpay or Stripe:** needs your test keys, plan and price ids, and webhook values in `.env.local` / Coolify.
+
+## B5a review (fresh-context reviewer)
+
+- **Fixed (medium):** a late "cancelled" for an old subscription replaced a newer one that was paused: the host lost their way back to it and could start a second checkout. Any subscription that hasn't ended now counts as the host's. Negative test fails without it.
+- **Fixed (medium, product call taken):** Razorpay "halted" and Stripe "unpaid" mean the provider stopped retrying a failed renewal, but they mapped to "retrying", so the host kept paid features indefinitely without paying. They are now a separate `unpaid` status: paid features off, a clear "update your card" line, cancel still available. Negative test fails without it.
+- **Fixed (low):** several "check this calendar" toggles at the same moment could take a Free host past 2 calendars. Toggles now take turns per host. A test fires 6 at once; without the fix it fails every run.
+- **Fixed (low):** a webhook for a subscription the provider says doesn't exist (another account, or test mode) answered 500 on every retry. A permanent 4xx from the provider is now recorded and the event closed; outages still return 500 so the provider retries. Negative test fails without it.
+- **Fixed (low):** the Plan page heading said "Solo" while the subscription was paused or unpaid; it now shows the plan the host actually has. The return from checkout says "Checkout finished" rather than claiming a payment.
+- **Accepted (low, ops note):** a host who opens two Razorpay payment links in two tabs and pays both gets two subscriptions (Razorpay has no idempotency on creating one). Hourhand keeps the newer and logs `[billing] host … has two open subscriptions`. Refund the other by hand from the Razorpay dashboard.
+- **Accepted (cosmetic):** toggling a calendar id that isn't the host's shows the calendar-limit message instead of nothing.
+- **Checked:** signatures in constant time on the raw body; dedupe and retry; the lock and row lock; the plan comes only from notes/metadata Hourhand set and known price ids; test-only base URLs need `HOURHAND_E2E=1`; every action checks the session; redirects only to provider URLs or the configured base URL; the reminder path doesn't touch booking or calendar mail.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
@@ -113,8 +134,10 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 | Create a Google Cloud project with an OAuth client (web), redirect URI `https://<domain>/api/auth/callback/google`, plus `http://localhost:3000/...` for dev | 30 min | B2 |
 | Enable the Google Calendar API and **submit OAuth verification** for the `calendar.events` and `calendar.freebusy` scopes. Until it is approved, the app is limited to 100 test users | **2–6 weeks** | B4, public launch |
 | Resend account, domain `mail.<domain>` with SPF, DKIM, DMARC `p=none` | 1 day for DNS | B3 |
-| Razorpay account (test mode keys) and KYC for live | KYC takes days | B5 |
-| Stripe account (test mode keys) | 30 min | B5 |
+| Razorpay account (test mode keys) and KYC for live; turn on Subscriptions; create the 4 Plans and the webhook (see README → Plans and billing) | KYC takes days | B5 |
+| Stripe account (test mode keys); 2 Products with monthly and yearly Prices, Customer Portal on, webhook (see README) | 30 min | B5 |
+| In Razorpay (test mode first), set the business and GST invoice details: **Marvice Media Private Limited**, GSTIN **33AAMCM6642H1ZB** (Tamil Nadu), 37, Veeraragavapuram, Ekkadu Post, Tiruvallur, Tamil Nadu 602021; GST invoices at 18% on plan amounts set before tax. Decided 2026-10-11: invoices are issued from the Tamil Nadu registration | 15 min | B5 |
+| One test-mode payment end to end (test keys, 4 test Plans, webhook); check the plan turns Solo, then swap to live keys. Regenerate the live key pair shared in chat on 2026-10-11 before going live | 20 min | B5, before live |
 | Meta WhatsApp Business account; submit utility templates for confirmation and reminder | 1–7 days per template | later |
 | DLT registration of the entity, sender ID and SMS templates (for example via MSG91) | **days to weeks** | later |
 | Trademark search for "Hourhand" before buying the domain | 1 day | launch |
@@ -148,6 +171,16 @@ RAZORPAY_KEY_SECRET=
 RAZORPAY_WEBHOOK_SECRET=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
+RAZORPAY_PLAN_SOLO_MONTH=
+RAZORPAY_PLAN_SOLO_YEAR=
+RAZORPAY_PLAN_DUO_MONTH=
+RAZORPAY_PLAN_DUO_YEAR=
+STRIPE_PRICE_SOLO_MONTH=
+STRIPE_PRICE_SOLO_YEAR=
+STRIPE_PRICE_DUO_MONTH=
+STRIPE_PRICE_DUO_YEAR=
+RAZORPAY_API_BASE_URL=
+STRIPE_API_BASE_URL=
 TURNSTILE_SECRET_KEY=
 ```
 
@@ -159,7 +192,7 @@ Rounds after B1 add their variables here as they land.
 - [ ] input validated on the server on every route (booking and manage routes: done in the fake-data rounds; host actions: done)
 - [x] authorisation checked on every read and write, tested with a second user (B2b closed the nine-method gap). B1: every data method that takes a user id is tested against a second host (Arun) and returns nothing. **Open:** nine methods take no user id (`listEventLocations`, `listCustomQuestions`, `cancelBooking`, `rescheduleBooking`, `saveWeeklyHours`, `saveDateOverride`, `deleteDateOverride`, `blockDateRange`, `saveQuestions`) and rely on the caller's ownership check; B2 adds that check with the session. Calendar list methods filter by user but have no second-host test yet
 - [ ] rate limits on auth, sign up, and anything that sends email or SMS (sign-in: done in B2b; new bookings, which send email: done in B3; slot endpoint and SMS: still to do)
-- [ ] webhooks verify signatures and dedupe on `webhook_events`
+- [x] webhooks verify signatures and dedupe on `webhook_events` (B5a: Razorpay and Stripe; plan state re-read from the provider, never taken from the event)
 - [ ] uploads: size and type limits, served from a separate bucket or domain (avatars only)
 - [ ] no user data in URLs or logs (manage links use an opaque token, not an email)
 - [ ] dependencies audited: `npm audit --omit=dev` is clean; 5 dev-only advisories via `eslint-config-next`, with no non-breaking fix
