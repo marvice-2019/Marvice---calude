@@ -173,6 +173,10 @@ export async function handleCreateBooking(
   const priceMinor = eventType.priceMinor;
   // A priced repeat goes through startPaidBooking below instead, so a still-held booking gets its payment details back.
   if (existing && !priceMinor) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
+  // A priced repeat that is no longer waiting on payment: a confirmed one is simply returned (even if the host has since
+  // downgraded or disconnected), and a released or failed attempt is over, so the guest's page starts a fresh one.
+  if (existing && priceMinor && existing.status === "confirmed") return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
+  if (existing && priceMinor && existing.status === "cancelled") return { status: 409, body: { error: "attempt_expired" } };
 
   const questions = await store.listCustomQuestions(host.id, eventType.id);
   const missing = questions.filter((q) => q.required && !req.answers[q.id]);

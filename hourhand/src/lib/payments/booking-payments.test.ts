@@ -278,6 +278,47 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
       expect(await notifications(id)).toBeGreaterThan(0);
     });
 
+    it("a payment landing just after the hold ran out is still found and refunded", async () => {
+      const { fake, id } = await abandoned();
+      expect(await run(fake, later(HOLD_MINUTES + 1))).toMatchObject({ expired: 1 });
+      // The guest's Checkout completes a moment later and they close the tab before our page hears about it.
+      const order = (await pool.query("select provider_order_id from payments where booking_id = $1", [id])).rows[0].provider_order_id;
+      fake.state.payments.set("pay_late", { id: "pay_late", order_id: order, amount: 50_000, currency: "INR", status: "captured" });
+      expect(await run(fake, later(HOLD_MINUTES + 3))).toMatchObject({ refundPending: 1 });
+      expect((await payment(id))[0]).toMatchObject({ status: "refund_pending", provider_payment_id: "pay_late" });
+      expect(await booking(id)).toMatchObject({ status: "cancelled" });
+    });
+
+    it("the same holds when a new booking released the lapsed hold", async () => {
+      const { fake, id } = await abandoned();
+      // Lapse the hold by the database clock; the next insert for this host releases it.
+      await pool.query("update bookings set hold_expires_at = now() - interval '1 minute' where id = $1", [id]);
+      await startPaidBooking({ pool, store, auth, orders: fake.orders }, input(), new Date());
+      expect(await booking(id)).toMatchObject({ status: "cancelled" });
+      const order = (await pool.query("select provider_order_id from payments where booking_id = $1", [id])).rows[0].provider_order_id;
+      fake.state.payments.set("pay_late2", { id: "pay_late2", order_id: order, amount: 50_000, currency: "INR", status: "captured" });
+      await run(fake, later(2));
+      expect((await payment(id))[0]).toMatchObject({ status: "refund_pending" });
+    });
+
+    it("gives up on a released hold's payment once the late window has passed", async () => {
+      const { fake, id } = await abandoned();
+      await run(fake, later(HOLD_MINUTES + 1));
+      await run(fake, later(HOLD_MINUTES + 40));
+      expect((await payment(id))[0]).toMatchObject({ status: "failed" });
+    });
+
+    it("someone else capturing the same payment first doesn't stop the booking confirming", async () => {
+      const { fake, id, pay } = await abandoned(undefined, { status: "authorized" });
+      // The host's auto-capture (or the browser's confirm) wins the race; Razorpay refuses our second capture.
+      fake.orders.capture = async (paymentId: string) => {
+        fake.state.payments.get(paymentId)!.status = "captured";
+        throw new Error("This payment has already been captured");
+      };
+      expect(await run(fake, later(2))).toMatchObject({ confirmed: 1, errors: 0 });
+      expect((await payment(id))[0]).toMatchObject({ status: "paid", provider_payment_id: pay!.id });
+    });
+
     it("captures an authorized payment and confirms", async () => {
       const { fake, id, pay } = await abandoned(undefined, { status: "authorized" });
       expect(await run(fake, later(2))).toMatchObject({ claimed: 1, confirmed: 1 });
@@ -290,7 +331,8 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
       expect(await run(fake, later(HOLD_MINUTES + 1))).toMatchObject({ claimed: 1, expired: 1 });
       const { rows } = await pool.query("select status, cancelled_by, cancel_reason, hold_expires_at from bookings where id = $1", [id]);
       expect(rows[0]).toMatchObject({ status: "cancelled", cancelled_by: "system", cancel_reason: "Payment not completed", hold_expires_at: null });
-      expect((await payment(id))[0]).toMatchObject({ status: "failed" });
+      // The payment stays pending through the late window, so a payment landing just after the hold is still caught.
+      expect((await payment(id))[0]).toMatchObject({ status: "pending" });
       // The hold hasn't lapsed by the database clock, so only the reconciler can have freed the slot.
       const again = await startPaidBooking({ pool, store, auth, orders: fake.orders }, input({ startAt }), new Date());
       expect(again.booking.status).toBe("pending_payment");
@@ -460,6 +502,19 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
       expect(await handleCreateBooking(store, req, now(), undefined, deps(undefined, { connected: false }))).toEqual({ status: 409, body: { error: "payments_unavailable" } });
       expect(await handleCreateBooking(store, req, now(), undefined, null)).toEqual({ status: 409, body: { error: "payments_unavailable" } });
       expect((await store.listBookings(priya.id)).some((b) => b.idempotencyKey === req.idempotencyKey)).toBe(false);
+    });
+
+    it("a repeat after the attempt ended says so, and a repeat of a confirmed booking returns it even after the host disconnects", async () => {
+      const fake = fakeRazorpay();
+      const req = await request();
+      const first = (await handleCreateBooking(store, req, now(), undefined, deps(fake))).body as Created;
+      await pool.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null where id = $1", [first.bookingId]);
+      expect(await handleCreateBooking(store, req, now(), undefined, deps(fake))).toMatchObject({ status: 409, body: { error: "attempt_expired" } });
+
+      const req2 = await request();
+      const second = (await handleCreateBooking(store, req2, now(), undefined, deps(fake))).body as Created;
+      await pool.query("update bookings set status = 'confirmed', hold_expires_at = null where id = $1", [second.bookingId]);
+      expect(await handleCreateBooking(store, req2, now(), undefined, deps(fake, { connected: false }))).toMatchObject({ status: 200, body: { bookingId: second.bookingId } });
     });
 
     it("holds a priced booking and returns its payment; a repeat returns the same order", async () => {

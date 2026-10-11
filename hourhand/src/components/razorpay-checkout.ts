@@ -34,6 +34,8 @@ export async function payWithRazorpay(payment: CheckoutPayment, info: { name: st
     const rzp = new Razorpay({
       key: payment.keyId, order_id: payment.orderId, amount: payment.amount, currency: payment.currency,
       name: info.name, description: info.description, prefill: info.prefill,
+      // Checkout closes itself when the hold runs out, so nobody pays for a time that's no longer held.
+      timeout: Math.max(1, Math.floor((new Date(payment.holdExpiresAt).getTime() - Date.now()) / 1000)),
       handler: (r: CheckoutResult) => resolve(r),
       modal: { ondismiss: () => resolve(null) },
     });

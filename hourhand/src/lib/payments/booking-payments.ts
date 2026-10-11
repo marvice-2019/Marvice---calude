@@ -4,7 +4,7 @@ import { queueBookingNotifications } from "../data/notifications";
 import type { BookingWithInvitee, CreateBookingInput, DataStore } from "../data/types";
 import { kickJobs } from "../jobs/kick";
 import type { HostRazorpayAuth } from "./host-razorpay";
-import type { RazorpayOrders } from "./razorpay-orders";
+import type { RazorpayOrders, RazorpayPayment } from "./razorpay-orders";
 
 // Priced bookings: the guest pays the host's own Razorpay account. The booking holds its slot as pending_payment while
 // the guest pays, and only becomes confirmed (with its emails) once the captured payment is checked against our records.
@@ -80,7 +80,7 @@ export async function startPaidBooking(
     // Without an order the guest can't pay, so free the slot now rather than holding it until the hold lapses.
     await pool.query(
       `update bookings set status = 'cancelled', cancelled_at = $2, cancelled_by = 'system', cancel_reason = 'Payment could not start', hold_expires_at = null
-       where id = $1 and status = 'pending_payment'`, [booking.id, now]);
+       where id = $1 and status = 'pending_payment' and not exists (select 1 from payments where booking_id = $1)`, [booking.id, now]);
     throw new PaymentStartError(`Payment could not start: ${(error as Error).message}`, error instanceof BillingApiError && error.retryable);
   }
   const row = await inTx(pool, async (client) => {
@@ -138,9 +138,24 @@ export async function confirmPayment(
   let p = await orders.getPayment(input.paymentId);
   if (p.orderId !== row.provider_order_id) throw new PaymentVerifyError("mismatch");
   if (p.amount !== row.amount_minor || p.currency !== row.currency) throw new PaymentVerifyError("mismatch");
-  if (p.status === "authorized") p = await orders.capture(p.id, row.amount_minor, row.currency);
+  if (p.status === "authorized") p = await captureOnce(orders, p.id, row.amount_minor, row.currency);
   if (p.status !== "captured") throw new PaymentVerifyError("not_paid");
   return applyCapturedPayment(pool, input.bookingId, p.id, now);
+}
+
+/**
+ * Captures an authorized payment. Someone else may capture it at the same moment (the reconciler, the browser's confirm,
+ * or the host's own auto-capture); Razorpay refuses the second call, so on failure read the payment again and carry on
+ * if it is captured now.
+ */
+async function captureOnce(orders: RazorpayOrders, paymentId: string, amount: number, currency: string): Promise<RazorpayPayment> {
+  try {
+    return await orders.capture(paymentId, amount, currency);
+  } catch (error) {
+    const again = await orders.getPayment(paymentId);
+    if (again.status === "captured") return again;
+    throw error;
+  }
 }
 
 /** How the reconciler reaches each host's Razorpay. Injected so tests can use fakes. */
@@ -163,9 +178,9 @@ async function expireHold(pool: pg.Pool, bookingId: string, now: Date): Promise<
     const { rowCount } = await client.query(
       `update bookings set status = 'cancelled', cancelled_at = $2, cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null
        where id = $1 and status = 'pending_payment'`, [bookingId, now]);
-    if (!rowCount) return false;
-    await client.query("update payments set status = 'failed', updated_at = $2 where booking_id = $1 and status = 'pending'", [bookingId, now]);
-    return true;
+    // The payment stays pending: a guest paying in the last seconds may still land, and the late-payment check below
+    // finds it and refunds it. It is marked failed once the late window has passed.
+    return (rowCount ?? 0) > 0;
   });
 }
 
@@ -194,6 +209,10 @@ export async function reconcilePayments(deps: PaymentCheckDeps & { pool: pg.Pool
     if (r === "refund_pending") result.refundPending += 1;
   };
   const holdLapsed = (row: DueRow) => row.booking_status === "pending_payment" && row.hold_expires_at !== null && row.hold_expires_at <= now;
+  // Long enough after a system cancel that no payment is still coming.
+  const pastLateWindow = (row: DueRow) => row.booking_status === "cancelled" && row.cancelled_at !== null && now.getTime() - row.cancelled_at.getTime() > LATE_PAYMENT_MS;
+  const markFailed = (row: DueRow) =>
+    pool.query("update payments set status = 'failed', updated_at = $2 where booking_id = $1 and status = 'pending'", [row.booking_id, now]);
   const setError = (row: DueRow, message: string) =>
     pool.query("update payments set last_error = $2, updated_at = $3 where booking_id = $1 and status = 'pending'", [row.booking_id, message.slice(0, 500), now]);
 
@@ -204,6 +223,7 @@ export async function reconcilePayments(deps: PaymentCheckDeps & { pool: pg.Pool
         await setError(row, "Razorpay disconnected");
         // Nobody can pay without the host's account, so a lapsed hold still frees its slot.
         if (holdLapsed(row) && await expireHold(pool, row.booking_id, now)) result.expired += 1;
+        else if (pastLateWindow(row)) await markFailed(row);
         continue;
       }
       const orders = deps.ordersFor(auth);
@@ -213,13 +233,12 @@ export async function reconcilePayments(deps: PaymentCheckDeps & { pool: pg.Pool
       if (captured) {
         count(await applyCapturedPayment(pool, row.booking_id, captured.id, now));
       } else if (authorized) {
-        const p = await orders.capture(authorized.id, authorized.amount, authorized.currency);
+        const p = await captureOnce(orders, authorized.id, authorized.amount, authorized.currency);
         count(await applyCapturedPayment(pool, row.booking_id, p.id, now));
       } else if (holdLapsed(row)) {
         if (await expireHold(pool, row.booking_id, now)) result.expired += 1;
-      } else if (row.booking_status === "cancelled" && row.cancelled_at && now.getTime() - row.cancelled_at.getTime() > LATE_PAYMENT_MS) {
-        // Long enough after the cancel that no payment is still coming.
-        await pool.query("update payments set status = 'failed', updated_at = $2 where booking_id = $1 and status = 'pending'", [row.booking_id, now]);
+      } else if (pastLateWindow(row)) {
+        await markFailed(row);
       }
     } catch (error) {
       // One host's failing account must not stop the others; the row stays pending and is retried next round.

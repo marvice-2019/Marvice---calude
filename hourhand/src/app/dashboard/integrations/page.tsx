@@ -18,6 +18,7 @@ const ERRORS: Record<string, string> = {
   unreachable: "Couldn't reach Razorpay to check the keys. Try again in a minute.",
   not_configured: "Payments aren't set up on this server yet.",
   demo: "The demo data can't connect Razorpay.",
+  busy: "A guest's payment is still being confirmed or refunded through this account. Disconnect once it settles, usually within a few minutes.",
 };
 
 /** True when the server can encrypt stored keys; a missing or malformed TOKEN_ENCRYPTION_KEY means it can't. */
@@ -49,7 +50,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
 
       {params.connected && <p role="status" className="mt-4 max-w-xl text-success">Razorpay connected. Guests&apos; payments now go to your account.</p>}
       {params.disconnected && <p role="status" className="mt-4 max-w-xl text-success">Razorpay disconnected. Your keys were removed from Hourhand.</p>}
-      {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{ERRORS[params.error] ?? ERRORS.unreachable}</p>}
+      {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{(Object.hasOwn(ERRORS, params.error) && ERRORS[params.error]) || ERRORS.unreachable}</p>}
 
       <Card className="mt-6 max-w-2xl">
         <h2 className="font-semibold text-text">Razorpay · take payments at booking</h2>

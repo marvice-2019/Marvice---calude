@@ -106,14 +106,14 @@ export function createPgStore(pool: pg.Pool): DataStore {
     return id;
   }
 
-  /** Cancels the event type's host's lapsed payment holds (and fails their payments), freeing those slots. */
+  /**
+   * Cancels the event type's host's lapsed payment holds, freeing those slots. Their payments stay pending so the
+   * reconciler still catches (and refunds) a payment that lands just after the hold ran out.
+   */
   async function expireHolds(client: pg.PoolClient, eventTypeId: string): Promise<void> {
-    const { rows } = await client.query(
+    await client.query(
       `update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null
-       where host_id = (select user_id from event_types where id = $1) and status = 'pending_payment' and hold_expires_at < now() returning id`, [eventTypeId]);
-    if (rows.length > 0) {
-      await client.query("update payments set status = 'failed', updated_at = now() where booking_id = any($1::uuid[]) and status = 'pending'", [rows.map((r) => r.id)]);
-    }
+       where host_id = (select user_id from event_types where id = $1) and status = 'pending_payment' and hold_expires_at < now()`, [eventTypeId]);
   }
 
   /** A key already used for this same request returns its booking; a key used for anything else is a conflict. */
@@ -271,7 +271,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
       if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
         const id = await tx(async (client) => {
-          const old = await client.query(`${BOOKING} where b.id = $1 and b.host_id = $2 for update of b`, [bookingId, hostId]);
+          const old = await client.query(`${BOOKING} where b.id = $1 and b.host_id = $2 and b.status = 'confirmed' for update of b`, [bookingId, hostId]);
           if (!old.rows[0]) throw new NotFoundError("Booking");
           const { eventTypeId, invitee } = toBooking(old.rows[0]);
           // Cancel first: the exclusion constraint only covers confirmed rows, so the new slot may overlap the old one.

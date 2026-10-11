@@ -181,5 +181,18 @@ describe.skipIf(!BASE)("booking payments (TEST_DATABASE_URL)", () => {
          values ($1, $2, '2030-03-06T10:00:00Z', '2030-03-06T10:30:00Z', '2030-03-06T10:00:00Z', '2030-03-06T10:30:00Z', 'confirmed', 'pay-test-x', now())`,
         [eventTypeId, priya.id])).rejects.toThrow(/bookings_hold_check/);
     });
+
+    it("the host can't disconnect while a guest's payment is still settling", async () => {
+      await saveRazorpayKeys(pool, key, priya.id, KEY_ID, KEY_SECRET, ok);
+      await book("confirmed", "2030-03-07T10:00:00Z");
+      const { rows: [b] } = await pool.query("select id from bookings where idempotency_key = $1", [`pay-test-${n}`]);
+      await pool.query("insert into payments (booking_id, host_id, provider, amount_minor, currency, status) values ($1, $2, 'razorpay', 49900, 'INR', 'refund_pending')", [b.id, priya.id]);
+      await expect(disconnectRazorpay(pool, priya.id)).rejects.toMatchObject({ code: "busy" });
+      expect(await loadHostRazorpay(pool, key, priya.id)).not.toBeNull();
+      await pool.query("update payments set status = 'refunded' where booking_id = $1", [b.id]);
+      await disconnectRazorpay(pool, priya.id);
+      expect(await loadHostRazorpay(pool, key, priya.id)).toBeNull();
+      await pool.query("delete from payments where booking_id = $1", [b.id]);
+    });
   });
 });

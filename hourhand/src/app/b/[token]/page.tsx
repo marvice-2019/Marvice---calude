@@ -4,6 +4,7 @@ import { LocalTime } from "@/components/LocalTime";
 import { ManageBooking } from "@/components/ManageBooking";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { isUnpaidRelease } from "@/lib/booking-reasons";
 import { store } from "@/lib/data";
 import { formatDate, zoneName } from "@/lib/format";
 import { GUEST_LOCATION_LABELS as locationLabels } from "@/lib/location-labels";
@@ -21,7 +22,7 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
   const cancelled = booking.status === "cancelled";
   const pending = booking.status === "pending_payment";
   // A hold that ran out before the guest paid: say so plainly rather than "cancelled".
-  const unpaid = cancelled && booking.cancelReason === "Payment not completed";
+  const unpaid = cancelled && isUnpaidRelease(booking.cancelReason);
 
   return (
     <main className="mx-auto max-w-(--hh-booking-max) px-4 py-10">

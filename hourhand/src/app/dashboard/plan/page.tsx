@@ -73,8 +73,8 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
         <p role="status" className="mt-4 max-w-xl text-success">Checkout finished. Your plan switches on as soon as the payment provider confirms the payment, usually within a minute. Refresh to see it.</p>
       )}
       {params.checkout === "cancelled" && <p role="status" className="mt-4 text-text-muted">Checkout closed. Nothing was charged.</p>}
-      {params.done && DONE[params.done] && <p role="status" className="mt-4 max-w-xl text-success">{DONE[params.done]}</p>}
-      {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{ERRORS[params.error] ?? ERRORS.provider}</p>}
+      {params.done && Object.hasOwn(DONE, params.done) && <p role="status" className="mt-4 max-w-xl text-success">{DONE[params.done]}</p>}
+      {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{(Object.hasOwn(ERRORS, params.error) && ERRORS[params.error]) || ERRORS.provider}</p>}
 
       <Card className="mt-6 max-w-2xl">
         <h2 className="font-semibold text-text">Current plan: {PLAN_NAMES[effectivePlan(sub && sub.plan !== "free" ? { plan: sub.plan, status: sub.status } : null)]}</h2>

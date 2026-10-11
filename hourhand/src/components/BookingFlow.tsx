@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
@@ -46,7 +46,9 @@ interface FormProps {
 
 function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }: FormProps) {
   const router = useRouter();
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  // A new key starts a fresh attempt; it changes only after an attempt is over (payment couldn't start, or the hold ran out).
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const freshAttempt = () => setIdempotencyKey(crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [taken, setTaken] = useState<string[] | null>(null);
@@ -56,10 +58,20 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
   const [held, setHeld] = useState<{ bookingId: string; manageToken: string; payment: CheckoutPayment; prefill: { name: string; email: string; contact?: string } } | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
+  const [notPaid, setNotPaid] = useState(false);
+  const [expired, setExpired] = useState(false);
+
+  // Once the hold runs out the Pay button goes: paying after that would only be refunded.
+  useEffect(() => {
+    if (!held) return;
+    const left = new Date(held.payment.holdExpiresAt).getTime() - Date.now();
+    const t = setTimeout(() => { setHeld(null); setExpired(true); freshAttempt(); }, Math.max(0, left));
+    return () => clearTimeout(t);
+  }, [held]);
 
   /** Opens Checkout; after a payment the server checks it with Razorpay. The booked page shows the result either way. */
   async function pay(h: NonNullable<typeof held>) {
-    setCheckoutFailed(false);
+    setCheckoutFailed(false); setNotPaid(false);
     let result;
     try {
       result = await payWithRazorpay(h.payment, { name: paid?.hostName ?? "", description: paid?.eventName ?? "", prefill: h.prefill });
@@ -71,10 +83,15 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
     if (!result) { setHeld(h); return; }
     setBusy(true);
     try {
-      await fetch("/api/bookings/pay", {
+      const res = await fetch("/api/bookings/pay", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ manageToken: h.manageToken, paymentId: result.razorpay_payment_id, signature: result.razorpay_signature }),
       });
+      // Razorpay says the payment didn't complete: stay here with the hold and let the guest try again.
+      if (res.status === 400 && (await res.json().catch(() => ({}))).error === "not_paid") {
+        setBusy(false); setNotPaid(true); setHeld(h);
+        return;
+      }
     } catch {
       // The reconciler confirms a real payment within a minute even if this call never arrives.
     }
@@ -86,7 +103,7 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const answers = Object.fromEntries(questions.map((q) => [q.id, String(data.get(`q_${q.id}`) ?? "")]));
-    setBusy(true); setFailed(false); setLimited(false);
+    setBusy(true); setFailed(false); setLimited(false); setExpired(false);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST", headers: { "content-type": "application/json" },
@@ -104,6 +121,7 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
         return;
       }
       if (res.status === 409 && body.error === "payments_unavailable") setUnavailable(true);
+      else if ((res.status === 409 && body.error === "attempt_expired") || res.status === 502) { freshAttempt(); setFailed(true); }
       else if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
       else if (res.status === 400) setErrors(body.fields ?? {});
       else if (res.status === 429) setLimited(true);
@@ -159,11 +177,12 @@ function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }:
       })}
       {limited && <p className="text-danger" role="alert">Too many bookings from here in the last hour. Try again later.</p>}
       {failed && <p className="text-danger" role="alert">Something went wrong. Your time isn&apos;t booked yet. Try again.</p>}
+      {expired && <p className="text-danger" role="alert">Your hold on this time ran out before payment. Book it again if it&apos;s still free.</p>}
       {unavailable && <p className="text-danger" role="alert">{paid?.hostName ?? "This host"} isn&apos;t taking payments online right now, so this event can&apos;t be booked here. Contact them directly.</p>}
       {held ? (
         <div className="grid gap-2 rounded-md bg-warning-bg p-4" role="status">
           <p className="text-text">
-            {checkoutFailed ? "Razorpay didn't open. Check your connection and try again." : "You haven't paid yet."} Your time is held until{" "}
+            {checkoutFailed ? "Razorpay didn't open. Check your connection and try again." : notPaid ? "That payment didn't go through. Try again, or use another way to pay." : "You haven't paid yet."} Your time is held until{" "}
             <LocalTime date={held.payment.holdExpiresAt} tz={tz} />.
           </p>
           <Button type="button" loading={busy} onClick={() => { const h = held; setHeld(null); void pay(h); }}>Pay {paid?.price}</Button>

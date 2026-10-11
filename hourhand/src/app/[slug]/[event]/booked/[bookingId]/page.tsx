@@ -4,6 +4,7 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { LocalTime } from "@/components/LocalTime";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { isUnpaidRelease } from "@/lib/booking-reasons";
 import { store } from "@/lib/data";
 import { formatDate, zoneName } from "@/lib/format";
 import { GUEST_LOCATION_LABELS as locationLabels } from "@/lib/location-labels";
@@ -21,17 +22,17 @@ export default async function BookedPage({ params }: { params: Promise<{ slug: s
   if (booking.status === "pending_payment") {
     return (
       <main className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
-        <AutoRefresh />
         <h1 className="font-display text-xl text-text">Confirming your payment…</h1>
         <p className="mt-2 max-w-md text-text-muted" role="status">
-          This usually takes a few seconds. Your time is held{booking.holdExpiresAt && <> until <LocalTime date={booking.holdExpiresAt} tz={tz} /></>}, and this page updates by itself.
+          This usually takes a few seconds. Your time is held{booking.holdExpiresAt && <> until <LocalTime date={booking.holdExpiresAt} tz={tz} /></>}.
           If you closed Razorpay without paying, go back and pick the time again.
         </p>
+        <AutoRefresh />
       </main>
     );
   }
   if (booking.status === "cancelled") {
-    const unpaid = booking.cancelReason === "Payment not completed";
+    const unpaid = isUnpaidRelease(booking.cancelReason);
     return (
       <main className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
         <h1 className="font-display text-xl text-text">{unpaid ? "The payment wasn't completed" : "This booking is cancelled"}</h1>

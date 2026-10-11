@@ -21,7 +21,7 @@ export type RazorpayMode = "test" | "live";
 
 const KEY_ID = /^rzp_(test|live)_[A-Za-z0-9]{8,32}$/;
 
-export type RazorpayKeyProblem = "format" | "rejected" | "unreachable";
+export type RazorpayKeyProblem = "format" | "rejected" | "unreachable" | "busy";
 
 /** Why a key pair wasn't saved. `rejected`: Razorpay said the pair is wrong; `unreachable`: try again later. */
 export class RazorpayKeyError extends Error {
@@ -107,8 +107,17 @@ export async function razorpayStatus(db: Db, userId: string): Promise<{ keyId: s
   return rows[0] ? { keyId: rows[0].public_id, mode: rows[0].mode } : null;
 }
 
+/**
+ * Removes the host's keys, unless a guest's payment is still being confirmed or refunded: those need the keys to finish,
+ * and deleting them would strand the guest's money.
+ */
 export async function disconnectRazorpay(db: Db, userId: string): Promise<void> {
-  await db.query("delete from integrations where user_id = $1 and provider = 'razorpay'", [userId]);
+  const { rowCount } = await db.query(
+    `delete from integrations where user_id = $1 and provider = 'razorpay'
+       and not exists (select 1 from payments where host_id = $1 and provider = 'razorpay' and status in ('pending', 'refund_pending'))`, [userId]);
+  if (rowCount) return;
+  const { rows } = await db.query("select 1 from integrations where user_id = $1 and provider = 'razorpay'", [userId]);
+  if (rows.length) throw new RazorpayKeyError("busy", "A guest's payment is still being confirmed or refunded.");
 }
 
 /** rzp_test_••••AbCd: enough for the host to recognise which key is connected. */
