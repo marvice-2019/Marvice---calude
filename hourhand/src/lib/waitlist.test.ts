@@ -129,6 +129,20 @@ describe.skipIf(!BASE)("waitlist (Postgres)", () => {
     expect((await pool.query("select name from waitlist where email = 'esha@example.in'")).rows).toEqual([{ name: "Esha" }]);
   });
 
+  it("lets one address join at most 5 times a week, across hosts, so a stranger can't be signed up everywhere", async () => {
+    const at = new Date("2031-03-05T00:00:00Z");
+    const join = (day: string) => {
+      const v = validateWaitlist({ day, timezone: "Asia/Kolkata", name: "Victim", email: "victim@example.in" }, at, 3650, isIanaTimeZone);
+      if (!v.ok) throw new Error("invalid");
+      return joinWaitlist(pool, priya.id, coaching.id, v.value, at);
+    };
+    for (const d of ["2031-03-11", "2031-03-12", "2031-03-13", "2031-03-14", "2031-03-15"]) expect(await join(d)).toBe(true);
+    expect(await join("2031-03-16")).toBe(false);
+    expect(await join("2031-03-15")).toBe(true); // re-joining a day already on the list is fine
+    expect((await pool.query("select count(*)::int as n from waitlist where email = 'victim@example.in'")).rows[0].n).toBe(5);
+    await pool.query("delete from waitlist where email = 'victim@example.in'");
+  });
+
   it("forgets guests a day after their day is over", async () => {
     expect(await pruneWaitlist(pool, new Date("2031-03-07T00:00:00Z"))).toBe(3); // asha, bala and dev's 5 March
     expect((await pool.query("select email from waitlist order by email")).rows.map((r) => r.email)).toEqual(["chitra@example.in", "esha@example.in"]);

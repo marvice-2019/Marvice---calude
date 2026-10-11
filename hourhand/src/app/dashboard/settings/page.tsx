@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
 import { signOutEverywhere } from "@/lib/auth/actions";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   return (
     <div>
       <h1 className="font-display text-xl text-text">Settings</h1>

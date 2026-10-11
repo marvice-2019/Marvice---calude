@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 import { calendarDeps } from "@/lib/calendar/env";
 import { PROVIDER_NAMES } from "@/lib/calendar/provider";
 import { store, type CalendarConnection } from "@/lib/data";
@@ -39,7 +39,7 @@ function health(c: CalendarConnection, now: Date): { tone: string; words: string
 }
 
 export default async function CalendarsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   const params = await searchParams;
   const [connections, calendars] = await Promise.all([store.listCalendarConnections(user.id), store.listCalendars(user.id)]);
   const live = authEnabled();

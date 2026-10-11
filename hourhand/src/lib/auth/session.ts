@@ -49,9 +49,20 @@ export const getHostContext = cache(async (): Promise<HostContext | null> => {
 
 /**
  * The account a shared page works on. Only the pages a Duo second person may use call this (bookings, availability,
- * event types, links, clients, packages, invoices, the public page); everything else calls requireUser and so always
+ * event types, links, clients, packages, the public page); everything else calls requireUser and so always
  * works on the signed-in person's own account.
  */
+/**
+ * For pages that are the signed-in person's alone (plan, settings, integrations, calendars, earnings, invoices): while
+ * managing someone else's account, send them to that account's bookings instead of showing their own data under it.
+ */
+export async function requireOwnAccount(): Promise<User> {
+  const ctx = await getHostContext();
+  if (!ctx) redirect("/sign-in");
+  if (ctx.acting) redirect("/dashboard/bookings");
+  return ctx.actor;
+}
+
 export async function requireHost(): Promise<User> {
   const ctx = await getHostContext();
   if (!ctx) redirect("/sign-in");

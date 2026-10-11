@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/billing/plans";
 import { getPool } from "@/lib/data/pg-store";
 import { monthlyEarnings, monthOf, monthRange } from "@/lib/earnings";
@@ -12,7 +12,7 @@ const label = (month: string) => new Intl.DateTimeFormat("en-IN", { month: "long
 const shift = (month: string, by: number) => { const d = new Date(`${month}-01T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + by); return d.toISOString().slice(0, 7); };
 
 export default async function EarningsPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   const now = new Date();
   const current = monthOf(now);
   const asked = (await searchParams).month;

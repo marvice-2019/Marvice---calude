@@ -52,9 +52,9 @@ export async function monthlyEarnings(db: Db, hostId: string, month: string, now
   const [money, refunds, packages, kept, held, gst, sessions, byBooking, byPackage] = await Promise.all([
     db.query(`select coalesce(sum(amount_minor), 0)::bigint as total from payments
               where host_id = $1 and kind = 'payment' and paid_at >= $2 and paid_at < $3 and status in ('paid', 'refund_pending', 'refunded')`, args),
-    // A refund's time is when it was recorded (updated_at as the row became refunded).
+    // A refund's month is when it was recorded.
     db.query(`select coalesce(sum(refunded_minor), 0)::bigint as total from payments
-              where host_id = $1 and kind = 'payment' and status = 'refunded' and updated_at >= $2 and updated_at < $3`, args),
+              where host_id = $1 and kind = 'payment' and status = 'refunded' and refunded_at >= $2 and refunded_at < $3`, args),
     db.query(`select coalesce(sum(price_minor), 0)::bigint as total from package_purchases where host_id = $1 and status = 'paid' and paid_at >= $2 and paid_at < $3`, args),
     db.query(`select coalesce(sum(p.amount_minor), 0)::bigint as total from payments p join bookings b on b.id = p.booking_id join invitees i on i.booking_id = b.id
               where p.host_id = $1 and p.kind = 'deposit' and p.status = 'paid' and i.no_show_at is not null and b.start_at >= $2 and b.start_at < $3`, args),
@@ -112,6 +112,8 @@ export async function queueMonthlyReports(db: Db, now: Date): Promise<number> {
 export function earningsCsv(e: MonthlyEarnings): string {
   const r = (m: number) => (m / 100).toFixed(2);
   const cell = (v: string) => (/[",\n\r]/.test(v) || /^[=+\-@\t\r]/.test(v) ? `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"` : v);
+  // Figures we format ourselves stay numbers (a refund is "-12.00"); only text cells get the formula guard.
+  const value = (v: string) => (/^-?\d+(\.\d+)?$/.test(v) ? v : cell(v));
   const rows = [
     ["Month", e.month], ["Bookings paid", r(e.bookingsMinor)], ["Packages paid", r(e.packagesMinor)], ["Deposits kept (no-shows)", r(e.depositsKeptMinor)],
     ["Refunds", r(-e.refundsMinor)], ["Net received", r(e.netMinor)], ["of which GST", r(e.gstMinor)], ["Razorpay fee (estimate)", r(e.feeEstimateMinor)],
@@ -119,5 +121,5 @@ export function earningsCsv(e: MonthlyEarnings): string {
     ["Cancelled by guest", String(e.sessions.cancelledByGuest)], ["Cancelled by you", String(e.sessions.cancelledByHost)],
     ...e.byEventType.map((l) => [`${l.eventName}`, r(l.bookingsMinor + l.packagesMinor)]),
   ];
-  return ["Item,Value", ...rows.map(([k, v]) => `${cell(k)},${cell(v)}`)].join("\r\n") + "\r\n";
+  return ["Item,Value", ...rows.map(([k, v]) => `${cell(k)},${value(v)}`)].join("\r\n") + "\r\n";
 }

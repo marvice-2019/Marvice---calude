@@ -50,7 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
                 <Button type="submit" variant="secondary" size="sm">Manage {owner.name}&apos;s account</Button>
               </form>
             )}
-            <SyncLight status={sync.status} minutesAgo={sync.minutesAgo} />
+            {!acting && <SyncLight status={sync.status} minutesAgo={sync.minutesAgo} />}
             {authEnabled() && (
               <form action={signOut}>
                 <Button type="submit" variant="ghost" size="sm">

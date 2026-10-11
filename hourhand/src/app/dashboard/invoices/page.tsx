@@ -2,7 +2,7 @@ import Link from "next/link";
 import { TaxProfileForm } from "@/components/TaxProfileForm";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/billing/plans";
 import { getPool } from "@/lib/data/pg-store";
 import { dayKey, formatDate } from "@/lib/format";
@@ -11,7 +11,7 @@ import { getTaxProfile, listInvoices } from "@/lib/gst/invoices";
 export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage() {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   const db = authEnabled() ? getPool(process.env.DATABASE_URL as string) : null;
   const [profile, invoices] = db ? await Promise.all([getTaxProfile(db, user.id), listInvoices(db, user.id)]) : [null, []];
   const month = dayKey(new Date(), "Asia/Kolkata").slice(0, 7); // this month in India

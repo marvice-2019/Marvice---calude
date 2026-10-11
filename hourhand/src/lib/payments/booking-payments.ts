@@ -302,7 +302,7 @@ export async function processRefunds(deps: PaymentCheckDeps & { pool: pg.Pool },
   const markRefunded = async (row: RefundRow, refundId: string, amount: number) => {
     await inTx(pool, async (client) => {
       const { rowCount } = await client.query(
-        "update payments set status = 'refunded', refund_id = $2, refunded_minor = $3, last_error = null, updated_at = $4 where id = $1 and status = 'refund_pending'",
+        "update payments set status = 'refunded', refund_id = $2, refunded_minor = $3, last_error = null, updated_at = $4, refunded_at = $4 where id = $1 and status = 'refund_pending'",
         [row.id, refundId, amount, now]);
       // An invoiced payment refunded in full is reversed by a credit note, recorded with the refund.
       if (rowCount) await creditNoteForRefund(client, row.id, now);

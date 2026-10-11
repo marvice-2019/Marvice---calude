@@ -36,8 +36,9 @@ export async function inviteSeat(db: Db, owner: { id: string; email: string }, r
   if ((await ownPlan(db, owner.id)) !== "duo") throw new SeatActionError("not_duo");
   const { rows: [other] } = await db.query("select 1 from seats where member_email = $1 and owner_id <> $2", [email, owner.id]);
   if (other) throw new SeatActionError("taken");
-  // A different email starts over; the same email again just re-sends the invitation. The row and its email are one
-  // statement, so neither exists without the other.
+  // A different email starts over; the same email again re-sends the invitation, at most once a day. The row and its
+  // email are one statement, so neither exists without the other. Two owners racing for one email: the unique index decides.
+  try {
   await db.query(
     `with seat as (
        insert into seats (owner_id, member_email, invited_at) values ($1, $2, $3)
@@ -47,7 +48,11 @@ export async function inviteSeat(db: Db, owner: { id: string; email: string }, r
        returning owner_id, member_email)
      insert into notifications (booking_id, user_id, channel, kind, recipient, send_at, dedupe_key)
      select null, owner_id, 'email', 'seat_invite', member_email, $3, $4 from seat on conflict (dedupe_key) do nothing`,
-    [owner.id, email, now, `seat:${owner.id}:${now.getTime()}`]);
+    [owner.id, email, now, `seat:${owner.id}:${email.toLowerCase()}:${now.toISOString().slice(0, 10)}`]);
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") throw new SeatActionError("taken");
+    throw error;
+  }
 }
 
 export async function removeSeat(db: Db, ownerId: string): Promise<void> {

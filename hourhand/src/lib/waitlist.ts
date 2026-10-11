@@ -42,12 +42,23 @@ export function validateWaitlist(input: Record<string, unknown>, now: Date, book
   return { ok: true, value: { day, timezone: timezone!, name, email, window: window! } };
 }
 
-/** Adds the guest to the event type's waitlist for that day; joining twice keeps one entry (and their newest name). */
-export async function joinWaitlist(db: Db, hostId: string, eventTypeId: string, v: WaitlistInput & { window: { start: Date; end: Date } }): Promise<void> {
+/** Joins an address may make in a rolling week, across every host: anyone can type any email, so this bounds what a stranger can be sent. */
+export const WAITLIST_JOINS_PER_WEEK = 5;
+
+/**
+ * Adds the guest to the event type's waitlist for that day; joining twice keeps one entry (and their newest name).
+ * False when the address has used up its joins for the week.
+ */
+export async function joinWaitlist(db: Db, hostId: string, eventTypeId: string, v: WaitlistInput & { window: { start: Date; end: Date } }, now = new Date()): Promise<boolean> {
+  const { rows: [c] } = await db.query(
+    "select count(*)::int as n, bool_or(event_type_id = $2 and day = $3) as same from waitlist where email = $1 and created_at > $4",
+    [v.email, eventTypeId, v.day, new Date(now.getTime() - 7 * DAY_MS)]);
+  if (c.n >= WAITLIST_JOINS_PER_WEEK && !c.same) return false;
   await db.query(
-    `insert into waitlist (host_id, event_type_id, day, timezone, window_start, window_end, name, email) values ($1, $2, $3, $4, $5, $6, $7, $8)
+    `insert into waitlist (host_id, event_type_id, day, timezone, window_start, window_end, name, email, created_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      on conflict (event_type_id, day, email) do update set name = excluded.name`,
-    [hostId, eventTypeId, v.day, v.timezone, v.window.start, v.window.end, v.name, v.email]);
+    [hostId, eventTypeId, v.day, v.timezone, v.window.start, v.window.end, v.name, v.email, now]);
+  return true;
 }
 
 /**

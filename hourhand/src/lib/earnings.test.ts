@@ -59,9 +59,10 @@ describe.skipIf(!BASE)("monthly earnings (Postgres)", () => {
       await pool.query("insert into invitees (booking_id, host_id, name, email, timezone, no_show_at) values ($1, $2, 'G', $3, 'Asia/Kolkata', $4)",
         [b.id, u, `g${k}@example.in`, o.noShow ? end : null]);
       if (o.pay) await pool.query(
-        `insert into payments (booking_id, host_id, provider, amount_minor, currency, status, kind, paid_at, refunded_minor, updated_at, provider_order_id)
-         values ($1, $2, 'razorpay', $3, 'INR', $4, $5, $6, $7, $8, $9)`,
-        [b.id, u, o.pay.amount, o.pay.status, o.pay.kind ?? "payment", o.pay.paidAt, o.pay.refunded ?? 0, o.pay.updatedAt ?? o.pay.paidAt, `order_e${k}`]);
+        `insert into payments (booking_id, host_id, provider, amount_minor, currency, status, kind, paid_at, refunded_minor, updated_at, refunded_at, provider_order_id)
+         values ($1, $2, 'razorpay', $3, 'INR', $4, $5, $6, $7, $8, $9, $10)`,
+        [b.id, u, o.pay.amount, o.pay.status, o.pay.kind ?? "payment", o.pay.paidAt, o.pay.refunded ?? 0, o.pay.updatedAt ?? o.pay.paidAt,
+         o.pay.status === "refunded" ? (o.pay.updatedAt ?? o.pay.paidAt) : null, `order_e${k}`]);
     };
     await booking(host, coaching, oct(3), { pay: { amount: 100_000, status: "paid", paidAt: oct(1) } });
     await booking(host, coaching, oct(10), { pay: { amount: 50_000, status: "refunded", paidAt: oct(2), refunded: 50_000, updatedAt: oct(4) } , status: "cancelled", by: "guest" });
@@ -98,6 +99,21 @@ describe.skipIf(!BASE)("monthly earnings (Postgres)", () => {
     expect(e.feeEstimateMinor).toBe(Math.round((640_000 * 200 * 1.18) / 10_000));
     expect(e.byEventType.map((l) => [l.eventName, l.bookingsMinor + l.packagesMinor])).toEqual([["Coaching", 620_000]]);
     expect(earningsCsv(e)).toContain("Net received,5900.00");
+    expect(earningsCsv(e)).toContain("Refunds,-500.00"); // a number a spreadsheet adds up, not text
+  });
+
+  it("keeps a refund in the month it was made, whatever touches the row later", async () => {
+    // A June refund; any later write (a reconcile, a replayed webhook) fires the updated_at trigger and moves updated_at to today.
+    const { rows: [et] } = await pool.query("select id from event_types where user_id = $1 and slug = 'coaching'", [host]);
+    const { rows: [b] } = await pool.query(
+      `insert into bookings (event_type_id, host_id, start_at, end_at, buffered_start, buffered_end, status, idempotency_key, cancelled_at, cancelled_by)
+       values ($1, $2, '2026-06-10T06:00:00Z', '2026-06-10T07:00:00Z', '2026-06-10T06:00:00Z', '2026-06-10T07:00:00Z', 'cancelled', 'earn-june', '2026-06-09T06:00:00Z', 'guest') returning id`, [et.id, host]);
+    await pool.query(
+      `insert into payments (booking_id, host_id, provider, amount_minor, currency, status, kind, paid_at, refunded_minor, refunded_at, provider_order_id)
+       values ($1, $2, 'razorpay', 30000, 'INR', 'refunded', 'payment', '2026-06-01T06:00:00Z', 30000, '2026-06-09T06:00:00Z', 'order_june')`, [b.id, host]);
+    await pool.query("update payments set last_error = null where provider_order_id = 'order_june'");
+    expect((await monthlyEarnings(pool, host, "2026-06", now))!.refundsMinor).toBe(30_000);
+    expect((await monthlyEarnings(pool, host, monthOf(new Date()), now))!.refundsMinor).toBe(monthOf(new Date()) === "2026-10" ? 50_000 : 0);
   });
 
   it("emails each active host last month's figures once", async () => {

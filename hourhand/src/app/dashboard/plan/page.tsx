@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { focusRing } from "@/components/ui/focus";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 import { getHostSubscription, type HostSubscription } from "@/lib/billing/account";
 import { billingFor } from "@/lib/billing/env";
 import { effectivePlan, LIMITS, PLAN_NAMES, PROVIDER_FOR, priceLine, providerPriceId, type BillingInterval, type Currency, type PaidPlan } from "@/lib/billing/plans";
@@ -44,7 +44,7 @@ function statusLine(s: HostSubscription, fmt: (d: Date) => string): string {
 }
 
 export default async function PlanPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   const params = await searchParams;
   const live = authEnabled();
   const sub = live ? await getHostSubscription(getPool(process.env.DATABASE_URL as string), user.id) : null;

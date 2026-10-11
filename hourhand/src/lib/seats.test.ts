@@ -84,6 +84,26 @@ describe.skipIf(!BASE)("Duo seat (Postgres)", () => {
   it("keeps a person on one Duo plan at most", async () => {
     await plan(other, "duo");
     await expect(inviteSeat(pool, other, "ASST@example.com", now)).rejects.toMatchObject({ code: "taken" });
+    // Two owners racing: the pre-check passes for both, the unique index refuses the second as "taken", not a crash.
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("insert into seats (owner_id, member_email) values ($1, 'race@example.com')", [stranger.id]);
+      const racer = { query: (sql: string, params?: unknown[]) => (/^select 1 from seats/.test(sql.trim()) ? Promise.resolve({ rows: [] }) : client.query(sql, params)) };
+      await expect(inviteSeat(racer as never, other, "race@example.com", now)).rejects.toMatchObject({ code: "taken" });
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+  });
+
+  it("sends one invitation a day however often the owner presses the button", async () => {
+    const before = (await pool.query("select count(*)::int as n from notifications where kind = 'seat_invite'")).rows[0].n;
+    await inviteSeat(pool, other, "fresh@example.com", new Date(now.getTime() + 60_000));
+    await inviteSeat(pool, other, "Fresh@example.com", new Date(now.getTime() + 120_000));
+    await inviteSeat(pool, other, "fresh@example.com", new Date(now.getTime() + 180_000));
+    expect((await pool.query("select count(*)::int as n from notifications where kind = 'seat_invite'")).rows[0].n).toBe(before + 1);
+    await removeSeat(pool, other.id);
   });
 
   it("ends at once when the owner's plan lapses, and comes back when it's paid again", async () => {

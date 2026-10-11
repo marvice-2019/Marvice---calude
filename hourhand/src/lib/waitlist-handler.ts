@@ -21,6 +21,6 @@ export async function handleJoinWaitlist(
   if (limit && (!limit.limiter.take(`waitlist-ip:${limit.clientKey}`, BOOKING_LIMITS.perIp) || !limit.limiter.take(`waitlist-email:${v.value.email.toLowerCase()}`, BOOKING_LIMITS.perEmail))) {
     return { status: 429, body: { error: "too_many_requests" } };
   }
-  await joinWaitlist(pool, found.host.id, found.eventType.id, v.value);
+  if (!(await joinWaitlist(pool, found.host.id, found.eventType.id, v.value, now))) return { status: 429, body: { error: "too_many_requests" } };
   return { status: 200, body: { ok: true } };
 }
