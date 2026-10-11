@@ -44,7 +44,8 @@ function refreshSession(): Promise<string | null> {
     if (!r.ok) {
       const now = getSession();
       if (now && now.refresh !== s.refresh) return now.access; // another tab refreshed first
-      clearSession();
+      // Sign out only when the API rejects the token; a 429 or 5xx keeps the session (and offline passes).
+      if ([400, 401, 403].includes(r.status)) clearSession();
       return null;
     }
     const t = C.Refreshed.parse(await r.json());

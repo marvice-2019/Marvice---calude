@@ -12,6 +12,7 @@ export const revalidate = 300;
 
 type P = { params: Promise<{ city: string; code: string }> };
 
+/** The lot, null if it doesn't exist, or "down" if the API can't be reached right now. */
 const load = cache(async (code: string) => {
   try {
     const { lot } = await api.lotByCode(code);
@@ -19,13 +20,14 @@ const load = cache(async (code: string) => {
     return await api.lot(lot.id, { from: w.from.toISOString(), to: w.to.toISOString(), vehicle: "car" });
   } catch (e) {
     if (e instanceof ApiFailure && e.status === 404) return null;
-    throw e;
+    return "down" as const;
   }
 });
 
 export async function generateMetadata({ params }: P): Promise<Metadata> {
-  const d = await load((await params).code).catch(() => null);
+  const d = await load((await params).code);
   if (!d) return { title: "Lot not found" };
+  if (d === "down") return { title: "Parking in Bengaluru", robots: { index: false } };
   const l = d.lot;
   return {
     title: `${l.name} parking (${l.code}), Bengaluru`,
@@ -40,6 +42,13 @@ export default async function PublicLotPage({ params }: P) {
   if (city !== CITY.slug) notFound();
   const d = await load(code);
   if (!d) notFound();
+  if (d === "down") return (
+    <section className="panelpage errbox" role="alert">
+      <h1 style={{ color: "var(--ink)" }}>Live details unavailable</h1>
+      <p style={{ color: "var(--ink)" }}>We can&apos;t load lot {code.toUpperCase()} right now. Try again in a minute.</p>
+      <Link className="btn ghost" href="/parking/bengaluru">Parking in Bengaluru</Link>
+    </section>
+  );
   const l = d.lot, q = d.quote, w = defaultWindow();
   const bookHref = `/lot/${l.id}?` + new URLSearchParams({ from: w.from.toISOString(), to: w.to.toISOString(), vehicle: "car" });
   return (

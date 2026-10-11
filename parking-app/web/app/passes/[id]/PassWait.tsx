@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PassCard } from "@/components/PassCard";
 import { useNow } from "@/components/hooks";
@@ -14,14 +15,17 @@ const POLL_MS = 2000, GIVE_UP_MS = 90_000;
  * Poll until the booking is confirmed (or failed). Covers the webhook arriving late.
  */
 export function PassWait({ id, fresh }: { id: string; fresh: boolean }) {
+  const router = useRouter();
   const now = useNow(30_000);
   const [b, setB] = useState<Booking | null>(null);
   const [state, setState] = useState<"waiting" | "ok" | "failed" | "cancelled" | "missing" | "slow" | "error">("waiting");
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    let stop = false, timer: ReturnType<typeof setTimeout>;
+    let stop = false, timer: ReturnType<typeof setTimeout>, polls = 0;
     const started = Date.now();
+    // Once settled, drop ?new=1 so a later reload doesn't read a driver's cancellation as a failed payment.
+    const settle = () => { if (fresh) router.replace(`/passes/${id}`, { scroll: false }); };
     const tick = async () => {
       try {
         const list = await api.bookings();
@@ -29,10 +33,11 @@ export function PassWait({ id, fresh }: { id: string; fresh: boolean }) {
         const userId = getSession()?.user.id;
         if (found && userId) cachePasses(userId, list);
         // Right after paying, "cancelled" means the payment failed; otherwise the driver cancelled it.
-        if (found && found.status === "cancelled") { setB(found); setState(fresh ? "failed" : "cancelled"); return; }
-        if (found) { setB(found); setState("ok"); return; }
-        // Unpaid bookings aren't listed, so only keep waiting when we just came from the gateway.
-        if (!fresh) { setState("missing"); return; }
+        if (found && found.status === "cancelled") { setB(found); setState(fresh ? "failed" : "cancelled"); settle(); return; }
+        if (found) { setB(found); setState("ok"); settle(); return; }
+        // Unpaid bookings aren't listed. Straight from the gateway, wait for the webhook; otherwise
+        // allow a few polls for a late webhook before saying the pass isn't on this account.
+        if (!fresh && ++polls >= 3) { setState("missing"); return; }
       } catch (e) {
         if (e instanceof ApiFailure && e.status === 401) { setErr(e.message); setState("error"); return; }
       }
@@ -42,7 +47,7 @@ export function PassWait({ id, fresh }: { id: string; fresh: boolean }) {
     };
     void tick();
     return () => { stop = true; clearTimeout(timer); };
-  }, [id, fresh]);
+  }, [id, fresh, router]);
 
   return (
     <section style={{ maxWidth: 420, marginInline: "auto" }}>

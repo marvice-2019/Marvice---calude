@@ -40,8 +40,8 @@ export function FindView({ initial }: { initial: FindParams }) {
 
   // Keep the URL shareable and remember the area for Park now and Monthly.
   useEffect(() => {
-    const q = new URLSearchParams({ area: p.area, from: p.from, to: p.to, vehicle: p.vehicle, sort: p.sort });
-    router.replace("/?" + q.toString(), { scroll: false });
+    const q = "?" + new URLSearchParams({ area: p.area, from: p.from, to: p.to, vehicle: p.vehicle, sort: p.sort }).toString();
+    if (window.location.search !== q) router.replace("/" + q, { scroll: false }); // each replace re-renders the server page
     local("area", p.area);
   }, [p, router]);
 

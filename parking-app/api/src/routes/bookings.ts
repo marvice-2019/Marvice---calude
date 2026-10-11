@@ -9,10 +9,17 @@ import { promoFor, quoteFor, rateFor, spotsLeft, type VehicleKind } from "../ser
 
 const driver = requireRole("driver");
 
-/** Replays the stored response for a repeated Idempotency-Key; otherwise runs fn and stores its result. */
-async function idempotent(deps: Deps, userId: string, key: string, route: string, fn: () => Promise<{ status: number; body: unknown }>) {
+/**
+ * Replays the stored response for a repeated Idempotency-Key; otherwise runs fn and stores its result.
+ * `stale` lets a route refuse to replay a response that no longer holds (e.g. a booking whose hold
+ * was released): the old key record is dropped and the request runs fresh.
+ */
+async function idempotent(deps: Deps, userId: string, key: string, route: string, fn: () => Promise<{ status: number; body: unknown }>,
+  stale?: (body: any) => Promise<boolean>) {
   const prev = await deps.db.query("SELECT status_code, response FROM idempotency_keys WHERE user_id = $1 AND key = $2 AND route = $3", [userId, key, route]);
-  if (prev.rows[0]) return { status: prev.rows[0].status_code as number, body: prev.rows[0].response };
+  if (prev.rows[0] && stale && await stale(prev.rows[0].response)) {
+    await deps.db.query("DELETE FROM idempotency_keys WHERE user_id = $1 AND key = $2 AND route = $3", [userId, key, route]);
+  } else if (prev.rows[0]) return { status: prev.rows[0].status_code as number, body: prev.rows[0].response };
   const out = await fn();
   await deps.db.query("INSERT INTO idempotency_keys (user_id, key, route, response, status_code) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING",
     [userId, key, route, JSON.stringify(out.body), out.status]);
@@ -99,6 +106,13 @@ export function bookingRoutes(app: FastifyInstance, deps: Deps) {
         const order = await createPayment(c, deps, { bookingId, purpose: "booking", amountPaise: q.totalPaise, receipt: booking.code });
         return { status: 201, body: { booking, quote: q, razorpay_order: order } };
       });
+    }, async prevBody => {
+      // A replayed booking is useless if its hold was released (failed payment or expired hold).
+      const id = prevBody?.booking?.id;
+      if (!id) return false;
+      const r = await deps.db.query(
+        `SELECT 1 FROM bookings WHERE id = $1 AND (status = 'cancelled' OR (status = 'pending_payment' AND hold_expires_at <= now()))`, [id]);
+      return (r.rowCount ?? 0) > 0;
     });
     return reply.code(out.status).send(out.body);
   });
@@ -193,6 +207,24 @@ async function onCaptured(c: Tx, deps: Deps, pay: { id: string; order_id: string
 
   let taxable = 0, gst = 0;
   if (p.purpose === "booking") {
+    // A capture can land after the hold was released: a failed attempt (Razorpay lets the driver
+    // retry in the same checkout) or an expired 10-minute hold. Re-take the bay under the lot lock
+    // book_bay uses; if someone else has it, refund in full instead of overbooking.
+    const bk = (await c.query(`SELECT id, lot_id, vehicle, status, hold_expires_at, lower(period) AS "from", upper(period) AS "to"
+      FROM bookings WHERE id = $1 FOR UPDATE`, [p.booking_id])).rows[0];
+    const holdLive = bk.status === "pending_payment" && bk.hold_expires_at && bk.hold_expires_at > new Date();
+    if (!holdLive && bk.status !== "confirmed") {
+      await c.query("SELECT 1 FROM lots WHERE id = $1 FOR UPDATE", [bk.lot_id]);
+      if (await spotsLeft(c, bk.lot_id, bk.vehicle, bk.from, bk.to, bk.id) <= 0) {
+        const r = await deps.payments.refund(pay.id, p.amount_paise);
+        await c.query("INSERT INTO refunds (payment_id, amount_paise, razorpay_refund_id, reason) VALUES ($1,$2,$3,'lot_full_after_capture')", [p.id, p.amount_paise, r.id]);
+        await c.query("UPDATE payments SET status = 'refunded', refunded_paise = amount_paise WHERE id = $1", [p.id]);
+        await c.query("UPDATE bookings SET status = 'cancelled', hold_expires_at = NULL WHERE id = $1", [bk.id]);
+        const v = (await c.query("SELECT b.code, u.phone FROM bookings b JOIN users u ON u.id = b.user_id WHERE b.id = $1", [bk.id])).rows[0];
+        deps.notify.send({ event: "refund_issued", phone: v.phone, data: { code: v.code, amount: rupees(p.amount_paise), reason: "lot_full" } });
+        return "refunded_lot_full";
+      }
+    }
     const b = (await c.query("UPDATE bookings SET status = 'confirmed', hold_expires_at = NULL WHERE id = $1 RETURNING *", [p.booking_id])).rows[0];
     taxable = b.base_paise - b.discount_paise + b.fee_paise; gst = b.gst_paise;
     if (b.promo_code) await c.query("UPDATE promo_codes SET used_count = used_count + 1 WHERE code = $1", [b.promo_code]);

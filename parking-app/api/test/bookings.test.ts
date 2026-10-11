@@ -184,3 +184,73 @@ describe("Security: drivers only touch their own bookings", () => {
     expect((await ctx.app.inject({ method: "POST", url: "/v1/admin/promos", headers: d.h, payload: {} })).statusCode).toBe(403);
   });
 });
+
+describe("Late capture after a failed attempt or an expired hold (no overbooking)", () => {
+  // Razorpay lets a driver retry in the same checkout after a failed attempt, and a capture can
+  // arrive after the 10-minute hold. The bay may have gone to someone else by then.
+  let n = 0;
+  const oneBay = async () => {
+    const lot = (await ctx.db.query(
+      `INSERT INTO lots (operator_id, name, address, city, geo, kind, capacity_car, online_share, is_live, code)
+       VALUES ($1,'One Bay Late','x','Bengaluru',ST_MakePoint(77.6068,12.9759)::geography,'surface',1,1,true,$2) RETURNING id`, [s.op, `BLR16${n++}`])).rows[0].id as string;
+    await ctx.db.query("INSERT INTO lot_rates (lot_id, vehicle, hourly_paise, valid) VALUES ($1,'car',4000,tstzrange('-infinity',NULL))", [lot]);
+    return lot;
+  };
+  const status = async (id: string) => (await ctx.db.query("SELECT status FROM bookings WHERE id = $1", [id])).rows[0].status;
+  const confirmedOn = async (lot: string) => (await ctx.db.query("SELECT count(*)::int AS n FROM bookings WHERE lot_id = $1 AND status = 'confirmed'", [lot])).rows[0].n;
+
+  it("confirms a retry captured after a failed attempt when the bay is still free", async () => {
+    const lot = await oneBay(), d = await ctx.login("9300000001");
+    const b = (await book(d.h, { lot_id: lot, from: iso(3_600_000), to: iso(2 * 3_600_000) })).json();
+    await ctx.webhook("payment.failed", b.razorpay_order.id, b.razorpay_order.amount);
+    expect(await status(b.booking.id)).toBe("cancelled");
+    const w = await ctx.webhook("payment.captured", b.razorpay_order.id, b.razorpay_order.amount);
+    expect(w.json().result).toBe("captured");
+    expect(await status(b.booking.id)).toBe("confirmed");
+  });
+
+  it("refunds a capture after a failed attempt when the bay went to another driver", async () => {
+    const lot = await oneBay(), a = await ctx.login("9300000002"), other = await ctx.login("9300000003");
+    const from = iso(3_600_000), to = iso(2 * 3_600_000);
+    const b = (await book(a.h, { lot_id: lot, from, to })).json();
+    await ctx.webhook("payment.failed", b.razorpay_order.id, b.razorpay_order.amount);
+    const taken = (await book(other.h, { lot_id: lot, from, to })).json();
+    await ctx.webhook("payment.captured", taken.razorpay_order.id, taken.razorpay_order.amount);
+    const refundsBefore = ctx.payments.refunds.length;
+    const w = await ctx.webhook("payment.captured", b.razorpay_order.id, b.razorpay_order.amount);
+    expect(w.statusCode).toBe(200);
+    expect(w.json().result).toBe("refunded_lot_full");
+    expect(await status(b.booking.id)).toBe("cancelled");
+    expect(await confirmedOn(lot)).toBe(1);
+    expect(ctx.payments.refunds.length).toBe(refundsBefore + 1);
+    expect(ctx.payments.refunds.at(-1)!.amountPaise).toBe(b.razorpay_order.amount);
+    const p = (await ctx.db.query("SELECT status, refunded_paise FROM payments WHERE razorpay_order_id = $1", [b.razorpay_order.id])).rows[0];
+    expect(p).toMatchObject({ status: "refunded", refunded_paise: b.razorpay_order.amount });
+    expect((await ctx.db.query("SELECT count(*)::int AS n FROM invoices i JOIN payments p ON p.id = i.payment_id WHERE p.razorpay_order_id = $1", [b.razorpay_order.id])).rows[0].n).toBe(0);
+    expect(ctx.notify.sent.some(x => x.event === "refund_issued" && x.phone === "+919300000002")).toBe(true);
+  });
+
+  it("refunds a capture that lands after the hold expired and the bay was resold", async () => {
+    const lot = await oneBay(), a = await ctx.login("9300000004"), other = await ctx.login("9300000005");
+    const from = iso(3_600_000), to = iso(2 * 3_600_000);
+    const b = (await book(a.h, { lot_id: lot, from, to })).json();
+    await ctx.db.query("UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = $1", [b.booking.id]);
+    const taken = (await book(other.h, { lot_id: lot, from, to })).json();
+    await ctx.webhook("payment.captured", taken.razorpay_order.id, taken.razorpay_order.amount);
+    const w = await ctx.webhook("payment.captured", b.razorpay_order.id, b.razorpay_order.amount);
+    expect(w.json().result).toBe("refunded_lot_full");
+    expect(await confirmedOn(lot)).toBe(1);
+  });
+
+  it("replaying an Idempotency-Key whose booking was released starts a fresh booking", async () => {
+    const lot = await oneBay(), d = await ctx.login("9300000006");
+    const key = idem(), p = { lot_id: lot, from: iso(3_600_000), to: iso(2 * 3_600_000) };
+    const first = (await book(d.h, p, key)).json();
+    await ctx.webhook("payment.failed", first.razorpay_order.id, first.razorpay_order.amount);
+    const again = await book(d.h, p, key);
+    expect(again.statusCode).toBe(201);
+    expect(again.json().booking.id).not.toBe(first.booking.id);
+    expect(again.json().razorpay_order.id).not.toBe(first.razorpay_order.id);
+    expect(again.json().booking.status).toBe("pending_payment");
+  });
+});
