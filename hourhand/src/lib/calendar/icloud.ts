@@ -122,7 +122,7 @@ export function busyFromIcs(ics: string, zone: string): BusyRange[] {
 }
 
 const icsUtc = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-const icsEscape = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const icsEscape = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
 
 /** UID from the booking id, so a retried insert lands on the same resource instead of a second event. */
 export const icloudUid = (bookingId: string) => `hourhand-${bookingId}`;

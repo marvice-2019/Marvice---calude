@@ -73,13 +73,39 @@ export const BOOKING_LIMITS = {
 /** Payment confirmations, per client address: generous for a guest retrying, tight enough to stop probing tokens. */
 export const CONFIRM_PAYMENT_LIMIT: Limit = { max: 20, windowMs: 60 * 60_000 };
 
+/** Networks our own reverse proxy runs on. Default: the private ranges Docker and Coolify use. Override with TRUSTED_PROXIES. */
+export function trustedProxies(env: Record<string, string | undefined> = process.env): string[] {
+  const list = env.TRUSTED_PROXIES ?? "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16";
+  return list.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+const ipv4 = (ip: string): number | null => {
+  const parts = ip.split(".");
+  if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 255)) return null;
+  return parts.reduce((n, p) => n * 256 + Number(p), 0);
+};
+
+/** Whether an address is one of our own proxies (IPv4 CIDRs, or exact addresses). */
+function isTrusted(ip: string, proxies: string[]): boolean {
+  const n = ipv4(ip);
+  return proxies.some((entry) => {
+    const [base, bits = "32"] = entry.split("/");
+    const b = ipv4(base);
+    if (n === null || b === null) return entry === ip;
+    const size = 2 ** (32 - Number(bits));
+    return Math.floor(n / size) === Math.floor(b / size);
+  });
+}
+
 /**
- * The client's address as our reverse proxy saw it. Coolify's Traefik appends the real address to x-forwarded-for,
- * so the rightmost entry is the trustworthy one; anything to its left was sent by the client and can be forged.
+ * The client's address as our reverse proxies saw it. Each proxy appends the address it got the request from to
+ * x-forwarded-for, so reading from the right and skipping our own proxies (TRUSTED_PROXIES) gives the first address
+ * we didn't add ourselves; anything further left was sent by the client and can be forged.
  */
-export function clientIp(headers: Headers): string {
+export function clientIp(headers: Headers, proxies: string[] = trustedProxies()): string {
   const forwarded = headers.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
-  return addressKey(forwarded.at(-1) || headers.get("x-real-ip") || "unknown");
+  const client = [...forwarded].reverse().find((ip) => !isTrusted(ip, proxies)) ?? forwarded[0];
+  return addressKey(client || headers.get("x-real-ip") || "unknown");
 }
 
 /** IPv6 addresses are grouped by their /64 prefix (one household or server gets a whole /64), IPv4 kept as is. */

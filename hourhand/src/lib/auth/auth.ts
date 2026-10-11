@@ -3,7 +3,9 @@ import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins/magic-link";
 import { getPool } from "@/lib/data/pg-store";
-import { rateLimiter, SIGN_IN_LIMITS } from "@/lib/rate-limit";
+import { rateLimiter, SIGN_IN_LIMITS, trustedProxies } from "@/lib/rate-limit";
+
+export { trustedProxies };
 import { deliverMagicLink } from "./outbox";
 import { uniqueSlug } from "./slug";
 
@@ -72,11 +74,6 @@ export function resolveBaseUrl(env: Record<string, string | undefined> = process
   return url;
 }
 
-/** Networks our own reverse proxy runs on. Default: the private ranges Docker and Coolify use. Override with TRUSTED_PROXIES. */
-export function trustedProxies(env: Record<string, string | undefined> = process.env): string[] {
-  const list = env.TRUSTED_PROXIES ?? "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16";
-  return list.split(",").map((s) => s.trim()).filter(Boolean);
-}
 
 function createAuth() {
   const url = process.env.DATABASE_URL;
@@ -112,6 +109,8 @@ function createAuth() {
       fields: { userId: "user_id", expiresAt: "expires_at", ipAddress: "ip_address", userAgent: "user_agent", ...at },
     },
     account: {
+      // Sign-in tokens are sealed at rest; rows written before this stay readable (Better Auth passes plain values through).
+      encryptOAuthTokens: true,
       modelName: "auth_accounts",
       fields: {
         accountId: "account_id",

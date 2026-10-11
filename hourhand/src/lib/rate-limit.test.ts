@@ -35,6 +35,14 @@ describe("clientIp", () => {
     expect(clientIp(new Headers({ "x-real-ip": "198.51.100.2" }))).toBe("198.51.100.2");
     expect(clientIp(new Headers())).toBe("unknown");
   });
+
+  it("skips our own proxies from the right, so a second proxy hop doesn't put every visitor in one bucket", () => {
+    // Visitor -> edge proxy 10.0.0.5 -> Traefik on 172.18.0.2: the address before our proxies is the visitor's.
+    expect(clientIp(new Headers({ "x-forwarded-for": "6.6.6.6, 203.0.113.7, 10.0.0.5, 172.18.0.2" }))).toBe("203.0.113.7");
+    // Only trusted hops seen: the leftmost (where the chain started) is used.
+    expect(clientIp(new Headers({ "x-forwarded-for": "192.168.1.9, 10.0.0.5" }))).toBe("192.168.1.9");
+    expect(clientIp(new Headers({ "x-forwarded-for": "203.0.113.7, 198.51.100.4" }), ["198.51.100.4"])).toBe("203.0.113.7");
+  });
 });
 
 describe("addressKey", () => {

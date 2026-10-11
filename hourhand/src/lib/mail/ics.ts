@@ -17,7 +17,7 @@ const utc = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/,
 
 /** Escapes TEXT values: backslash, semicolon, comma and line breaks. */
 export function icsText(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n");
 }
 
 /** Folds a content line to at most 75 octets per line, never splitting a multi-byte character. */
