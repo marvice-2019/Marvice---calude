@@ -1,6 +1,6 @@
 # Parking.com recon: website, iOS app, Android app
 
-Researched 11 Oct 2026. Each line is marked **[V]** (verified from a primary source, linked), **[E]** (estimate or inference) or **[GAP]** (could not get the data).
+Researched 11 Oct 2026; re-checked the same day with /replica-recon (App Store data unchanged; Play Store and website still unreadable). Each line is marked **[V]** (verified from a primary source, linked), **[E]** (estimate or inference) or **[GAP]** (could not get the data).
 
 ## Verdict
 
@@ -12,6 +12,12 @@ Parking.com has a big app (20,084 iOS ratings, 4.5 stars) with lots of inventory
 - **[V]** Metropolis Technologies agreed in Oct 2023 to buy SP+ for about US$1.5B in enterprise value, and the deal closed in 2024 ([Facilities Dive](https://www.facilitiesdive.com/news/metropolis-sp-plus-parking-automation-billion-acquisition/695855/), [Payments Dive](https://www.paymentsdive.com/news/metropolis-sp-plus-parking-automation-billion-acquisition-contactless-payment/695970/)). The iOS seller is now **Metropolis Technologies, Inc.** ([App Store lookup](https://itunes.apple.com/lookup?id=1414389805&country=us)).
 - **[V]** Metropolis's core product is computer-vision checkout: drivers register their plate, phone and card in an app, then drive in and out with no gate interaction ([Payments Dive](https://www.paymentsdive.com/news/metropolis-sp-plus-parking-automation-billion-acquisition-contactless-payment/695970/)).
 - **[E]** Expect Parking.com to move toward plate-based, gateless entry. Their direction is "no ticket, no QR, the plate is the pass".
+
+## Competitors in our target market (India)
+
+- **Park+.** [V] Drive-in pay or pre-book; earns 10–15% commission on drive-in bookings plus monthly passes (₹1,800 per site, ₹2,500 city-wide); active in Delhi NCR, Mumbai, Bengaluru, Hyderabad and Pune with about 50,000 slots ([Outlook Business](https://www.outlookbusiness.com/big-idea/that-raw-nerve-in-personal-mobility-park-has-found-a-way-around-it-6256)). [E] Those figures come from an older profile; Park+ has grown since then into FASTag and car services, so confirm its current numbers before pitching against it.
+- **ParkZebra.** [V] A Bengaluru startup for searching, reserving and pre-paying parking at business parks, hospitals and malls ([The Week](https://www.theweek.in/news/sci-tech/parkzebra-app-aims-easing-parking.html)). [GAP] Its current status is unknown; the article is undated.
+- **Get My Parking.** [E] A B2B vendor of white-label parking apps and gate hardware for cities, airports and corporates, so it is a possible supplier or partner rather than a consumer rival.
 
 ## iOS app facts [V] ([App Store lookup](https://itunes.apple.com/lookup?id=1414389805&country=us))
 
@@ -91,8 +97,30 @@ Praise is rare and is about the location of the lot, not the app.
 4. **WhatsApp pass and expiry alerts.** This replaces Apple Wallet for most Indian users and fixes "my session isn't showing".
 5. **Venue and event pages** (stadiums, metro stations, malls, hospitals). Parking.com and SP+ use these for SEO, and they're cheap to generate from lot data.
 
+## What the Bayline prototype is still missing
+
+1. **"Park now".** Drive-up pay by lot or zone number, with no pre-booking.
+2. **Saved vehicle and card for returning drivers.** The prototype asks for the plate every time.
+3. **Guest purchase linked to a phone number.** The pass should survive account creation.
+4. **Favourites ("Park here again")** and promo codes. The schema also needs a `promo_codes` table.
+5. **Directions hand-off to Google Maps** and an expiry alert 15 minutes before the end.
+6. **Venue and event search** (metro stations, stadiums, hospitals).
+7. **Live lot status** set by operator staff (gate down, lot full, entrance closed).
+
 ## Gaps to close before building
 
 - [GAP] Play Store numbers (installs, Android rating, data safety). Check on a phone.
 - [GAP] Parking.com's own fees and cancellation policy. Book one test reservation in the US app and screenshot each step; it's free to cancel if their policy allows.
 - [GAP] Their live web search flow. Walk it on a desktop browser and screenshot it; automation was blocked here.
+
+## Sources (all checked 11 Oct 2026)
+
+- [App Store lookup API, id 1414389805](https://itunes.apple.com/lookup?id=1414389805&country=us)
+- [App Store newest reviews feed](https://itunes.apple.com/us/rss/customerreviews/id=1414389805/sortBy=mostRecent/json)
+- [Play Store listing, com.spplus.parking](https://play.google.com/store/apps/details?id=com.spplus.parking) (did not render)
+- [SP+ Parking.com product page](https://spplus.com/parking-com/)
+- [SP+ launches Parking.com](https://test.spplus.com/sp-launches-parking-com/)
+- [Facilities Dive: Metropolis to buy SP+](https://www.facilitiesdive.com/news/metropolis-sp-plus-parking-automation-billion-acquisition/695855/)
+- [Payments Dive: Metropolis computer-vision checkout](https://www.paymentsdive.com/news/metropolis-sp-plus-parking-automation-billion-acquisition-contactless-payment/695970/)
+- [Outlook Business: Park+ profile](https://www.outlookbusiness.com/big-idea/that-raw-nerve-in-personal-mobility-park-has-found-a-way-around-it-6256)
+- [The Week: ParkZebra](https://www.theweek.in/news/sci-tech/parkzebra-app-aims-easing-parking.html)
