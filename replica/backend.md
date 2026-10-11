@@ -167,10 +167,17 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 
 ## B7 evidence (2026-10-11, Postgres 16.15, production build)
 
-- 333 tests pass with `TEST_DATABASE_URL` set. No migration.
+- 335 tests pass with `TEST_DATABASE_URL` set (after the review fixes below). No migration.
 - **Against Postgres:** the host's cancel records cancelled_by host and queues the guest and host cancellation emails, and a paid booking's payment goes to refund; the host's move cancels the old booking as moved by the host, confirms the new time, carries the payment, and refuses a taken time; no-show only after the start, both ways; another host's booking is not found for every action.
 - **Negative tests** (guard set aside, test fails): host scoping of no-show, the start-time rule on no-show, recording who moved the booking.
 - **End to end on a production build (16 of 16):** the detail page offers cancel and move; cancel asks first, records the host and reason, and the guest is told the host cancelled; move lists free times, lands on the new booking, cancels the old one as moved by the host, and the guest gets "Priya Raman moved your booking to a new time"; no-show is recorded, shown on the page and the list, and undone; another host gets 404. All earlier suites pass again (B5b 28, B5a 26, B4 23, B3 10, B2b 12, sign-in 15).
+
+## B7 review (fresh-context reviewer)
+
+- **Fixed (medium):** the server let a host move a booking that had already happened (only the page hid the form), which would cancel it as the host's, drop a no-show mark and email the guest. A move now needs an upcoming booking; a repeated submit still gets its move back. Test fails without it.
+- **Fixed (low):** each time on the move page has its own request key, so clicking a second time on a stale page is refused rather than silently repeating the first move; a malformed time shows its own message; tests now cover who-moved-it wording in both emails and the repeat. The wording test fails without the fix.
+- **Accepted (low):** two tabs submitting the same move at the same instant: one moves it, the other shows "not found" (the guest path behaves the same).
+- **Checked:** no path to another host's booking (forged ids and keys get not found or a conflict that leaks nothing); a taken time is refused by the free-time check and again by the database; the guest path and its emails are unchanged.
 
 ## Production addresses for hourhand.cloud
 

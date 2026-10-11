@@ -60,6 +60,14 @@ describe("booking emails", () => {
     expect(renderBookingMail("booked_guest", free).text).not.toContain("Paid");
   });
 
+  it("a moved booking says who moved it", () => {
+    const moved = { ...ctx, previousStartAt: new Date(ctx.startAt.getTime() - 86_400_000) };
+    expect(renderBookingMail("rescheduled_guest", { ...moved, movedBy: "host" }).text).toContain("moved your booking to a new time");
+    expect(renderBookingMail("rescheduled_guest", { ...moved, movedBy: "guest" }).text).toContain("has moved");
+    expect(renderBookingMail("rescheduled_host", { ...moved, movedBy: "host" }).text).toContain("You moved");
+    expect(renderBookingMail("rescheduled_host", { ...moved, movedBy: "guest" }).text).toContain(`${ctx.guestName} moved`);
+  });
+
   it("shows the Meet link once the calendar event has one", () => {
     const meet = { ...ctx, location: { kind: "google_meet" as const, value: null }, joinUrl: "https://meet.google.com/abc-defg-hij" };
     expect(renderBookingMail("booked_guest", meet).text).toContain("Google Meet: https://meet.google.com/abc-defg-hij");

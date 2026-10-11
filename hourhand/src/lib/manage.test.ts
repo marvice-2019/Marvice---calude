@@ -141,6 +141,18 @@ describe("host actions from the dashboard", () => {
     expect((await store.getBooking(host.id, booking.id))!.status).toBe("confirmed");
   });
 
+  it("host reschedule refuses a booking that already happened, but a repeated submit still returns the move", async () => {
+    const { store, host, booking, slot } = await setup();
+    const after = new Date(booking.startAt.getTime() + 60_000);
+    expect(await handleHostReschedule(store, host.id, booking.id, { start: slot.toISOString(), idempotencyKey: "host-move-past" }, after))
+      .toMatchObject({ status: 409, body: { error: "not_upcoming" } });
+    expect((await store.getBooking(host.id, booking.id))!.status).toBe("confirmed");
+    const first = await handleHostReschedule(store, host.id, booking.id, { start: slot.toISOString(), idempotencyKey: "host-move-again" }, now);
+    const again = await handleHostReschedule(store, host.id, booking.id, { start: slot.toISOString(), idempotencyKey: "host-move-again" }, now);
+    expect(first.status).toBe(201);
+    expect(again).toMatchObject({ status: 200, body: { bookingId: (first.body as { bookingId: string }).bookingId } });
+  });
+
   it("no-show is only allowed once the booking has started, toggles both ways, and only for the host's own booking", async () => {
     const { store, host, booking } = await setup();
     const before = new Date(booking.startAt.getTime() - MIN);

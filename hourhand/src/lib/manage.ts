@@ -58,6 +58,10 @@ async function moveBooking(store: DataStore, booking: BookingWithInvitee, input:
   const repeat = all.find((b) => b.idempotencyKey === idempotencyKey && b.rescheduledFromId === booking.id);
   if (repeat) return { status: 200, body: { bookingId: repeat.id, manageToken: repeat.invitee.manageToken } };
   if (booking.status === "cancelled") return { status: 409, body: { error: "cancelled" } };
+  // The host moves upcoming bookings only (the page hides the form, but a post can still arrive): moving one that
+  // already happened would cancel it as the host's and email the guest. Checked after the repeat lookup, so a double
+  // submit still gets its booking back.
+  if (by === "host" && booking.startAt.getTime() <= now.getTime()) return { status: 409, body: { error: "not_upcoming" } };
 
   const [host, eventType] = await Promise.all([store.getUser(booking.hostId), store.getEventType(booking.hostId, booking.eventTypeId)]);
   if (!host || !eventType) return notFound;

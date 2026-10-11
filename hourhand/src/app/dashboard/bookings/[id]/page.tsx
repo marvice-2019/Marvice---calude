@@ -29,6 +29,7 @@ const ERRORS: Record<string, string> = {
   not_cancellable: "Only upcoming confirmed bookings can be cancelled.",
   slot_taken: "That time was just taken. Pick another.",
   not_movable: "This booking can't be moved. Only upcoming confirmed bookings can.",
+  bad_time: "That time didn't come through. Pick one from the list.",
   not_started: "You can mark a no-show once the booking has started.",
 };
 const DAY = 86_400_000;
@@ -124,7 +125,8 @@ export default async function BookingDetailPage({ params, searchParams }: { para
                           <form action={rescheduleAsHost}>
                             <input type="hidden" name="bookingId" value={booking.id} />
                             <input type="hidden" name="start" value={t.toISOString()} />
-                            <input type="hidden" name="key" value={key} />
+                            {/* One key per time: clicking a second time on a stale page is refused instead of silently repeating the first move. */}
+                            <input type="hidden" name="key" value={`${key}:${t.toISOString()}`} />
                             <Button type="submit" variant="secondary">{formatTime(t, tz)}</Button>
                           </form>
                         </li>
