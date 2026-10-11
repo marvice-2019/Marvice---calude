@@ -39,6 +39,9 @@ export interface EventType {
   dailyLimit: number | null;
   /** Guests can't cancel online once the start is closer than this. 0 = any time before the start. */
   cancelCutoffMinutes: number;
+  /** What guests pay in paise; null = free. Set only together with currency (price_minor / currency in the schema). */
+  priceMinor: number | null;
+  currency: "INR" | null;
   hidden: boolean;
   active: boolean;
   position: number;
@@ -224,7 +227,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

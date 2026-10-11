@@ -1,4 +1,5 @@
 // Pure validation for the event type editor. Limits mirror the checks on event_types and custom_questions in replica/schema.sql.
+import type { Plan } from "./billing/plans";
 import { LOCATION_KINDS, type CustomQuestion, type EventLocation, type EventType, type EventTypeDraft, type LocationKind, type QuestionDraft } from "./data/types";
 
 export const DURATION = { min: 5, max: 720 } as const;
@@ -7,6 +8,9 @@ export const BUFFER = { min: 0, max: 240 } as const;
 export const BOOKING_WINDOW = { min: 1, max: 730 } as const;
 export const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,59}$/;
 export const SLUG_TAKEN = "That link is already used by another event type";
+/** Guest prices in paise: ₹1 to ₹5,00,000. */
+export const PRICE = { min: 100, max: 50_000_000 } as const;
+export const PRICE_INVALID = "Enter a price in rupees, like 499 or 499.50 (at least ₹1).";
 
 /** Locations whose value the host must fill in, with the label shown for that value. */
 export const LOCATION_VALUE_LABEL: Partial<Record<LocationKind, string>> = {
@@ -31,6 +35,8 @@ export interface EventTypeForm {
   /** Blank means no limit. */
   dailyLimit: string;
   cancelCutoffMinutes: string;
+  /** Rupees as typed. Blank means free. */
+  price: string;
 }
 
 export type EventTypeErrors = Partial<Record<keyof EventTypeForm, string>>;
@@ -51,6 +57,35 @@ export function slugify(name: string): string {
 function whole(raw: string): number | null {
   const t = raw.trim();
   return /^\d+$/.test(t) ? Number(t) : null;
+}
+
+/** "499.50" -> 49950 paise; "" -> null (free); anything else or outside ₹1 to ₹5,00,000 -> "invalid". No floats, so no rounding error. */
+export function parsePrice(raw: string): number | null | "invalid" {
+  const t = raw.trim();
+  if (!t) return null;
+  if (!/^\d{1,6}(\.\d{1,2})?$/.test(t)) return "invalid";
+  const [rupees, paise = ""] = t.split(".");
+  const minor = Number(rupees) * 100 + Number(paise.padEnd(2, "0"));
+  return minor < PRICE.min || minor > PRICE.max ? "invalid" : minor;
+}
+
+/** Paise back to what the host typed: 49900 -> "499", 49950 -> "499.50". */
+export function priceInput(minor: number | null): string {
+  if (minor === null) return "";
+  const paise = minor % 100;
+  return paise === 0 ? String(minor / 100) : `${Math.floor(minor / 100)}.${String(paise).padStart(2, "0")}`;
+}
+
+/**
+ * Why this host may not charge guests yet, or null when they may. Charging is a paid-plan feature and the money goes to
+ * the host's own Razorpay account. Making an event free is always allowed.
+ */
+export function priceGateError(input: { priceMinor: number | null; demo: boolean; plan: Plan; razorpayConnected: boolean }): string | null {
+  if (input.priceMinor === null) return null;
+  if (input.demo) return "Prices can't be set on the demo data.";
+  if (input.plan === "free") return "Charging guests needs the Solo or Duo plan.";
+  if (!input.razorpayConnected) return "Connect Razorpay first, so payments go to your account.";
+  return null;
 }
 
 /** Checks the form against the schema limits. `takenSlugs` are the user's other event type slugs. */
@@ -96,6 +131,10 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
   const cancelCutoffMinutes = number("cancelCutoffMinutes", 0, Number.MAX_SAFE_INTEGER, "Enter 0 or more minutes.");
   const dailyLimit = form.dailyLimit.trim() ? number("dailyLimit", 1, Number.MAX_SAFE_INTEGER, "Enter 1 or more, or leave it blank for no limit.") : null;
 
+  const price = parsePrice(form.price);
+  if (price === "invalid") errors.price = PRICE_INVALID;
+  const priceMinor = price === "invalid" ? null : price;
+
   const valueLabel = form.locationKind ? LOCATION_VALUE_LABEL[form.locationKind] : undefined;
   const locationValue = form.locationValue.trim();
   if (valueLabel && !locationValue) errors.locationValue = `Add the ${valueLabel.toLowerCase()} so guests know where to go.`;
@@ -106,6 +145,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
     value: {
       name, slug, description: form.description.trim() || null, durationMinutes, minNoticeMinutes, bookingWindowDays,
       startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
+      priceMinor, currency: priceMinor === null ? null : "INR",
       location: form.locationKind ? { kind: form.locationKind, value: valueLabel ? locationValue : null } : null,
     },
   };
@@ -115,6 +155,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
 export const NEW_EVENT_TYPE_FORM: EventTypeForm = {
   name: "", slug: "", durationMinutes: "30", description: "", locationKind: "google_meet", locationValue: "", minNoticeMinutes: "240",
   bookingWindowDays: "60", startIncrementMinutes: "30", bufferBeforeMinutes: "0", bufferAfterMinutes: "0", dailyLimit: "", cancelCutoffMinutes: "0",
+  price: "",
 };
 
 /** The editor's values for a saved event type and its first location. */
@@ -125,6 +166,7 @@ export function toForm(et: EventType, location: EventLocation | undefined): Even
     bookingWindowDays: String(et.bookingWindowDays), startIncrementMinutes: String(et.startIncrementMinutes),
     bufferBeforeMinutes: String(et.bufferBeforeMinutes), bufferAfterMinutes: String(et.bufferAfterMinutes),
     dailyLimit: et.dailyLimit === null ? "" : String(et.dailyLimit), cancelCutoffMinutes: String(et.cancelCutoffMinutes),
+    price: priceInput(et.priceMinor),
   };
 }
 

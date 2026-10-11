@@ -184,6 +184,15 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect(created.userId).toBe(arun.id);
     });
 
+    it("stores a price in paise with its currency, and clears both for a free event", async () => {
+      const priced = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), priceMinor: 49950, currency: "INR" });
+      expect([priced.priceMinor, priced.currency]).toEqual([49950, "INR"]);
+      const reread = (await store.getEventType(priya.id, intro.id))!;
+      expect([reread.priceMinor, reread.currency]).toEqual([49950, "INR"]);
+      const free = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), priceMinor: null, currency: null });
+      expect([free.priceMinor, free.currency]).toEqual([null, null]);
+    });
+
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
       const [coachingQuestion] = await store.listCustomQuestions(priya.id, coaching.id);
       const saved = await store.saveQuestions(priya.id, intro.id, [
@@ -241,6 +250,6 @@ function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
     startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit,
-    cancelCutoffMinutes: e.cancelCutoffMinutes, location: null,
+    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, location: null,
   };
 }

@@ -18,7 +18,7 @@ function arunSeed(now: Date): Seed {
     rules: [1, 2, 3, 4, 5].map((d) => ({ id: `rule_a${d}`, scheduleId: "sch_arun", kind: "weekly" as const, weekday: d, onDate: null, intervals: [{ from: "09:00", to: "17:00" }] })),
     eventTypes: [{
       id: "evt_arun_chat", userId, scheduleId: "sch_arun", name: "30-min chat", slug: "chat", description: null, durationMinutes: 30, minNoticeMinutes: 60,
-      bookingWindowDays: 30, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null, cancelCutoffMinutes: 0, hidden: false, active: true, position: 0,
+      bookingWindowDays: 30, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null, cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: false, active: true, position: 0,
     }],
     locations: [], questions: [], connections: [], calendars: [], busyBlocks: [],
     bookings: [{
