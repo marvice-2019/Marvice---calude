@@ -199,6 +199,13 @@ export interface DataStore {
   deleteEventType(userId: string, id: string, now?: Date): Promise<void>;
   /** Replaces the event type's questions; list order becomes position. */
   saveQuestions(userId: string, eventTypeId: string, questions: QuestionDraft[]): Promise<CustomQuestion[]>;
+  /**
+   * Closes the account now: marks it deleted, turns its links off, cancels upcoming bookings and ends every session.
+   * Deleted hosts are invisible to getUser and getUserBySlug. Returns the cancelled bookings so guests can be told.
+   */
+  deleteAccount(userId: string, now?: Date): Promise<BookingWithInvitee[]>;
+  /** Permanently removes accounts deleted more than 30 days before `now`, with everything they own. Returns how many. */
+  purgeDeletedAccounts(now?: Date): Promise<number>;
 }
 
 /** The editable fields of an event type, already validated. */
@@ -222,10 +229,15 @@ export class SlugTakenError extends Error {
 /** "upcoming": confirmed bookings still ahead. "history": only past or cancelled bookings, which must be kept. */
 export class EventTypeInUseError extends Error {
   readonly code = "event_type_in_use";
-  constructor(readonly reason: "upcoming" | "history", readonly upcomingCount: number) {
+  readonly reason: "upcoming" | "history";
+  readonly upcomingCount: number;
+  // Plain fields, not parameter properties: Node's built-in TypeScript stripping (used by scripts/) can't run those.
+  constructor(reason: "upcoming" | "history", upcomingCount: number) {
     super(reason === "upcoming"
       ? `This event type has ${upcomingCount} upcoming ${upcomingCount === 1 ? "booking" : "bookings"}. Cancel or move ${upcomingCount === 1 ? "it" : "them"} first, or turn the link off to stop new bookings.`
       : "Past bookings were made with this event type, so it stays in your history. Turn the link off to stop new bookings.");
     this.name = "EventTypeInUseError";
+    this.reason = reason;
+    this.upcomingCount = upcomingCount;
   }
 }

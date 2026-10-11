@@ -23,6 +23,7 @@ One line per screen or unit. "Done" means built and checked: build, types, lint,
 
 | Postgres data layer (B1) | 2026-10-11 | done | owner check for the nine methods without a user id (comes with sign-in, B2) | a builder worktree can't switch to the postgres OS user, so the orchestrator runs the throwaway database; tsx can't load esbuild here, so scripts run on Node's own TypeScript support |
 | Sign-in (B2a) | 2026-10-11 | done | Resend sending (B3); account deletion, rate limits and owner checks (B2b) | Better Auth inserts non-uuid ids into the verification table, so auth table ids had to be text; builders could not fit this round in their context, so it was built in the main session |
+| Ownership, deletion, rate limits (B2b) | 2026-10-11 | done | booking/slot endpoint limits; guests not yet emailed when a host closes their account (B3) | Better Auth puts requests with a multi-entry x-forwarded-for into one shared rate-limit bucket unless trusted proxies are configured |
 
 **Feature parity after round 3**: 42.0 / 100, must-haves 9 of 22 done (round 2: 33.9 and 6). Not shippable yet: calendar connection and sync, emails, payments and auth are the big must-haves left.
 

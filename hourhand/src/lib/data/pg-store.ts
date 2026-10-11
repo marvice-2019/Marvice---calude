@@ -1,9 +1,9 @@
 import pg from "pg";
-import { datesInRange } from "../availability";
+import { datesInRange } from "../availability.ts";
 import {
   EventTypeInUseError, NotFoundError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
   type EventType, type EventTypeDraft, type Interval, type User,
-} from "./types";
+} from "./types.ts";
 
 const MIN = 60_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -148,11 +148,11 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async getUser(id) {
       if (!isId(id)) return null;
-      const { rows } = await pool.query(`select ${USER} from users where id = $1`, [id]);
+      const { rows } = await pool.query(`select ${USER} from users where id = $1 and deleted_at is null`, [id]);
       return rows[0] ? toUser(rows[0]) : null;
     },
     async getUserBySlug(slug) {
-      const { rows } = await pool.query(`select ${USER} from users where slug = $1`, [slug]);
+      const { rows } = await pool.query(`select ${USER} from users where slug = $1 and deleted_at is null`, [slug]);
       return rows[0] ? toUser(rows[0]) : null;
     },
     async listEventTypes(userId) {
@@ -326,6 +326,31 @@ export function createPgStore(pool: pg.Pool): DataStore {
         if (rows[0].upcoming > 0) throw new EventTypeInUseError("upcoming", rows[0].upcoming);
         if (rows[0].used > 0) throw new EventTypeInUseError("history", 0);
         await client.query("delete from event_types where user_id = $1 and id = $2", [userId, id]); // locations and questions cascade
+      });
+    },
+    async deleteAccount(userId, now = new Date()) {
+      if (!isId(userId)) throw new NotFoundError("Account");
+      const ids = await tx(async (client) => {
+        const { rowCount } = await client.query("update users set deleted_at = $2, updated_at = $2 where id = $1 and deleted_at is null", [userId, now]);
+        if (!rowCount) throw new NotFoundError("Account");
+        await client.query("update event_types set active = false where user_id = $1", [userId]);
+        await client.query("delete from auth_sessions where user_id = $1", [userId]); // signs out every device
+        const cancelled = await client.query(
+          `update bookings set status = 'cancelled', cancelled_at = $2, cancelled_by = 'host', cancel_reason = 'The host closed their account'
+           where host_id = $1 and status = 'confirmed' and start_at > $2 returning id`, [userId, now]);
+        return cancelled.rows.map((r) => r.id as string);
+      });
+      if (ids.length === 0) return [];
+      return (await pool.query(`${BOOKING} where b.id = any($1::uuid[]) order by b.start_at`, [ids])).rows.map(toBooking);
+    },
+    async purgeDeletedAccounts(now = new Date()) {
+      // Everything a host owns (event types, bookings, invitees, schedules, calendars, sessions) cascades from users.
+      return tx(async (client) => {
+        const { rows } = await client.query("select id from users where deleted_at < $1::timestamptz - interval '30 days' for update", [now]);
+        const ids = rows.map((r) => r.id as string);
+        if (ids.length === 0) return 0;
+        await client.query("delete from users where id = any($1::uuid[])", [ids]);
+        return ids.length;
       });
     },
     async saveQuestions(userId, eventTypeId, questions) {

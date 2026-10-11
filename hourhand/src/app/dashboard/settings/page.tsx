@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DeleteAccountForm } from "@/components/DeleteAccountForm";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
@@ -32,6 +33,17 @@ export default async function SettingsPage() {
           <p className="mt-1 text-text-muted">This copy runs on demo data, so there are no sessions to end.</p>
         )}
       </Card>
+
+      {authEnabled() && (
+        <Card className="mt-6 max-w-xl">
+          <h2 className="font-semibold text-text">Delete your account</h2>
+          <p className="mt-1 text-text-muted">
+            Your booking links stop working straight away and upcoming bookings are cancelled. We keep your data for 30 days in case you change
+            your mind, then delete it for good.
+          </p>
+          <DeleteAccountForm email={user.email} />
+        </Card>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ const MIN = 60_000;
 /** In-memory stand-in for the Postgres store. The "current user" is the first seeded user until auth lands. */
 export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore {
   const db = structuredClone(seed);
+  const deleted = new Map<string, Date>(); // user id -> when the account was closed
   const host = db.users[0];
 
   /** Builds a confirmed booking after the overlap check. `movingId` is the booking being rescheduled, which the check skips. */
@@ -61,14 +62,16 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   return {
+    deleteAccount,
+    purgeDeletedAccounts,
     async getCurrentUser() {
       return host;
     },
     async getUser(id) {
-      return db.users.find((u) => u.id === id) ?? null;
+      return db.users.find((u) => u.id === id && !deleted.has(u.id)) ?? null;
     },
     async getUserBySlug(slug) {
-      return db.users.find((u) => u.slug === slug) ?? null;
+      return db.users.find((u) => u.slug === slug && !deleted.has(u.id)) ?? null;
     },
     async listEventTypes(userId) {
       return db.eventTypes.filter((e) => e.userId === userId).sort((a, b) => a.position - b.position);
@@ -77,7 +80,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       return db.eventTypes.find((e) => e.userId === userId && e.id === id) ?? null;
     },
     async getPublicEventType(hostSlug, eventSlug) {
-      const user = db.users.find((u) => u.slug === hostSlug);
+      const user = db.users.find((u) => u.slug === hostSlug && !deleted.has(u.id));
       const eventType = user && db.eventTypes.find((e) => e.userId === user.id && e.slug === eventSlug && e.active);
       return user && eventType ? { host: user, eventType } : null;
     },
@@ -201,6 +204,33 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       return saved;
     },
   };
+
+  async function deleteAccount(userId: string, now = new Date()) {
+    deleted.set(userId, now);
+    for (const e of db.eventTypes) if (e.userId === userId) e.active = false;
+    const upcoming = db.bookings.filter((b) => b.hostId === userId && b.status === "confirmed" && b.startAt.getTime() > now.getTime());
+    for (const b of upcoming) Object.assign(b, { status: "cancelled", cancelledAt: now, cancelledBy: "host", cancelReason: "The host closed their account" });
+    return upcoming;
+  }
+
+  async function purgeDeletedAccounts(now = new Date()) {
+    const cutoff = now.getTime() - 30 * 24 * 60 * MIN;
+    const gone = new Set([...deleted].filter(([, at]) => at.getTime() < cutoff).map(([id]) => id));
+    const types = new Set(db.eventTypes.filter((e) => gone.has(e.userId)).map((e) => e.id));
+    const schedules = new Set(db.schedules.filter((sc) => gone.has(sc.userId)).map((sc) => sc.id));
+    db.users = db.users.filter((u) => !gone.has(u.id));
+    db.eventTypes = db.eventTypes.filter((e) => !gone.has(e.userId));
+    db.locations = db.locations.filter((l) => !types.has(l.eventTypeId));
+    db.questions = db.questions.filter((q) => !types.has(q.eventTypeId));
+    db.schedules = db.schedules.filter((sc) => !gone.has(sc.userId));
+    db.rules = db.rules.filter((r) => !schedules.has(r.scheduleId));
+    db.bookings = db.bookings.filter((b) => !gone.has(b.hostId));
+    db.connections = db.connections.filter((c) => !gone.has(c.userId));
+    db.calendars = db.calendars.filter((c) => !gone.has(c.userId));
+    db.busyBlocks = db.busyBlocks.filter((b) => !gone.has(b.userId));
+    for (const id of gone) deleted.delete(id);
+    return gone.size;
+  }
 
   function ownsEventType(userId: string, eventTypeId: string): boolean {
     return db.eventTypes.some((e) => e.userId === userId && e.id === eventTypeId);

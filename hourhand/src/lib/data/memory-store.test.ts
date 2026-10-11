@@ -85,4 +85,17 @@ describe("memory store createBooking", () => {
     expect((await store.listCustomQuestions(host.id, "evt_coaching")).length).toBe(1);
     expect((await store.getDefaultSchedule(host.id)).rules).toEqual(rules);
   });
+
+  it("closes an account at once and purges it after 30 days", async () => {
+    const { store, host, first } = await setup();
+    const cancelled = await store.deleteAccount(host.id, NOW);
+    expect(cancelled.map((b) => b.id)).toContain(first.id);
+    expect(await store.getUserBySlug("priya")).toBeNull();
+    expect(await store.getPublicEventType("priya", "coaching")).toBeNull();
+    expect(await store.purgeDeletedAccounts(new Date(NOW.getTime() + 29 * 864e5))).toBe(0);
+    expect(await store.purgeDeletedAccounts(new Date(NOW.getTime() + 31 * 864e5))).toBe(1);
+    expect(await store.listBookings(host.id)).toEqual([]);
+    expect(await store.listEventTypes(host.id)).toEqual([]);
+  });
 });
+

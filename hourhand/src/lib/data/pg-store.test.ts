@@ -189,6 +189,38 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect(resaved.map((q) => q.id)).toEqual([listed[1].id, listed[0].id]);
     });
   });
+
+  // Runs last: it closes and then purges Arun's account.
+  describe("account deletion", () => {
+    it("closes the account at once and purges it only after 30 days", async () => {
+      const now = at("2030-06-01T00:00:00Z");
+      const upcoming = await store.createBooking({
+        eventTypeId: (await store.listEventTypes(arun.id))[0].id, startAt: at("2030-06-05T04:00:00Z"), idempotencyKey: "pg-delete-upcoming", invitee: guest,
+      });
+      await pool.query("insert into auth_sessions (token, user_id, expires_at) values ('pg-delete-session', $1, now() + interval '1 day')", [arun.id]);
+
+      const cancelled = await store.deleteAccount(arun.id, now);
+      expect(cancelled.map((b) => b.id)).toContain(upcoming.id);
+      expect(cancelled.every((b) => b.status === "cancelled" && b.cancelledBy === "host")).toBe(true);
+      expect(await store.getUserBySlug("arun")).toBeNull();
+      expect(await store.getUser(arun.id)).toBeNull();
+      expect(await store.getPublicEventType("arun", "chat")).toBeNull();
+      expect((await pool.query("select count(*)::int as n from auth_sessions where user_id = $1", [arun.id])).rows[0].n).toBe(0);
+      await expect(store.deleteAccount(arun.id, now)).rejects.toBeInstanceOf(NotFoundError);
+      expect(await store.getUserBySlug("priya")).not.toBeNull();
+
+      expect(await store.purgeDeletedAccounts(at("2030-06-30T00:00:00Z"))).toBe(0); // 29 days: still recoverable
+      expect((await pool.query("select count(*)::int as n from bookings where host_id = $1", [arun.id])).rows[0].n).toBeGreaterThan(0);
+
+      expect(await store.purgeDeletedAccounts(at("2030-07-02T00:00:00Z"))).toBe(1);
+      for (const table of ["users", "event_types", "bookings", "invitees", "availability_schedules"]) {
+        const column = table === "users" ? "id" : table === "bookings" || table === "invitees" ? "host_id" : "user_id";
+        const { rows } = await pool.query(`select count(*)::int as n from ${table} where ${column} = $1`, [arun.id]);
+        expect({ table, n: rows[0].n }).toEqual({ table, n: 0 });
+      }
+      expect((await store.listBookings(priya.id)).length).toBeGreaterThan(0);
+    });
+  });
 });
 
 function draftOf(e: EventType): EventTypeDraft {
