@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { LegalLinks } from "@/components/LegalLinks";
 import { SignInForm } from "@/components/SignInForm";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -42,6 +43,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           </form>
         )}
       </Card>
+      <footer className="mt-8">
+        <LegalLinks />
+      </footer>
     </div>
   );
 }

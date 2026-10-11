@@ -92,7 +92,7 @@ type Env = Record<string, string | undefined>;
  */
 export function createMailer(env: Env = process.env): Mailer {
   if (env.RESEND_API_KEY) {
-    if (!env.EMAIL_FROM) throw new Error("EMAIL_FROM must be set with RESEND_API_KEY, for example: Hourhand <bookings@mail.example.com>");
+    if (!env.EMAIL_FROM) throw new Error("EMAIL_FROM must be set with RESEND_API_KEY, for example: Hourhand <booking@hourhand.cloud>");
     return resendMailer(env.RESEND_API_KEY, env.EMAIL_FROM);
   }
   if (env.NODE_ENV === "production" && env.HOURHAND_MAIL_TO_LOG !== "1") {
