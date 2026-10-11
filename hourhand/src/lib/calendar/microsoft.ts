@@ -4,7 +4,7 @@
 
 import { TZDate } from "@date-fns/tz";
 import {
-  CalendarApiError, type BusyRange, type CalendarEntry, type CalendarProvider, type EventInput, type EventResult, type RefreshedToken, type TokenSet,
+  CalendarApiError, type BusyRange, type CalendarEntry, type EventInput, type EventResult, type OAuthCalendarProvider, type RefreshedToken, type TokenSet,
 } from "./provider";
 
 /** `offline_access` gets a refresh token; `User.Read` is what Graph needs to resolve `/me`. */
@@ -68,7 +68,7 @@ function parseGraphUtc(t: { dateTime: string }): Date {
 
 type GraphEvent = { id?: string; isOnlineMeeting?: boolean; onlineMeeting?: { joinUrl?: string } | null };
 
-export function microsoftClient(opts: { clientId: string; clientSecret: string; endpoints?: MicrosoftEndpoints; fetchImpl?: Fetch }): CalendarProvider {
+export function microsoftClient(opts: { clientId: string; clientSecret: string; endpoints?: MicrosoftEndpoints; fetchImpl?: Fetch }): OAuthCalendarProvider {
   const ep = opts.endpoints ?? MICROSOFT_ENDPOINTS;
   const f = opts.fetchImpl ?? fetch;
 

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { seal, unseal } from "../crypto/seal";
-import type { CalendarProviderId } from "./provider";
+import type { OAuthProviderId } from "./provider";
 
 // The "connect a calendar" handshake (Google, Outlook). Before sending the host to Google we put a sealed, short-lived cookie in
 // their browser holding a random state and the PKCE verifier, tied to their user id. The callback only goes ahead when
@@ -9,7 +9,7 @@ import type { CalendarProviderId } from "./provider";
 
 // One cookie per provider, so a Google and an Outlook handshake don't overwrite each other. Google's name, path and
 // sealing context are unchanged, so a Google handshake in flight across a deploy still finishes.
-export const OAUTH_COOKIES: Record<CalendarProviderId, { name: string; path: string; aad: string }> = {
+export const OAUTH_COOKIES: Record<OAuthProviderId, { name: string; path: string; aad: string }> = {
   google: { name: "hh_gcal_oauth", path: "/api/calendars/google", aad: "google-calendar-oauth" },
   microsoft: { name: "hh_mcal_oauth", path: "/api/calendars/microsoft", aad: "microsoft-calendar-oauth" },
 };
@@ -19,7 +19,7 @@ const TTL_MS = 10 * 60_000;
 
 interface Pending { state: string; verifier: string; userId: string; expiresAt: number }
 
-export function startOAuth(key: Buffer, userId: string, now = new Date(), provider: CalendarProviderId = "google"): { cookie: string; state: string; codeChallenge: string } {
+export function startOAuth(key: Buffer, userId: string, now = new Date(), provider: OAuthProviderId = "google"): { cookie: string; state: string; codeChallenge: string } {
   const state = randomBytes(24).toString("base64url");
   const verifier = randomBytes(48).toString("base64url");
   const pending: Pending = { state, verifier, userId, expiresAt: now.getTime() + TTL_MS };
@@ -32,7 +32,7 @@ export function startOAuth(key: Buffer, userId: string, now = new Date(), provid
 
 export type CallbackCheck = { ok: true; verifier: string } | { ok: false; error: "expired" | "state_mismatch" | "wrong_user" };
 
-export function checkOAuthCallback(key: Buffer, cookie: string | undefined, state: string | null, userId: string, now = new Date(), provider: CalendarProviderId = "google"): CallbackCheck {
+export function checkOAuthCallback(key: Buffer, cookie: string | undefined, state: string | null, userId: string, now = new Date(), provider: OAuthProviderId = "google"): CallbackCheck {
   if (!cookie || !state) return { ok: false, error: "state_mismatch" };
   let pending: Pending;
   try {

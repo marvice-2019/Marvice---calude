@@ -1,10 +1,10 @@
 import type pg from "pg";
 import { checkedCalendarLimit } from "../billing/account";
 import { seal, unseal } from "../crypto/seal";
-import { CalendarApiError, PROVIDER_NAMES, type CalendarEntry, type CalendarProviderId, type CalendarProviders, type TokenSet } from "./provider";
+import { CalendarApiError, PROVIDER_NAMES, type CalendarEntry, type CalendarProviderId, type CalendarProviders, type OAuthCalendarProvider, type TokenSet } from "./provider";
 import { stopConnectionChannels, watchCapable } from "./push";
 
-// Stored calendar connections (Google, Microsoft). Tokens are sealed with TOKEN_ENCRYPTION_KEY and bound to their connection, so neither a
+// Stored calendar connections (Google, Microsoft, iCloud). Tokens are sealed with TOKEN_ENCRYPTION_KEY and bound to their connection, so neither a
 // database dump nor a row copied into another account's connection can be used.
 
 type Db = Pick<pg.Pool, "query">;
@@ -73,6 +73,8 @@ export async function accessTokenFor(pool: Db, providers: CalendarProviders, key
     const aad = aadFor(row.provider, row.user_id, row.account_email);
     const sealed = row.credentials_encrypted as Buffer;
     const creds = unseal<Credentials>(key, sealed, aad);
+    // iCloud has nothing to refresh: the Apple ID and the app-specific password (kept as the refresh token) are the credential.
+    if (providerId === "icloud") return { provider, aad, sealed, creds: { ...creds, accessToken: `${row.account_email}:${creds.refreshToken}` }, valid: true };
     const valid = Boolean(creds.accessToken && creds.expiresAt && new Date(creds.expiresAt).getTime() - now.getTime() > 60_000);
     return { provider, aad, sealed, creds, valid };
   };
@@ -93,7 +95,7 @@ export async function accessTokenFor(pool: Db, providers: CalendarProviders, key
       // Whoever held the lock may have just refreshed.
       const { provider, aad, sealed, creds, valid } = await read(db);
       if (valid) return creds.accessToken as string;
-      const fresh = await provider.refresh(creds.refreshToken, now);
+      const fresh = await (provider as OAuthCalendarProvider).refresh(creds.refreshToken, now); // iCloud returned above
       const next: Credentials = { ...creds, accessToken: fresh.accessToken, expiresAt: fresh.expiresAt.toISOString() };
       if (fresh.refreshToken) next.refreshToken = fresh.refreshToken;
       // A reconnect that saved new credentials meanwhile wins; this token still works for this call.
@@ -122,7 +124,8 @@ export async function disconnectConnection(pool: Db, providers: CalendarProvider
   if (provider && key && row.credentials_encrypted.length > 0) {
     // Stop the watch channels while the token still works; revoking it next would leave them pinging for up to a week.
     if (row.provider === "google" && watchCapable(provider)) await stopConnectionChannels(pool, provider, key, connectionId).catch(() => undefined);
-    try {
+    // iCloud has no revoke: the host deletes the app-specific password at appleid.apple.com.
+    if (provider.revoke) try {
       await provider.revoke(unseal<Credentials>(key, row.credentials_encrypted, aadFor(row.provider, row.user_id, row.account_email)).refreshToken);
     } catch {
       // A token that can't be opened can't be used either; deleting the row is what matters.

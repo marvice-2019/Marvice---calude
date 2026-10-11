@@ -1,10 +1,13 @@
-// The contract every calendar provider (Google, Microsoft) meets, so sync, connections and the calendar jobs
+// The contract every calendar provider (Google, Microsoft, iCloud) meets, so sync, connections and the calendar jobs
 // don't care which one a connection uses. Push channels stay provider-specific and optional.
 
-export type CalendarProviderId = "google" | "microsoft";
+export type CalendarProviderId = "google" | "microsoft" | "icloud";
+
+/** Providers connected through an OAuth handshake. iCloud has none: the host types an app-specific password instead. */
+export type OAuthProviderId = Exclude<CalendarProviderId, "icloud">;
 
 /** How a provider is named in messages a host may read. */
-export const PROVIDER_NAMES: Record<CalendarProviderId, string> = { google: "Google", microsoft: "Microsoft" };
+export const PROVIDER_NAMES: Record<CalendarProviderId, string> = { google: "Google", microsoft: "Microsoft", icloud: "iCloud" };
 
 /** Thrown by every provider. `revoked`: only a reconnect fixes it (grant revoked, permission removed). */
 export class CalendarApiError extends Error {
@@ -53,8 +56,8 @@ export interface EventInput {
 /** `conferencePending`: the provider is still creating the video link; read the event again shortly. */
 export interface EventResult { id: string; joinUrl: string | null; conferencePending: boolean }
 
-export interface CalendarProvider {
-  readonly id: CalendarProviderId;
+/** The OAuth half of a provider. iCloud stores the host's credential itself, so it has nothing to exchange, refresh or revoke. */
+export interface OAuthMethods {
   authUrl(p: { redirectUri: string; state: string; codeChallenge: string; loginHint?: string }): string;
   exchangeCode(p: { code: string; redirectUri: string; codeVerifier: string }, now?: Date): Promise<TokenSet>;
   refresh(refreshToken: string, now?: Date): Promise<RefreshedToken>;
@@ -62,6 +65,10 @@ export interface CalendarProvider {
   revoke(token: string): Promise<void>;
   /** Scopes from `granted` (space-separated) that Hourhand needs but the user didn't grant. */
   missingScopes(granted: string): string[];
+}
+
+export interface CalendarProvider extends Partial<OAuthMethods> {
+  readonly id: CalendarProviderId;
   listCalendars(accessToken: string): Promise<CalendarEntry[]>;
   /**
    * Busy times per calendar id. A calendar that can't be read goes in `errors` instead of failing the whole call.
@@ -76,4 +83,6 @@ export interface CalendarProvider {
 }
 
 /** The providers configured on this server. A connection whose provider isn't configured can't sync or take events. */
-export type CalendarProviders = Partial<Record<CalendarProviderId, CalendarProvider>>;
+export type CalendarProviders = Partial<Record<OAuthProviderId, OAuthCalendarProvider>> & { icloud?: CalendarProvider };
+
+export type OAuthCalendarProvider = CalendarProvider & OAuthMethods;

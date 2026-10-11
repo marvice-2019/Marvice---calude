@@ -416,7 +416,7 @@ export async function processDueNotifications(
         continue;
       }
     }
-    if (isCalendarJob(c.kind) && !opts.calendar) { await skip(c, `${Object.values(PROVIDER_NAMES).join(" and ")} calendars are not configured on this server`); await release(c); continue; }
+    if (isCalendarJob(c.kind) && !opts.calendar) { await skip(c, `${new Intl.ListFormat("en").format(Object.values(PROVIDER_NAMES))} calendars are not configured on this server`); await release(c); continue; }
 
     // Renew the lease for this row only, right before running it. If another worker took the row over, leave it to them.
     const renewed = await pool.query(

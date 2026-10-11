@@ -14,7 +14,7 @@ import { MEET_LINK_WAIT_SECONDS, processDueNotifications } from "../jobs/worker"
 import { calendarConfigError, calendarDeps } from "./env";
 import { accessTokenFor, disconnectConnection, saveConnection, setAddToCalendar, setCheckConflicts } from "./connections";
 import { eventIdFor, GoogleApiError, REQUIRED_SCOPES, type BusyRange, type EventInput, type GoogleClient } from "./google";
-import { CalendarApiError, type CalendarProvider } from "./provider";
+import { CalendarApiError, type OAuthCalendarProvider } from "./provider";
 import { ALERT_AFTER_FAILURES, recordConnectionFailure, syncDueConnections } from "./sync";
 
 const BASE = process.env.TEST_DATABASE_URL;
@@ -105,7 +105,7 @@ function fakeMicrosoft(teams = true) {
     },
     async deleteEvent(_t: string, _c: string, id: string) { s.events.delete(id); },
   };
-  return { microsoft: m as unknown as CalendarProvider, s };
+  return { microsoft: m as unknown as OAuthCalendarProvider, s };
 }
 
 function recordingMailer() {
@@ -205,7 +205,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
           sent.push(refreshToken);
           return { accessToken: `rot-${sent.length}`, expiresAt: new Date(Date.now() + 3600_000), refreshToken: `rt-rotated-${sent.length}` };
         },
-      } as unknown as CalendarProvider;
+      } as unknown as OAuthCalendarProvider;
       const hoursLater = (h: number) => new Date(Date.now() + h * 3600_000);
       expect(await accessTokenFor(pool, { google: rotating }, key, id, hoursLater(2))).toBe("rot-1");
       const sealed = (await conn(id)).credentials_encrypted;
@@ -229,7 +229,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
           await new Promise((resolve) => setTimeout(resolve, 200));
           return { accessToken: `conc-${refreshes}`, expiresAt: new Date(Date.now() + 3 * 3600_000), refreshToken: `rt-conc-${refreshes}` };
         },
-      } as unknown as CalendarProvider;
+      } as unknown as OAuthCalendarProvider;
       const later = new Date(Date.now() + 2 * 3600_000);
       // What sync and the calendar jobs do with a revoked error: disconnect the connection.
       const call = () => accessTokenFor(pool, { google: rotating }, key, id, later)
@@ -519,7 +519,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const { mailer, sent } = recordingMailer();
       await processDueNotifications(pool, mailer, { baseUrl, calendar: null });
       await processDueNotifications(pool, mailer, { baseUrl, calendar: null, now: new Date(Date.now() + 30_000) });
-      expect((await queue(b.id)).find((q) => q.kind === "calendar_create")).toMatchObject({ status: "skipped", last_error: "Google and Microsoft calendars are not configured on this server" });
+      expect((await queue(b.id)).find((q) => q.kind === "calendar_create")).toMatchObject({ status: "skipped", last_error: "Google, Microsoft, and iCloud calendars are not configured on this server" });
       expect(sent.filter((m) => m.to === guest.email)).toHaveLength(1);
     });
   });
