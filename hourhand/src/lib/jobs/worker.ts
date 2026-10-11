@@ -28,7 +28,8 @@ const MIN = 60_000;
 
 /** `released`: emails a calendar write just unblocked, which are due now (the runner goes round again for them). */
 export interface WorkerResult { claimed: number; sent: number; skipped: number; retrying: number; failed: number; deferred: number; released: number }
-export interface CalendarDeps { google: GoogleClient; key: Buffer }
+/** `pushAddress`: where Google sends change pings, or null when push can't work (no public https URL). */
+export interface CalendarDeps { google: GoogleClient; key: Buffer; pushAddress?: string | null }
 
 interface Claimed { id: string; booking_id: string | null; user_id: string; kind: NotificationKind; channel: string; recipient: string; attempts: number; locked_until: Date; dedupe_key: string }
 

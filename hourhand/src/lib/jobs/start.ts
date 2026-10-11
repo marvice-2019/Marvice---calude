@@ -1,5 +1,6 @@
 import { resolveBaseUrl } from "../auth/auth";
 import { calendarConfigError, calendarDeps } from "../calendar/env";
+import { pushAddress } from "../calendar/push";
 import { tokenKey } from "../crypto/seal";
 import { getPool } from "../data/pg-store";
 import { createMailer } from "../mail/mailer";
@@ -19,7 +20,8 @@ export function startJobsFromEnv(env: Record<string, string | undefined> = proce
   // Google Calendar is optional; when it's configured, a missing or bad TOKEN_ENCRYPTION_KEY stops the server here.
   const configError = calendarConfigError(env);
   if (configError) throw new Error(configError);
-  const calendar = calendarDeps(env);
+  const deps = calendarDeps(env);
+  const calendar = deps && { ...deps, pushAddress: pushAddress(baseUrl, env) };
   const pool = getPool(env.DATABASE_URL);
   // Hosts' Razorpay keys are sealed with TOKEN_ENCRYPTION_KEY; without it no paid booking can exist, so there's nothing to check.
   let payments: PaymentCheckDeps | null = null;
@@ -30,5 +32,5 @@ export function startJobsFromEnv(env: Record<string, string | undefined> = proce
     payments = null;
   }
   shared.__hourhandJobs = startJobRunner({ pool, mailer, baseUrl, calendar, payments });
-  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, Google Calendar ${calendar ? "on" : "off"}, booking payments ${payments ? "on" : "off"})`);
+  console.info(`[jobs] runner started (${env.RESEND_API_KEY ? "Resend" : "log only"}, Google Calendar ${calendar ? (calendar.pushAddress ? "on, instant" : "on, polling") : "off"}, booking payments ${payments ? "on" : "off"})`);
 }

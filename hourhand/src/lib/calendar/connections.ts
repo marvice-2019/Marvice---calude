@@ -2,6 +2,7 @@ import type pg from "pg";
 import { checkedCalendarLimit } from "../billing/account";
 import { seal, unseal } from "../crypto/seal";
 import { GoogleApiError, type GoogleCalendarEntry, type GoogleClient, type TokenSet } from "./google";
+import { stopConnectionChannels } from "./push";
 
 // Stored Google connections. Tokens are sealed with TOKEN_ENCRYPTION_KEY and bound to their connection, so neither a
 // database dump nor a row copied into another account's connection can be used.
@@ -79,6 +80,8 @@ export async function disconnectConnection(pool: Db, google: GoogleClient | null
   if (!row) return false;
   if (google && key && row.credentials_encrypted.length > 0) {
     try {
+      // Stop the watch channels while the token still works; revoking it next would leave them pinging for up to a week.
+      await stopConnectionChannels(pool, google, key, connectionId);
       await google.revoke(unseal<Credentials>(key, row.credentials_encrypted, aadFor(row.user_id, row.account_email)).refreshToken);
     } catch {
       // A token that can't be opened can't be used either; deleting the row is what matters.
