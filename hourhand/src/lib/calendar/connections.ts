@@ -181,3 +181,22 @@ export async function setAddToCalendar(pool: pg.Pool, userId: string, calendarId
     client.release();
   }
 }
+
+/**
+ * Connects iCloud with an Apple ID and app-specific password. Listing the calendars proves the password (Apple answers
+ * 401 otherwise) before anything is stored; the password is kept sealed like a refresh token and never logged.
+ */
+export async function connectICloud(
+  pool: pg.Pool, key: Buffer, provider: Pick<OAuthCalendarProvider, "listCalendars">, userId: string, appleId: string, password: string, now: Date,
+): Promise<"ok" | "rejected" | "unreachable" | "no_calendars"> {
+  const email = appleId.trim().toLowerCase();
+  let calendars: CalendarEntry[];
+  try {
+    calendars = await provider.listCalendars(`${email}:${password}`);
+  } catch (error) {
+    return error instanceof CalendarApiError && error.revoked ? "rejected" : "unreachable";
+  }
+  if (calendars.length === 0) return "no_calendars";
+  await saveConnection(pool, key, userId, "icloud", { accessToken: "", refreshToken: password, expiresAt: now, scope: "", email }, calendars, now);
+  return "ok";
+}

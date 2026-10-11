@@ -39,7 +39,7 @@ Notetaker and Callie AI assistant,ai,skip,yes,skip,out of scope: reviewers ask f
 Contacts and Opportunities CRM,crm,skip,yes,skip,out of scope: 'calendar app that desires to be a CRM'
 "Single sign-on, SCIM, admin roles",admin,skip,yes,skip,out of scope: enterprise
 Exchange on-premise calendars,calendar,skip,yes,skip,out of scope at launch: rare for solo coaches
-Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,partial,"Google and Outlook: sync light, email alert on disconnect; no iCloud, no WhatsApp alert"
+Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,partial,"Google, Outlook and iCloud (CalDAV, app-specific password): sync light, email alert on disconnect; no WhatsApp alert"
 Never offer a slot when calendar sync is stale,integrations,must,no,yes,slot engine refuses stale sync; real Google sync since B4
 One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,must,no,yes,"B5a: cancel, pause and resume, renewal email 7 days ahead"
 Human support reply under 1 business day; WhatsApp/callback on paid plans,support,should,no,no,fix 3: support (14 reviews/2 sources); ops not code
@@ -60,3 +60,4 @@ Private client notes and session history,crm,should,no,yes,"clients grouped by e
 Monthly earnings report,payments,should,no,yes,"IST month: bookings, packages, deposits kept, refunds, GST, fee estimate; emailed on the 1st; CSV for the accountant"
 Waitlist for full days,booking,should,no,yes,"guest leaves an email for a day in their zone; emailed once when a time there frees up; entries deleted a day after"
 Booking page as a mini website,booking,should,no,yes,"photo, headline, about, area, WhatsApp, Instagram, Google reviews link, services with prices, schema.org markup"
+Booking pages in Indian languages,booking,should,no,yes,"Hindi, Tamil, Telugu, Kannada on guest pages; host default plus a switcher; drafts pending native review; guest emails still English"

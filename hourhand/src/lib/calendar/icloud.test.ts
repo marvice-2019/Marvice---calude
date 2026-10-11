@@ -119,7 +119,12 @@ describe("iCloud CalDAV", () => {
   });
 
   it("inserts with If-None-Match, moves by PUT, deletes treating gone as done; never a video link", async () => {
-    const { calls, client } = fake({ "PUT *": () => new Response("", { status: 201 }), "DELETE *": () => new Response("", { status: 404 }) });
+    let stored = "";
+    const { calls, client } = fake({
+      "PUT *": (c) => { stored = c.body ?? ""; return new Response("", { status: 201 }); },
+      "GET *": () => new Response(stored, { status: 200 }),
+      "DELETE *": () => new Response("", { status: 404 }),
+    });
     const cal = "https://caldav.icloud.com/123/calendars/work/";
     const r = await client.insertEvent(CRED, cal, {
       summary: "Coaching", description: "Notes", start: new Date("2026-11-03T09:00:00Z"), end: new Date("2026-11-03T10:00:00Z"),
@@ -134,11 +139,16 @@ describe("iCloud CalDAV", () => {
     expect(calls[0].body).toContain("Guest: Guest <g@example.com>");
 
     await client.moveEvent(CRED, cal, "hourhand-b-1", new Date("2026-11-04T09:00:00Z"), new Date("2026-11-04T10:00:00Z"), "Asia/Kolkata", "Coaching");
-    expect(calls[1]).toMatchObject({ method: "PUT", url: `${cal}hourhand-b-1.ics` });
-    expect(calls[1].headers["if-none-match"]).toBeUndefined();
-    expect(calls[1].body).toContain("DTSTART:20261104T090000Z");
+    expect(calls[1]).toMatchObject({ method: "GET", url: `${cal}hourhand-b-1.ics` });
+    expect(calls[2]).toMatchObject({ method: "PUT", url: `${cal}hourhand-b-1.ics` });
+    expect(calls[2].headers["if-none-match"]).toBeUndefined();
+    // New times, one of each; the guest's details written at insert survive the move.
+    expect(calls[2].body).toContain("DTSTART:20261104T090000Z\r\nDTEND:20261104T100000Z");
+    expect(calls[2].body).not.toContain("20261103T090000Z");
+    expect(calls[2].body?.match(/^DTSTART/gm)).toHaveLength(1);
+    expect(calls[2].body).toContain("Guest: Guest <g@example.com>");
 
     await expect(client.deleteEvent(CRED, cal, "hourhand-b-1")).resolves.toBeUndefined();
-    expect(calls[2]).toMatchObject({ method: "DELETE", url: `${cal}hourhand-b-1.ics` });
+    expect(calls[3]).toMatchObject({ method: "DELETE", url: `${cal}hourhand-b-1.ics` });
   });
 });

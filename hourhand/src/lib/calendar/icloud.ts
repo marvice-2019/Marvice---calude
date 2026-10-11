@@ -257,9 +257,16 @@ export function icloudClient(opts: { baseUrl?: string; fetchImpl?: Fetch; now?: 
       return { id: eventId, joinUrl: null, conferencePending: false };
     },
 
-    /** PUT over the whole event. Hourhand owns these events, so the rewrite loses nothing it didn't write. */
+    /** Rewrites the times and title of the stored event, keeping the guest's details and anything the host added. */
     async moveEvent(credential: string, calendarId: string, eventId: string, start: Date, end: Date, _timeZone: string, summary: string): Promise<EventResult> {
-      await dav(credential, "PUT", eventUrl(calendarId, eventId), { body: eventIcs(eventId, { summary, start, end }, now()), contentType: "text/calendar; charset=utf-8" });
+      const url = eventUrl(calendarId, eventId);
+      const old = await dav(credential, "GET", url, { okStatuses: [404] });
+      const body = old.status === 200 && /BEGIN:VEVENT/.test(old.text)
+        ? old.text.replace(/\r?\n[ \t]/g, "") // unfold, so a long line is one line
+          .replace(/^(DTSTART|DTEND|DURATION|DTSTAMP|SUMMARY)[;:].*\r?\n/gm, "")
+          .replace(/^(BEGIN:VEVENT\r?\n)/m, `$1DTSTAMP:${icsUtc(now())}\r\nDTSTART:${icsUtc(start)}\r\nDTEND:${icsUtc(end)}\r\nSUMMARY:${icsEscape(summary)}\r\n`)
+        : eventIcs(eventId, { summary, start, end }, now());
+      await dav(credential, "PUT", url, { body, contentType: "text/calendar; charset=utf-8" });
       return { id: eventId, joinUrl: null, conferencePending: false };
     },
 

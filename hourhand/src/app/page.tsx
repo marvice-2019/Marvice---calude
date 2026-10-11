@@ -21,7 +21,7 @@ const comingSoon = (
 );
 
 const steps = [
-  { title: "Connect your calendar", body: "Google or Outlook: pick the calendars to check. Each one gets its own sync light. iCloud is coming soon." },
+  { title: "Connect your calendar", body: "Google, Outlook or iCloud: pick the calendars to check. Each one gets its own sync light." },
   { title: "Share your link", body: "Put it in your bio, your messages or your site. Guests see only the times you're free, in their own time zone." },
   { title: "Show up", body: "The booking lands in your calendar with a Google Meet link, and your guest gets a confirmation and reminders." },
 ];
@@ -70,7 +70,7 @@ const faqs = [
     q: "What happens if my calendar stops syncing?",
     a: "The sync light shows it, your booking page stops offering times until we can check again, and we email you a link to reconnect. Nobody can book a time we can't check.",
   },
-  { q: "Which calendars work?", a: "Google Calendar, Outlook and Office 365 today. iCloud is coming soon." },
+  { q: "Which calendars work?", a: "Google Calendar, Outlook, Office 365 and iCloud." },
   { q: "Do you send WhatsApp reminders?", a: "Emails go out on their own. For WhatsApp, one tap on a booking opens a ready confirmation or reminder to send from your own number; sending automatically is coming later." },
   { q: "How do I cancel?", a: "Dashboard, then Plan, then Cancel. You keep your plan until the end of the period you've paid for." },
   { q: "Who answers support?", a: "A person, within one working day." },
@@ -186,15 +186,13 @@ export default async function Home() {
             ))}
           </div>
           <p className="mt-6 text-text-muted">
-            Also included: Google Meet and Teams links created for you; weekly repeat bookings, session packages and refundable no-show deposits; GST invoices to guests; a waitlist for full days; private client notes; a monthly earnings report; and from your dashboard you can cancel a booking, move it to another free time, or mark a no-show.
+            Also included: Google Meet and Teams links created for you; weekly repeat bookings, session packages and refundable no-show deposits; GST invoices to guests; a waitlist for full days; private client notes; a monthly earnings report; booking pages in Hindi, Tamil, Telugu and Kannada; and from your dashboard you can cancel a booking, move it to another free time, or mark a no-show.
           </p>
           <div className="mt-6 rounded-lg border border-border p-5">
             <h3 className="text-lg text-text">
               On the way {comingSoon}
             </h3>
             <ul className="mt-2 list-disc pl-5 text-text-muted">
-              <li>iCloud calendars</li>
-              <li>Booking pages in Hindi, Tamil, Telugu and Kannada</li>
               <li>WhatsApp reminders sent automatically, and WhatsApp sync alerts</li>
               <li>A mobile app</li>
               <li>An importer for links you already have</li>
