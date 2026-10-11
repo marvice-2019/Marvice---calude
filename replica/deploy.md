@@ -23,7 +23,7 @@ The repo is ready to deploy as a **public beta**. Five must-have features are st
 | Favicon, title, share image | yours (`src/app/icon.svg`, `src/app/opengraph-image.tsx`) |
 | Real Docker build | **not run here** (no Docker daemon in this sandbox); the first Coolify build is the real test. The steps it runs were each run above |
 
-**Still missing (must-haves):** Outlook calendar and Microsoft sign-in (B6, next), text/WhatsApp reminders (B9), add-guests on the booking form, an add-to-calendar button on the confirmation page (the confirmation email already carries the calendar file).
+**Still missing (must-haves):** text/WhatsApp reminders (B9), add-guests on the booking form, an add-to-calendar button on the confirmation page (the confirmation email already carries the calendar file).
 
 **Not yet tried against the real services:** Resend sending, Google Calendar freeBusy and push, Razorpay Checkout in a browser. The first live booking is that test.
 
@@ -77,7 +77,7 @@ Generate the two random values on your own machine with `openssl rand -hex 32` (
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | from Razorpay (test first) | for paid plans |
 | `RAZORPAY_PLAN_SOLO_MONTH`, `_SOLO_YEAR`, `_DUO_MONTH`, `_DUO_YEAR` | the 4 Plan ids | for paid plans |
 | `STRIPE_*` | only if you get Stripe (see backend.md) | no |
-| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | from Entra (section 6); used once B6 ships | after B6 |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | from Entra (section 6) | for Outlook and Sign in with Microsoft |
 | `TRUSTED_PROXIES` | leave unset (defaults cover Coolify's Docker network) | no |
 
 Never set `HOURHAND_ALLOW_MEMORY`, `HOURHAND_MAIL_TO_LOG`, `HOURHAND_E2E`, `GOOGLE_API_BASE_URL` or `RAZORPAY_API_BASE_URL` in production; they exist for local testing only.
@@ -90,6 +90,7 @@ Never set `HOURHAND_ALLOW_MEMORY`, `HOURHAND_MAIL_TO_LOG`, `HOURHAND_E2E`, `GOOG
 4. Certificates & secrets → New client secret (24 months). Copy the **Value** straight into Coolify as `MICROSOFT_CLIENT_SECRET`. Put a reminder in your calendar a month before it expires.
 5. Overview → copy **Application (client) ID** into `MICROSOFT_CLIENT_ID`. Tenant stays `common` (no variable).
 6. Branding & properties: home page `https://hourhand.cloud`, privacy `https://hourhand.cloud/privacy`, terms `https://hourhand.cloud/terms`. Later, verify the publisher (needs a Microsoft Partner ID) so users don't see "unverified" on the consent screen.
+7. Token configuration → Add optional claim → token type **ID** → tick `xms_edov` → Add. This tells Hourhand that Microsoft has verified a work or school email's domain. Without it, people on work or school accounts can still connect Outlook, but must sign up with an email link rather than "Continue with Microsoft" (Hourhand won't create an account from an email Microsoft doesn't vouch for). Personal Microsoft accounts don't need it.
 
 Teams links only work for work or school Microsoft 365 accounts; personal Outlook.com accounts get Outlook calendar sync but no Teams link.
 

@@ -3,6 +3,7 @@ import type pg from "pg";
 import { kickJobs } from "../jobs/kick";
 import { accessTokenFor } from "./connections";
 import { GoogleApiError, type GoogleClient } from "./google";
+import type { CalendarProvider } from "./provider";
 
 // Instant sync. Each calendar a host checks for conflicts gets a Google watch channel; when its events change, Google
 // pings /api/webhooks/google-calendar and that connection syncs at once. The ping says nothing about what changed and
@@ -28,6 +29,11 @@ export function pushAddress(baseUrl: string, env: Env = process.env): string | n
   return ok ? `${baseUrl.replace(/\/+$/, "")}/api/webhooks/google-calendar` : null;
 }
 
+/** Whether a provider can run watch channels: only the Google client can (pings are Google-only). */
+export function watchCapable(p: CalendarProvider): p is GoogleClient {
+  return typeof (p as Partial<GoogleClient>).stopChannel === "function";
+}
+
 export interface ChannelResult { started: number; stopped: number; failed: number }
 
 interface DueCalendar { id: string; connection_id: string; external_id: string; push_channel_id: string | null; push_resource_id: string | null }
@@ -35,7 +41,7 @@ interface DueCalendar { id: string; connection_id: string; external_id: string; 
 /** Stops a channel with the connection's token. Best effort: a channel we can't stop just expires on its own. */
 async function stopQuietly(pool: Pick<pg.Pool, "query">, google: GoogleClient, key: Buffer, connectionId: string, channelId: string, resourceId: string, now: Date) {
   try {
-    await google.stopChannel(await accessTokenFor(pool, google, key, connectionId, now), channelId, resourceId);
+    await google.stopChannel(await accessTokenFor(pool, { google }, key, connectionId, now), channelId, resourceId);
   } catch {
     // Google stops sending once it expires; until then its pings find no matching channel and are ignored.
   }
@@ -71,7 +77,7 @@ export async function maintainChannels(pool: pg.Pool, google: GoogleClient, key:
     [now, limit, CLAIM_MS, RENEW_BEFORE_MS]);
   for (const cal of due) {
     try {
-      const token = await accessTokenFor(pool, google, key, cal.connection_id, now);
+      const token = await accessTokenFor(pool, { google }, key, cal.connection_id, now);
       const channel = { id: randomUUID(), token: randomBytes(24).toString("hex"), address, ttlSeconds: CHANNEL_TTL_SECONDS };
       const watched = await google.watchEvents(token, cal.external_id, channel);
       const expiresAt = watched.expiresAt ?? new Date(now.getTime() + CHANNEL_TTL_SECONDS * 1000);

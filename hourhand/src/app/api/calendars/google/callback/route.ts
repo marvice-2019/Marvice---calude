@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSignedInUser } from "@/lib/auth/session";
-import { saveGoogleConnection } from "@/lib/calendar/connections";
+import { saveConnection } from "@/lib/calendar/connections";
 import { calendarDeps, calendarRedirectUri } from "@/lib/calendar/env";
-import { checkOAuthCallback, missingScopes, OAUTH_COOKIE, OAUTH_COOKIE_PATH } from "@/lib/calendar/oauth";
+import { checkOAuthCallback, OAUTH_COOKIE, OAUTH_COOKIE_PATH } from "@/lib/calendar/oauth";
 import { getPool } from "@/lib/data/pg-store";
 import { kickJobs } from "@/lib/jobs/kick";
 
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
     return res;
   };
   const deps = calendarDeps();
-  if (!deps) return done("error=not_configured");
+  const google = deps?.providers.google;
+  if (!deps || !google) return done("error=not_configured");
 
   const params = request.nextUrl.searchParams;
   const check = checkOAuthCallback(deps.key, request.cookies.get(OAUTH_COOKIE)?.value, params.get("state"), user.id);
@@ -28,13 +29,13 @@ export async function GET(request: NextRequest) {
   if (!code) return done("error=denied");
 
   try {
-    const tokens = await deps.google.exchangeCode({ code, redirectUri: calendarRedirectUri(request.nextUrl.origin), codeVerifier: check.verifier });
-    if (missingScopes(tokens.scope).length > 0) {
-      await deps.google.revoke(tokens.refreshToken ?? tokens.accessToken);
+    const tokens = await google.exchangeCode({ code, redirectUri: calendarRedirectUri(request.nextUrl.origin), codeVerifier: check.verifier });
+    if (google.missingScopes(tokens.scope).length > 0) {
+      await google.revoke(tokens.refreshToken ?? tokens.accessToken);
       return done("error=missing_permissions");
     }
-    const calendars = await deps.google.listCalendars(tokens.accessToken);
-    await saveGoogleConnection(getPool(process.env.DATABASE_URL as string), deps.key, user.id, tokens, calendars, new Date());
+    const calendars = await google.listCalendars(tokens.accessToken);
+    await saveConnection(getPool(process.env.DATABASE_URL as string), deps.key, user.id, "google", tokens, calendars, new Date());
     kickJobs(); // the first sync runs straight away instead of waiting for the next poll
     return done("connected=1");
   } catch (error) {

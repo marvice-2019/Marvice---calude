@@ -1,6 +1,8 @@
 // Google Calendar over plain HTTPS: OAuth (with PKCE), the calendar list, free/busy, and the host's booked events.
 // Endpoints are injectable so tests and the end-to-end run can point at a fake Google.
 
+import { CalendarApiError, type BusyRange, type CalendarEntry, type CalendarProvider, type EventInput, type EventResult, type RefreshedToken, type TokenSet } from "./provider";
+
 /**
  * The fewest scopes that do the job. `events.owned` only touches calendars the host owns, not shared ones.
  * `events.freebusy` reads availability (never event details) on every calendar the host can see, and is the narrowest
@@ -30,37 +32,25 @@ export const GOOGLE_ENDPOINTS: GoogleEndpoints = {
  * A failed Google call. `retryable`: trying later can work (rate limits, outages). `revoked`: the host must reconnect
  * (they removed access, or a permission is missing); retrying never helps.
  */
-export class GoogleApiError extends Error {
-  readonly status: number | null;
-  readonly reason: string | null;
-  readonly retryable: boolean;
-  readonly revoked: boolean;
+export class GoogleApiError extends CalendarApiError {
   constructor(message: string, opts: { status?: number | null; reason?: string | null; retryable: boolean; revoked?: boolean }) {
-    super(message);
+    super(message, opts);
     this.name = "GoogleApiError";
-    this.status = opts.status ?? null;
-    this.reason = opts.reason ?? null;
-    this.retryable = opts.retryable;
-    this.revoked = opts.revoked ?? false;
   }
 }
 
-export interface TokenSet { accessToken: string; refreshToken: string | null; expiresAt: Date; scope: string; email: string | null }
-export interface GoogleCalendarEntry { id: string; name: string; primary: boolean; accessRole: string }
-export interface BusyRange { start: Date; end: Date }
+export type { BusyRange, EventInput, EventResult, TokenSet } from "./provider";
 
-export interface EventInput {
-  summary: string;
-  description: string;
-  start: Date;
-  end: Date;
-  timeZone: string;
-  location: string | null;
-  attendee: { email: string; name: string };
-  withMeet: boolean;
-  bookingId: string;
+/** Google lets people untick permissions on the consent screen; every calendar permission is needed. */
+export function missingScopes(granted: string): string[] {
+  const have = new Set(granted.split(/\s+/));
+  return REQUIRED_SCOPES.filter((s) => !have.has(s));
 }
-export interface EventResult { id: string; joinUrl: string | null; conferencePending: boolean }
+
+/** Google's access roles, normalised: "freeBusyReader" can only be checked for conflicts, like "reader". */
+function normaliseRole(role: string): CalendarEntry["accessRole"] {
+  return role === "owner" ? "owner" : role === "writer" ? "writer" : "reader";
+}
 
 type Fetch = typeof fetch;
 const RATE_REASONS = new Set(["rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"]);
@@ -135,7 +125,9 @@ export function googleClient(opts: { clientId: string; clientSecret: string; end
     });
   }
 
-  return {
+  const client = {
+    id: "google" as const,
+
     authUrl(p: { redirectUri: string; state: string; codeChallenge: string; loginHint?: string }): string {
       const url = new URL(ep.auth);
       url.search = new URLSearchParams({
@@ -158,7 +150,7 @@ export function googleClient(opts: { clientId: string; clientSecret: string; end
       };
     },
 
-    async refresh(refreshToken: string, now = new Date()): Promise<{ accessToken: string; expiresAt: Date }> {
+    async refresh(refreshToken: string, now = new Date()): Promise<RefreshedToken> {
       const body = await tokenRequest({ client_id: opts.clientId, client_secret: opts.clientSecret, grant_type: "refresh_token", refresh_token: refreshToken });
       return { accessToken: body.access_token as string, expiresAt: new Date(now.getTime() + Number(body.expires_in ?? 3600) * 1000) };
     },
@@ -168,20 +160,23 @@ export function googleClient(opts: { clientId: string; clientSecret: string; end
       await call(ep.revoke, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token }) }).catch(() => undefined);
     },
 
-    async listCalendars(accessToken: string): Promise<GoogleCalendarEntry[]> {
-      const out: GoogleCalendarEntry[] = [];
+    /** Google lets people untick permissions on the consent screen; every calendar permission is needed. */
+    missingScopes,
+
+    async listCalendars(accessToken: string): Promise<CalendarEntry[]> {
+      const out: CalendarEntry[] = [];
       let pageToken: string | undefined;
       do {
         const { body } = await api<{ items?: { id: string; summary?: string; summaryOverride?: string; primary?: boolean; accessRole: string }[]; nextPageToken?: string }>(
           accessToken, "GET", "/users/me/calendarList", { query: { maxResults: "250", ...(pageToken ? { pageToken } : {}) } });
-        for (const c of body.items ?? []) out.push({ id: c.id, name: c.summaryOverride ?? c.summary ?? c.id, primary: c.primary === true, accessRole: c.accessRole });
+        for (const c of body.items ?? []) out.push({ id: c.id, name: c.summaryOverride ?? c.summary ?? c.id, primary: c.primary === true, accessRole: normaliseRole(c.accessRole) });
         pageToken = body.nextPageToken;
       } while (pageToken);
       return out;
     },
 
     /** Busy ranges per calendar id. A calendar Google reports an error for is returned in `errors`, not silently as free. */
-    async freeBusy(accessToken: string, calendarIds: string[], timeMin: Date, timeMax: Date): Promise<{ busy: Map<string, BusyRange[]>; errors: Map<string, string> }> {
+    async busy(accessToken: string, calendarIds: string[], timeMin: Date, timeMax: Date): Promise<{ busy: Map<string, BusyRange[]>; errors: Map<string, string> }> {
       const busy = new Map<string, BusyRange[]>();
       const errors = new Map<string, string>();
       for (let i = 0; i < calendarIds.length; i += 50) {
@@ -209,7 +204,7 @@ export function googleClient(opts: { clientId: string; clientSecret: string; end
           ...(e.location ? { location: e.location } : {}),
           attendees: [{ email: e.attendee.email, displayName: e.attendee.name, responseStatus: "needsAction" }],
           extendedProperties: { private: { hourhandBookingId: e.bookingId } },
-          ...(e.withMeet ? { conferenceData: { createRequest: { requestId: e.bookingId, conferenceSolutionKey: { type: "hangoutsMeet" } } } } : {}),
+          ...(e.conference === "google_meet" ? { conferenceData: { createRequest: { requestId: e.bookingId, conferenceSolutionKey: { type: "hangoutsMeet" } } } } : {}),
         },
       });
       const event = status === 409 ? (await api<Record<string, unknown>>(accessToken, "GET", `${path}/${id}`)).body : body;
@@ -251,6 +246,8 @@ export function googleClient(opts: { clientId: string; clientSecret: string; end
       await api(accessToken, "DELETE", `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { query: { sendUpdates: "none" }, okStatuses: [404, 410] });
     },
   };
+  // Google-only extras (watch channels) ride along; everything else is the shared provider contract.
+  return client satisfies CalendarProvider;
 }
 
 export type GoogleClient = ReturnType<typeof googleClient>;

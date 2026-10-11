@@ -17,6 +17,51 @@ export function googleEnabled(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+export function microsoftEnabled(): boolean {
+  return Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
+}
+
+/** Microsoft's tenant id for personal accounts: there the email is the Microsoft sign-in itself, so Microsoft vouches for it. */
+const MICROSOFT_PERSONAL_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
+
+/**
+ * Whether Microsoft vouches for the email on a sign-in. Work and school tenants can set any address on a user, so their
+ * email counts only with the email_verified claim or the xms_edov ("email domain owner verified") optional claim.
+ */
+export function microsoftEmailVerified(profile: { email_verified?: boolean; xms_edov?: boolean | string; tid?: string }): boolean {
+  return profile.email_verified === true || profile.xms_edov === true || profile.xms_edov === "1" || profile.xms_edov === "true"
+    || profile.tid === MICROSOFT_PERSONAL_TENANT;
+}
+
+/**
+ * True when a new account must not be created: a Microsoft sign-in whose email Microsoft doesn't vouch for. Otherwise
+ * someone could sign up as another person's address, attach their own calendar, and keep it there after the real owner
+ * later proves the email with a sign-in link. `ctx` is Better Auth's endpoint context (the OAuth callback or idToken sign-in).
+ */
+export function refuseUnverifiedSignUp(user: { emailVerified?: boolean | null }, ctx: unknown): boolean {
+  const c = (ctx ?? {}) as { params?: { id?: string }; path?: string; body?: { provider?: string } };
+  const viaMicrosoft = c.params?.id === "microsoft" || (c.path === "/sign-in/social" && c.body?.provider === "microsoft");
+  return viaMicrosoft && user.emailVerified !== true;
+}
+
+/**
+ * Social sign-in providers from the environment. Microsoft is deliberately not a trusted provider for account linking:
+ * Entra often doesn't vouch for the email, so a Microsoft account showing someone's address must not take over their
+ * Hourhand account. An email that already has an account is refused and the host signs in with their email link.
+ */
+export function socialProvidersFromEnv(env: Record<string, string | undefined> = process.env) {
+  return {
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } } : {}),
+    // tenant "common": work, school and personal Microsoft accounts. No profile photo: it would be stored inline in users.image.
+    ...(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET
+      ? { microsoft: {
+          clientId: env.MICROSOFT_CLIENT_ID, clientSecret: env.MICROSOFT_CLIENT_SECRET, tenantId: "common", disableProfilePhoto: true,
+          mapProfileToUser: (profile: Parameters<typeof microsoftEmailVerified>[0]) => ({ emailVerified: microsoftEmailVerified(profile) }),
+        } }
+      : {}),
+  };
+}
+
 /**
  * The public base URL that sign-in links are built from. Production must set it: without it Better Auth
  * falls back to the request's Host header, and a forged Host would put a stranger's domain in a real sign-in email.
@@ -85,7 +130,8 @@ function createAuth() {
       user: {
         create: {
           // Every host needs a booking-link slug; users.slug is not null.
-          before: async (user) => {
+          before: async (user, ctx) => {
+            if (refuseUnverifiedSignUp(user, ctx)) return false;
             const slug = await uniqueSlug(user.email, user.name, async (candidate) => {
               const { rowCount } = await pool.query("select 1 from users where slug = $1", [candidate]);
               return (rowCount ?? 0) > 0;
@@ -104,9 +150,7 @@ function createAuth() {
         },
       },
     },
-    socialProviders: googleEnabled()
-      ? { google: { clientId: process.env.GOOGLE_CLIENT_ID as string, clientSecret: process.env.GOOGLE_CLIENT_SECRET as string } }
-      : {},
+    socialProviders: socialProvidersFromEnv(),
     plugins: [
       magicLink({ expiresIn: 15 * 60, storeToken: "hashed", sendMagicLink: async ({ email, url }) => {
           // Both the sign-in page and direct calls to /api/auth reach here, so the per-email limit lives here.

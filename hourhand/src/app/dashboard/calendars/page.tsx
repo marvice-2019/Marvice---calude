@@ -4,11 +4,12 @@ import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
 import { requireUser } from "@/lib/auth/session";
 import { calendarDeps } from "@/lib/calendar/env";
+import { PROVIDER_NAMES } from "@/lib/calendar/provider";
 import { store, type CalendarConnection } from "@/lib/data";
 import { SYNC_STALE_AFTER_MINUTES } from "@/lib/slots";
 import { disconnectCalendar, toggleConflictCheck, useForBookings } from "./actions";
 
-// The connect links never prefetch: a prefetch would start a Google handshake nobody asked for.
+// The connect links never prefetch: a prefetch would start an OAuth handshake nobody asked for.
 export const dynamic = "force-dynamic";
 
 const MESSAGES: Record<string, string> = {
@@ -18,6 +19,10 @@ const MESSAGES: Record<string, string> = {
   expired: "That took longer than 10 minutes. Start again from this page.",
   wrong_user: "You signed in as someone else partway through. Start again from this page.",
   google: "Google didn't respond as expected. Try again in a minute.",
+  microsoft_denied: "Microsoft didn't connect: the request was cancelled. Try again when you're ready.",
+  microsoft_missing_permissions: "Hourhand needs every permission on Microsoft's screen to check your availability and add bookings. Connect again and accept them all.",
+  microsoft: "Microsoft didn't respond as expected. Try again in a minute.",
+  microsoft_not_configured: "Outlook isn't set up on this server yet.",
   not_configured: "Google Calendar isn't set up on this server yet.",
   demo: "The demo data can't connect a real calendar. Sign in with the database set up to connect one.",
   calendar_limit: "The Free plan checks 2 calendars for conflicts. Stop checking one first, or move to Solo for unlimited calendars.",
@@ -37,8 +42,11 @@ export default async function CalendarsPage({ searchParams }: { searchParams: Pr
   const user = await requireUser();
   const params = await searchParams;
   const [connections, calendars] = await Promise.all([store.listCalendarConnections(user.id), store.listCalendars(user.id)]);
-  const canConnect = authEnabled() && calendarDeps() !== null;
   const live = authEnabled();
+  const providers = live ? (calendarDeps()?.providers ?? {}) : {};
+  const canGoogle = Boolean(providers.google);
+  const canOutlook = Boolean(providers.microsoft);
+  const canConnect = canGoogle || canOutlook;
   const now = new Date();
 
   return (
@@ -48,7 +56,7 @@ export default async function CalendarsPage({ searchParams }: { searchParams: Pr
         Hourhand checks these calendars so nobody books you when you&apos;re busy, and adds each booking to the one you choose.
       </p>
 
-      {params.connected && <p role="status" className="mt-4 text-success">Google Calendar connected. Your busy times are syncing now.</p>}
+      {params.connected && <p role="status" className="mt-4 text-success">Calendar connected. Your busy times are syncing now.</p>}
       {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{(Object.hasOwn(MESSAGES, params.error) && MESSAGES[params.error]) || MESSAGES.google}</p>}
 
       <div className="mt-6 grid max-w-2xl gap-4">
@@ -65,7 +73,7 @@ export default async function CalendarsPage({ searchParams }: { searchParams: Pr
             <Card key={c.id}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="truncate font-semibold text-text">Google · {c.accountEmail}</h2>
+                  <h2 className="truncate font-semibold text-text">{PROVIDER_NAMES[c.provider as keyof typeof PROVIDER_NAMES] ?? c.provider} · {c.accountEmail}</h2>
                   <span className={`mt-1 inline-flex items-center gap-2 rounded-pill px-3 py-1 text-xs ${h.tone}`}>
                     <span aria-hidden className="size-2 rounded-pill bg-current" />
                     {h.words}
@@ -79,8 +87,11 @@ export default async function CalendarsPage({ searchParams }: { searchParams: Pr
                   </form>
                 )}
               </div>
-              {c.status === "disconnected" && canConnect && (
+              {c.status === "disconnected" && c.provider === "google" && canGoogle && (
                 <Link prefetch={false} href="/api/calendars/google/connect" className={`${buttonClasses()} mt-4`}>Reconnect Google Calendar</Link>
+              )}
+              {c.status === "disconnected" && c.provider === "microsoft" && canOutlook && (
+                <Link prefetch={false} href="/api/calendars/microsoft/connect" className={`${buttonClasses()} mt-4`}>Reconnect Outlook</Link>
               )}
               <ul className="mt-4 divide-y divide-border">
                 {own.map((cal) => (
@@ -118,9 +129,18 @@ export default async function CalendarsPage({ searchParams }: { searchParams: Pr
       </div>
 
       {canConnect ? (
-        <Link prefetch={false} href="/api/calendars/google/connect" className={`${buttonClasses()} mt-6`}>
-          {connections.length ? "Connect another Google account" : "Connect Google Calendar"}
-        </Link>
+        <div className="mt-6 flex flex-wrap gap-3">
+          {canGoogle && (
+            <Link prefetch={false} href="/api/calendars/google/connect" className={buttonClasses()}>
+              {connections.length ? "Connect another Google account" : "Connect Google Calendar"}
+            </Link>
+          )}
+          {canOutlook && (
+            <Link prefetch={false} href="/api/calendars/microsoft/connect" className={buttonClasses()}>
+              {connections.length ? "Connect another Outlook account" : "Connect Outlook"}
+            </Link>
+          )}
+        </div>
       ) : (
         <p className="mt-6 max-w-xl text-sm text-text-muted">{live ? MESSAGES.not_configured : MESSAGES.demo}</p>
       )}

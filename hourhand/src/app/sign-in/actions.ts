@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAPIError } from "better-auth/api";
-import { authEnabled, getAuth, googleEnabled } from "@/lib/auth/auth";
+import { authEnabled, getAuth, googleEnabled, microsoftEnabled } from "@/lib/auth/auth";
 import { clientIp, rateLimiter, SIGN_IN_LIMITS } from "@/lib/rate-limit";
 
 export type SignInState = { status: "idle" | "sent" | "error"; email?: string; error?: string };
@@ -31,6 +31,16 @@ export async function requestMagicLink(_prev: SignInState, form: FormData): Prom
 export async function signInWithGoogle(): Promise<void> {
   if (!authEnabled() || !googleEnabled()) redirect("/sign-in");
   const result = await getAuth().api.signInSocial({ body: { provider: "google", callbackURL: "/dashboard/event-types" }, headers: await headers() });
+  if (!result.url) redirect("/sign-in");
+  redirect(result.url);
+}
+
+export async function signInWithMicrosoft(): Promise<void> {
+  if (!authEnabled() || !microsoftEnabled()) redirect("/sign-in");
+  const result = await getAuth().api.signInSocial({
+    body: { provider: "microsoft", callbackURL: "/dashboard/event-types", errorCallbackURL: "/sign-in?error=microsoft" },
+    headers: await headers(),
+  });
   if (!result.url) redirect("/sign-in");
   redirect(result.url);
 }

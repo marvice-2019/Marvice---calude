@@ -1,6 +1,7 @@
 import type pg from "pg";
 import { accessTokenFor } from "../calendar/connections";
-import { GoogleApiError, type GoogleClient } from "../calendar/google";
+import type { GoogleClient } from "../calendar/google";
+import { CalendarApiError, PROVIDER_NAMES, type CalendarProvider, type CalendarProviderId, type CalendarProviders } from "../calendar/provider";
 import { recordConnectionFailure } from "../calendar/sync";
 import type { BookingEmailKind, CalendarJobKind, NotificationKind } from "../data/notifications";
 import type { InviteeAnswer, LocationKind } from "../data/types";
@@ -10,7 +11,7 @@ import { MailError, type Mailer } from "../mail/mailer";
 import { renderBookingMail, renderCalendarAlert, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
 import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
 
-// Runs due rows of the notifications queue: emails, and writes to the host's Google Calendar. Several workers can run
+// Runs due rows of the notifications queue: emails, and writes to the host's calendar (Google or Microsoft). Several workers can run
 // at once: each claims rows with FOR UPDATE SKIP LOCKED and a lease (locked_until), so a row is never run by two
 // workers, and a worker that dies mid-run frees its rows when the lease ends. Re-running a row is harmless: the
 // notification id is Resend's idempotency key, and a calendar event's id is fixed per booking.
@@ -21,15 +22,17 @@ export const RETRY_DELAYS_MINUTES = [1, 5, 30, 120] as const;
 const LEASE_MINUTES = 5;
 /** Rows claimed per run. Each row's lease is renewed before it runs, so a slow batch can't outlive its lease. */
 export const BATCH_SIZE = 10;
-/** How long a guest's confirmation may wait for the Google Meet link before it goes without it. */
+/** How long a guest's confirmation may wait for its video link (Google Meet or Teams) before it goes without it. */
 export const MEET_LINK_WAIT_SECONDS = 180;
+const VIDEO_LINK_WAIT = "waiting for the video link";
 const DEFER_SECONDS = 20;
 const MIN = 60_000;
 
 /** `released`: emails a calendar write just unblocked, which are due now (the runner goes round again for them). */
 export interface WorkerResult { claimed: number; sent: number; skipped: number; retrying: number; failed: number; deferred: number; released: number }
 /** `pushAddress`: where Google sends change pings, or null when push can't work (no public https URL). */
-export interface CalendarDeps { google: GoogleClient; key: Buffer; pushAddress?: string | null }
+/** `providers`: the calendar providers configured here. `google`: the Google client, for watch channels only. */
+export interface CalendarDeps { providers: CalendarProviders; google?: GoogleClient; key: Buffer; pushAddress?: string | null }
 
 interface Claimed { id: string; booking_id: string | null; user_id: string; kind: NotificationKind; channel: string; recipient: string; attempts: number; locked_until: Date; dedupe_key: string }
 
@@ -55,7 +58,7 @@ const CONTEXT = `
     (select p.amount_minor from payments p where p.booking_id = b.id and p.status in ('paid', 'refund_pending', 'refunded')
       order by p.created_at desc limit 1) as paid_minor,
     coalesce(u.name, '') as host_name, u.email as host_email, u.timezone as host_timezone, u.time_format as host_time_format,
-    loc.kind as location_kind, loc.value as location_value,
+    loc.kind as location_kind, loc.value as location_value, atc.provider as add_to_provider, atc.can_teams as add_to_can_teams,
     -- a calendar write that hasn't been tried yet or is running right now; one waiting to retry doesn't hold emails back
     exists (select 1 from notifications cj where cj.booking_id = b.id and cj.channel = 'calendar' and cj.kind <> 'calendar_delete'
             and cj.status = 'queued' and (cj.attempts = 0 or cj.locked_until > $2)) as calendar_write_pending,
@@ -68,6 +71,12 @@ const CONTEXT = `
   left join users u on u.id = b.host_id
   left join bookings prev on prev.id = b.rescheduled_from_id
   left join lateral (select kind, value from event_locations l where l.event_type_id = e.id order by position limit 1) loc on true
+  -- the calendar the booking's event goes into: the old event's calendar when a move updates it, else the calendar job's target
+  left join lateral (select cc.provider, c.can_teams from calendars c join calendar_connections cc on cc.id = c.connection_id
+    where c.user_id = b.host_id and ((prev.external_event_id is not null and c.id = prev.external_calendar_id)
+      or c.id::text = (select cj.recipient from notifications cj where cj.booking_id = b.id and cj.channel = 'calendar'
+                       and cj.kind in ('calendar_create', 'calendar_move') order by cj.created_at desc limit 1))
+    order by (prev.external_event_id is not null and c.id = prev.external_calendar_id) is true desc limit 1) atc on true
   where n.id = any($1::uuid[])`;
 
 type ContextRow = Record<string, unknown>;
@@ -111,28 +120,37 @@ export function skipReason(kind: NotificationKind, r: ContextRow, now: Date): st
 
 /** Why a claimed row should wait a little before running, or null to run it now. */
 export function deferReason(kind: NotificationKind, r: ContextRow, now: Date, calendarOn = true): string | null {
-  // The guest's confirmation carries the Meet link, which exists once the host's calendar event is written.
-  if (calendarOn && (kind === "booked_guest" || kind === "rescheduled_guest") && r.booking_location_kind === "google_meet" && !r.join_url && r.calendar_write_pending
+  // The guest's confirmation carries the video link, which exists once the host's calendar event is written. A Teams
+  // link only comes from a Microsoft calendar that allows Teams meetings; otherwise there is none to wait for.
+  const linkComing = r.booking_location_kind === "google_meet"
+    || (r.booking_location_kind === "teams" && r.add_to_provider === "microsoft" && r.add_to_can_teams !== false);
+  if (calendarOn && (kind === "booked_guest" || kind === "rescheduled_guest") && linkComing && !r.join_url && r.calendar_write_pending
       && now.getTime() - new Date(r.queued_at as Date).getTime() < MEET_LINK_WAIT_SECONDS * 1000) {
-    return "waiting for the Meet link";
+    return VIDEO_LINK_WAIT;
   }
   // Never delete or move an event while another worker may still be creating it.
   if ((kind === "calendar_delete" || kind === "calendar_move") && r.calendar_write_in_flight) return "another calendar write is running";
   return null;
 }
 
-/** Writes one booking change to the host's Google Calendar. Returns the event id, or a reason to skip. */
+/** Writes one booking change to the host's calendar. Returns the event id, or a reason to skip. */
 async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: ContextRow, baseUrl: string, now: Date): Promise<{ eventId: string } | { skip: string }> {
   const calendarRow = async (calendarId: unknown) => {
     if (typeof calendarId !== "string" || !/^[0-9a-f-]{36}$/i.test(calendarId)) return null;
     const { rows: [cal] } = await pool.query(
-      `select c.external_id, c.connection_id from calendars c join calendar_connections cc on cc.id = c.connection_id
+      `select c.external_id, c.connection_id, c.can_teams, cc.provider from calendars c join calendar_connections cc on cc.id = c.connection_id
        where c.id = $1 and c.user_id = $2 and cc.status <> 'disconnected'`, [calendarId, r.host_id]);
-    return cal ? { externalId: cal.external_id as string, connectionId: cal.connection_id as string } : null;
+    return cal ? {
+      externalId: cal.external_id as string, connectionId: cal.connection_id as string, providerId: cal.provider as CalendarProviderId,
+      canTeams: cal.can_teams === true,
+    } : null;
   };
+  /** The provider for a calendar's connection, or a reason to skip when that provider isn't configured here. */
+  const providerOf = (cal: { providerId: CalendarProviderId }): CalendarProvider | { skip: string } =>
+    deps.providers[cal.providerId] ?? { skip: `${PROVIDER_NAMES[cal.providerId] ?? cal.providerId} calendars are not configured on this server` };
   const kind = c.kind as CalendarJobKind;
   const ctx = toContext(r, baseUrl);
-  const where = ctx.location && ctx.location.kind !== "google_meet"
+  const where = ctx.location && ctx.location.kind !== "google_meet" && ctx.location.kind !== "teams"
     ? (ctx.location.value ? `${GUEST_LOCATION_LABELS[ctx.location.kind]}: ${ctx.location.value}` : GUEST_LOCATION_LABELS[ctx.location.kind]) : null;
   const summary = `${ctx.eventName} with ${ctx.guestName}`;
 
@@ -142,7 +160,9 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
       const cal = await calendarRow(r.external_calendar_id);
       if (!r.external_event_id || !cal) return { skip: "no calendar event to remove" };
       connectionId = cal.connectionId;
-      await deps.google.deleteEvent(await accessTokenFor(pool, deps.google, deps.key, cal.connectionId, now), cal.externalId, r.external_event_id as string);
+      const provider = providerOf(cal);
+      if ("skip" in provider) return provider;
+      await provider.deleteEvent(await accessTokenFor(pool, deps.providers, deps.key, cal.connectionId, now), cal.externalId, r.external_event_id as string);
       return { eventId: r.external_event_id as string };
     }
 
@@ -150,8 +170,10 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
       const cal = await calendarRow(r.previous_calendar_id);
       if (cal) {
         connectionId = cal.connectionId;
-        const token = await accessTokenFor(pool, deps.google, deps.key, cal.connectionId, now);
-        const moved = await deps.google.moveEvent(token, cal.externalId, r.previous_event_id as string, ctx.startAt, ctx.endAt, ctx.hostTimezone, summary);
+        const provider = providerOf(cal);
+        if ("skip" in provider) return provider;
+        const token = await accessTokenFor(pool, deps.providers, deps.key, cal.connectionId, now);
+        const moved = await provider.moveEvent(token, cal.externalId, r.previous_event_id as string, ctx.startAt, ctx.endAt, ctx.hostTimezone, summary);
         await pool.query("update bookings set external_event_id = $2, external_calendar_id = $3, join_url = $4, updated_at = now() where id = $1",
           [r.id, moved.id, r.previous_calendar_id, moved.joinUrl ?? r.previous_join_url ?? null]);
         return { eventId: moved.id };
@@ -162,27 +184,31 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
     const cal = await calendarRow(c.recipient);
     if (!cal) return { skip: "no calendar to add the event to" };
     connectionId = cal.connectionId;
-    const token = await accessTokenFor(pool, deps.google, deps.key, cal.connectionId, now);
+    const provider = providerOf(cal);
+    if ("skip" in provider) return provider;
+    const token = await accessTokenFor(pool, deps.providers, deps.key, cal.connectionId, now);
     const description = [
       `Booked through Hourhand by ${ctx.guestName} <${ctx.guestEmail}>, time zone ${ctx.guestTimezone}.`,
       ...ctx.answers.filter((a) => a.answer.trim()).map((a) => `${a.label}: ${a.answer}`),
       "", `Details: ${ctx.dashboardUrl}`,
     ].join("\n");
-    let event = await deps.google.insertEvent(token, cal.externalId, {
+    // Only a calendar that allows Teams meetings can make one; asking any other (e.g. a personal Outlook account) can fail the whole write.
+    const conference = r.booking_location_kind === "google_meet" ? "google_meet" : r.booking_location_kind === "teams" && cal.canTeams ? "teams" : null;
+    let event = await provider.insertEvent(token, cal.externalId, {
       summary, description, start: ctx.startAt, end: ctx.endAt, timeZone: ctx.hostTimezone, location: where,
-      attendee: { email: ctx.guestEmail, name: ctx.guestName }, withMeet: r.booking_location_kind === "google_meet", bookingId: ctx.bookingId,
+      attendee: { email: ctx.guestEmail, name: ctx.guestName }, conference, bookingId: ctx.bookingId,
     });
-    // Google creates Meet links asynchronously; give it a moment so the guest's confirmation can carry the link.
+    // Meet and Teams links can be created asynchronously; give the provider a moment so the guest's confirmation can carry the link.
     for (let i = 0; i < 3 && event.conferencePending; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      event = await deps.google.getEvent(token, cal.externalId, event.id);
+      event = await provider.getEvent(token, cal.externalId, event.id);
     }
     await pool.query("update bookings set external_event_id = $2, external_calendar_id = $3, join_url = coalesce($4, join_url), updated_at = now() where id = $1",
       [r.id, event.id, c.recipient, event.joinUrl]);
     return { eventId: event.id };
   } catch (error) {
     // A revoked grant or missing permission disconnects the connection (and tells the host) right away.
-    if (connectionId && error instanceof GoogleApiError && error.revoked) await recordConnectionFailure(pool, connectionId, error, now);
+    if (connectionId && error instanceof CalendarApiError && error.revoked) await recordConnectionFailure(pool, connectionId, error, now);
     throw error;
   }
 }
@@ -236,7 +262,7 @@ export async function processDueNotifications(
     await finish(c, "skipped", { error: reason });
     result.skipped++;
   };
-  // Once a calendar write has run, whatever the outcome, a guest confirmation waiting for its Meet link goes at once:
+  // Once a calendar write has run, whatever the outcome, a guest confirmation waiting for its video link goes at once:
   // with the link if the write worked, without it if not. It never waits on a calendar that may take hours to recover.
   const release = async (c: Claimed) => {
     if (c.kind !== "calendar_create" && c.kind !== "calendar_move") return;
@@ -260,7 +286,7 @@ export async function processDueNotifications(
       const why = skipReason(c.kind, r, now);
       if (why) { await skip(c, why); continue; }
       let wait = deferReason(c.kind, r, now, Boolean(opts.calendar));
-      if (wait === "waiting for the Meet link") {
+      if (wait === VIDEO_LINK_WAIT) {
         // The calendar write may have finished earlier in this same batch: look again before waiting.
         const { rows: [fresh] } = await pool.query(
           `select b.join_url, exists (select 1 from notifications cj where cj.booking_id = b.id and cj.channel = 'calendar'
@@ -278,7 +304,7 @@ export async function processDueNotifications(
         continue;
       }
     }
-    if (isCalendarJob(c.kind) && !opts.calendar) { await skip(c, "Google Calendar is not configured"); await release(c); continue; }
+    if (isCalendarJob(c.kind) && !opts.calendar) { await skip(c, `${Object.values(PROVIDER_NAMES).join(" and ")} calendars are not configured on this server`); await release(c); continue; }
 
     // Renew the lease for this row only, right before running it. If another worker took the row over, leave it to them.
     const renewed = await pool.query(
@@ -301,7 +327,7 @@ export async function processDueNotifications(
         ({ id: providerId } = await mailer.send({ ...mail, to: c.recipient, idempotencyKey: `notification-${c.id}` }));
       }
     } catch (error) {
-      const retryable = error instanceof MailError || error instanceof GoogleApiError ? error.retryable : true;
+      const retryable = error instanceof MailError || error instanceof CalendarApiError ? error.retryable : true;
       const message = (error as Error).message.slice(0, 500);
       if (!retryable || c.attempts >= MAX_ATTEMPTS) {
         await finish(c, "failed", { error: message });

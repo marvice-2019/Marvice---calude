@@ -89,6 +89,16 @@ Add these as authorized redirect URIs on the OAuth client: `https://<your-domain
 | `TOKEN_ENCRYPTION_KEY` | encrypting calendar tokens: 64 hex characters (`openssl rand -hex 32`). **Required when Google is configured**; keep it safe, changing it means every host reconnects |
 | `GOOGLE_API_BASE_URL`, `HOURHAND_E2E` | end-to-end tests against a fake Google only. A production server ignores the first unless the second is `1`; never set either on a real deployment |
 
+## Outlook and Microsoft
+
+Set `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` (an Entra app; steps in `replica/deploy.md`, section 6). Either Google or Microsoft can be configured without the other; both need `TOKEN_ENCRYPTION_KEY`.
+
+- **Connect Outlook** (Dashboard → Calendars, and onboarding): work, school and personal Microsoft accounts. Busy times are read every 5 minutes from each checked calendar (events shown as free don't block). Outlook has no instant push yet; Google does.
+- **Teams links**: an event type whose location is Microsoft Teams gets a Teams meeting when the booking goes to a work or school Outlook calendar that allows Teams. The guest's confirmation waits up to 3 minutes for the link. Personal Outlook.com calendars, and Google calendars, get no Teams link; the confirmation goes without one.
+- **Sign in with Microsoft**: on the sign-in page. Microsoft isn't trusted to link accounts by email, so if that email already has a Hourhand account, sign in with an email link instead.
+- Microsoft replaces the refresh token on every refresh; Hourhand stores each new one (sealed) before using the access token.
+- For local testing, `MICROSOFT_LOGIN_BASE_URL` and `MICROSOFT_GRAPH_BASE_URL` point at a fake; they are ignored in production unless `HOURHAND_E2E=1`.
+
 ## Plans and billing
 
 Hosts choose a plan from Dashboard → Plan. Rupees go through Razorpay subscriptions (UPI AutoPay or card), US dollars through Stripe Checkout. It needs the Postgres store.
