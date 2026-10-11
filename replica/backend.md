@@ -127,6 +127,15 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Accepted (cosmetic):** toggling a calendar id that isn't the host's shows the calendar-limit message instead of nothing.
 - **Checked:** signatures in constant time on the raw body; dedupe and retry; the lock and row lock; the plan comes only from notes/metadata Hourhand set and known price ids; test-only base URLs need `HOURHAND_E2E=1`; every action checks the session; redirects only to provider URLs or the configured base URL; the reminder path doesn't touch booking or calendar mail.
 
+## B5b evidence (2026-10-11, Postgres 16.15, production build, fake host-side Razorpay)
+
+- 311 tests pass with `TEST_DATABASE_URL` set. Migration 0006 applies on top of 0005.
+- **Decision:** guests pay the host's own Razorpay account with the host's own key pair. Razorpay Route was rejected: it settles guests' money into the platform's account first, which would make Marvice hold client funds. Stripe Connect is invite-only for Indian businesses. Razorpay calls checked against Razorpay's docs (orders, order payments, capture, refunds, Checkout signature; read 2026-10-11).
+- **Against Postgres:** keys rejected by Razorpay are not stored; stored keys aren't readable and can't be used by another host; two holds, or a hold and a booking, can't overlap; a lapsed hold never blocks a new booking; a held time isn't offered; a forged signature, a payment for another order, or a wrong amount changes nothing; an authorized payment is captured then confirmed; confirming twice is a no-op; a cancelled booking is never revived by a late payment (refunded instead); the background check confirms paid-then-closed bookings, releases unpaid holds, keeps going when one host's Razorpay fails, and doesn't recheck within a minute; refunds happen once, retry after failures, and spot an earlier refund; rescheduling moves the payment; closing an account releases holds; a host sees only their own bookings' payments; Free hosts and hosts without Razorpay can't set a price or take a paid booking.
+- **Negative tests** (fix set aside, test fails): overlapping holds, the hold check, the 401 rejection, key binding to the host, the plan gate and the Razorpay gate on prices, order id from the database not the browser, amount mismatch, no revival of cancelled bookings, hold expiry, the concurrent-confirm guard, recheck spacing, refund on cancel, payment carried on reschedule, refund de-duplication, releasing holds on account close, host scoping of the payment view, the Free gate on booking.
+- **End to end on a production build against a fake Razorpay (28 of 28):** connect refuses a wrong key pair and stores nothing, accepts the right one, stores it encrypted and shows it masked with Test mode; the booking page shows ₹499; booking returns a Razorpay order and holds the time; the time disappears and can't be booked by someone else; no email before payment; a forged signature is refused; a real payment confirms, the email shows ₹499, the page says booked; the guest cancels and the job runner refunds once in full, the email says so; a paid-then-closed booking is confirmed by the job runner; an unpaid hold is released and the time comes back, the manage page explains it; a Free host's priced event is refused. B5a (26), B4 (19), B3 (10), B2b (12) and sign-in (15) pass again.
+- **Not checked here:** Razorpay's own Checkout window in a browser (browser automation is blocked in this environment; the e2e drives the same server calls Checkout makes). Your test-mode payment checks it.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
@@ -141,6 +150,7 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 | Meta WhatsApp Business account; submit utility templates for confirmation and reminder | 1–7 days per template | later |
 | DLT registration of the entity, sender ID and SMS templates (for example via MSG91) | **days to weeks** | later |
 | Trademark search for "Hourhand" before buying the domain | 1 day | launch |
+| Apply to Razorpay's partner programme as a technology partner, so hosts can click "Connect Razorpay" instead of pasting keys (OAuth) | weeks | later |
 | Coolify: a Postgres 16 service with daily backups to S3-compatible storage, and a monthly restore test | 1 hour | deploy |
 
 Claude never creates these accounts or types keys. Put the values in `hourhand/.env.local` on your machine and in Coolify's environment settings.
