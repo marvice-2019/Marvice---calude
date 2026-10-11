@@ -9,6 +9,13 @@ describe("waNumber", () => {
     expect(waNumber("+44 7700 900123")).toBe("447700900123");
     expect(waNumber("0044 7700 900123")).toBe("447700900123");
   });
+  it("won't guess India for a number that isn't an Indian mobile, so a manage link can't reach a stranger", () => {
+    expect(waNumber("555 123 4567")).toBeNull(); // a US number typed without +1
+    expect(waNumber("05551234567")).toBeNull();
+    expect(waNumber("0919876543210")).toBe("919876543210");
+    expect(waNumber("919876543210")).toBe("919876543210");
+  });
+
   it("refuses what can't be a phone number", () => {
     expect(waNumber(null)).toBeNull();
     expect(waNumber("123")).toBeNull();

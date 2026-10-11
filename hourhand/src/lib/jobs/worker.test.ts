@@ -170,6 +170,35 @@ describe.skipIf(!BASE)("email queue (TEST_DATABASE_URL)", () => {
     expect(mail.html).toContain(`${priya.slug}/${coaching.slug}?at=`);
   });
 
+  it("a running-late tap after a short meeting's end still reaches the host, each email with the minutes tapped", async () => {
+    const b = await book();
+    const late = new Date(b.endAt.getTime() + 2 * MIN);
+    await store.markRunningLate(b.invitee.manageToken, 5, late);
+    await store.markRunningLate(b.invitee.manageToken, 15, new Date(late.getTime() + 1000));
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl, now: new Date(late.getTime() + 60_000) });
+    const subjects = sent.filter((m) => m.subject.startsWith("Running late")).map((m) => m.subject);
+    expect(subjects).toHaveLength(2);
+    expect(subjects.some((s) => s.includes(", 5 min,"))).toBe(true);
+    expect(subjects.some((s) => s.includes(", 15 min,"))).toBe(true);
+  });
+
+  it("the cancellation still goes out when looking up suggestions fails", async () => {
+    const b = await book();
+    await store.cancelBooking(priya.id, b.id, "host");
+    // The host lookup inside the suggestions throws; every other query works.
+    const flaky = new Proxy(pool, { get(target, prop) {
+      if (prop === "query") return (sql: unknown, ...rest: unknown[]) =>
+        typeof sql === "string" && sql.includes("from users where id = $1 and deleted_at is null") ? Promise.reject(new Error("db down")) : (target.query as (...a: unknown[]) => unknown)(sql, ...rest);
+      const v = Reflect.get(target, prop); return typeof v === "function" ? v.bind(target) : v;
+    } });
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(flaky, mailer, { baseUrl });
+    const mail = sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"));
+    expect(mail).toBeDefined();
+    expect(mail!.text).not.toContain("Book another time");
+  });
+
   it("a guest's own cancel offers no other times", async () => {
     const b = await book();
     await store.cancelBooking(priya.id, b.id, "guest");

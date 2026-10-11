@@ -114,7 +114,11 @@ export default async function BookingDetailPage({ params, searchParams }: { para
               </div>
             </>
           ) : (
-            <p className="text-sm text-text-muted">{booking.invitee.name} didn&apos;t leave a WhatsApp number, so you can only email them.</p>
+            <p className="text-sm text-text-muted">
+              {booking.invitee.phone
+                ? `${booking.invitee.name}'s number (${booking.invitee.phone}) has no country code, so Hourhand won't guess where to send it. Check it with them first.`
+                : `${booking.invitee.name} didn't leave a WhatsApp number, so you can only email them.`}
+            </p>
           )}
         </section>
       )}

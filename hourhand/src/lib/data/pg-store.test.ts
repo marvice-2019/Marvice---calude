@@ -293,12 +293,14 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       });
       const token = booking.invitee.manageToken;
       const when = at("2034-02-06T03:45:00Z");
-      await store.markRunningLate(token, 10, when);
-      await store.markRunningLate(token, 10, when);
-      await store.markRunningLate(token, 20, when);
-      expect((await store.getBookingByManageToken(token))!.invitee).toMatchObject({ runningLateMinutes: 20, runningLateAt: when });
-      const { rows } = await pool.query("select kind, recipient, dedupe_key from notifications where booking_id = $1 and kind = 'late_host' order by dedupe_key", [booking.id]);
-      expect(rows.map((r) => r.dedupe_key)).toEqual([`booking:${booking.id}:late:10`, `booking:${booking.id}:late:20`]);
+      const tap = (m: number, s: number) => store.markRunningLate(token, m, new Date(when.getTime() + s * 1000));
+      await tap(10, 0);
+      await tap(10, 1); // a double tap
+      await tap(20, 2);
+      await tap(10, 3); // changed back: the host must hear it again
+      expect((await store.getBookingByManageToken(token))!.invitee).toMatchObject({ runningLateMinutes: 10, runningLateAt: new Date(when.getTime() + 3000) });
+      const { rows } = await pool.query("select kind, recipient, dedupe_key from notifications where booking_id = $1 and kind = 'late_host' order by send_at", [booking.id]);
+      expect(rows.map((r) => r.dedupe_key.replace(/:\d+$/, ""))).toEqual([10, 20, 10].map((m) => `booking:${booking.id}:late:${m}`));
       expect(rows[0].recipient).toBe(priya.email);
       await store.cancelBooking(priya.id, booking.id, "guest");
       await expect(store.markRunningLate(token, 5, when)).rejects.toBeInstanceOf(NotFoundError);

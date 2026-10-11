@@ -397,18 +397,22 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async markRunningLate(manageToken, minutes, now) {
       return tx(async (client) => {
-        // Only a confirmed booking; the host's email is queued in the same write, keyed so a repeated tap sends once.
-        const { rows } = await client.query(
-          `update invitees i set running_late_minutes = $2, running_late_at = $3 from bookings b
-           where b.id = i.booking_id and i.manage_token = $1 and b.status = 'confirmed' returning b.id, b.host_id`, [manageToken, minutes, now]);
-        if (!rows[0]) throw new NotFoundError("Booking");
-        const { id, host_id: hostId } = rows[0];
-        await client.query(
-          `insert into notifications (booking_id, user_id, channel, kind, recipient, send_at, dedupe_key)
-           select $1, $2, 'email', 'late_host', u.email, $3, $4 from users u where u.id = $2 on conflict (dedupe_key) do nothing`,
-          [id, hostId, now, `booking:${id}:late:${minutes}`]);
+        // Only a confirmed booking. The host is emailed in the same write whenever the answer changes, so a double tap
+        // sends once but 15, then 5, then 15 again sends three. The key carries the minutes the email reports.
+        const { rows: [prev] } = await client.query(
+          `select i.id, i.running_late_minutes, b.id as booking_id, b.host_id from invitees i join bookings b on b.id = i.booking_id
+           where i.manage_token = $1 and b.status = 'confirmed' for update of i`, [manageToken]);
+        if (!prev) throw new NotFoundError("Booking");
+        const { booking_id: id, host_id: hostId } = prev;
+        await client.query("update invitees set running_late_minutes = $2, running_late_at = $3 where id = $1", [prev.id, minutes, now]);
+        if (prev.running_late_minutes !== minutes) {
+          await client.query(
+            `insert into notifications (booking_id, user_id, channel, kind, recipient, send_at, dedupe_key)
+             select $1, $2, 'email', 'late_host', u.email, $3, $4 from users u where u.id = $2 on conflict (dedupe_key) do nothing`,
+            [id, hostId, now, `booking:${id}:late:${minutes}:${now.getTime()}`]);
+        }
         return (await bookingWhere(client, "b.id = $1", [id]))!;
-      });
+      }).then((booking) => { kickJobs(); return booking; });
     },
     async saveWeeklyHours(userId, scheduleId, byWeekday) {
       await tx(async (client) => {
