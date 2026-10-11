@@ -9,6 +9,8 @@ export interface User {
   slug: string;
   timezone: string;
   timeFormat: "12h" | "24h";
+  /** The language guests see on the booking pages unless they pick another: en, hi, ta, te or kn. */
+  locale: string;
 }
 
 export interface AvailabilitySchedule {
@@ -273,6 +275,8 @@ export interface DataStore {
   getCurrentUser(): Promise<User>;
   getUserBySlug(slug: string): Promise<User | null>;
   getUser(id: string): Promise<User | null>;
+  /** The host's default booking page language. */
+  setUserLocale(userId: string, locale: string): Promise<void>;
   listEventTypes(userId: string): Promise<EventType[]>;
   getEventType(userId: string, id: string): Promise<EventType | null>;
   getPublicEventType(hostSlug: string, eventSlug: string): Promise<{ host: User; eventType: EventType } | null>;

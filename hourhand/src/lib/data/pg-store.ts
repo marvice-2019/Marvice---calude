@@ -28,8 +28,8 @@ export function getPool(databaseUrl: string): pg.Pool {
   return (shared.__hourhandPool ??= new pg.Pool({ connectionString: databaseUrl }));
 }
 
-const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format";
-const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"] });
+const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format, locale";
+const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"], locale: r.locale as string });
 
 const EVENT = `id, user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
   buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind, max_repeats, deposit_minor`;
@@ -225,6 +225,9 @@ export function createPgStore(pool: pg.Pool): DataStore {
       if (!isId(id)) return null;
       const { rows } = await pool.query(`select ${USER} from users where id = $1 and deleted_at is null`, [id]);
       return rows[0] ? toUser(rows[0]) : null;
+    },
+    async setUserLocale(userId, locale) {
+      await pool.query(`update users set locale = $2 where id = $1`, [userId, locale]);
     },
     async getUserBySlug(slug) {
       const { rows } = await pool.query(`select ${USER} from users where slug = $1 and deleted_at is null`, [slug]);

@@ -110,6 +110,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     async getUser(id) {
       return db.users.find((u) => u.id === id && !deleted.has(u.id)) ?? null;
     },
+    async setUserLocale(userId, locale) {
+      const user = db.users.find((u) => u.id === userId);
+      if (user) user.locale = locale;
+    },
     async getUserBySlug(slug) {
       return db.users.find((u) => u.slug === slug && !deleted.has(u.id)) ?? null;
     },
