@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmbedResize } from "@/components/EmbedResize";
 import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/LocalTime";
 import { ManageBooking } from "@/components/ManageBooking";
@@ -39,6 +40,7 @@ export default async function ManageBookingPage({ params, searchParams }: { para
 
   return (
     <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
       <LanguageSwitcher locale={locale} path={`/b/${token}`} />
       <h1 className="font-display text-xl text-text">{t(locale, "yourBooking")}</h1>
       <Card className="mt-4 max-w-md">

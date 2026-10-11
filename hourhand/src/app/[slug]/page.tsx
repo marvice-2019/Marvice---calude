@@ -1,6 +1,7 @@
 import { BookingFooter } from "@/components/BookingFooter";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { EmbedResize } from "@/components/EmbedResize";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { Card } from "@/components/ui/Card";
@@ -50,6 +51,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
   const jsonLd = p && profileJsonLd({ baseUrl: (resolveBaseUrl() ?? "").replace(/\/+$/, ""), slug: host.slug, name: host.name, profile: p, services: eventTypes });
   return (
     <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
       <LanguageSwitcher locale={locale} path={`/${host.slug}`} />
       {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center">

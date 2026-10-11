@@ -6,7 +6,9 @@ import { focusRing } from "@/components/ui/focus";
 /** After a booking, the host's own page: a few seconds to read the confirmation first, and a link if the move is blocked. */
 export function AutoRedirect({ url, label, waiting, seconds = 5 }: { url: string; label: string; waiting: string; seconds?: number }) {
   useEffect(() => {
-    const t = setTimeout(() => window.location.assign(url), seconds * 1000);
+    // Inside a host's embed the page around us does the move (a frame can't); otherwise we go ourselves.
+    const go = () => (window.parent !== window ? window.parent.postMessage({ hourhand: "redirect", url }, "*") : window.location.assign(url));
+    const t = setTimeout(go, seconds * 1000);
     return () => clearTimeout(t);
   }, [url, seconds]);
   return (

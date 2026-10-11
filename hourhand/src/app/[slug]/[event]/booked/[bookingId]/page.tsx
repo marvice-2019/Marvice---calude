@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmbedResize } from "@/components/EmbedResize";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { LocalTime } from "@/components/LocalTime";
@@ -29,6 +30,7 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
   if (booking.status === "pending_payment") {
     return (
       <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
         <h1 className="font-display text-xl text-text">{t(locale, "confirmingPayment")}</h1>
         <p className="mt-2 max-w-md text-text-muted" role="status">
           {t(locale, "paymentSeconds")} {booking.holdExpiresAt ? tNodes(locale, "heldUntil", { time: time(booking.holdExpiresAt) }) : t(locale, "heldGeneric")}{" "}
@@ -42,6 +44,7 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
     const unpaid = isUnpaidRelease(booking.cancelReason);
     return (
       <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
         <h1 className="font-display text-xl text-text">{t(locale, unpaid ? "unpaidTitle" : "cancelledTitle")}</h1>
         <p className="mt-2 max-w-md text-text-muted">{t(locale, unpaid ? "unpaidBody" : "nothingMore")}</p>
         <Link href={`/${host.slug}/${eventType?.slug ?? ""}${q}`} className={`mt-4 ${buttonClasses({ variant: "primary" })}`}>{t(locale, "bookATime")}</Link>
@@ -50,6 +53,7 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
   }
   return (
     <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
       <h1 className="font-display text-xl text-text">{t(locale, "booked")}</h1>
       <Card className="mt-4 max-w-md">
         <dl className="grid gap-3">
