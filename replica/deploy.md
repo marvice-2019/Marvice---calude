@@ -90,6 +90,7 @@ Never set `HOURHAND_ALLOW_MEMORY`, `HOURHAND_MAIL_TO_LOG`, `HOURHAND_E2E`, `GOOG
 4. Certificates & secrets → New client secret (24 months). Copy the **Value** straight into Coolify as `MICROSOFT_CLIENT_SECRET`. Put a reminder in your calendar a month before it expires.
 5. Overview → copy **Application (client) ID** into `MICROSOFT_CLIENT_ID`. Tenant stays `common` (no variable).
 6. Branding & properties: home page `https://hourhand.cloud`, privacy `https://hourhand.cloud/privacy`, terms `https://hourhand.cloud/terms`. Later, verify the publisher (needs a Microsoft Partner ID) so users don't see "unverified" on the consent screen.
+7. Token configuration → Add optional claim → token type **ID** → tick `xms_edov` → Add. This tells Hourhand that Microsoft has verified a work or school email's domain. Without it, people on work or school accounts can still connect Outlook, but must sign up with an email link rather than "Continue with Microsoft" (Hourhand won't create an account from an email Microsoft doesn't vouch for). Personal Microsoft accounts don't need it.
 
 Teams links only work for work or school Microsoft 365 accounts; personal Outlook.com accounts get Outlook calendar sync but no Teams link.
 

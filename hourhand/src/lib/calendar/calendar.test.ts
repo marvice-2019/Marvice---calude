@@ -36,6 +36,7 @@ function fakeGoogle() {
     failInsert: null as GoogleApiError | null,
     /** Calendars Google answers with an error for, as free/busy does for a deleted or unshared calendar. */
     freeBusyErrors: new Map<string, string>(),
+    busyTimeZone: undefined as string | undefined,
     /** When set, event creation waits for it: a write that is still running when something else happens. */
     insertGate: null as Promise<void> | null,
     /** Runs during a free/busy call: something the host does while a sync is in progress. */
@@ -49,7 +50,8 @@ function fakeGoogle() {
       return { accessToken: `at-${s.refreshes}`, expiresAt: new Date(Date.now() + 3600_000) };
     },
     async revoke(token: string) { s.revoked.push(token); },
-    async busy(_t: string, ids: string[]) {
+    async busy(_t: string, ids: string[], _from?: Date, _until?: Date, opts?: { timeZone?: string }) {
+      s.busyTimeZone = opts?.timeZone;
       if (s.failFreeBusy) throw s.failFreeBusy;
       if (s.duringFreeBusy) { const run = s.duringFreeBusy; s.duringFreeBusy = null; await run(); }
       const ok = ids.filter((id) => !s.freeBusyErrors.has(id));
@@ -322,6 +324,23 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       expect(r.ok).toBe(false);
       expect((await conn(id)).status).toBe("degraded");
       expect(await store.listBusyBlocks(priya.id, new Date(), new Date(Date.now() + 86_400_000))).toHaveLength(1);
+    });
+
+    it("passes the host's time zone to the provider and names every calendar it couldn't read", async () => {
+      const { google, s } = fakeGoogle();
+      const id = await connect(priya);
+      await pool.query("update users set timezone = 'Europe/London' where id = $1", [priya.id]);
+      await pool.query("update calendars set check_conflicts = true where connection_id = $1", [id]);
+      s.freeBusyErrors.set("priya@gmail.com", "notFound");
+      s.freeBusyErrors.set("team@group.calendar.google.com", "forbidden");
+      try {
+        const [r] = await syncDueConnections(pool, { google }, key);
+        expect(s.busyTimeZone).toBe("Europe/London");
+        expect(r.ok).toBe(false);
+        expect((await conn(id)).last_error).toMatch(/Priya \(notFound\).*Team \(forbidden\)/);
+      } finally {
+        await pool.query("update users set timezone = 'Asia/Kolkata' where id = $1", [priya.id]);
+      }
     });
 
     it("a failing sync marks the connection degraded, emails the host once after repeated failures, and recovers", async () => {

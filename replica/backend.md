@@ -179,6 +179,23 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Accepted (low):** two tabs submitting the same move at the same instant: one moves it, the other shows "not found" (the guest path behaves the same).
 - **Checked:** no path to another host's booking (forged ids and keys get not found or a conflict that leaks nothing); a taken time is refused by the free-time check and again by the database; the guest path and its emails are unchanged.
 
+## B6 evidence (2026-10-11, Postgres 16, production build)
+
+- **What shipped:** Outlook calendar (connect, busy times every 5 minutes, events in the chosen calendar), Teams links on work/school Outlook calendars, Sign in with Microsoft. Google now sits behind the same `CalendarProvider` interface with no behaviour change.
+- **Tests:** 379 pass with `TEST_DATABASE_URL` set (335 before B6). Negative tests (fix set aside, test fails): rotated refresh token stored, concurrent refreshes serialised, Teams confirmation wait, `can_teams` stored, Teams only where allowed, all-day events in the host's zone, every unreadable calendar named, 401 not treated as revoked, unverified Microsoft sign-up refused.
+- **End to end (fake Microsoft, Google switched off): 31 of 31.** Connect with PKCE, forged state refused, an Outlook handshake can't finish on the Google callback, tokens unreadable in the database, busy time hides a slot while a "free" event doesn't, Teams booking creates a Teams meeting tagged with the booking id and the guest's confirmation carries the link, 30-second tokens rotate through every refresh with the connection still healthy, cancel removes the event. All earlier suites pass again (B4 23, B3 10, B2b 12, sign-in 15, B5a 26, B5b 28, B7 16).
+- **Fixed on the way:** `package-lock.json` was out of sync, so `npm ci` (the Docker build's first step) failed; regenerated with no version changes.
+
+## B6 review (fresh-context reviewer)
+
+- **Fixed (medium):** two refreshes at once could redeem the same Microsoft refresh token and disconnect a healthy connection; refreshes now take a per-connection advisory lock, re-read, and won't overwrite a reconnect that landed meanwhile.
+- **Fixed (medium):** any Graph 401 disconnected the host; now only a refused refresh (`invalid_grant`) or a removed permission does.
+- **Fixed (medium):** all-day Outlook events were read as UTC days; they now use the host's time zone.
+- **Fixed (medium):** Outlook would have mailed guests its own invitation carrying their answers and the host's dashboard link; Outlook events no longer list the guest as an attendee (Hourhand's own emails cover the guest).
+- **Fixed (medium, security):** a Microsoft sign-in with an email Microsoft doesn't vouch for could create an account in someone else's name and leave a calendar attached after the owner proved the email. Hourhand now trusts the Microsoft email only with `email_verified`, `xms_edov` or a personal account, and refuses to create an account otherwise. The sign-in page's "use an email link" message now actually shows (Better Auth appends its own error code).
+- **Fixed (low):** Teams requested only on calendars that allow it; "working elsewhere" counts as busy; calendars shared with edit rights aren't treated as owned; every unreadable calendar is named in the sync error.
+- **Needs a real Microsoft account to confirm:** what a repeated create with the same `transactionId` returns; whether a reused refresh token is rejected; how all-day events come back; whether a personal account refuses a Teams request. The code is safe either way, and the first live Outlook booking settles them.
+
 ## Production addresses for hourhand.cloud
 
 Set `BETTER_AUTH_URL=https://hourhand.cloud` in Coolify. Register exactly these:
