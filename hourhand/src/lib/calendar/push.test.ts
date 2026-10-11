@@ -7,7 +7,7 @@ import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "../data/pg-store";
 import type { User } from "../data/types";
-import { disconnectConnection, saveGoogleConnection } from "./connections";
+import { disconnectConnection, saveConnection } from "./connections";
 import { GoogleApiError, GOOGLE_CALENDAR_SCOPES, REQUIRED_SCOPES, type GoogleClient } from "./google";
 import { handlePing, maintainChannels, pushAddress } from "./push";
 import { syncDueConnections } from "./sync";
@@ -49,10 +49,10 @@ describe.skipIf(!BASE)("instant sync (TEST_DATABASE_URL)", () => {
   let priya: User;
   const key = randomBytes(32);
   const cals = [
-    { id: "priya@gmail.com", name: "Priya", primary: true, accessRole: "owner" },
-    { id: "team@group.calendar.google.com", name: "Team", primary: false, accessRole: "reader" },
+    { id: "priya@gmail.com", name: "Priya", primary: true, accessRole: "owner" as const },
+    { id: "team@group.calendar.google.com", name: "Team", primary: false, accessRole: "reader" as const },
   ];
-  const connect = () => saveGoogleConnection(pool, key, priya.id,
+  const connect = () => saveConnection(pool, key, priya.id, "google",
     { accessToken: "at-0", refreshToken: "rt", expiresAt: new Date(Date.now() + 3600_000), scope: REQUIRED_SCOPES.join(" "), email: "priya@gmail.com" }, cals, new Date());
   const calRow = async (externalId: string) => (await pool.query("select * from calendars where external_id = $1 and user_id = $2", [externalId, priya.id])).rows[0];
 
@@ -173,9 +173,9 @@ describe.skipIf(!BASE)("instant sync (TEST_DATABASE_URL)", () => {
     const now = new Date();
     await pool.query("update calendar_connections set next_sync_at = $2, sync_claimed_until = $3 where id = $1", [id, now, new Date(now.getTime() + 60_000)]);
     const { google } = fakeGoogle();
-    expect(await syncDueConnections(pool, google, key, now)).toEqual([]);
+    expect(await syncDueConnections(pool, { google }, key, now)).toEqual([]);
     await pool.query("update calendar_connections set sync_claimed_until = $2 where id = $1", [id, new Date(now.getTime() - 1000)]);
-    expect((await syncDueConnections(pool, google, key, now)).map((r) => r.connectionId)).toEqual([id]);
+    expect((await syncDueConnections(pool, { google }, key, now)).map((r) => r.connectionId)).toEqual([id]);
   });
 
   it("disconnecting stops the connection's channels before the grant is revoked", async () => {
@@ -187,7 +187,7 @@ describe.skipIf(!BASE)("instant sync (TEST_DATABASE_URL)", () => {
     const stop = g.stopChannel;
     g.stopChannel = async (...a) => { order.push("stop"); await stop(...a); };
     g.revoke = async () => { order.push("revoke"); };
-    await disconnectConnection(pool, google, key, priya.id, id);
+    await disconnectConnection(pool, { google }, key, priya.id, id);
     expect(s.stopped).toEqual([s.watches[0].id]);
     expect(order).toEqual(["stop", "revoke"]);
   });

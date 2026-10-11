@@ -11,7 +11,7 @@ import { BillingApiError, formEncode, razorpayProvider, stripeProvider, type Bil
 import { handleWebhook, saveSubscription, syncSubscription } from "./sync";
 import { cancelPlan, hostPlan, startCheckout } from "./account";
 import { queueRenewalReminders } from "./reminders";
-import { saveGoogleConnection, setCheckConflicts } from "../calendar/connections";
+import { saveConnection, setCheckConflicts } from "../calendar/connections";
 import { processDueNotifications } from "../jobs/worker";
 import type { Mail, Mailer } from "../mail/mailer";
 import { parseRazorpayEvent, parseStripeEvent, verifyRazorpaySignature, verifyStripeSignature } from "./webhooks";
@@ -317,17 +317,17 @@ describe.skipIf(!BASE)("saving subscriptions (TEST_DATABASE_URL)", () => {
     });
 
     it("Free checks at most 2 calendars; a paid plan checks any number; turning one off always works", async () => {
-      const cals = ["a", "b", "c"].map((x, i) => ({ id: `${x}@x.com`, name: x, primary: i === 0, accessRole: "owner" }));
+      const cals = ["a", "b", "c"].map((x, i) => ({ id: `${x}@x.com`, name: x, primary: i === 0, accessRole: "owner" as const }));
       const tokens = (email: string) => ({ accessToken: "at", refreshToken: "rt", expiresAt: new Date(Date.now() + 3600_000), scope: "", email });
       const key = Buffer.alloc(32, 1);
-      await saveGoogleConnection(pool, key, priya.id, tokens("one@x.com"), cals, new Date());
+      await saveConnection(pool, key, priya.id, "google", tokens("one@x.com"), cals, new Date());
       const ids = async () => (await pool.query("select id, check_conflicts from calendars where user_id = $1 order by name", [priya.id])).rows;
       const [a, b, c] = await ids();
       expect(a.check_conflicts).toBe(true);
       expect(await setCheckConflicts(pool, priya.id, b.id, true)).toBe(true);
       expect(await setCheckConflicts(pool, priya.id, c.id, true)).toBe(false);
       // A second Google account's primary calendar isn't checked while Free is at its limit.
-      await saveGoogleConnection(pool, key, priya.id, tokens("two@x.com"), [{ id: "two@x.com", name: "z", primary: true, accessRole: "owner" }], new Date());
+      await saveConnection(pool, key, priya.id, "google", tokens("two@x.com"), [{ id: "two@x.com", name: "z", primary: true, accessRole: "owner" as const }], new Date());
       expect((await ids()).filter((r) => r.check_conflicts)).toHaveLength(2);
       expect(await setCheckConflicts(pool, priya.id, b.id, false)).toBe(true);
       // Several "on" toggles at the same moment: only as many as fit under the limit go through.

@@ -71,7 +71,7 @@ describe("google client", () => {
 
   it("creates the event with a fixed id, no Google emails, and a Meet request; a retry that hits 409 reads the existing event", async () => {
     const input = { summary: "Coaching with Kiran", description: "d", start: new Date("2026-11-03T04:30:00Z"), end: new Date("2026-11-03T05:15:00Z"), timeZone: "Asia/Kolkata",
-      location: null, attendee: { email: "k@x.com", name: "Kiran" }, conference: "google_meet", bookingId: "0b7c2d1e-0000-4000-8000-00000000abcd" };
+      location: null, attendee: { email: "k@x.com", name: "Kiran" }, conference: "google_meet" as const, bookingId: "0b7c2d1e-0000-4000-8000-00000000abcd" };
     const f = fake([[200, { id: eventIdFor(input.bookingId), hangoutLink: "https://meet.google.com/aaa-bbbb-ccc" }]]);
     const r = await f.client.insertEvent("at", "p@gmail.com", input);
     expect(r).toEqual({ id: "hh0b7c2d1e000040008000" + "00000000abcd", joinUrl: "https://meet.google.com/aaa-bbbb-ccc", conferencePending: false });

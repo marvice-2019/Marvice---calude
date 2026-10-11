@@ -5,13 +5,15 @@ import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
+import { unseal } from "../crypto/seal";
 import { createPgStore } from "../data/pg-store";
 import type { DataStore, EventType, User } from "../data/types";
 import type { Mail, Mailer } from "../mail/mailer";
 import { MEET_LINK_WAIT_SECONDS, processDueNotifications } from "../jobs/worker";
 import { calendarConfigError, calendarDeps } from "./env";
-import { accessTokenFor, disconnectConnection, saveGoogleConnection, setAddToCalendar, setCheckConflicts } from "./connections";
+import { accessTokenFor, disconnectConnection, saveConnection, setAddToCalendar, setCheckConflicts } from "./connections";
 import { eventIdFor, GoogleApiError, REQUIRED_SCOPES, type BusyRange, type EventInput, type GoogleClient } from "./google";
+import type { CalendarProvider } from "./provider";
 import { ALERT_AFTER_FAILURES, syncDueConnections } from "./sync";
 
 const BASE = process.env.TEST_DATABASE_URL;
@@ -65,7 +67,7 @@ function fakeGoogle() {
     async moveEvent(_t: string, _c: string, id: string, start: Date, end: Date) {
       const e = s.events.get(id)!;
       s.events.set(id, { ...e, start, end });
-      return { id, joinUrl: e.conference === "google_meet" ? meet(id) : null, conferencePending: false };
+      return { id, joinUrl: e.withMeet ? meet(id) : null, conferencePending: false };
     },
     async deleteEvent(_t: string, _c: string, id: string) { s.events.delete(id); },
   };
@@ -91,10 +93,10 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
   const tokens = (email: string, scope = ["openid", "email", ...REQUIRED_SCOPES].join(" ")) =>
     ({ accessToken: "at-0", refreshToken: "rt-for-tests", expiresAt: new Date(Date.now() + 3600_000), scope, email });
   const cals = [
-    { id: "priya@gmail.com", name: "Priya", primary: true, accessRole: "owner" },
-    { id: "team@group.calendar.google.com", name: "Team", primary: false, accessRole: "reader" },
+    { id: "priya@gmail.com", name: "Priya", primary: true, accessRole: "owner" as const },
+    { id: "team@group.calendar.google.com", name: "Team", primary: false, accessRole: "reader" as const },
   ];
-  const connect = (user: User, email = "priya@gmail.com") => saveGoogleConnection(pool, key, user.id, tokens(email), cals, new Date());
+  const connect = (user: User, email = "priya@gmail.com") => saveConnection(pool, key, user.id, "google", tokens(email), cals, new Date());
   const conn = async (id: string) => (await pool.query("select * from calendar_connections where id = $1", [id])).rows[0];
   const calendarRows = async (userId: string) => (await pool.query("select id, external_id, check_conflicts, is_add_to from calendars where user_id = $1 order by name", [userId])).rows;
   const queue = async (bookingId: string) =>
@@ -154,10 +156,29 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
     it("refreshes an expired access token and stores the new one sealed", async () => {
       const { google, s } = fakeGoogle();
       const id = await connect(priya);
-      expect(await accessTokenFor(pool, google, key, id)).toBe("at-0");
-      expect(await accessTokenFor(pool, google, key, id, new Date(Date.now() + 2 * 3600_000))).toBe("at-1");
+      expect(await accessTokenFor(pool, { google }, key, id)).toBe("at-0");
+      expect(await accessTokenFor(pool, { google }, key, id, new Date(Date.now() + 2 * 3600_000))).toBe("at-1");
       expect(s.refreshes).toBe(1);
       expect((await conn(id)).credentials_encrypted.toString("latin1")).not.toContain("at-1");
+    });
+
+    it("keeps a rotated refresh token: it is stored sealed and sent on the next refresh", async () => {
+      const id = await connect(priya);
+      const sent: string[] = [];
+      const rotating = {
+        id: "google",
+        async refresh(refreshToken: string) {
+          sent.push(refreshToken);
+          return { accessToken: `rot-${sent.length}`, expiresAt: new Date(Date.now() + 3600_000), refreshToken: `rt-rotated-${sent.length}` };
+        },
+      } as unknown as CalendarProvider;
+      const hoursLater = (h: number) => new Date(Date.now() + h * 3600_000);
+      expect(await accessTokenFor(pool, { google: rotating }, key, id, hoursLater(2))).toBe("rot-1");
+      const sealed = (await conn(id)).credentials_encrypted;
+      expect(unseal<{ refreshToken: string }>(key, sealed, `google:${priya.id}:priya@gmail.com`).refreshToken).toBe("rt-rotated-1");
+      expect(sealed.toString("latin1")).not.toContain("rt-rotated-1");
+      expect(await accessTokenFor(pool, { google: rotating }, key, id, hoursLater(4))).toBe("rot-2");
+      expect(sent).toEqual(["rt-for-tests", "rt-rotated-1"]);
     });
 
     it("another host can't change or remove a host's calendars", async () => {
@@ -166,7 +187,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const [primary] = await calendarRows(priya.id);
       expect(await setCheckConflicts(pool, arun.id, primary.id, false)).toBe(false);
       expect(await setAddToCalendar(pool, arun.id, primary.id)).toBe(false);
-      expect(await disconnectConnection(pool, google, key, arun.id, id)).toBe(false);
+      expect(await disconnectConnection(pool, { google }, key, arun.id, id)).toBe(false);
       expect((await calendarRows(priya.id)).find((c) => c.id === primary.id).check_conflicts).toBe(true);
     });
 
@@ -178,7 +199,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
 
     it("a host can still disconnect when the server has no encryption key (the grant just isn't revoked)", async () => {
       const id = await connect(priya);
-      expect(await disconnectConnection(pool, null, null, priya.id, id)).toBe(true);
+      expect(await disconnectConnection(pool, {}, null, priya.id, id)).toBe(true);
       expect(await store.listCalendarConnections(priya.id)).toEqual([]);
     });
 
@@ -196,8 +217,8 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const { google, s } = fakeGoogle();
       const id = await connect(priya);
       s.busy.set("priya@gmail.com", [{ start: new Date(Date.now() + 3600_000), end: new Date(Date.now() + 7200_000) }]);
-      await syncDueConnections(pool, google, key);
-      expect(await disconnectConnection(pool, google, key, priya.id, id)).toBe(true);
+      await syncDueConnections(pool, { google }, key);
+      expect(await disconnectConnection(pool, { google }, key, priya.id, id)).toBe(true);
       expect(s.revoked).toEqual(["rt-for-tests"]);
       expect(await calendarRows(priya.id)).toEqual([]);
       expect(await store.listBusyBlocks(priya.id, new Date(), new Date(Date.now() + 86_400_000))).toEqual([]);
@@ -211,22 +232,22 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const start = new Date(Date.now() + 26 * 3600_000);
       s.busy.set("priya@gmail.com", [{ start, end: new Date(start.getTime() + 3600_000) }]);
       s.busy.set("team@group.calendar.google.com", [{ start: new Date(start.getTime() + 7200_000), end: new Date(start.getTime() + 9000_000) }]);
-      const [r] = await syncDueConnections(pool, google, key);
+      const [r] = await syncDueConnections(pool, { google }, key);
       expect(r).toMatchObject({ connectionId: id, ok: true });
       const blocks = await store.listBusyBlocks(priya.id, new Date(), new Date(Date.now() + 3 * 86_400_000));
       expect(blocks.map((b) => b.start.toISOString())).toEqual([start.toISOString()]); // the unchecked Team calendar is ignored
       expect((await conn(id)).last_synced_at).not.toBeNull();
-      expect(await syncDueConnections(pool, google, key)).toEqual([]); // not due again for 5 minutes
+      expect(await syncDueConnections(pool, { google }, key)).toEqual([]); // not due again for 5 minutes
     });
 
     it("turning a calendar off removes its busy times at the next sync", async () => {
       const { google, s } = fakeGoogle();
       await connect(priya);
       s.busy.set("priya@gmail.com", [{ start: new Date(Date.now() + 3600_000), end: new Date(Date.now() + 7200_000) }]);
-      await syncDueConnections(pool, google, key);
+      await syncDueConnections(pool, { google }, key);
       const [primary] = await calendarRows(priya.id);
       await setCheckConflicts(pool, priya.id, primary.id, false);
-      await syncDueConnections(pool, google, key, new Date(Date.now() + 6 * MIN));
+      await syncDueConnections(pool, { google }, key, new Date(Date.now() + 6 * MIN));
       expect(await store.listBusyBlocks(priya.id, new Date(), new Date(Date.now() + 86_400_000))).toEqual([]);
     });
 
@@ -235,10 +256,10 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const id = await connect(priya);
       const start = new Date(Date.now() + 5 * 3600_000);
       s.busy.set("priya@gmail.com", [{ start, end: new Date(start.getTime() + 3600_000) }]);
-      await syncDueConnections(pool, google, key);
+      await syncDueConnections(pool, { google }, key);
       s.freeBusyErrors.set("priya@gmail.com", "notFound");
       s.busy.delete("priya@gmail.com");
-      const [r] = await syncDueConnections(pool, google, key, new Date(Date.now() + 6 * MIN));
+      const [r] = await syncDueConnections(pool, { google }, key, new Date(Date.now() + 6 * MIN));
       expect(r.ok).toBe(false);
       expect((await conn(id)).status).toBe("degraded");
       expect(await store.listBusyBlocks(priya.id, new Date(), new Date(Date.now() + 86_400_000))).toHaveLength(1);
@@ -250,7 +271,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       s.failFreeBusy = new GoogleApiError("Google 503", { status: 503, retryable: true });
       let now = new Date();
       for (let i = 1; i <= ALERT_AFTER_FAILURES + 1; i++) {
-        await syncDueConnections(pool, google, key, now);
+        await syncDueConnections(pool, { google }, key, now);
         now = new Date(now.getTime() + 3 * MIN);
       }
       const row = await conn(id);
@@ -259,7 +280,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       expect(alerts.rows).toEqual([{ recipient: priya.email }]);
 
       s.failFreeBusy = null;
-      await syncDueConnections(pool, google, key, now);
+      await syncDueConnections(pool, { google }, key, now);
       expect(await conn(id)).toMatchObject({ status: "ok", error_count: 0, alert_sent_at: null });
     });
 
@@ -267,26 +288,26 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const { google, s } = fakeGoogle();
       const id = await connect(priya);
       s.failRefresh = new GoogleApiError("invalid_grant", { status: 400, reason: "invalid_grant", retryable: false, revoked: true });
-      await syncDueConnections(pool, google, key, new Date(Date.now() + 2 * 3600_000)); // past the access token's expiry
+      await syncDueConnections(pool, { google }, key, new Date(Date.now() + 2 * 3600_000)); // past the access token's expiry
       expect((await conn(id)).status).toBe("disconnected");
       const { mailer, sent } = recordingMailer();
       await processDueNotifications(pool, mailer, { baseUrl, now: new Date(Date.now() + 2 * 3600_000) });
       expect(sent.map((m) => m.subject)).toEqual(["Reconnect your Google Calendar"]);
-      expect(await syncDueConnections(pool, google, key, new Date(Date.now() + 3 * 3600_000))).toEqual([]);
+      expect(await syncDueConnections(pool, { google }, key, new Date(Date.now() + 3 * 3600_000))).toEqual([]);
     });
 
     it("a calendar switched on while a sync is running is synced again straight after, not 5 minutes later", async () => {
       const { google, s } = fakeGoogle();
       const id = await connect(priya);
       s.duringFreeBusy = async () => { await pool.query("update calendar_connections set next_sync_at = now() where id = $1", [id]); };
-      await syncDueConnections(pool, google, key);
-      expect(await syncDueConnections(pool, google, key, new Date(Date.now() + 1000))).toHaveLength(1);
+      await syncDueConnections(pool, { google }, key);
+      expect(await syncDueConnections(pool, { google }, key, new Date(Date.now() + 1000))).toHaveLength(1);
     });
 
     it("leaves demo connections without tokens alone", async () => {
       const { google } = fakeGoogle();
       await pool.query("insert into calendar_connections (user_id, provider, account_email, credentials_encrypted) values ($1, 'google', 'demo@example.in', '')", [priya.id]);
-      expect(await syncDueConnections(pool, google, key)).toEqual([]);
+      expect(await syncDueConnections(pool, { google }, key)).toEqual([]);
     });
   });
 
@@ -297,14 +318,14 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
       expect((await queue(b.id)).find((q) => q.kind === "calendar_create")).toMatchObject({ channel: "calendar", status: "queued" });
       const { mailer, sent } = recordingMailer();
-      await processDueNotifications(pool, mailer, { baseUrl, calendar: { google, key } });
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { google }, key } });
       const event = s.events.get(eventIdFor(b.id))!;
       expect(event).toMatchObject({ calendarId: "priya@gmail.com", attendee: guest.email, withMeet: true });
       const after = (await store.getBooking(priya.id, b.id))!;
       expect(after.joinUrl).toMatch(/^https:\/\/meet\.google\.com\//);
       // Whichever order the batch ran in, the confirmation is never sent without the link, and is due again at once
       // (the runner goes round again when a calendar write releases it).
-      await processDueNotifications(pool, mailer, { baseUrl, calendar: { google, key } });
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { google }, key } });
       const confirmations = sent.filter((m) => m.to === guest.email);
       expect(confirmations).toHaveLength(1);
       expect(confirmations[0].text).toContain(after.joinUrl!);
@@ -316,8 +337,8 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       s.failInsert = new GoogleApiError("Google 503", { status: 503, retryable: true });
       const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
       const { mailer, sent } = recordingMailer();
-      await processDueNotifications(pool, mailer, { baseUrl, calendar: { google, key } });
-      await processDueNotifications(pool, mailer, { baseUrl, calendar: { google, key } });
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { google }, key } });
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { google }, key } });
       expect(sent.filter((m) => m.to === guest.email && m.subject.startsWith("Booked"))).toHaveLength(1);
       const q = await queue(b.id);
       expect(q.find((x) => x.kind === "booked_guest")!.status).toBe("sent");
@@ -331,9 +352,9 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       // Hold the calendar write as if another worker had it.
       await pool.query("update notifications set locked_until = now() + interval '1 hour' where booking_id = $1 and channel = 'calendar'", [b.id]);
       const { mailer, sent } = recordingMailer();
-      await processDueNotifications(pool, mailer, { baseUrl, calendar: { google, key } });
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { google }, key } });
       expect(sent.filter((m) => m.to === guest.email)).toHaveLength(0);
-      await processDueNotifications(pool, mailer, { baseUrl, calendar: { google, key }, now: new Date(Date.now() + (MEET_LINK_WAIT_SECONDS + 5) * 1000) });
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { google }, key }, now: new Date(Date.now() + (MEET_LINK_WAIT_SECONDS + 5) * 1000) });
       expect(sent.filter((m) => m.to === guest.email && m.subject.startsWith("Booked"))).toHaveLength(1);
     });
 
@@ -341,7 +362,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const { google, s } = fakeGoogle();
       await connect(priya);
       const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
-      const deps = { baseUrl, calendar: { google, key } };
+      const deps = { baseUrl, calendar: { providers: { google }, key } };
       await processDueNotifications(pool, recordingMailer().mailer, deps);
       const newStart = nextStart();
       const moved = await store.rescheduleBooking(priya.id, b.id, newStart, `cal-move-${slot}`);
@@ -362,7 +383,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       let open!: () => void;
       s.insertGate = new Promise((r) => { open = r; });
       const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
-      const deps = { baseUrl, calendar: { google, key } };
+      const deps = { baseUrl, calendar: { providers: { google }, key } };
       const a = processDueNotifications(pool, recordingMailer().mailer, deps); // worker A is now inside Google's create call
       await new Promise((r) => setTimeout(r, 200));
       await store.cancelBooking(priya.id, b.id, "guest");
@@ -382,7 +403,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       let open!: () => void;
       s.insertGate = new Promise((r) => { open = r; });
       const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
-      const deps = { baseUrl, calendar: { google, key } };
+      const deps = { baseUrl, calendar: { providers: { google }, key } };
       const a = processDueNotifications(pool, recordingMailer().mailer, deps);
       await new Promise((r) => setTimeout(r, 200));
       const newStart = nextStart();
@@ -409,7 +430,7 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       const id = await connect(priya);
       s.failInsert = new GoogleApiError("insufficientPermissions", { status: 403, reason: "insufficientPermissions", retryable: false, revoked: true });
       const b = await store.createBooking({ eventTypeId: coaching.id, startAt: nextStart(), idempotencyKey: `cal-${slot}`, invitee: guest });
-      await processDueNotifications(pool, recordingMailer().mailer, { baseUrl, calendar: { google, key } });
+      await processDueNotifications(pool, recordingMailer().mailer, { baseUrl, calendar: { providers: { google }, key } });
       expect((await queue(b.id)).find((q) => q.kind === "calendar_create")!.status).toBe("failed");
       expect((await conn(id)).status).toBe("disconnected");
     });
