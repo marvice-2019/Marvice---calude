@@ -11,7 +11,8 @@ import { confirmPayment, processRefunds, startPaidBooking } from "../payments/bo
 import { keyPairAuth } from "../payments/host-razorpay";
 import { razorpayOrders } from "../payments/razorpay-orders";
 import { gstinCheckChar } from "./gst";
-import { invoiceByToken, invoicesCsv, listInvoices, saveTaxProfile, validateTaxProfile } from "./invoices";
+import { invoiceByToken, invoicesCsv, listInvoices, saveTaxProfile, validateTaxProfile, type Invoice } from "./invoices";
+import { purgeClosedAccounts } from "../data/account-lifecycle";
 
 const BASE = process.env.TEST_DATABASE_URL;
 const auth = keyPairAuth("rzp_test_abcdefgh12", "k");
@@ -55,9 +56,28 @@ describe("GST details form", () => {
   it("takes a valid GSTIN and reads the state from it", () => {
     expect(validateTaxProfile(form)).toEqual({ ok: true, value: { legalName: form.legalName, address: form.address, stateCode: "29", gstin: GSTIN, sac: "999293", rateBp: 1800, invoicePrefix: "PRS" } });
   });
+  it("refuses a prefix starting CN, which credit notes use", () => {
+    expect(validateTaxProfile({ ...form, invoicePrefix: "CNAB" })).toMatchObject({ ok: false, errors: { invoicePrefix: expect.any(String) } });
+  });
+
   it("refuses a bad GSTIN, SAC, rate or prefix", () => {
     const bad = validateTaxProfile({ ...form, gstin: GSTIN.slice(0, 14) + (GSTIN[14] === "A" ? "B" : "A"), sac: "12", rate: "10", invoicePrefix: "TOOLONG" });
     expect(bad).toMatchObject({ ok: false, errors: { gstin: expect.any(String), sac: expect.any(String), rate: expect.any(String), invoicePrefix: expect.any(String) } });
+  });
+});
+
+describe("CSV export", () => {
+  const doc = (o: Partial<Invoice>): Invoice => ({
+    id: "i", hostId: "h", kind: "invoice", number: "PRS/2627/000001", token: "t", issuedAt: new Date("2027-03-31T19:00:00Z"), buyerName: "Asha", buyerEmail: "a@example.in",
+    supplier: { legalName: "L", address: "A", gstin: "G", stateCode: "29" }, placeOfSupply: "29", description: "x", sac: "999293", rateBp: 1800,
+    taxableMinor: 42_288, cgstMinor: 3806, sgstMinor: 3806, igstMinor: 0, totalMinor: 49_900, originalNumber: null, ...o,
+  });
+  it("defuses formulas typed by a guest, and dates documents in IST", () => {
+    const csv = invoicesCsv([doc({ buyerName: '=HYPERLINK("http://x","Refund")', buyerEmail: "+cmd@example.in" })]);
+    const row = csv.split("\r\n")[1];
+    expect(row).toContain(`"'=HYPERLINK(""http://x"",""Refund"")"`);
+    expect(row).toContain(",'+cmd@example.in,");
+    expect(row).toContain(",2027-04-01,"); // 00:30 IST on 1 April, though still 31 March in UTC
   });
 });
 
@@ -160,6 +180,30 @@ describe.skipIf(!BASE)("GST invoices (Postgres)", () => {
     await confirmPurchase({ pool, auth, orders: fake.orders }, { token: r.token, paymentId: "pay_pkg", signature: sign(r.payment!.orderId, "pay_pkg") }, new Date());
     const { rows: [v] } = await pool.query("select v.* from invoices v join package_purchases p on p.id = v.package_purchase_id where p.token = $1", [r.token]);
     expect(v).toMatchObject({ kind: "invoice", total_minor: 200_000, description: "5 sessions: 5 × 45-min coaching session", buyer_email: "kavya@example.in" });
+  });
+
+  it("a closed account with invoices and credit notes is purged cleanly", async () => {
+    const { rows: [host] } = await pool.query("insert into users (email, name, slug) values ('gst-purge@example.com', 'Purge Host', 'gst-purge') returning *");
+    const { rows: [et] } = await pool.query("insert into event_types (user_id, name, slug, duration_minutes) values ($1, 'Call', 'call', 30) returning id", [host.id]);
+    const v = validateTaxProfile({ legalName: "Purge Host", address: "1 Road, Pune 411001", gstin: "27AAPFU0939F1Z" + gstinCheckChar("27AAPFU0939F1Z"), sac: "999293", rate: "18", invoicePrefix: "PH" });
+    if (!v.ok) throw new Error("profile");
+    await saveTaxProfile(pool, host.id, v.value);
+    const kept = await paidBooking({ ...priya, id: host.id } as User, et.id);
+    const refunded = await paidBooking({ ...priya, id: host.id } as User, et.id);
+    await store.cancelBooking(host.id, refunded.booking.id, "guest");
+    await processRefunds({ pool, authFor: async () => auth, ordersFor: () => refunded.fake.orders }, new Date());
+    expect((await pool.query("select kind from invoices where host_id = $1 order by kind", [host.id])).rows.map((r) => r.kind)).toEqual(["credit_note", "invoice", "invoice"]);
+    expect(kept.paymentId).toBeTruthy();
+    await pool.query("update users set deleted_at = now() - interval '31 days' where id = $1", [host.id]);
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      expect(await purgeClosedAccounts(client, new Date())).toBeGreaterThanOrEqual(1);
+      await client.query("commit");
+    } finally {
+      client.release();
+    }
+    expect((await pool.query("select count(*)::int as n from invoices where host_id = $1", [host.id])).rows[0].n).toBe(0);
   });
 
   it("exports the host's documents as CSV with credit notes negative", async () => {

@@ -9,7 +9,7 @@ create table tax_profiles (
   gstin text not null check (gstin ~ '^[0-9]{2}[A-Z0-9]{13}$' and substr(gstin, 1, 2) = state_code),
   sac text not null check (sac ~ '^[0-9]{4,8}$'),
   rate_bp int not null check (rate_bp in (500, 1200, 1800, 2800)),
-  invoice_prefix text not null check (invoice_prefix ~ '^[A-Z0-9]{1,4}$'),
+  invoice_prefix text not null check (invoice_prefix ~ '^[A-Z0-9]{1,4}$' and invoice_prefix !~ '^CN'),  -- CN… is the credit-note series
   updated_at timestamptz not null default now()
 );
 

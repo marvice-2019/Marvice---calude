@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/format";
 import { invoiceByToken, stateLabel } from "@/lib/gst/invoices";
 
 export const dynamic = "force-dynamic";
+// A private document reached by its link: keep it out of search engines.
+export const metadata = { robots: { index: false, follow: false } };
 
 /**
  * A GST tax invoice or credit note, by its private link. Laid out with the particulars CGST Rule 46 asks for; electronic,

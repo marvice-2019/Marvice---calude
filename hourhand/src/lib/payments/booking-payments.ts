@@ -258,7 +258,8 @@ export const DEPOSIT_HOLD_MS = 24 * 60 * 60_000;
 
 /**
  * Deposits whose session ended over a day ago with no no-show marked: queued for a full refund (processRefunds does it).
- * A deposit kept for a no-show stays paid. Returns how many were released.
+ * A deposit kept for a no-show stays paid. The guest's row is locked too, so a no-show being marked at that moment
+ * either lands first (and the deposit is kept) or waits until the release is done. Returns how many were released.
  */
 export async function releaseDeposits(pool: pg.Pool, now: Date, limit = 50): Promise<number> {
   const { rowCount } = await pool.query(
@@ -267,7 +268,7 @@ export async function releaseDeposits(pool: pg.Pool, now: Date, limit = 50): Pro
        select p2.id from payments p2 join bookings b on b.id = p2.booking_id join invitees i on i.booking_id = b.id
        where p2.kind = 'deposit' and p2.status = 'paid' and b.status = 'confirmed' and i.no_show_at is null
          and b.end_at < $1::timestamptz - $2 * interval '1 millisecond'
-       limit $3 for update of p2 skip locked)`, [now, DEPOSIT_HOLD_MS, limit]);
+       limit $3 for update of p2, i skip locked)`, [now, DEPOSIT_HOLD_MS, limit]);
   return rowCount ?? 0;
 }
 

@@ -5,7 +5,7 @@ import { authEnabled } from "@/lib/auth/auth";
 import { requireUser } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/billing/plans";
 import { getPool } from "@/lib/data/pg-store";
-import { formatDate } from "@/lib/format";
+import { dayKey, formatDate } from "@/lib/format";
 import { getTaxProfile, listInvoices } from "@/lib/gst/invoices";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export default async function InvoicesPage() {
   const user = await requireUser();
   const db = authEnabled() ? getPool(process.env.DATABASE_URL as string) : null;
   const [profile, invoices] = db ? await Promise.all([getTaxProfile(db, user.id), listInvoices(db, user.id)]) : [null, []];
-  const month = new Date().toISOString().slice(0, 7);
+  const month = dayKey(new Date(), "Asia/Kolkata").slice(0, 7); // this month in India
 
   return (
     <div>

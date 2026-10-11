@@ -37,6 +37,8 @@ export function validateTaxProfile(form: { legalName: string; address: string; g
   if (!/^\d{4,8}$/.test(sac)) errors.sac = "Enter the SAC code for your service (4 to 8 digits), e.g. 999293 for coaching.";
   if (!(GST_RATES_BP as readonly number[]).includes(rateBp)) errors.rate = "Pick your GST rate.";
   if (!/^[A-Z0-9]{1,4}$/.test(invoicePrefix)) errors.invoicePrefix = "Use 1 to 4 letters or digits.";
+  // Credit notes are numbered CN…, so an invoice prefix starting CN could clash with one.
+  else if (invoicePrefix.startsWith("CN")) errors.invoicePrefix = "Pick a prefix that doesn't start with CN: credit notes use that.";
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return { ok: true, value: { legalName, address, stateCode: gstin.slice(0, 2), gstin, sac, rateBp, invoicePrefix } };
 }
@@ -103,7 +105,7 @@ export async function invoiceForPayment(db: Db, paymentId: string, now: Date): P
   if (!p || p.kind !== "payment" || p.done) return null;
   return issue(db, {
     hostId: p.host_id, totalMinor: p.amount_minor, buyerName: p.name, buyerEmail: p.email, paymentId,
-    description: `${p.event_name} (${p.duration_minutes} min), ${new Date(p.start_at).toISOString().slice(0, 10)}`,
+    description: `${p.event_name} (${p.duration_minutes} min), ${istDate(new Date(p.start_at))}`,
   }, now);
 }
 
@@ -174,19 +176,25 @@ export async function listInvoices(db: Db, hostId: string, range?: { from: Date;
   return rows.map(toInvoice);
 }
 
+/** "2027-04-01": the calendar date in India, which is what an Indian invoice and its financial year go by. */
+const istDate = (d: Date) => new Date(d.getTime() + 330 * 60_000).toISOString().slice(0, 10);
+
 /** "29 Karnataka". */
 export const stateLabel = (code: string) => `${code} ${GST_STATES[code] ?? ""}`.trim();
 
 /** One CSV row per document, for the host's accountant (GSTR-1 preparation). Credit notes carry negative amounts. */
 export function invoicesCsv(invoices: Invoice[]): string {
   const rupees = (minor: number, sign: number) => ((sign * minor) / 100).toFixed(2);
-  const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const cell = (v: string) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  // Text a guest typed must never run as a spreadsheet formula when the accountant opens the file.
+  const text = (v: string) => cell(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
   const head = ["Type", "Number", "Date", "Original invoice", "Buyer", "Buyer email", "Place of supply", "SAC", "Rate %", "Taxable value", "CGST", "SGST", "IGST", "Total"];
   const rows = invoices.map((v) => {
     const sign = v.kind === "credit_note" ? -1 : 1;
-    return [v.kind === "invoice" ? "Invoice" : "Credit note", v.number, v.issuedAt.toISOString().slice(0, 10), v.originalNumber ?? "", v.buyerName, v.buyerEmail,
-      stateLabel(v.placeOfSupply), v.sac, (v.rateBp / 100).toFixed(2), rupees(v.taxableMinor, sign), rupees(v.cgstMinor, sign), rupees(v.sgstMinor, sign),
-      rupees(v.igstMinor, sign), rupees(v.totalMinor, sign)].map((c) => cell(String(c)));
+    return [
+      ...[v.kind === "invoice" ? "Invoice" : "Credit note", v.number, istDate(v.issuedAt), v.originalNumber ?? "", v.buyerName, v.buyerEmail, stateLabel(v.placeOfSupply), v.sac].map(text),
+      ...[(v.rateBp / 100).toFixed(2), rupees(v.taxableMinor, sign), rupees(v.cgstMinor, sign), rupees(v.sgstMinor, sign), rupees(v.igstMinor, sign), rupees(v.totalMinor, sign)].map(cell),
+    ];
   });
   return [head, ...rows].map((r) => r.join(",")).join("\r\n") + "\r\n";
 }
