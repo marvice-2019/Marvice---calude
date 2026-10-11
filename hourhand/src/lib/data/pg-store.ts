@@ -36,13 +36,14 @@ const toEventType = (r: Row): EventType => ({
   priceMinor: r.price_minor as number | null, currency: r.currency as EventType["currency"], hidden: r.hidden as boolean, active: r.active as boolean, position: r.position as number,
 });
 
-const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.location_kind, b.join_url, b.idempotency_key,
+const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
   b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.created_at,
   i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token
   from bookings b join invitees i on i.booking_id = b.id`;
 const toBooking = (r: Row): BookingWithInvitee => ({
   id: r.id as string, eventTypeId: r.event_type_id as string, hostId: r.host_id as string, startAt: r.start_at as Date, endAt: r.end_at as Date,
   bufferedStart: r.buffered_start as Date, bufferedEnd: r.buffered_end as Date, status: r.status as BookingWithInvitee["status"],
+  holdExpiresAt: (r.hold_expires_at as Date | null) ?? null,
   locationKind: r.location_kind as BookingWithInvitee["locationKind"], joinUrl: (r.join_url as string | null) ?? null, idempotencyKey: r.idempotency_key as string, cancelledAt: r.cancelled_at as Date | null,
   cancelledBy: r.cancelled_by as BookingWithInvitee["cancelledBy"], cancelReason: r.cancel_reason as string | null, rescheduledFromId: r.rescheduled_from_id as string | null,
   createdAt: r.created_at as Date,
@@ -78,9 +79,13 @@ export function createPgStore(pool: pg.Pool): DataStore {
 
   const byKey = (db: Db, key: string) => bookingWhere(db, "b.idempotency_key = $1", [key]);
 
-  /** Inserts a confirmed booking and its invitee. The no_double_booking constraint is the overlap guard (23P01). */
+  /**
+   * Inserts a booking (confirmed, or pending_payment with a hold) and its invitee. The no_double_booking constraint is the
+   * overlap guard (23P01); it covers holds too, so this host's lapsed holds are cancelled first and never block the insert.
+   */
   async function insertBooking(client: pg.PoolClient, input: CreateBookingInput, movingId: string | null): Promise<string> {
     if (!isId(input.eventTypeId)) throw new Error(`Unknown event type ${input.eventTypeId}`);
+    await expireHolds(client, input.eventTypeId);
     const { rows } = await client.query(
       `select e.user_id, e.duration_minutes, e.buffer_before_minutes, e.buffer_after_minutes,
          (select kind from event_locations l where l.event_type_id = e.id order by position limit 1) as location_kind
@@ -90,15 +95,25 @@ export function createPgStore(pool: pg.Pool): DataStore {
     const startAt = input.startAt;
     const endAt = new Date(startAt.getTime() + et.duration_minutes * MIN);
     const inserted = await client.query(
-      `insert into bookings (event_type_id, host_id, start_at, end_at, buffered_start, buffered_end, status, location_kind, idempotency_key, rescheduled_from_id)
-       values ($1,$2,$3,$4,$5,$6,'confirmed',$7,$8,$9) returning id`,
+      `insert into bookings (event_type_id, host_id, start_at, end_at, buffered_start, buffered_end, status, location_kind, idempotency_key, rescheduled_from_id, hold_expires_at)
+       values ($1,$2,$3,$4,$5,$6,$10,$7,$8,$9,$11) returning id`,
       [input.eventTypeId, et.user_id, startAt, endAt, new Date(startAt.getTime() - et.buffer_before_minutes * MIN), new Date(endAt.getTime() + et.buffer_after_minutes * MIN),
-        et.location_kind, input.idempotencyKey, movingId]);
+        et.location_kind, input.idempotencyKey, movingId, input.holdUntil ? "pending_payment" : "confirmed", input.holdUntil ?? null]);
     const id = inserted.rows[0].id as string;
     const i = input.invitee;
     await client.query("insert into invitees (booking_id, host_id, name, email, timezone, phone, answers) values ($1,$2,$3,$4,$5,$6,$7)",
       [id, et.user_id, i.name, i.email, i.timezone, i.phone, JSON.stringify(i.answers)]);
     return id;
+  }
+
+  /** Cancels the event type's host's lapsed payment holds (and fails their payments), freeing those slots. */
+  async function expireHolds(client: pg.PoolClient, eventTypeId: string): Promise<void> {
+    const { rows } = await client.query(
+      `update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null
+       where host_id = (select user_id from event_types where id = $1) and status = 'pending_payment' and hold_expires_at < now() returning id`, [eventTypeId]);
+    if (rows.length > 0) {
+      await client.query("update payments set status = 'failed', updated_at = now() where booking_id = any($1::uuid[]) and status = 'pending'", [rows.map((r) => r.id)]);
+    }
   }
 
   /** A key already used for this same request returns its booking; a key used for anything else is a conflict. */
@@ -239,7 +254,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
       try {
         const id = await tx(async (client) => {
           const newId = await insertBooking(client, input, null);
-          await queueBookingNotifications(client, newId, "booked", new Date());
+          // A held booking says nothing yet: its emails and calendar write go out once the payment is confirmed.
+          if (!input.holdUntil) await queueBookingNotifications(client, newId, "booked", new Date());
           return newId;
         });
         kickJobs();

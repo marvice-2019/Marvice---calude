@@ -13,6 +13,9 @@ alter table payments add column provider_order_id text unique;
 alter table payments add column paid_at timestamptz;
 alter table payments add column refund_id text;
 alter table payments add column last_error text;
+-- Reconciler bookkeeping: when a pending payment was last checked with Razorpay, so each round picks up the stalest ones.
+alter table payments add column checked_at timestamptz;
+create index payments_pending_check_idx on payments (checked_at nulls first, created_at) where status = 'pending';
 alter table payments drop constraint payments_status_check;
 alter table payments add constraint payments_status_check check (status in ('pending','paid','failed','refunded','refund_pending'));
 

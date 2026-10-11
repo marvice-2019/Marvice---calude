@@ -80,7 +80,9 @@ export interface Booking {
   endAt: Date;
   bufferedStart: Date;
   bufferedEnd: Date;
-  status: "confirmed" | "cancelled";
+  /** pending_payment: a paid booking holding its slot until holdExpiresAt while the guest pays. */
+  status: "confirmed" | "cancelled" | "pending_payment";
+  holdExpiresAt: Date | null;
   locationKind: LocationKind | null;
   /** The video link from the host's calendar (Google Meet), once the calendar event exists. */
   joinUrl: string | null;
@@ -145,6 +147,8 @@ export interface CreateBookingInput {
   eventTypeId: string;
   startAt: Date;
   idempotencyKey: string;
+  /** Set for a paid booking: it starts as pending_payment holding the slot until then, with no emails yet. Postgres only. */
+  holdUntil?: Date;
   invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
 }
 

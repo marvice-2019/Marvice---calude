@@ -1,6 +1,6 @@
 // Booking payments: the host's own Razorpay keys (sealed, bound to their owner) and the 0006 booking constraints,
 // against real Postgres (only with TEST_DATABASE_URL; uses its own database <name>_pay, dropped and recreated each run).
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
@@ -8,20 +8,32 @@ import { seed } from "../../../scripts/seed";
 import { BillingApiError } from "../billing/providers";
 import { createPgStore } from "../data/pg-store";
 import type { User } from "../data/types";
-import { disconnectRazorpay, loadHostRazorpay, maskKeyId, razorpayVerifier, RazorpayKeyError, saveRazorpayKeys, type HostRazorpayAuth } from "./host-razorpay";
+import { disconnectRazorpay, keyPairAuth, loadHostRazorpay, maskKeyId, razorpayVerifier, RazorpayKeyError, saveRazorpayKeys, type HostRazorpayAuth } from "./host-razorpay";
 
 const KEY_ID = "rzp_test_AbCdEfGh1234";
 const KEY_SECRET = "s3cr3tValueThatMustNotLeak";
 const ok = async () => {};
 
 describe("Razorpay key checks (no database)", () => {
+  it("verifies Checkout payment signatures with the host's key", () => {
+    const sign = (key: string, text: string) => createHmac("sha256", key).update(text).digest("hex");
+    const auth = keyPairAuth("rzp_test_abcdefgh", "host-key");
+    const good = sign("host-key", "order_1|pay_1");
+    expect(auth.verifyPaymentSignature("order_1", "pay_1", good)).toBe(true);
+    expect(auth.verifyPaymentSignature("order_1", "pay_1", sign("other-key", "order_1|pay_1"))).toBe(false); // wrong key
+    expect(auth.verifyPaymentSignature("order_2", "pay_1", good)).toBe(false); // tampered order
+    expect(auth.verifyPaymentSignature("order_1", "pay_2", good)).toBe(false); // tampered payment
+    expect(auth.verifyPaymentSignature("order_1", "pay_1", "zz" + good.slice(2))).toBe(false); // bad hex
+    expect(auth.verifyPaymentSignature("order_1", "pay_1", good.slice(0, 62))).toBe(false); // wrong length
+  });
+
   it("verifier sends Basic auth to /v1/orders and classifies a 401", async () => {
     const seen: { url: string; headers: Record<string, string> }[] = [];
     const f = (async (url: string, init: RequestInit) => {
       seen.push({ url, headers: init.headers as Record<string, string> });
       return new Response("{}", { status: 401 });
     }) as unknown as typeof fetch;
-    const auth: HostRazorpayAuth = { keyId: KEY_ID, headers: () => ({ authorization: "Basic x" }) };
+    const auth: HostRazorpayAuth = { keyId: KEY_ID, headers: () => ({ authorization: "Basic x" }), verifyPaymentSignature: () => false };
     const err = await razorpayVerifier("https://rp.fake/", f)(auth).catch((e) => e);
     expect(err).toBeInstanceOf(BillingApiError);
     expect(err.status).toBe(401);

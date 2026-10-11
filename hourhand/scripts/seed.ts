@@ -22,7 +22,7 @@ function arunSeed(now: Date): Seed {
     }],
     locations: [], questions: [], connections: [], calendars: [], busyBlocks: [],
     bookings: [{
-      id: "bkg_arun_1", eventTypeId: "evt_arun_chat", hostId: userId, startAt: start, endAt: end, bufferedStart: start, bufferedEnd: end, status: "confirmed",
+      id: "bkg_arun_1", eventTypeId: "evt_arun_chat", hostId: userId, startAt: start, endAt: end, bufferedStart: start, bufferedEnd: end, status: "confirmed", holdExpiresAt: null,
       locationKind: null, joinUrl: null, idempotencyKey: "seed-bkg_arun_1", cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: null, createdAt: now,
       invitee: { id: "inv_arun_1", bookingId: "bkg_arun_1", hostId: userId, name: "Divya Menon", email: "divya.menon@example.com", timezone: "Asia/Kolkata", phone: null, answers: [], manageToken: "tok_bkg_arun_1" },
     }],

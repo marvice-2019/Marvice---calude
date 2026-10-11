@@ -17,6 +17,8 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
 
   /** Builds a confirmed booking after the overlap check. `movingId` is the booking being rescheduled, which the check skips. */
   function build(input: CreateBookingInput, movingId: string | null): BookingWithInvitee {
+    // Paid bookings need Razorpay and the payments table: Postgres only.
+    if (input.holdUntil) throw new Error("Paid bookings (holdUntil) need the Postgres store");
     const et = db.eventTypes.find((e) => e.id === input.eventTypeId);
     if (!et) throw new Error(`Unknown event type ${input.eventTypeId}`);
 
@@ -33,7 +35,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
 
     const id = randomUUID();
     return {
-      id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed",
+      id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed", holdExpiresAt: null,
       locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null, joinUrl: null,
       idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, createdAt: new Date(),
       invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", "") },

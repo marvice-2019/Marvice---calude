@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type pg from "pg";
 import { BillingApiError } from "../billing/providers";
 import { seal, unseal } from "../crypto/seal";
@@ -13,6 +14,8 @@ type Env = Record<string, string | undefined>;
 export interface HostRazorpayAuth {
   headers(): Record<string, string>;
   keyId: string;
+  /** Checkout's razorpay_signature for an order and payment. Lives here because an OAuth connection signs differently. */
+  verifyPaymentSignature(orderId: string, paymentId: string, signature: string): boolean;
 }
 
 export type RazorpayMode = "test" | "live";
@@ -31,7 +34,15 @@ export class RazorpayKeyError extends Error {
 
 export function keyPairAuth(keyId: string, keySecret: string): HostRazorpayAuth {
   const value = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
-  return { keyId, headers: () => ({ authorization: value }) };
+  return {
+    keyId,
+    headers: () => ({ authorization: value }),
+    verifyPaymentSignature(orderId, paymentId, signature) {
+      const expected = createHmac("sha256", keySecret).update(`${orderId}|${paymentId}`).digest();
+      if (!/^[0-9a-f]{64}$/i.test(signature)) return false;
+      return timingSafeEqual(expected, Buffer.from(signature, "hex"));
+    },
+  };
 }
 
 const aad = (userId: string, keyId: string) => `razorpay:${userId}:${keyId}`;
