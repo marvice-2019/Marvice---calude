@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeSlots } from "../slots";
 import { createMemoryStore } from "./memory-store";
 import { buildSeed } from "./seed";
-import { SlotTakenError } from "./types";
+import { NotFoundError, SlotTakenError } from "./types";
 
 const NOW = new Date("2026-10-10T06:00:00Z");
 const guest = { name: "Meera Iyer", email: "meera@example.com", timezone: "Asia/Kolkata", phone: null, answers: [] };
@@ -42,7 +42,7 @@ describe("memory store createBooking", () => {
     expect(await slotsNow()).not.toContain(first.startAt.getTime());
     await expect(store.createBooking({ eventTypeId: eventType.id, startAt: first.startAt, idempotencyKey: "k2", invitee: guest })).rejects.toBeInstanceOf(SlotTakenError);
 
-    await store.cancelBooking(first.id, "guest");
+    await store.cancelBooking(host.id, first.id, "guest");
     expect(await slotsNow()).toContain(first.startAt.getTime());
     const rebooked = await store.createBooking({ eventTypeId: eventType.id, startAt: first.startAt, idempotencyKey: "k3", invitee: guest });
     expect(rebooked.status).toBe("confirmed");
@@ -51,16 +51,16 @@ describe("memory store createBooking", () => {
   it("does not reuse a question id that belongs to another event type", async () => {
     const { store } = await setup();
     const q = { label: "Anything else?", kind: "short_text" as const, required: false, choices: [] };
-    const [saved] = await store.saveQuestions("evt_intro", [{ ...q, id: "q_goal" }]);
+    const [saved] = await store.saveQuestions("usr_priya", "evt_intro", [{ ...q, id: "q_goal" }]);
     expect(saved.id).not.toBe("q_goal");
-    const coaching = await store.listCustomQuestions("evt_coaching");
+    const coaching = await store.listCustomQuestions("usr_priya", "evt_coaching");
     expect(coaching.map((c) => c.id)).toEqual(["q_goal"]);
     expect(coaching[0].label).toBe("What would you like to work on?");
   });
 
   it("keeps a question id that belongs to the same event type", async () => {
     const { store } = await setup();
-    const [saved] = await store.saveQuestions("evt_coaching", [{ label: "Goal?", kind: "long_text", required: true, choices: [], id: "q_goal" }]);
+    const [saved] = await store.saveQuestions("usr_priya", "evt_coaching", [{ label: "Goal?", kind: "long_text", required: true, choices: [], id: "q_goal" }]);
     expect(saved.id).toBe("q_goal");
   });
 
@@ -68,5 +68,21 @@ describe("memory store createBooking", () => {
     const { store } = await setup();
     expect((await store.getPublicEventType("priya", "coaching"))?.eventType.durationMinutes).toBe(45);
     expect((await store.getPublicEventType("priya", "intro"))?.eventType.name).toBe("Free 15-min intro call");
+  });
+
+  it("refuses another host's records in every method that takes a host id", async () => {
+    const { store, host, first } = await setup();
+    const stranger = "usr_someone_else";
+    const { schedule, rules } = await store.getDefaultSchedule(host.id);
+    expect(await store.listCustomQuestions(stranger, "evt_coaching")).toEqual([]);
+    expect(await store.listEventLocations(stranger, "evt_coaching")).toEqual([]);
+    await expect(store.saveQuestions(stranger, "evt_coaching", [])).rejects.toBeInstanceOf(NotFoundError);
+    await expect(store.cancelBooking(stranger, first.id, "host")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(store.rescheduleBooking(stranger, first.id, new Date("2026-10-20T04:00:00Z"), "hijack-1")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(store.saveWeeklyHours(stranger, schedule.id, {})).rejects.toBeInstanceOf(NotFoundError);
+    await expect(store.blockDateRange(stranger, schedule.id, "2026-10-20", "2026-10-21")).rejects.toBeInstanceOf(NotFoundError);
+    expect((await store.getBooking(host.id, first.id))!.status).toBe("confirmed");
+    expect((await store.listCustomQuestions(host.id, "evt_coaching")).length).toBe(1);
+    expect((await store.getDefaultSchedule(host.id)).rules).toEqual(rules);
   });
 });

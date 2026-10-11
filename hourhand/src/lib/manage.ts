@@ -24,7 +24,7 @@ export async function handleCancel(store: DataStore, token: string, reason: unkn
   const cutoffMs = (eventType?.cancelCutoffMinutes ?? 0) * MIN;
   if (booking.startAt.getTime() - now.getTime() < cutoffMs) return { status: 409, body: { error: "past_cutoff" } };
 
-  await store.cancelBooking(booking.id, "guest", text || undefined);
+  await store.cancelBooking(booking.hostId, booking.id, "guest", text || undefined);
   return { status: 200, body: { status: "cancelled" } };
 }
 
@@ -55,7 +55,7 @@ export async function handleReschedule(store: DataStore, token: string, input: u
   if (!offered.some((s) => s.getTime() === start.getTime())) return slotTaken(store, host, eventType, start, now, booking.id);
 
   try {
-    const moved = await store.rescheduleBooking(booking.id, start, idempotencyKey);
+    const moved = await store.rescheduleBooking(booking.hostId, booking.id, start, idempotencyKey);
     return { status: 201, body: { bookingId: moved.id, manageToken: moved.invitee.manageToken } };
   } catch (err) {
     if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, start, now, booking.id);

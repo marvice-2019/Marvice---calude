@@ -8,7 +8,7 @@ export default async function PublicEventPage({ params }: { params: Promise<{ sl
   const found = await store.getPublicEventType(slug, event);
   if (!found) notFound();
   const { host, eventType } = found;
-  const questions = (await store.listCustomQuestions(eventType.id))
+  const questions = (await store.listCustomQuestions(host.id, eventType.id))
     .sort((a, b) => a.position - b.position)
     .map(({ id, label, kind, required }) => ({ id, label, kind, required }));
   return (

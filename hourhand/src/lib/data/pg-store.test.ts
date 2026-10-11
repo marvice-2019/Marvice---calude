@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "./pg-store";
-import { SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
+import { NotFoundError, SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
 
 const URL_ = process.env.TEST_DATABASE_URL;
 const MIN = 60_000;
@@ -84,11 +84,11 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
   describe("rescheduleBooking", () => {
     it("moves the booking, frees the old slot, and returns the same booking for a repeated key", async () => {
       const old = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-09T04:00:00Z"), idempotencyKey: "pg-move-1", invitee: guest });
-      const moved = await store.rescheduleBooking(old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
+      const moved = await store.rescheduleBooking(priya.id, old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
       expect(moved).toMatchObject({ status: "confirmed", rescheduledFromId: old.id, startAt: at("2030-01-09T08:00:00Z") });
       expect((await store.getBooking(priya.id, old.id))!.status).toBe("cancelled");
 
-      const retry = await store.rescheduleBooking(old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
+      const retry = await store.rescheduleBooking(priya.id, old.id, at("2030-01-09T08:00:00Z"), "pg-move-1b");
       expect(retry.id).toBe(moved.id);
 
       const reuse = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-09T04:00:00Z"), idempotencyKey: "pg-move-1c", invitee: guest });
@@ -97,14 +97,14 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
 
     it("moves to a slot that overlaps the booking's own old slot", async () => {
       const old = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-10T04:00:00Z"), idempotencyKey: "pg-overlap-1", invitee: guest });
-      const moved = await store.rescheduleBooking(old.id, at("2030-01-10T04:15:00Z"), "pg-overlap-2");
+      const moved = await store.rescheduleBooking(priya.id, old.id, at("2030-01-10T04:15:00Z"), "pg-overlap-2");
       expect(moved).toMatchObject({ status: "confirmed", startAt: at("2030-01-10T04:15:00Z") });
     });
 
     it("a failed reschedule leaves the old booking confirmed", async () => {
       const old = await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-11T04:00:00Z"), idempotencyKey: "pg-fail-1", invitee: guest });
       await store.createBooking({ eventTypeId: coaching.id, startAt: at("2030-01-11T08:00:00Z"), idempotencyKey: "pg-fail-other", invitee: guest });
-      await expect(store.rescheduleBooking(old.id, at("2030-01-11T08:00:00Z"), "pg-fail-2")).rejects.toBeInstanceOf(SlotTakenError);
+      await expect(store.rescheduleBooking(priya.id, old.id, at("2030-01-11T08:00:00Z"), "pg-fail-2")).rejects.toBeInstanceOf(SlotTakenError);
       expect((await store.getBooking(priya.id, old.id))!.status).toBe("confirmed");
     });
   });
@@ -137,6 +137,33 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       await expect(store.deleteEventType(arun.id, intro.id)).rejects.toThrow();
       expect(await store.getEventType(priya.id, intro.id)).toEqual(before);
     });
+
+    it("cannot read Priya's locations or questions, nor overwrite her questions", async () => {
+      expect((await store.listCustomQuestions(priya.id, coaching.id)).length).toBeGreaterThan(0);
+      expect(await store.listCustomQuestions(arun.id, coaching.id)).toEqual([]);
+      expect(await store.listEventLocations(arun.id, coaching.id)).toEqual([]);
+      const before = await store.listCustomQuestions(priya.id, coaching.id);
+      await expect(store.saveQuestions(arun.id, coaching.id, [])).rejects.toBeInstanceOf(NotFoundError);
+      expect(await store.listCustomQuestions(priya.id, coaching.id)).toEqual(before);
+    });
+
+    it("cannot cancel or move Priya's booking", async () => {
+      const priyaBooking = (await store.getBookingByManageToken("tok_bkg_1"))!;
+      await expect(store.cancelBooking(arun.id, priyaBooking.id, "host")).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.rescheduleBooking(arun.id, priyaBooking.id, at("2030-02-01T04:00:00Z"), "pg-hijack-1")).rejects.toBeInstanceOf(NotFoundError);
+      const after = (await store.getBooking(priya.id, priyaBooking.id))!;
+      expect(after.status).toBe(priyaBooking.status);
+      expect(after.startAt).toEqual(priyaBooking.startAt);
+    });
+
+    it("cannot change Priya's hours or overrides", async () => {
+      const { schedule, rules } = await store.getDefaultSchedule(priya.id);
+      await expect(store.saveWeeklyHours(arun.id, schedule.id, {})).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.saveDateOverride(arun.id, schedule.id, "2030-03-01", [])).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.blockDateRange(arun.id, schedule.id, "2030-03-01", "2030-03-07")).rejects.toBeInstanceOf(NotFoundError);
+      await expect(store.deleteDateOverride(arun.id, schedule.id, "2030-03-01")).rejects.toBeInstanceOf(NotFoundError);
+      expect((await store.getDefaultSchedule(priya.id)).rules).toEqual(rules);
+    });
   });
 
   describe("event types and questions", () => {
@@ -147,18 +174,18 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
     });
 
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
-      const [coachingQuestion] = await store.listCustomQuestions(coaching.id);
-      const saved = await store.saveQuestions(intro.id, [
+      const [coachingQuestion] = await store.listCustomQuestions(priya.id, coaching.id);
+      const saved = await store.saveQuestions(priya.id, intro.id, [
         { id: coachingQuestion.id, label: "Company", kind: "short_text", required: false, choices: [] },
         { id: null, label: "What brings you here?", kind: "long_text", required: true, choices: [] },
       ]);
       expect(saved[0].id).not.toBe(coachingQuestion.id);
-      const listed = await store.listCustomQuestions(intro.id);
+      const listed = await store.listCustomQuestions(priya.id, intro.id);
       expect(listed.map((q) => [q.label, q.required, q.position])).toEqual([["Company", false, 0], ["What brings you here?", true, 1]]);
       expect(listed.map((q) => q.id)).toEqual(saved.map((q) => q.id));
-      expect((await store.listCustomQuestions(coaching.id)).map((q) => q.id)).toEqual([coachingQuestion.id]);
+      expect((await store.listCustomQuestions(priya.id, coaching.id)).map((q) => q.id)).toEqual([coachingQuestion.id]);
 
-      const resaved = await store.saveQuestions(intro.id, [...listed].reverse().map(({ id, label, kind, required, choices }) => ({ id, label, kind, required, choices })));
+      const resaved = await store.saveQuestions(priya.id, intro.id, [...listed].reverse().map(({ id, label, kind, required, choices }) => ({ id, label, kind, required, choices })));
       expect(resaved.map((q) => q.id)).toEqual([listed[1].id, listed[0].id]);
     });
   });

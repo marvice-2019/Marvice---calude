@@ -71,7 +71,7 @@ describe("availability in the memory store", () => {
     const { schedule } = await store.getDefaultSchedule(host.id);
     expect(await slotsFor(store, "2026-10-11", "2026-10-12")).toEqual([]); // no Sunday hours in the seed
 
-    await store.saveWeeklyHours(schedule.id, { 0: [{ from: "10:00", to: "11:00" }] });
+    await store.saveWeeklyHours(host.id, schedule.id, { 0: [{ from: "10:00", to: "11:00" }] });
 
     const sunday = await slotsFor(store, "2026-10-11", "2026-10-12");
     expect(sunday.map((d) => d.toISOString())).toEqual(["2026-10-11T04:30:00.000Z", "2026-10-11T04:45:00.000Z", "2026-10-11T05:00:00.000Z", "2026-10-11T05:15:00.000Z"]);
@@ -84,11 +84,11 @@ describe("availability in the memory store", () => {
     const { schedule } = await store.getDefaultSchedule(host.id);
     expect((await slotsFor(store, "2026-10-12", "2026-10-19")).length).toBeGreaterThan(0);
 
-    await store.blockDateRange(schedule.id, "2026-10-12", "2026-10-18");
+    await store.blockDateRange(host.id, schedule.id, "2026-10-12", "2026-10-18");
 
     expect(await slotsFor(store, "2026-10-12", "2026-10-19")).toEqual([]);
     expect((await slotsFor(store, "2026-10-19", "2026-10-20")).length).toBeGreaterThan(0);
-    await store.deleteDateOverride(schedule.id, "2026-10-13");
+    await store.deleteDateOverride(host.id, schedule.id, "2026-10-13");
     expect((await slotsFor(store, "2026-10-13", "2026-10-14")).length).toBeGreaterThan(0);
   });
 });

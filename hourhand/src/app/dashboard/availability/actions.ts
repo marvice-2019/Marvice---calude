@@ -32,7 +32,8 @@ export async function saveWeeklyHoursAction(_prev: FormState, form: FormData): P
   for (let day = 0; day < 7; day++) hours[day] = form.get(`w${day}-on`) ? readRanges(form, `w${day}`) : [];
   const checked = validateWeeklyHours(hours);
   if (!checked.ok) return fail(checked.errors);
-  await store.saveWeeklyHours((await mySchedule()).id, checked.value);
+  const mine = await mySchedule();
+  await store.saveWeeklyHours(mine.userId, mine.id, checked.value);
   revalidatePath(PATH);
   return saved();
 }
@@ -43,7 +44,7 @@ export async function saveDateOverrideAction(_prev: FormState, form: FormData): 
   if (form.get("ov-kind") === "hours" && intervals.length === 0) return fail({ "ov-0-from": "Add at least one range." });
   const checked = validateDateOverride(String(form.get("ov-date") ?? ""), intervals, todayIn(schedule.timezone, new Date()));
   if (!checked.ok) return fail(checked.errors);
-  await store.saveDateOverride(schedule.id, checked.value.date, checked.value.intervals);
+  await store.saveDateOverride(schedule.userId, schedule.id, checked.value.date, checked.value.intervals);
   revalidatePath(PATH);
   return saved();
 }
@@ -52,12 +53,13 @@ export async function blockDateRangeAction(_prev: FormState, form: FormData): Pr
   const schedule = await mySchedule();
   const checked = validateDateRange(String(form.get("block-from") ?? ""), String(form.get("block-to") ?? ""), todayIn(schedule.timezone, new Date()));
   if (!checked.ok) return fail(checked.errors);
-  await store.blockDateRange(schedule.id, checked.value.from, checked.value.to);
+  await store.blockDateRange(schedule.userId, schedule.id, checked.value.from, checked.value.to);
   revalidatePath(PATH);
   return saved();
 }
 
 export async function deleteDateOverrideAction(form: FormData): Promise<void> {
-  await store.deleteDateOverride((await mySchedule()).id, String(form.get("date") ?? ""));
+  const mine = await mySchedule();
+  await store.deleteDateOverride(mine.userId, mine.id, String(form.get("date") ?? ""));
   revalidatePath(PATH);
 }

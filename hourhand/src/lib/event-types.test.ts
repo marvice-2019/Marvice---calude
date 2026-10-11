@@ -125,13 +125,13 @@ describe("event type store", () => {
     const host = await store.getCurrentUser();
     const created = await store.createEventType(host.id, draft({ locationKind: "in_person", locationValue: "MG Road office" }));
     expect(created).toMatchObject({ slug: "strategy", active: true, durationMinutes: 30, position: 2 });
-    expect(await store.listEventLocations(created.id)).toMatchObject([{ kind: "in_person", value: "MG Road office" }]);
+    expect(await store.listEventLocations(host.id, created.id)).toMatchObject([{ kind: "in_person", value: "MG Road office" }]);
     await expect(store.createEventType(host.id, draft())).rejects.toThrow(SLUG_TAKEN);
     await expect(store.updateEventType(host.id, created.id, draft({ slug: "coaching" }))).rejects.toThrow(SLUG_TAKEN);
 
     await store.updateEventType(host.id, created.id, draft({ durationMinutes: "60", locationKind: "" }));
     expect(await store.getEventType(host.id, created.id)).toMatchObject({ durationMinutes: 60, slug: "strategy" });
-    expect(await store.listEventLocations(created.id)).toEqual([]);
+    expect(await store.listEventLocations(host.id, created.id)).toEqual([]);
 
     await store.setEventTypeActive(host.id, created.id, false);
     expect(await store.getPublicEventType(host.slug, "strategy")).toBeNull();
@@ -145,9 +145,9 @@ describe("event type store", () => {
       { id: null, label: "How did you hear about me?", kind: "single_select", required: true, choices: ["Friend", "LinkedIn"] },
     ]);
     if (!checked.ok) throw new Error("questions should be valid");
-    await store.saveQuestions("evt_coaching", checked.value);
+    await store.saveQuestions("usr_priya", "evt_coaching", checked.value);
 
-    const back = await store.listCustomQuestions("evt_coaching");
+    const back = await store.listCustomQuestions("usr_priya", "evt_coaching");
     expect(back.map((q) => [q.label, q.required, q.position])).toEqual([
       ["Company name", false, 0],
       ["What would you like to work on?", true, 1],
@@ -155,6 +155,6 @@ describe("event type store", () => {
     ]);
     expect(back[1].id).toBe("q_goal");
     expect(back[2].choices).toEqual(["Friend", "LinkedIn"]);
-    expect(await store.listCustomQuestions("evt_intro")).toEqual([]);
+    expect(await store.listCustomQuestions("usr_priya", "evt_intro")).toEqual([]);
   });
 });

@@ -150,6 +150,15 @@ export class SlotTakenError extends Error {
   }
 }
 
+/** A record that doesn't exist, or belongs to someone else (the caller can't tell which, by design). */
+export class NotFoundError extends Error {
+  readonly code = "not_found";
+  constructor(what: string) {
+    super(`${what} not found`);
+    this.name = "NotFoundError";
+  }
+}
+
 /** The data layer every screen talks to. The Postgres version implements the same interface. */
 export interface DataStore {
   /** Memory mode only: the seeded demo host. Postgres throws; screens use requireUser() from @/lib/auth/session. */
@@ -159,8 +168,9 @@ export interface DataStore {
   listEventTypes(userId: string): Promise<EventType[]>;
   getEventType(userId: string, id: string): Promise<EventType | null>;
   getPublicEventType(hostSlug: string, eventSlug: string): Promise<{ host: User; eventType: EventType } | null>;
-  listEventLocations(eventTypeId: string): Promise<EventLocation[]>;
-  listCustomQuestions(eventTypeId: string): Promise<CustomQuestion[]>;
+  /** Empty unless the event type belongs to `userId`. */
+  listEventLocations(userId: string, eventTypeId: string): Promise<EventLocation[]>;
+  listCustomQuestions(userId: string, eventTypeId: string): Promise<CustomQuestion[]>;
   getDefaultSchedule(userId: string): Promise<{ schedule: AvailabilitySchedule; rules: AvailabilityRule[] }>;
   listCalendarConnections(userId: string): Promise<CalendarConnection[]>;
   listCalendars(userId: string): Promise<Calendar[]>;
@@ -169,16 +179,18 @@ export interface DataStore {
   getBooking(userId: string, id: string): Promise<BookingWithInvitee | null>;
   getBookingByManageToken(token: string): Promise<BookingWithInvitee | null>;
   createBooking(input: CreateBookingInput): Promise<BookingWithInvitee>;
-  cancelBooking(bookingId: string, by: "host" | "guest", reason?: string): Promise<BookingWithInvitee>;
+  /** Throws NotFoundError unless the booking belongs to `hostId`. */
+  cancelBooking(hostId: string, bookingId: string, by: "host" | "guest", reason?: string): Promise<BookingWithInvitee>;
   /** Atomically books `startAt` for the same guest and cancels the old booking. The overlap check ignores the old booking. */
-  rescheduleBooking(bookingId: string, startAt: Date, idempotencyKey: string): Promise<BookingWithInvitee>;
+  rescheduleBooking(hostId: string, bookingId: string, startAt: Date, idempotencyKey: string): Promise<BookingWithInvitee>;
   /** Replaces the weekly rules: weekday (0 = Sunday) to its ranges. Days left out or empty are unavailable. */
-  saveWeeklyHours(scheduleId: string, byWeekday: Record<number, Interval[]>): Promise<void>;
+  /** The four schedule writes throw NotFoundError unless the schedule belongs to `userId`. */
+  saveWeeklyHours(userId: string, scheduleId: string, byWeekday: Record<number, Interval[]>): Promise<void>;
   /** Sets one date's hours, replacing any override for that date. Empty intervals = unavailable all day. */
-  saveDateOverride(scheduleId: string, date: string, intervals: Interval[]): Promise<void>;
-  deleteDateOverride(scheduleId: string, date: string): Promise<void>;
+  saveDateOverride(userId: string, scheduleId: string, date: string, intervals: Interval[]): Promise<void>;
+  deleteDateOverride(userId: string, scheduleId: string, date: string): Promise<void>;
   /** Marks every date from `from` to `to` (both included, YYYY-MM-DD) unavailable. */
-  blockDateRange(scheduleId: string, from: string, to: string): Promise<void>;
+  blockDateRange(userId: string, scheduleId: string, from: string, to: string): Promise<void>;
   /** Throws SlugTakenError when the user already has an event type with that slug (unique (user_id, slug)). */
   createEventType(userId: string, draft: EventTypeDraft): Promise<EventType>;
   updateEventType(userId: string, id: string, draft: EventTypeDraft): Promise<EventType>;
@@ -186,7 +198,7 @@ export interface DataStore {
   /** Throws EventTypeInUseError while bookings still point at it (bookings.event_type_id is on delete restrict). */
   deleteEventType(userId: string, id: string, now?: Date): Promise<void>;
   /** Replaces the event type's questions; list order becomes position. */
-  saveQuestions(eventTypeId: string, questions: QuestionDraft[]): Promise<CustomQuestion[]>;
+  saveQuestions(userId: string, eventTypeId: string, questions: QuestionDraft[]): Promise<CustomQuestion[]>;
 }
 
 /** The editable fields of an event type, already validated. */
