@@ -43,7 +43,7 @@ Parking.com has a big app (20,084 iOS ratings, 4.5 stars) with lots of inventory
 | Cashless tip to the valet | Not documented in any source found | No; **Proposed** as a differentiator |
 | Key-tag ↔ ticket ↔ plate audit trail (fraud control) | SMS Valet ("no fraud") | No |
 
-## iOS app walkthrough [V] (your screenshots, iOS app 3.68.0, Bengaluru, 11 Oct 2026; saved in `recon/parking-com-ios-3.68.0/`)
+## iOS app walkthrough [V] (your screenshots 01–19, iOS app 3.68.0, Bengaluru, 11 Oct 2026; saved in `recon/parking-com-ios-3.68.0/`)
 
 | Screen | What it shows (verified) | What it means for Bayline |
 |---|---|---|
@@ -58,6 +58,9 @@ Parking.com has a big app (20,084 iOS ratings, 4.5 stars) with lots of inventory
 | 14 Monthly Parking | A **separate web portal** with its own email + password login (plus Google) | Two logins for one customer. Ours keeps monthly in the same app and account |
 | 15 Settings | Only policy links: ALPR usage & privacy, CCPA, privacy policy, a Chevy Bolt EV notice | No notification, vehicle or payment settings. Ours: vehicles, payment preference, WhatsApp alerts, language |
 | 16 Support | FAQs, email support, call support | Add WhatsApp chat support, which is how Indian users expect to reach support |
+| 17 Find Parking search | Search box with Daily/Monthly, entrance and exit time, **Parking near me**, **recent searches** (London; The London NYC Hotel, New York) | Add recent searches and "near me". Searching by hotel or venue name confirms that venue search matters |
+| 18 Zone entry | Tapping "Enter Zone" opens a **numeric keypad**: zone codes are digits only | **Change ours:** BLR101 forces the letter keyboard. Accept the 3–5 digits alone (101), and keep "BLR" printed on the board for recognition |
+| 19 Zone validation | Empty submit shows "Zone # must be more than 2 characters", while the screen asks for a "5-digit Zone #" | Their message contradicts their own instruction. Ours says exactly what's wrong and offers nearby lots |
 
 **UrbanParking is still [GAP].** None of these screenshots are of it. If it's your own Emergent build, sharing its source or an export works as well as screenshots.
 
