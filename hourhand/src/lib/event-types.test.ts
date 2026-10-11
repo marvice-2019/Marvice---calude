@@ -52,8 +52,14 @@ describe("validateEventType", () => {
         name: "30-min strategy call", slug: "strategy", description: "Plan the next quarter.", durationMinutes: 30, minNoticeMinutes: 240,
         bookingWindowDays: 60, startIncrementMinutes: 15, bufferBeforeMinutes: 0, bufferAfterMinutes: 10, dailyLimit: null,
         cancelCutoffMinutes: 120, maxRepeats: 1, depositMinor: null, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
+        redirectUrl: null,
       },
     });
+  });
+
+  it("takes an https page to send guests to after booking, and nothing else", () => {
+    expect(validateEventType({ ...valid, redirectUrl: "https://priya.coach/thanks" }, [])).toMatchObject({ ok: true, value: { redirectUrl: "https://priya.coach/thanks" } });
+    expect(validateEventType({ ...valid, redirectUrl: "javascript:alert(1)" }, [])).toMatchObject({ ok: false, errors: { redirectUrl: expect.any(String) } });
   });
 
   it("carries the 'only people with the link' choice, and refuses anything but true or false", () => {

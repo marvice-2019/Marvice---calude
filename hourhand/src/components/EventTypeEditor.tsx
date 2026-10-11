@@ -145,7 +145,7 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
     });
   }
 
-  const numberField = (key: Exclude<keyof EventTypeForm, "hidden">, label: string, unit: string, hint?: string) => (
+  const numberField = (key: Exclude<keyof EventTypeForm, "hidden" | "redirectUrl">, label: string, unit: string, hint?: string) => (
     <div>
       <Label htmlFor={`f-${key}`}>{label}</Label>
       <div className="flex items-center gap-2">
@@ -261,6 +261,14 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
             aria-describedby="f-description-hint" className={`py-2 ${fieldClasses(false)}`}
           />
           <p id="f-description-hint" className="mt-1 text-sm text-text-muted">Shown on your booking page. Optional.</p>
+        </div>
+        <div>
+          <Label htmlFor="f-redirectUrl">After booking, send guests to</Label>
+          <Input
+            id="f-redirectUrl" inputMode="url" value={form.redirectUrl ?? ""} onChange={(e) => set("redirectUrl")(e.target.value)} error={errors.redirectUrl}
+            placeholder="https://yoursite.com/thank-you" aria-describedby="f-redirectUrl-hint"
+          />
+          <p id="f-redirectUrl-hint" className="mt-1 text-sm text-text-muted">Optional. Guests see their confirmation first, then go to this page a few seconds later.</p>
         </div>
       </Panel>
 

@@ -53,6 +53,8 @@ export interface EventType {
   maxRepeats: number;
   /** A refundable no-show deposit in paise, on a free event type; null = none. Refunded after the session unless marked a no-show. */
   depositMinor: number | null;
+  /** Where guests go after booking (https), instead of staying on the confirmation page; null = stay. */
+  redirectUrl: string | null;
 }
 
 /** What the host enters for a one-off meeting. */
@@ -351,7 +353,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor" | "redirectUrl"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

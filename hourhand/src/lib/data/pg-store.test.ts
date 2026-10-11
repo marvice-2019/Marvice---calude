@@ -193,6 +193,12 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect([free.priceMinor, free.currency]).toEqual([null, null]);
     });
 
+    it("stores and clears the page guests go to after booking", async () => {
+      const set = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), redirectUrl: "https://priya.coach/thanks" });
+      expect((await store.getEventType(priya.id, intro.id))!.redirectUrl).toBe("https://priya.coach/thanks");
+      expect((await store.updateEventType(priya.id, intro.id, { ...draftOf(set), redirectUrl: null })).redirectUrl).toBeNull();
+    });
+
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
       const [coachingQuestion] = await store.listCustomQuestions(priya.id, coaching.id);
       const saved = await store.saveQuestions(priya.id, intro.id, [
@@ -494,6 +500,6 @@ function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
     startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit, hidden: e.hidden,
-    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, depositMinor: e.depositMinor, location: null,
+    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, depositMinor: e.depositMinor, redirectUrl: e.redirectUrl, location: null,
   };
 }

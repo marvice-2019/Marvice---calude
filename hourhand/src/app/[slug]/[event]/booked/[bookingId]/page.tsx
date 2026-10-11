@@ -8,6 +8,9 @@ import { isUnpaidRelease } from "@/lib/booking-reasons";
 import { store } from "@/lib/data";
 import { formatDate, zoneName } from "@/lib/format";
 import { LOCATION_KEYS, resolveLocale, t, tNodes } from "@/lib/i18n/guest";
+import { AddToCalendar } from "@/components/AddToCalendar";
+import { AutoRedirect } from "@/components/AutoRedirect";
+import { resolveBaseUrl } from "@/lib/auth/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -59,8 +62,18 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
           <div><dt className="text-sm text-text-muted">{t(locale, "bookedFor")}</dt><dd className="text-text">{booking.invitee.name}, {booking.invitee.email}</dd></div>
         </dl>
       </Card>
+      {booking.status === "confirmed" && (
+        <AddToCalendar
+          token={booking.invitee.manageToken} title={`${eventType?.name ?? ""} with ${host.name}`} start={booking.startAt} end={booking.endAt} locale={locale}
+          location={booking.joinUrl ?? (booking.locationKind ? t(locale, LOCATION_KEYS[booking.locationKind]) : null)}
+          manageUrl={`${(resolveBaseUrl() ?? "").replace(/\/+$/, "")}/b/${booking.invitee.manageToken}`}
+        />
+      )}
       <p className="mt-4 text-text-muted">{t(locale, "keepLink")}</p>
       <Link href={`/b/${booking.invitee.manageToken}${q}`} className={`mt-2 ${buttonClasses({ variant: "secondary" })}`}>{t(locale, "manageBooking")}</Link>
+      {eventType?.redirectUrl && (
+        <AutoRedirect url={eventType.redirectUrl} waiting={t(locale, "redirecting")} label={t(locale, "continueTo", { site: new URL(eventType.redirectUrl).hostname })} />
+      )}
     </main>
   );
 }

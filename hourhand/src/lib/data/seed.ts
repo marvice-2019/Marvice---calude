@@ -40,7 +40,7 @@ export function buildSeed(now: Date): Seed {
     { id: "rule_off", scheduleId: schedule.id, kind: "date", weekday: null, onDate: dateOf(2), intervals: [] }, // next Wednesday off
   ];
 
-  const base = { userId: priya.id, scheduleId: schedule.id, minNoticeMinutes: 240, bookingWindowDays: 60, startIncrementMinutes: 30, dailyLimit: null, cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: false, active: true, kind: "one_on_one" as const, maxRepeats: 1, depositMinor: null };
+  const base = { userId: priya.id, scheduleId: schedule.id, minNoticeMinutes: 240, bookingWindowDays: 60, startIncrementMinutes: 30, dailyLimit: null, cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: false, active: true, kind: "one_on_one" as const, maxRepeats: 1, depositMinor: null, redirectUrl: null };
   const eventTypes: EventType[] = [
     { ...base, id: "evt_coaching", name: "45-min coaching session", slug: "coaching", description: "A focused session on one goal you bring.", durationMinutes: 45, bufferBeforeMinutes: 10, bufferAfterMinutes: 10, position: 0 },
     { ...base, id: "evt_intro", name: "Free 15-min intro call", slug: "intro", description: "A short call to see if we're a good fit.", durationMinutes: 15, startIncrementMinutes: 15, cancelCutoffMinutes: 120, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, position: 1 },

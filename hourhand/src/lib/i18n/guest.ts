@@ -165,6 +165,10 @@ const en = {
   locInPerson: "In person",
   locCustom: "Details from the host",
   locAskGuest: "Your chosen location",
+  addToCalendar: "Add to calendar",
+  calOther: "Apple / other (.ics)",
+  continueTo: "Continue to {site}",
+  redirecting: "Taking you there in a few seconds…",
 };
 
 export type GuestKey = keyof typeof en;
@@ -315,6 +319,10 @@ const hi: Catalog = {
   locInPerson: "आमने-सामने",
   locCustom: "होस्ट से मिली जानकारी",
   locAskGuest: "आपकी चुनी हुई जगह",
+  addToCalendar: "कैलेंडर में जोड़ें",
+  calOther: "Apple / अन्य (.ics)",
+  continueTo: "{site} पर आगे बढ़ें",
+  redirecting: "कुछ ही सेकंड में आपको वहाँ ले जा रहे हैं…",
 };
 
 const ta: Catalog = {
@@ -462,6 +470,10 @@ const ta: Catalog = {
   locInPerson: "நேரில்",
   locCustom: "ஹோஸ்ட் தந்த விவரங்கள்",
   locAskGuest: "நீங்கள் தேர்ந்தெடுத்த இடம்",
+  addToCalendar: "காலெண்டரில் சேர்க்கவும்",
+  calOther: "Apple / மற்றவை (.ics)",
+  continueTo: "{site} க்குத் தொடரவும்",
+  redirecting: "சில வினாடிகளில் அங்கு அழைத்துச் செல்கிறோம்…",
 };
 
 const te: Catalog = {
@@ -609,6 +621,10 @@ const te: Catalog = {
   locInPerson: "నేరుగా కలిసి",
   locCustom: "హోస్ట్ ఇచ్చిన వివరాలు",
   locAskGuest: "మీరు ఎంచుకున్న చోటు",
+  addToCalendar: "క్యాలెండర్‌లో జోడించండి",
+  calOther: "Apple / ఇతరాలు (.ics)",
+  continueTo: "{site} కి కొనసాగండి",
+  redirecting: "కొన్ని సెకన్లలో మిమ్మల్ని అక్కడికి తీసుకెళ్తున్నాం…",
 };
 
 const kn: Catalog = {
@@ -756,6 +772,10 @@ const kn: Catalog = {
   locInPerson: "ನೇರವಾಗಿ ಭೇಟಿ",
   locCustom: "ಹೋಸ್ಟ್ ಕೊಟ್ಟ ವಿವರಗಳು",
   locAskGuest: "ನೀವು ಆರಿಸಿದ ಸ್ಥಳ",
+  addToCalendar: "ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಸೇರಿಸಿ",
+  calOther: "Apple / ಇತರೆ (.ics)",
+  continueTo: "{site} ಗೆ ಮುಂದುವರಿಯಿರಿ",
+  redirecting: "ಕೆಲವೇ ಸೆಕೆಂಡುಗಳಲ್ಲಿ ನಿಮ್ಮನ್ನು ಅಲ್ಲಿಗೆ ಕರೆದೊಯ್ಯುತ್ತೇವೆ…",
 };
 
 export const CATALOGS: Record<Locale, Catalog> = { en, hi, ta, te, kn };
