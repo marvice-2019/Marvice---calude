@@ -14,6 +14,8 @@ const mockPay = jest.fn();
 jest.mock("@/lib/pay", () => ({ pay: (...a: unknown[]) => mockPay(...a) }));
 const mockRemind = jest.fn(() => Promise.resolve(true));
 jest.mock("@/lib/notify", () => ({ scheduleExpiryReminder: (...a: unknown[]) => (mockRemind as (...x: unknown[]) => Promise<boolean>)(...a) }));
+const mockHaptic = jest.fn();
+jest.mock("@/lib/feedback", () => ({ payHaptic: (...a: unknown[]) => mockHaptic(...a) }));
 let mockMe: Me | null = null;
 jest.mock("@/lib/useMe", () => ({ useMe: () => ({ me: mockMe, reload: jest.fn() }) }));
 
@@ -67,6 +69,7 @@ test("books with an idempotency key, pays, schedules the expiry reminder, then h
   }));
   expect(mockPay).toHaveBeenCalledWith(order, expect.objectContaining({ method: "upi" }), expect.stringContaining("BL-7Q2K"));
   expect(mockRemind).toHaveBeenCalledWith(expect.objectContaining({ id: "b1", lot_name: "MG Road Metro Multilevel" }));
+  expect(mockHaptic).toHaveBeenCalledWith("paid");
 });
 
 test("a closed payment sheet keeps the held bay: retry pays again without a second booking", async () => {
@@ -88,6 +91,7 @@ test("a failed payment says no money was taken", async () => {
   await render(<Checkout {...props} onPaid={jest.fn()} />);
   await fireEvent.press(screen.getByText("Pay ₹112.10"));
   expect(await screen.findByTestId("checkout-error")).toHaveTextContent(/No money was taken/);
+  expect(mockHaptic).toHaveBeenCalledWith("failed");
 });
 
 test("promo code updates the bill and total", async () => {

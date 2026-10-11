@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { api, ApiFailure } from "@/lib/api";
 import { scheduleExpiryReminder } from "@/lib/notify";
+import { payHaptic } from "@/lib/feedback";
 import { pay } from "@/lib/pay";
 import { useTheme } from "@/lib/theme";
 import { useMe } from "@/lib/useMe";
@@ -40,6 +41,7 @@ export function Checkout({ lotId, lotName, initialQuote, from, to, vehicle, full
 
   async function collect(res: CreateBookingResponse) {
     const out = await pay(res.razorpay_order, { contact: me?.user.phone, method }, `${lotName} · ${res.booking.code}`);
+    payHaptic(out);
     if (out === "paid") { scheduleExpiryReminder({ ...res.booking, lot_name: lotName }).catch(() => undefined); onPaid(res.booking.id); return; }
     setBusy(false);
     setErr(out === "cancelled" ? "Payment closed. Your bay is held for 10 minutes; tap Pay to try again." : "The payment didn't go through. No money was taken. Try again or pick another method.");

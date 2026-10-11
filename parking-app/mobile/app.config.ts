@@ -31,6 +31,8 @@ const config: ExpoConfig = {
       monochromeImage: "./assets/android-icon-monochrome.png"
     },
     permissions: ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+    // Template defaults the app never uses; dropping them keeps the Play data-safety form and install prompt honest.
+    blockedPermissions: ["android.permission.READ_EXTERNAL_STORAGE", "android.permission.WRITE_EXTERNAL_STORAGE", "android.permission.SYSTEM_ALERT_WINDOW"],
     config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_ANDROID_KEY } },
     intentFilters: passHost ? [{
       action: "VIEW", autoVerify: true, category: ["BROWSABLE", "DEFAULT"],

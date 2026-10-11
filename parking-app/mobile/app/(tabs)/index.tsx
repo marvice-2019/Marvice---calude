@@ -1,10 +1,11 @@
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, ScrollView, TextInput, View } from "react-native";
+import { FlatList, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LotMap } from "@/components/LotMap";
 import { LotRow } from "@/components/LotRow";
+import { LotSkeleton } from "@/components/Skeleton";
 import { Button, Card, Chip, T } from "@/components/ui";
 import { api, ApiFailure } from "@/lib/api";
 import { font, useTheme } from "@/lib/theme";
@@ -111,7 +112,7 @@ export default function Find() {
         </View>
       </View>
       {view === "map" && rows && <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}><LotMap rows={rows} center={dest} onPick={id => router.push({ pathname: "/lot/[id]", params: { id, ...query } })} /></View>}
-      {loading && <ActivityIndicator style={{ margin: 24 }} color={c.sign} accessibilityLabel="Loading lots" />}
+      {loading && <LotSkeleton />}
       {!!err && <Card style={{ margin: 16 }}><T variant="bold">Couldn&apos;t load lots</T><T variant="muted">{err}</T><Button title="Try again" onPress={() => setNonce(n => n + 1)} /></Card>}
       {rows?.length === 0 && <Card style={{ margin: 16 }}><T variant="bold">No bays here for those times</T><T variant="muted">Try a shorter stay or a nearby area.</T></Card>}
     </View>

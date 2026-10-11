@@ -6,6 +6,7 @@ import { SignIn } from "@/components/SignIn";
 import { Button, Card, Chip, Field, T } from "@/components/ui";
 import { api, ApiFailure } from "@/lib/api";
 import { scheduleExpiryReminder } from "@/lib/notify";
+import { payHaptic } from "@/lib/feedback";
 import { pay } from "@/lib/pay";
 import { font, useTheme } from "@/lib/theme";
 import { useMe } from "@/lib/useMe";
@@ -44,6 +45,7 @@ export default function ParkNow() {
     try {
       const res = await api<CreateBookingResponse>("/v1/bookings", { method: "POST", idempotent: true, body: { lot_id: lot.id, source: "park_now", hours, plate: p } });
       const out = await pay(res.razorpay_order, { contact: me?.user.phone }, `${lot.name} · Park now`);
+      payHaptic(out);
       if (out === "paid") { scheduleExpiryReminder({ ...res.booking, lot_name: lot.name }).catch(() => undefined); router.replace({ pathname: "/passes", params: { new: res.booking.id } }); return; }
       setErr(out === "cancelled" ? "Payment closed. Tap Pay to try again." : "The payment didn't go through. No money was taken.");
     } catch (x) { setErr(x instanceof ApiFailure ? x.message : "Something went wrong."); }
