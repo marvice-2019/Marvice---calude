@@ -269,6 +269,16 @@ export function renderInvoiceMail(v: { kind: "invoice" | "credit_note"; number: 
   }, { replyTo: v.supplierEmail });
 }
 
+/** Last month in a few figures, with a link to the full report. */
+export function renderEarningsMail(e: { monthLabel: string; netMinor: number; bookingsMinor: number; packagesMinor: number; refundsMinor: number; sessionsHeld: number; noShows: number; url: string }): RenderedMail {
+  return render(`Your ${e.monthLabel} on Hourhand: ${formatMoney(e.netMinor, "INR")}`, {
+    heading: `${e.monthLabel} at a glance`, intro: `Here's how ${e.monthLabel} went.`,
+    rows: [["Net received", formatMoney(e.netMinor, "INR")], ["Bookings", formatMoney(e.bookingsMinor, "INR")], ["Packages", formatMoney(e.packagesMinor, "INR")],
+      ["Refunds", formatMoney(e.refundsMinor, "INR")], ["Sessions held", String(e.sessionsHeld)], ["No-shows", String(e.noShows)]],
+    link: { label: "See the full report", url: e.url }, footer: "Sent by Hourhand once a month.",
+  });
+}
+
 export function renderMagicLink(url: string): RenderedMail {
   return render("Your Hourhand sign-in link", {
     heading: "Sign in to Hourhand", intro: "Use the button below to sign in. The link works once and expires in 15 minutes.",
