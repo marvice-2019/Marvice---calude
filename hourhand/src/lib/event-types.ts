@@ -105,6 +105,9 @@ export function priceGateError(input: { priceMinor: number | null; demo: boolean
 }
 
 /** Checks the form against the schema limits. `takenSlugs` are the user's other event type slugs. */
+/** Postgres `int` holds up to this; a larger number is a field error, not a failed save. */
+const INT_MAX = 2147483647;
+
 export function validateEventType(form: EventTypeForm, takenSlugs: readonly string[]):
   { ok: true; value: EventTypeDraft } | { ok: false; errors: EventTypeErrors } {
   const errors: EventTypeErrors = {};
@@ -142,7 +145,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
   };
 
   const durationMinutes = number("durationMinutes", DURATION.min, DURATION.max, `Pick a length between ${DURATION.min} and ${DURATION.max} minutes.`);
-  const minNoticeMinutes = number("minNoticeMinutes", 0, Number.MAX_SAFE_INTEGER, "Enter 0 or more minutes.");
+  const minNoticeMinutes = number("minNoticeMinutes", 0, INT_MAX, "Enter 0 or more minutes.");
   const bookingWindowDays = number("bookingWindowDays", BOOKING_WINDOW.min, BOOKING_WINDOW.max, `Enter between ${BOOKING_WINDOW.min} and ${BOOKING_WINDOW.max} days.`);
   const startIncrementMinutes = number("startIncrementMinutes", 0, 60, "Pick one of the listed start times.");
   if (!errors.startIncrementMinutes && !(START_INCREMENTS as readonly number[]).includes(startIncrementMinutes)) {
@@ -150,8 +153,8 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
   }
   const bufferBeforeMinutes = number("bufferBeforeMinutes", BUFFER.min, BUFFER.max, `Enter between ${BUFFER.min} and ${BUFFER.max} minutes.`);
   const bufferAfterMinutes = number("bufferAfterMinutes", BUFFER.min, BUFFER.max, `Enter between ${BUFFER.min} and ${BUFFER.max} minutes.`);
-  const cancelCutoffMinutes = number("cancelCutoffMinutes", 0, Number.MAX_SAFE_INTEGER, "Enter 0 or more minutes.");
-  const dailyLimit = form.dailyLimit.trim() ? number("dailyLimit", 1, Number.MAX_SAFE_INTEGER, "Enter 1 or more, or leave it blank for no limit.") : null;
+  const cancelCutoffMinutes = number("cancelCutoffMinutes", 0, INT_MAX, "Enter 0 or more minutes.");
+  const dailyLimit = form.dailyLimit.trim() ? number("dailyLimit", 1, INT_MAX, "Enter 1 or more, or leave it blank for no limit.") : null;
 
   const price = parsePrice(form.price);
   if (price === "invalid") errors.price = PRICE_INVALID;
@@ -168,7 +171,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
   const locationValue = form.locationValue.trim();
   if (valueLabel && !locationValue) errors.locationValue = `Add the ${valueLabel.toLowerCase()} so guests know where to go.`;
 
-  const weeklyLimit = (form.weeklyLimit ?? "").trim() ? number("weeklyLimit", 1, 2147483647, "Enter 1 or more, or leave it blank for no limit.") : null;
+  const weeklyLimit = (form.weeklyLimit ?? "").trim() ? number("weeklyLimit", 1, INT_MAX, "Enter 1 or more, or leave it blank for no limit.") : null;
   if (!errors.weeklyLimit && !errors.dailyLimit && weeklyLimit !== null && dailyLimit !== null && weeklyLimit < dailyLimit) errors.weeklyLimit = "Make the weekly limit at least the daily one.";
   const cancelPolicy = (form.cancelPolicy ?? "").trim().replace(/\r\n/g, "\n");
   if (cancelPolicy.length > 1000) errors.cancelPolicy = "Keep the policy to 1,000 characters.";
