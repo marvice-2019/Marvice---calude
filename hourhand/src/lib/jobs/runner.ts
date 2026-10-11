@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { maintainChannels } from "../calendar/push";
 import { syncDueConnections } from "../calendar/sync";
 import { queueRenewalReminders } from "../billing/reminders";
 import { purgeClosedAccounts } from "../data/account-lifecycle";
@@ -51,6 +52,11 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
         for (;;) {
           const r = await processDueNotifications(opts.pool, opts.mailer, { baseUrl: opts.baseUrl, calendar: opts.calendar });
           if (r.claimed < BATCH_SIZE && r.released === 0) break;
+        }
+        // Watch channels are a nice-to-have on top of polling: run after the emails, and a failure stops nothing.
+        if (opts.calendar?.pushAddress) {
+          await maintainChannels(opts.pool, opts.calendar.google, opts.calendar.key, opts.calendar.pushAddress)
+            .catch((error) => console.warn("[jobs] calendar watch upkeep failed; polling continues", error));
         }
         if (Date.now() - lastPurge >= HOUR) {
           lastPurge = Date.now();

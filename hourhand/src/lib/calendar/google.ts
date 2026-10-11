@@ -1,12 +1,16 @@
 // Google Calendar over plain HTTPS: OAuth (with PKCE), the calendar list, free/busy, and the host's booked events.
 // Endpoints are injectable so tests and the end-to-end run can point at a fake Google.
 
-/** The fewest scopes that do the job. `events.owned` only touches calendars the host owns, not shared ones. */
+/**
+ * The fewest scopes that do the job. `events.owned` only touches calendars the host owns, not shared ones.
+ * `events.freebusy` reads availability (never event details) on every calendar the host can see, and is the narrowest
+ * scope that also lets Hourhand watch those calendars for changes; `calendar.freebusy` can't watch.
+ */
 export const GOOGLE_CALENDAR_SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-  "https://www.googleapis.com/auth/calendar.freebusy",
+  "https://www.googleapis.com/auth/calendar.events.freebusy",
   "https://www.googleapis.com/auth/calendar.events.owned",
 ] as const;
 
@@ -223,6 +227,23 @@ export function googleClient(opts: { clientId: string; clientSecret: string; end
         body: { summary, start: { dateTime: start.toISOString(), timeZone }, end: { dateTime: end.toISOString(), timeZone } },
       });
       return { id: eventId, ...joinUrlOf(body as Parameters<typeof joinUrlOf>[0]) };
+    },
+
+    /**
+     * Asks Google to notify `address` when the calendar's events change. The notification carries no details; it only
+     * says "look again". Channels expire (a week at most) and must be renewed with a new id.
+     */
+    async watchEvents(accessToken: string, calendarId: string, ch: { id: string; token: string; address: string; ttlSeconds: number }): Promise<{ resourceId: string; expiresAt: Date | null }> {
+      const { body } = await api<{ resourceId?: string; expiration?: string | number }>(accessToken, "POST", `/calendars/${encodeURIComponent(calendarId)}/events/watch`, {
+        body: { id: ch.id, token: ch.token, type: "web_hook", address: ch.address, params: { ttl: String(ch.ttlSeconds) } },
+      });
+      if (!body.resourceId) throw new GoogleApiError("Google returned no resource id for the watch", { retryable: true });
+      return { resourceId: body.resourceId, expiresAt: body.expiration ? new Date(Number(body.expiration)) : null };
+    },
+
+    /** Stops a notification channel; one already gone counts as stopped. */
+    async stopChannel(accessToken: string, id: string, resourceId: string): Promise<void> {
+      await api(accessToken, "POST", "/channels/stop", { body: { id, resourceId }, okStatuses: [404, 410] });
     },
 
     /** Deletes the event; one that is already gone counts as deleted. */

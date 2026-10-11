@@ -74,10 +74,11 @@ Booking emails are queued in the `notifications` table inside the same transacti
 
 Hosts connect Google Calendar from Dashboard → Calendars. It needs the Postgres store, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (the same OAuth client as Google sign-in) and `TOKEN_ENCRYPTION_KEY`.
 
-- **Permissions:** the calendar list (read-only), free/busy, and events on calendars the host owns, plus the account's email. Never full calendar access. If the host unticks one on Google's screen, Hourhand says so and keeps nothing.
+- **Permissions:** the calendar list (read-only), free/busy on the calendars the host can see (`calendar.events.freebusy`: when they're busy, never what the meetings are), and events on calendars the host owns, plus the account's email. Never full calendar access. If the host unticks one on Google's screen, Hourhand says so and keeps nothing.
 - **Handshake:** a sealed 10-minute cookie ties Google's callback to the host who started it, with PKCE. A forged or replayed callback is refused.
 - **Tokens** are encrypted with AES-256-GCM using `TOKEN_ENCRYPTION_KEY` and bound to their account; a database dump or backup can't use them. Disconnecting asks Google to revoke the grant and deletes the tokens.
 - **Busy times:** the job runner reads free/busy from each checked calendar every 5 minutes (2 while failing), far enough ahead to cover the host's longest booking window, and replaces the cached busy times in one transaction. A calendar Google can't read fails the sync; it is never treated as free.
+- **Instant sync:** on a public https address, Hourhand asks Google to watch each checked calendar (renewed weekly, stopped when the host unchecks it or disconnects). When a meeting is added or moved, Google pings `/api/webhooks/google-calendar` and that host syncs within seconds, or within a minute if it synced in the last 30 seconds (a burst of pings is one sync). A ping only says "look again" and must carry the channel's own random token (only its hash is stored); a failing connection keeps its retry schedule; a forged or lost ping changes nothing, because the 5-minute poll keeps running. Calendars Google won't watch (holiday calendars, some shared ones) stay on polling. On `http://localhost` there is no push, only polling.
 - **Health:** if a connection hasn't synced for 15 minutes, its host's pages offer no times (so nobody books over a meeting) and the header shows it. After 3 failures in a row, or at once when the host revoked access, the host gets one email per outage with a link to fix it.
 - **Booked events:** each booking is written to the calendar the host picks (only calendars they own), with the guest as an attendee and, for Google Meet event types, a Meet link. Google sends no email (`sendUpdates=none`); Hourhand's own emails carry the link. A guest's confirmation waits up to 3 minutes for the link, and goes without it if the calendar write fails. Reschedules move the same event; cancellations delete it. The event id is fixed per booking, so a retry never creates a second event.
 
@@ -133,7 +134,7 @@ Hosts on Solo or Duo can charge guests for an event type, in rupees through Razo
 
 ## What is fake today
 
-- **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Push notifications from Google (instant sync) arrive in round B4b; until then busy times are at most 5 minutes old.
+- **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Instant sync needs a public https address, so on localhost busy times are at most 5 minutes old.
 - **Email in development:** without `RESEND_API_KEY`, every email is printed to the server log instead of sent.
 - **WhatsApp, Microsoft and iCloud calendars:** not wired up yet. They will need `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
 
