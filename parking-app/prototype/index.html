@@ -206,6 +206,107 @@ nav.bottom{display:none}
 }
 @media (max-width:480px){.search{grid-template-columns:1fr}.seg{width:100%}.seg button{flex:1}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ===== UI v2: depth, rhythm, motion. Same tokens in light and dark; components only read tokens. ===== */
+:root{ --r-l:18px; --r-m:12px; --r-s:8px;
+  --e1:0 1px 2px rgba(15,27,51,.06),0 6px 18px rgba(15,27,51,.06); --e2:0 18px 48px rgba(15,27,51,.22);
+  --tint:#E7EEFB; --kerb-soft:#FFF4CC; --ok-soft:#E3F4EA; --warn-soft:#FBEBDD; --glass:rgba(255,255,255,.82) }
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){ --e1:0 1px 2px rgba(0,0,0,.45),0 8px 22px rgba(0,0,0,.35); --e2:0 18px 48px rgba(0,0,0,.6);
+  --tint:#18264A; --kerb-soft:#3A3010; --ok-soft:#13301F; --warn-soft:#3A2412; --glass:rgba(20,28,46,.82) }}
+:root[data-theme="dark"]{ --e1:0 1px 2px rgba(0,0,0,.45),0 8px 22px rgba(0,0,0,.35); --e2:0 18px 48px rgba(0,0,0,.6);
+  --tint:#18264A; --kerb-soft:#3A3010; --ok-soft:#13301F; --warn-soft:#3A2412; --glass:rgba(20,28,46,.82) }
+
+body{font-size:15.5px;-webkit-font-smoothing:antialiased}
+header.top{background:var(--glass);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px)}
+.brand{font-size:26px}
+.p-sign{border-radius:7px;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+nav.tabs button{border-radius:999px;padding:8px 14px;transition:background .15s,color .15s}
+nav.tabs button[aria-current="page"]{background:var(--tint);color:var(--sign)}
+main{padding-block:20px 112px}
+
+/* hero search card */
+.search{border:0;border-radius:var(--r-l);box-shadow:var(--e1);padding:16px;gap:12px}
+.field input,.field select,.dest-row button{border-radius:var(--r-m);padding:11px 12px;border-color:transparent;background:var(--bg);transition:box-shadow .15s,background .15s}
+.field input:focus,.field select:focus{background:var(--surface);box-shadow:0 0 0 2px var(--sign);outline:none}
+.dest-row input{font-size:17px;font-weight:700}
+.seg{border-radius:var(--r-m);border:0;padding:3px;gap:3px}
+.seg button{border-radius:9px}
+.when{display:flex;gap:8px;overflow-x:auto;grid-column:1/-1;padding-bottom:2px;scrollbar-width:none}
+.when::-webkit-scrollbar{display:none}
+.when button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:700;font-size:14px;color:var(--ink)}
+.when button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.when .lbl{color:var(--muted);font-size:13px;align-self:center;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+details.exact{grid-column:1/-1}
+details.exact summary{cursor:pointer;color:var(--sign);font-weight:700;font-size:14px;list-style:none}
+details.exact summary::-webkit-details-marker{display:none}
+details.exact[open] summary{margin-bottom:10px}
+details.exact .row2{gap:12px}
+
+.park-now{border:0;border-radius:var(--r-l);box-shadow:var(--e1);background:linear-gradient(90deg,var(--kerb-soft),var(--surface) 70%);position:relative;padding:14px 16px 14px 74px}
+.park-now::before{content:"P";position:absolute;left:16px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:var(--kerb);color:#0F1B33;font:800 26px/1 var(--f-display);box-shadow:inset 0 -3px 0 rgba(0,0,0,.15)}
+.results-head h1{font-size:28px;letter-spacing:-.01em}
+.fchips button{padding:7px 13px;box-shadow:var(--e1);border-color:transparent}
+
+/* lot cards */
+.lot{border:0;border-radius:var(--r-l);box-shadow:var(--e1);padding:14px;transition:transform .15s,box-shadow .15s}
+.lot:hover{transform:translateY(-2px);box-shadow:var(--e2)}
+.lot[aria-current="true"]{box-shadow:0 0 0 2px var(--sign),var(--e1)}
+.lot .p-sign{border-radius:12px}
+.price b{font-size:24px;color:var(--ink)}
+.meter{display:block;height:6px;border-radius:99px;background:var(--bg);overflow:hidden;margin-top:6px;max-width:180px}
+.meter i{display:block;height:100%;border-radius:99px;background:var(--ok)}
+.meter.low i{background:var(--warn)}
+.mapwrap{border:0;border-radius:var(--r-l);box-shadow:var(--e1)}
+
+/* sheet: drag handle, slide-up, sticky CTA */
+.sheet{border-radius:0;box-shadow:var(--e2)}
+@media (max-width:900px){ .sheet{border-radius:22px 22px 0 0} .sheet::before{content:"";display:block;width:44px;height:5px;border-radius:99px;background:var(--line);margin:-6px auto 12px} }
+@media (prefers-reduced-motion:no-preference){ .sheet:not([hidden]){animation:rise .26s cubic-bezier(.2,.8,.2,1)} .scrim:not([hidden]){animation:fade .2s} }
+@keyframes rise{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sticky-cta{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));margin-inline:-20px;padding:12px 20px calc(16px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--surface) 75%,transparent);display:grid;gap:8px}
+.bill{background:var(--bg);border:0;border-radius:var(--r-m);padding:12px 14px}
+.bill .tot{border-top-style:dashed}
+.btn{border-radius:var(--r-m);padding:14px 18px;font-size:16px;transition:transform .08s,filter .15s;box-shadow:0 6px 16px color-mix(in srgb,var(--sign) 35%,transparent)}
+.btn:hover{filter:brightness(1.06)} .btn:active{transform:scale(.98)}
+.btn.ghost{box-shadow:none}
+.pay label{border-radius:var(--r-m);transition:border-color .15s,background .15s}
+.pay label:has(input:checked){border-color:var(--sign);background:var(--tint)}
+
+/* passes as tickets */
+.pass{border:0;border-radius:var(--r-l);box-shadow:var(--e1);overflow:visible;position:relative}
+.pass .ph{border-radius:var(--r-l) var(--r-l) 0 0;background:linear-gradient(135deg,var(--sign),color-mix(in srgb,var(--sign) 70%,#000))}
+.pass .pb{position:relative;border-top:2px dashed var(--line)}
+.pass .pb::before,.pass .pb::after{content:"";position:absolute;top:-11px;width:20px;height:20px;border-radius:50%;background:var(--bg)}
+.pass .pb::before{left:-10px} .pass .pb::after{right:-10px}
+.pass canvas{width:156px;height:156px;box-shadow:var(--e1)}
+.prog{height:8px;border-radius:99px;background:var(--bg);overflow:hidden}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),var(--kerb))}
+.status{padding:4px 12px}
+.status.live{background:var(--ok-soft);color:var(--ok)}
+.status.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:1px}
+@media (prefers-reduced-motion:no-preference){ .status.live::before{animation:pulse 1.6s infinite} }
+@keyframes pulse{50%{opacity:.25}}
+.spot{border-radius:var(--r-m);background:var(--tint)}
+
+/* valet + cards */
+.mcard,.panel{border:0;border-radius:var(--r-l);box-shadow:var(--e1)}
+.eta{font-size:44px;color:var(--sign)}
+.tl li.now::before{box-shadow:0 0 0 4px var(--kerb-soft)}
+.photos span{border-style:solid;border-color:transparent;background:var(--tint);color:var(--sign);font-weight:700}
+.tips button{border-radius:999px;padding:9px 16px}
+.qrow{border-radius:var(--r-m);background:var(--surface);box-shadow:var(--e1)}
+.empty{border:0;background:var(--surface);box-shadow:var(--e1);border-radius:var(--r-l);padding:36px 24px;font-size:15px}
+.empty::before{content:"";display:block;width:56px;height:56px;margin:0 auto 12px;border-radius:16px;background:var(--tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231446A0' stroke-width='2' stroke-linecap='round'%3E%3Crect x='4' y='3' width='16' height='18' rx='3'/%3E%3Cpath d='M9 16V8h3.5a2.5 2.5 0 0 1 0 5H9'/%3E%3C/svg%3E") center/28px no-repeat}
+.intro h1{font-size:32px;letter-spacing:-.01em}
+
+/* bottom nav with icons */
+nav.bottom{background:var(--glass);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);box-shadow:0 -6px 20px rgba(15,27,51,.06)}
+nav.bottom button{padding:8px 2px 10px;gap:2px;font-size:11.5px}
+nav.bottom svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;padding:3px 14px;box-sizing:content-box;border-radius:999px;transition:background .15s}
+nav.bottom button[aria-current="page"] svg{background:var(--tint)}
+.toast{border-radius:999px;padding:12px 18px;box-shadow:var(--e2)}
+@media (prefers-reduced-motion:no-preference){ .toast:not([hidden]){animation:rise .22s ease-out} }
 </style>
 
 <div class="notice">Prototype. Sample lots, venues and prices for Bengaluru. No real payment is taken; valet times are sped up.</div>
@@ -229,8 +330,17 @@ nav.bottom{display:none}
         <div class="dest-row"><input id="dest" list="dest-list" autocomplete="off" placeholder="Area, mall, hospital, office…"><button type="button" id="nearme">Near me</button></div>
         <datalist id="dest-list"></datalist></div>
       <div class="recent" id="recent"></div>
-      <div class="field"><label for="arrive">Arrive</label><input type="datetime-local" id="arrive"></div>
-      <div class="field"><label for="leave">Leave</label><input type="datetime-local" id="leave"></div>
+      <div class="when" role="group" aria-label="When">
+        <span class="lbl">When</span>
+        <button type="button" data-when="now2" aria-pressed="false">Now · 2 h</button>
+        <button type="button" data-when="next3" aria-pressed="true">In 1 h · 3 h</button>
+        <button type="button" data-when="evening" aria-pressed="false">This evening</button>
+        <button type="button" data-when="day" aria-pressed="false">All day</button>
+      </div>
+      <details class="exact"><summary id="exact-sum">Exact times</summary>
+        <div class="row2"><div class="field"><label for="arrive">Arrive</label><input type="datetime-local" id="arrive"></div>
+        <div class="field"><label for="leave">Leave</label><input type="datetime-local" id="leave"></div></div>
+      </details>
       <div class="field"><label id="vlab">Vehicle</label>
         <div class="seg" role="group" aria-labelledby="vlab">
           <button type="button" data-veh="car" aria-pressed="true">Car</button>
@@ -306,11 +416,11 @@ nav.bottom{display:none}
 </main>
 
 <nav class="bottom" aria-label="Main">
-  <button data-go="find" aria-current="page"><i></i>Find</button>
-  <button data-go="valet"><i></i>Valet</button>
-  <button data-go="passes"><i></i>Passes</button>
-  <button data-go="monthly"><i></i>Monthly</button>
-  <button data-go="account"><i></i>Account</button>
+  <button data-go="find" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>Find</button>
+  <button data-go="valet"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l2 2M15 8l2 2"/></svg>Valet</button>
+  <button data-go="passes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z"/><path d="M14 5v14" stroke-dasharray="2 2.5"/></svg>Passes</button>
+  <button data-go="monthly"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Monthly</button>
+  <button data-go="account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>Account</button>
 </nav>
 
 <div class="scrim" id="scrim" hidden></div>
@@ -407,18 +517,32 @@ function initSearch(){
   const now=new Date(); now.setMinutes(0,0,0); now.setHours(now.getHours()+1);
   S.arrive=now; S.leave=new Date(+now+3*36e5);
   $("#arrive").value=toLocal(S.arrive); $("#leave").value=toLocal(S.leave);
-  $("#arrive").onchange=$("#leave").onchange=readTimes;
+  $("#arrive").onchange=$("#leave").onchange=()=>{document.querySelectorAll("[data-when]").forEach(x=>x.setAttribute("aria-pressed","false"));readTimes()};
+  document.querySelectorAll("[data-when]").forEach(b=>b.onclick=()=>setWhen(b.dataset.when));
   document.querySelectorAll("[data-veh]").forEach(b=>b.onclick=()=>{
     S.veh=b.dataset.veh;document.querySelectorAll("[data-veh]").forEach(x=>x.setAttribute("aria-pressed",x===b));renderFind()});
   $("#sort").onchange=e=>{S.sort=e.target.value;renderFind()};
   $("#search").onsubmit=e=>e.preventDefault();
+}
+function setWhen(kind){
+  const n=new Date(); n.setSeconds(0,0); let a,b;
+  if(kind==="now2"){a=new Date(Math.ceil(+n/9e5)*9e5); b=new Date(+a+2*36e5)}
+  else if(kind==="next3"){a=new Date(n); a.setMinutes(0); a.setHours(a.getHours()+1); b=new Date(+a+3*36e5)}
+  else if(kind==="evening"){a=new Date(n); a.setHours(18,0,0,0); if(a<n) a=new Date(Math.ceil(+n/9e5)*9e5); b=new Date(a); b.setHours(23,0,0,0); if(b<=a) b=new Date(+a+2*36e5)}
+  else {a=new Date(n); a.setHours(9,0,0,0); if(a<n) a=new Date(Math.ceil(+n/9e5)*9e5); b=new Date(a); b.setHours(21,0,0,0); if(b<=a) b=new Date(+a+4*36e5)}
+  $("#arrive").value=toLocal(a); $("#leave").value=toLocal(b);
+  document.querySelectorAll("[data-when]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.when===kind));
+  readTimes();
 }
 function readTimes(){
   const a=new Date($("#arrive").value), b=new Date($("#leave").value), err=$("#search-err");
   if(isNaN(a)||isNaN(b)){err.textContent="Enter both arrival and leaving times.";return}
   if(b<=a){err.textContent="Leaving time must be after arrival. Move it later.";return}
   if(b-a>30*864e5){err.textContent="Bookings run up to 30 days. For longer stays, use Monthly.";return}
-  err.textContent="";S.arrive=a;S.leave=b;renderFind();
+  err.textContent="";S.arrive=a;S.leave=b;
+  const f=d=>d.toLocaleString("en-IN",{weekday:"short",hour:"numeric",minute:"2-digit"});
+  $("#exact-sum").textContent=`${f(a)} → ${f(b)} · change`;
+  renderFind();
 }
 
 function sorted(){
@@ -439,6 +563,7 @@ function renderFind(){
         <div class="meta"><span class="lotcode">${l.code}</span> ${esc(l.area)} · ${d.toFixed(1)} km · ${esc(l.type)}</div>
         <div class="chips">${favs.has(l.id)?'<span class="chip fav">★ Saved</span>':''}${l.valet?'<span class="chip valet">Valet</span>':''}${l.covered?'<span class="chip">Covered</span>':''}${l.ev?'<span class="chip ev">EV charging</span>':''}<span class="chip">${esc(l.hours)}</span></div>
         <div class="left ${l.left<10?'low':''}">${l.left<10?`Only ${l.left} spots left`:`${l.left} spots left`}</div>
+        <span class="meter ${l.left<10?'low':''}" aria-hidden="true"><i style="width:${Math.max(4,Math.round(l.left/l.cap*100))}%"></i></span>
       </span>
       <span class="price"><b class="num">${inr(q.total)}</b><span>total incl. GST</span><br><span class="num">${inr(q.rate)}/hr</span></span>
     </button>`).join("");
@@ -511,8 +636,8 @@ function openLot(id, opt={}){
         ${["UPI|UPI (GPay, PhonePe, Paytm)","Card|Debit or credit card","Netbanking|Netbanking"].map(s=>{const [v,t]=s.split("|");
           return `<label><input type="radio" name="pm" value="${v}" ${(p?p.pm:"UPI")===v?"checked":""}> ${t}</label>`}).join("")}
       </div>
-      <div class="err" id="co-err" role="alert"></div>
-      <button class="btn" type="submit" id="paybtn">Pay ${inr(q.total)} and get pass</button>
+      <div class="sticky-cta"><div class="err" id="co-err" role="alert"></div>
+      <button class="btn" type="submit" id="paybtn">Pay ${inr(q.total)} and get pass</button></div>
       <div style="font-size:12px;color:var(--muted)">${opt.now?"Pass is live as soon as you pay. Show it at the gate or give your plate to the attendant.":"Free cancellation until your arrival time."} Overstay is charged at ${inr(q.rate)}/hr at exit.</div>
     </form>`);
   $("#sheet [data-close]").onclick=closeSheet;
@@ -594,6 +719,7 @@ function renderPasses(){
     return `<article class="pass"><div class="ph"><div><h3>${esc(l.name)}</h3><div style="font-size:13px;opacity:.85">${esc(l.area)}</div></div>
       ${b.example?'<span class="tag">Example</span>':''}</div>
       <div class="pb"><span class="status ${st[1]}">${st[0]}</span>
+      ${now>=b.arrive&&now<b.leave?`<div class="prog" role="progressbar" aria-label="Time used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round((now-b.arrive)/(b.leave-b.arrive)*100)}"><i style="width:${Math.round((now-b.arrive)/(b.leave-b.arrive)*100)}%"></i></div>`:''}
       <canvas data-code="${b.id}" aria-label="Entry code for ${b.id}"></canvas>
       <dl class="kv" style="margin:0"><dt>Pass</dt><dd class="mono">${b.id}</dd><dt>Vehicle</dt><dd class="mono">${esc(b.vno)}</dd>
       <dt>From</dt><dd>${fmt(new Date(b.arrive))}</dd><dt>Until</dt><dd>${fmt(new Date(b.leave))}</dd><dt>Paid</dt><dd class="num">${inr(b.total)} · ${b.pm}${b.promo?` · ${esc(b.promo)}`:''}</dd>
@@ -758,7 +884,7 @@ function requestCar(t){
       <div class="bill num" id="vbill"></div>
       <div class="sec-h">Pay with</div>
       <div class="pay"><label><input type="radio" name="vpm" value="UPI" checked> UPI</label><label><input type="radio" name="vpm" value="Card"> Card</label></div>
-      <button class="btn" type="submit" id="vpay"></button>
+      <div class="sticky-cta"><button class="btn" type="submit" id="vpay"></button></div>
     </form>`);
   $("#sheet [data-close]").onclick=closeSheet;
   document.querySelectorAll("[data-tip]").forEach(b=>b.onclick=()=>{tip=+b.dataset.tip;draw()});
@@ -860,7 +986,7 @@ document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go)
 let tt;function toast(t){const e=$("#toast");e.textContent=t;e.hidden=false;clearTimeout(tt);tt=setTimeout(()=>e.hidden=true,3200)}
 setInterval(()=>{if(S.view==="passes")renderPasses()},60000);
 
-initSearch(); renderFind();
+initSearch(); readTimes();
 const h=location.hash.slice(1); if(["valet","passes","monthly","owners","account"].includes(h))go(h);
 })();
 </script>
