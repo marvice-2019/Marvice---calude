@@ -1,6 +1,6 @@
 // Instant sync (Google watch channels) against real Postgres with a fake Google. Runs only with TEST_DATABASE_URL; uses
 // its own database (<name>_push), dropped and recreated on every run.
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
@@ -10,6 +10,7 @@ import type { User } from "../data/types";
 import { disconnectConnection, saveGoogleConnection } from "./connections";
 import { GoogleApiError, GOOGLE_CALENDAR_SCOPES, REQUIRED_SCOPES, type GoogleClient } from "./google";
 import { handlePing, maintainChannels, pushAddress } from "./push";
+import { syncDueConnections } from "./sync";
 
 const BASE = process.env.TEST_DATABASE_URL;
 const ADDRESS = "https://hourhand.test/api/webhooks/google-calendar";
@@ -90,7 +91,10 @@ describe.skipIf(!BASE)("instant sync (TEST_DATABASE_URL)", () => {
     expect(await maintainChannels(pool, google, key, ADDRESS)).toMatchObject({ started: 1, failed: 0 });
     expect(s.watches.map((w) => w.calendarId)).toEqual(["priya@gmail.com"]); // the team calendar isn't checked by default
     const row = await calRow("priya@gmail.com");
-    expect(row).toMatchObject({ push_channel_id: s.watches[0].id, push_resource_id: "res-priya@gmail.com", push_token: s.watches[0].token, push_error: null });
+    // Only a hash of the token is kept, so someone reading the database can't forge pings.
+    expect(row).toMatchObject({ push_channel_id: s.watches[0].id, push_resource_id: "res-priya@gmail.com", push_error: null });
+    expect(row.push_token_hash).toBe(createHash("sha256").update(s.watches[0].token).digest("hex"));
+    expect(JSON.stringify(row)).not.toContain(s.watches[0].token);
     expect(s.watches[0].address).toBe(ADDRESS);
     expect(await maintainChannels(pool, google, key, ADDRESS)).toMatchObject({ started: 0 }); // not due again for days
   });
@@ -148,11 +152,43 @@ describe.skipIf(!BASE)("instant sync (TEST_DATABASE_URL)", () => {
     expect(await next()).toBe(now.getTime());
   });
 
+  it("a burst of pings is one sync: no sooner than 30s after the last one, and a failing connection keeps its backoff", async () => {
+    const id = await connect();
+    const { s, google } = fakeGoogle();
+    await maintainChannels(pool, google, key, ADDRESS);
+    const ch = s.watches[0];
+    const now = new Date();
+    const next = async () => new Date((await pool.query("select next_sync_at from calendar_connections where id = $1", [id])).rows[0].next_sync_at).getTime();
+    await pool.query("update calendar_connections set last_synced_at = $2, next_sync_at = $3 where id = $1", [id, new Date(now.getTime() - 10_000), new Date(now.getTime() + 5 * 60_000)]);
+    await handlePing(pool, { channelId: ch.id, token: ch.token, state: "exists" }, now);
+    expect(await next()).toBe(now.getTime() + 20_000);
+    const retryAt = new Date(now.getTime() + 2 * 60_000);
+    await pool.query("update calendar_connections set status = 'degraded', last_synced_at = null, next_sync_at = $2 where id = $1", [id, retryAt]);
+    await handlePing(pool, { channelId: ch.id, token: ch.token, state: "exists" }, now);
+    expect(await next()).toBe(retryAt.getTime());
+  });
+
+  it("a connection whose sync is still running isn't claimed again, so two syncs can't overlap", async () => {
+    const id = await connect();
+    const now = new Date();
+    await pool.query("update calendar_connections set next_sync_at = $2, sync_claimed_until = $3 where id = $1", [id, now, new Date(now.getTime() + 60_000)]);
+    const { google } = fakeGoogle();
+    expect(await syncDueConnections(pool, google, key, now)).toEqual([]);
+    await pool.query("update calendar_connections set sync_claimed_until = $2 where id = $1", [id, new Date(now.getTime() - 1000)]);
+    expect((await syncDueConnections(pool, google, key, now)).map((r) => r.connectionId)).toEqual([id]);
+  });
+
   it("disconnecting stops the connection's channels before the grant is revoked", async () => {
     const id = await connect();
     const { s, google } = fakeGoogle();
     await maintainChannels(pool, google, key, ADDRESS);
+    const order: string[] = [];
+    const g = google as unknown as { stopChannel: (...a: unknown[]) => Promise<void>; revoke: () => Promise<void> };
+    const stop = g.stopChannel;
+    g.stopChannel = async (...a) => { order.push("stop"); await stop(...a); };
+    g.revoke = async () => { order.push("revoke"); };
     await disconnectConnection(pool, google, key, priya.id, id);
     expect(s.stopped).toEqual([s.watches[0].id]);
+    expect(order).toEqual(["stop", "revoke"]);
   });
 });

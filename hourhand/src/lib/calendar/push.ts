@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type pg from "pg";
 import { kickJobs } from "../jobs/kick";
 import { accessTokenFor } from "./connections";
@@ -50,7 +50,7 @@ export async function maintainChannels(pool: pg.Pool, google: GoogleClient, key:
 
   // Calendars switched off (or whose connection was cut) don't need pings any more.
   const { rows: stale } = await pool.query(
-    `update calendars k set push_channel_id = null, push_resource_id = null, push_token = null, push_expires_at = null
+    `update calendars k set push_channel_id = null, push_resource_id = null, push_token_hash = null, push_expires_at = null
      from (select k2.id, k2.push_channel_id, k2.push_resource_id from calendars k2 join calendar_connections c on c.id = k2.connection_id
            where k2.push_channel_id is not null and (not k2.check_conflicts or c.status = 'disconnected')
            limit $1 for update of k2 skip locked) s
@@ -76,8 +76,8 @@ export async function maintainChannels(pool: pg.Pool, google: GoogleClient, key:
       const watched = await google.watchEvents(token, cal.external_id, channel);
       const expiresAt = watched.expiresAt ?? new Date(now.getTime() + CHANNEL_TTL_SECONDS * 1000);
       await pool.query(
-        `update calendars set push_channel_id = $2, push_resource_id = $3, push_token = $4, push_expires_at = $5, push_error = null, push_retry_at = null
-         where id = $1`, [cal.id, channel.id, watched.resourceId, channel.token, expiresAt]);
+        `update calendars set push_channel_id = $2, push_resource_id = $3, push_token_hash = $4, push_expires_at = $5, push_error = null, push_retry_at = null
+         where id = $1`, [cal.id, channel.id, watched.resourceId, tokenHash(channel.token), expiresAt]);
       // The new channel is live; the old one (if renewing) can go. They may overlap briefly, which is harmless.
       if (cal.push_channel_id && cal.push_resource_id) await stopQuietly(pool, google, key, cal.connection_id, cal.push_channel_id, cal.push_resource_id, now);
       result.started += 1;
@@ -92,11 +92,17 @@ export async function maintainChannels(pool: pg.Pool, google: GoogleClient, key:
   return result;
 }
 
-function sameToken(a: string, b: string): boolean {
-  const x = Buffer.from(a);
-  const y = Buffer.from(b);
+/** Only a hash is stored, so a database reader can't forge pings. */
+const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
+
+function sameHash(storedHex: string, token: string): boolean {
+  const x = Buffer.from(storedHex, "hex");
+  const y = Buffer.from(tokenHash(token), "hex");
   return x.length === y.length && timingSafeEqual(x, y);
 }
+
+/** At most one ping-triggered sync per connection in this window; Google can send many pings for one change. */
+export const PING_DEBOUNCE_SECONDS = 30;
 
 export type PingOutcome = "synced" | "ignored";
 
@@ -106,13 +112,17 @@ export type PingOutcome = "synced" | "ignored";
  */
 export async function handlePing(pool: Pick<pg.Pool, "query">, headers: { channelId: string | null; token: string | null; state: string | null }, now = new Date()): Promise<PingOutcome> {
   if (!headers.channelId || !headers.token || headers.channelId.length > 100) return "ignored";
-  const { rows: [cal] } = await pool.query("select connection_id, push_token from calendars where push_channel_id = $1", [headers.channelId]);
-  if (!cal?.push_token || !sameToken(cal.push_token, headers.token)) return "ignored";
+  const { rows: [cal] } = await pool.query("select connection_id, push_token_hash from calendars where push_channel_id = $1", [headers.channelId]);
+  if (!cal?.push_token_hash || !sameHash(cal.push_token_hash, headers.token)) return "ignored";
   // "sync" is Google's hello when a channel starts; nothing has changed yet.
   if (headers.state !== "exists" && headers.state !== "not_exists") return "ignored";
-  const { rowCount } = await pool.query(
-    "update calendar_connections set next_sync_at = $2 where id = $1 and status <> 'disconnected' and next_sync_at > $2", [cal.connection_id, now]);
-  if (rowCount) kickJobs();
+  // Brought forward to now, but no sooner than 30s after the last sync (a burst of pings is one sync), and only for a
+  // healthy connection: a failing one keeps its retry backoff, so pings can't hammer Google or hurry the outage email.
+  const { rows: [due] } = await pool.query(
+    `update calendar_connections set next_sync_at = greatest($2::timestamptz, coalesce(last_synced_at + make_interval(secs => $3), $2::timestamptz))
+     where id = $1 and status = 'ok' and next_sync_at > greatest($2::timestamptz, coalesce(last_synced_at + make_interval(secs => $3), $2::timestamptz))
+     returning next_sync_at <= $2 as now_due`, [cal.connection_id, now, PING_DEBOUNCE_SECONDS]);
+  if (due?.now_due) kickJobs();
   return "synced";
 }
 

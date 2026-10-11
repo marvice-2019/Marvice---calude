@@ -150,12 +150,20 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 
 ## B4b evidence (2026-10-11, Postgres 16.15, production build, fake Google)
 
-- 325 tests pass with `TEST_DATABASE_URL` set. Migration 0007 applies on top of 0006.
+- 327 tests pass with `TEST_DATABASE_URL` set (after the review fixes below). Migration 0007 applies on top of 0006.
 - **Checked against Google's docs (read 2026-10-11):** `events.watch` accepts `calendar.events.freebusy` and `calendar.events.owned` but not `calendar.freebusy`; `freeBusy.query` accepts `calendar.events.freebusy`. Pings carry no details, only channel id, token and resource state; channels expire (a week by default) and are renewed with a new id; `channels.stop` takes the id and resource id; the address must be https with a valid certificate.
 - **Against Postgres:** each checked calendar gets one channel with its own token, unchecked ones none; a channel is renewed a day before it ends and the old one stopped; unchecking stops it; a calendar Google won't watch is noted, retried a day later, and its connection keeps syncing; only a ping with the right channel and token (state `exists`/`not_exists`) brings the sync forward, a wrong token, unknown channel, missing token or the start-up `sync` ping changes nothing; disconnecting stops the channels before revoking the grant.
 - **Negative tests** (guard set aside, test fails): the token check, the state check, stopping the old channel on renewal, stopping on uncheck, the retry wait after a refused watch, stopping channels on disconnect.
-- **End to end on a production build against a fake Google (23 of 23, 4 new):** the job runner asks Google to watch the checked calendar, pointing at the ping endpoint with its own token; a ping with the wrong token answers the same and changes nothing; a real ping makes a newly busy time disappear from the booking page within seconds. B5b (28), B5a (26), B3 (10), B2b (12) and sign-in (15) pass again.
+- **End to end on a production build against a fake Google (23 of 23, 4 new):** the job runner asks Google to watch the checked calendar, pointing at the ping endpoint with its own token; a ping with the wrong token answers the same and changes nothing; a real ping makes a newly busy time disappear from the booking page without waiting for the poll (37.6 s in the run, because the calendar had synced moments before; usually seconds). B5b (28), B5a (26), B3 (10), B2b (12) and sign-in (15) pass again.
 - **Not yet run against real Google:** needs a public https address (Coolify) and the new scope on your OAuth consent screen.
+
+## B4b review (fresh-context reviewer)
+
+- **Fixed (medium):** every genuine ping forced a sync at once. A burst of pings (or someone spamming invitations to a host's calendar) cost a full sync each against the shared Google quota; pings skipped a failing connection's retry backoff and could bring its outage email forward; and on several servers a ping could start a second sync while one was running, whose older result could land last and show a just-booked time as free for up to 5 minutes. Now a ping brings the sync no sooner than 30 s after the last one, only for a healthy connection, and a running sync holds its connection for a 2-minute lease so syncs never overlap. Tests fail without each part.
+- **Fixed (low):** the per-channel ping token is stored only as a SHA-256 hash, so reading the database doesn't let anyone forge pings; watch upkeep runs after the emails, so slow Google calls never delay a confirmation; a database error while stopping channels no longer skips revoking the Google grant on disconnect; the disconnect test now checks the order (stop channels, then revoke). Tests fail without the hash and the order.
+- **Accepted (low):** channels on calendars removed from Google, on purged accounts, or created while a disconnect happened are not stopped; their pings match nothing and are ignored, and Google drops them within a week.
+- **Checked:** forged pings get the same answer and change nothing; channel ids are uuids and tokens 48 hex characters compared in constant time; the claim, renew and stop queries are sound; tokens that can't be refreshed only mark the calendar; the connections ↔ push import cycle is safe; the scope change doesn't break existing connections.
+- **To confirm against real Google:** that `freeBusy.query` works with only `calendar.events.freebusy` (Google's reference lists it; the fake doesn't check scopes).
 
 ## Things only you can do (start the slow ones this week)
 

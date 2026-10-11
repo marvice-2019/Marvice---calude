@@ -79,9 +79,9 @@ export async function disconnectConnection(pool: Db, google: GoogleClient | null
     "select user_id, account_email, credentials_encrypted from calendar_connections where id = $1 and user_id = $2", [connectionId, userId]);
   if (!row) return false;
   if (google && key && row.credentials_encrypted.length > 0) {
+    // Stop the watch channels while the token still works; revoking it next would leave them pinging for up to a week.
+    await stopConnectionChannels(pool, google, key, connectionId).catch(() => undefined);
     try {
-      // Stop the watch channels while the token still works; revoking it next would leave them pinging for up to a week.
-      await stopConnectionChannels(pool, google, key, connectionId);
       await google.revoke(unseal<Credentials>(key, row.credentials_encrypted, aadFor(row.user_id, row.account_email)).refreshToken);
     } catch {
       // A token that can't be opened can't be used either; deleting the row is what matters.
