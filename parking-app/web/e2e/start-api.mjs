@@ -36,7 +36,10 @@ const env = {
   RAZORPAY_WEBHOOK_SECRET: "e2e-webhook-secret", // must match e2e/env.ts
   INTERNAL_TOKEN: "e2e-internal-token-1234",
   OTP_PROVIDER: "console",
-  RATE_LIMIT_MAX: "2000"
+  RATE_LIMIT_MAX: "2000",
+  // Every test signs in from 127.0.0.1, which trips the 20-OTPs-per-IP-per-hour limit (SPEC §8).
+  // The API's own test knob raises per-route limits; the 5-per-number OTP limit is unaffected.
+  RATE_LIMIT_SCALE: "50"
 };
 delete env.RAZORPAY_KEY_ID; delete env.RAZORPAY_KEY_SECRET; // force the API's fake gateway
 

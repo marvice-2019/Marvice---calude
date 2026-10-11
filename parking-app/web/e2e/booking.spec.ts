@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { capture, checkout, freshPhone, knownOtp } from "./helpers";
+import { E2E } from "./env";
+import { bookingCount, capture, checkout, freshPhone, knownOtp, payInTestGateway } from "./helpers";
 
 // Runs at 390 px (phone) and 1280 px (desktop): see the projects in the config.
 
@@ -98,6 +99,96 @@ test("failed and cancelled payments say nothing was charged (DRV-04)", async ({ 
   await page.getByRole("button", { name: /^Pay ₹/ }).click(); // signed in now: straight to the gateway
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Payment cancelled. You weren't charged." })).toBeVisible();
+
+  // Paying again reuses the same Idempotency-Key: one booking (one held bay), not one per attempt.
+  await page.getByRole("button", { name: /^Pay ₹/ }).click();
+  const { orderId, amount } = await payInTestGateway(page);
+  await capture(orderId, amount);
+  await expect(page.getByTestId("pass")).toBeVisible();
+  expect(await bookingCount(phone)).toBe(1);
+});
+
+test("Razorpay: a failed attempt then a successful retry in the same modal is a success (no double charge)", async ({ page }) => {
+  // Make the app take the real-Razorpay branch: rewrite the key on the booking response, and serve
+  // a stand-in checkout.js that fails once, then succeeds, the way Razorpay's retry works.
+  await page.route(`${E2E.apiUrl}/v1/bookings`, async route => {
+    if (route.request().method() !== "POST") return route.continue();
+    const res = await route.fetch();
+    const json = await res.json();
+    if (json.razorpay_order) json.razorpay_order.key_id = "rzp_test_e2e_stub";
+    await route.fulfill({ response: res, json });
+  });
+  await page.route("https://checkout.razorpay.com/v1/checkout.js", route => route.fulfill({ contentType: "text/javascript", body: `
+    window.Razorpay = function (o) { this.o = o; this.h = {}; };
+    window.Razorpay.prototype.on = function (e, f) { this.h[e] = f; };
+    window.Razorpay.prototype.open = function () {
+      var s = this; window.__rzp = { order_id: s.o.order_id, amount: s.o.amount };
+      setTimeout(function () {
+        if (s.h["payment.failed"]) s.h["payment.failed"]({ error: { description: "declined" } });
+        setTimeout(function () { s.o.handler({ razorpay_payment_id: "pay_retry" }); }, 150);
+      }, 150);
+    };` }));
+
+  await page.goto("/?area=mg-road");
+  await page.getByRole("link", { name: /MG Road Metro Multilevel/ }).first().click();
+  const phone = freshPhone();
+  await page.getByLabel("Vehicle number").fill("KA 04 GH 3456");
+  await page.getByLabel("Mobile for WhatsApp pass").fill(phone);
+  await page.getByRole("button", { name: /^Pay ₹/ }).click();
+  await page.getByLabel("Code from SMS").fill(await knownOtp(phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+
+  await expect(page).toHaveURL(/\/passes\/[0-9a-f-]{36}\?new=1$/);
+  await expect(page.getByText("Payment didn't go through")).toHaveCount(0);
+  const rzp = await page.evaluate(() => (window as unknown as { __rzp: { order_id: string; amount: number } }).__rzp);
+  await capture(rzp.order_id, rzp.amount);
+  await expect(page.getByTestId("pass")).toBeVisible();
+  expect(await bookingCount(phone)).toBe(1);
+});
+
+test("sign-in return path stays on this site; sign-out wipes device data; promo refused at booking resets the price", async ({ page }) => {
+  // Book once so this phone is no longer a first-time customer.
+  const phone = freshPhone();
+  await page.goto("/?area=mg-road");
+  await page.getByRole("link", { name: /MG Road Metro Multilevel/ }).first().click();
+  const first = await checkout(page, { plate: "KA 06 JK 7890", phone });
+  await capture(first.orderId, first.amount);
+  await expect(page.getByTestId("pass")).toBeVisible();
+
+  // Sign out from Account: no pass, phone or plate left on the device.
+  await page.goto("/account");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/\?|\/$/);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("bayline.") && k !== "bayline.area"))).toEqual([]);
+  await page.goto("/passes");
+  await expect(page.getByText("Sign in with your mobile number to see your passes")).toBeVisible();
+  await expect(page.getByTestId("pass")).toHaveCount(0);
+
+  // FIRST50 quotes fine anonymously, but the API refuses it at booking for this repeat customer:
+  // the bill must drop back to the undiscounted total, never keep showing ₹88.50.
+  await page.goto("/?area=mg-road");
+  await page.getByRole("link", { name: /MG Road Metro Multilevel/ }).first().click();
+  await page.getByLabel("Promo code").fill("FIRST50");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByTestId("total")).toHaveText("₹88.50");
+  await page.getByLabel("Vehicle number").fill("KA 06 JK 7890");
+  await page.getByLabel("Mobile for WhatsApp pass").fill(phone);
+  await page.getByRole("button", { name: /^Pay ₹/ }).click();
+  await page.getByLabel("Code from SMS").fill(await knownOtp(phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "FIRST50 works on your first booking only." })).toBeVisible();
+  await expect(page.getByTestId("total")).toHaveText("₹159.30");
+  await expect(page.getByRole("button", { name: "Pay ₹159.30 and get pass" })).toBeVisible();
+
+  // Open redirect: "/\evil.com" must resolve to our own fallback, not another origin.
+  await page.goto("/account");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.goto("/signin?next=%2F%5Cevil.com");
+  await page.getByLabel("Mobile number").fill(phone);
+  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel("Code from SMS").fill(await knownOtp(phone));
+  await page.getByRole("button", { name: "Verify and continue" }).click();
+  await expect(page).toHaveURL(`${E2E.webUrl}/passes`);
 });
 
 test("search validation and public SEO lot page (DRV-01, S12)", async ({ page }) => {

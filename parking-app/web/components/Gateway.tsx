@@ -25,7 +25,9 @@ export function Gateway({ order, contact, method, description, onResult }: {
   useEffect(() => {
     if (fake || !ready || opened.current || !window.Razorpay) return;
     opened.current = true;
-    let settled = false;
+    // Razorpay keeps its modal open after a failed attempt and lets the user retry, so a failure
+    // is not final: settle only on success (handler) or when the modal closes (ondismiss).
+    let settled = false, failedAttempt = false;
     const done = (r: GatewayResult) => { if (!settled) { settled = true; onResult(r); } };
     const rzp = new window.Razorpay({
       key: order.key_id, order_id: order.id, amount: order.amount, currency: order.currency,
@@ -33,9 +35,9 @@ export function Gateway({ order, contact, method, description, onResult }: {
       prefill: { contact: "+91" + contact, method },
       theme: { color: "#1446A0" },
       handler: () => done("success"),
-      modal: { ondismiss: () => done("cancelled"), confirm_close: true }
+      modal: { ondismiss: () => done(failedAttempt ? "failed" : "cancelled"), confirm_close: true }
     });
-    rzp.on("payment.failed", () => done("failed"));
+    rzp.on("payment.failed", () => { failedAttempt = true; });
     rzp.open();
   }, [fake, ready, order, contact, method, description, onResult]);
 

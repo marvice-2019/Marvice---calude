@@ -5,7 +5,7 @@ import { PassCard } from "@/components/PassCard";
 import { useNow } from "@/components/hooks";
 import { api, ApiFailure } from "@/lib/api";
 import type { Booking } from "@/lib/contract";
-import { local } from "@/lib/session";
+import { cachePasses, getSession } from "@/lib/session";
 
 const POLL_MS = 2000, GIVE_UP_MS = 90_000;
 
@@ -13,10 +13,10 @@ const POLL_MS = 2000, GIVE_UP_MS = 90_000;
  * After the gateway says "paid", the pass exists only once the API has the signed webhook.
  * Poll until the booking is confirmed (or failed). Covers the webhook arriving late.
  */
-export function PassWait({ id }: { id: string }) {
+export function PassWait({ id, fresh }: { id: string; fresh: boolean }) {
   const now = useNow(30_000);
   const [b, setB] = useState<Booking | null>(null);
-  const [state, setState] = useState<"waiting" | "ok" | "failed" | "slow" | "error">("waiting");
+  const [state, setState] = useState<"waiting" | "ok" | "failed" | "cancelled" | "missing" | "slow" | "error">("waiting");
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -26,9 +26,13 @@ export function PassWait({ id }: { id: string }) {
       try {
         const list = await api.bookings();
         const found = list.find(x => x.id === id);
-        if (found) local("passes", list);
-        if (found && found.status === "cancelled") { setB(found); setState("failed"); return; }
+        const userId = getSession()?.user.id;
+        if (found && userId) cachePasses(userId, list);
+        // Right after paying, "cancelled" means the payment failed; otherwise the driver cancelled it.
+        if (found && found.status === "cancelled") { setB(found); setState(fresh ? "failed" : "cancelled"); return; }
         if (found) { setB(found); setState("ok"); return; }
+        // Unpaid bookings aren't listed, so only keep waiting when we just came from the gateway.
+        if (!fresh) { setState("missing"); return; }
       } catch (e) {
         if (e instanceof ApiFailure && e.status === 401) { setErr(e.message); setState("error"); return; }
       }
@@ -38,7 +42,7 @@ export function PassWait({ id }: { id: string }) {
     };
     void tick();
     return () => { stop = true; clearTimeout(timer); };
-  }, [id]);
+  }, [id, fresh]);
 
   return (
     <section style={{ maxWidth: 420, marginInline: "auto" }}>
@@ -46,6 +50,8 @@ export function PassWait({ id }: { id: string }) {
         {state === "waiting" && <div className="panelpage" role="status"><h1>Confirming payment…</h1><p style={{ color: "var(--muted)" }}>This usually takes a few seconds. Don&apos;t pay again.</p><div className="skel" aria-hidden="true" /></div>}
         {state === "slow" && <div className="panelpage" role="status"><h1>Still confirming</h1><p>Your bank hasn&apos;t confirmed yet. We&apos;ll send the pass on WhatsApp as soon as it does. Don&apos;t pay again. If money left your account and no pass arrives within 30 minutes, contact support with the time you paid.</p><Link className="btn ghost" href="/passes">Go to my passes</Link></div>}
         {state === "failed" && <div className="panelpage errbox" role="alert">Payment didn&apos;t go through. You weren&apos;t charged.<Link className="btn" href="/">Find parking</Link></div>}
+        {state === "cancelled" && <div className="panelpage" role="status"><h1>Pass cancelled</h1><p>This pass was cancelled. Refunds reach the original payment method in 3–5 working days.</p><Link className="btn" href="/">Find parking</Link></div>}
+        {state === "missing" && <div className="panelpage" role="status"><h1>Pass not found</h1><p>This pass isn&apos;t on your account. Check that you&apos;re signed in with the number you booked with.</p><Link className="btn" href="/passes">My passes</Link></div>}
         {state === "error" && <div className="panelpage errbox" role="alert">{err}<Link className="btn" href="/signin?next=/passes">Sign in</Link></div>}
         {state === "ok" && b && (
           <>

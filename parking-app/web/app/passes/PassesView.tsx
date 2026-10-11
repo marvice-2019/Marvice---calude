@@ -7,7 +7,7 @@ import { useMounted, useNow, useOnline, useSession } from "@/components/hooks";
 import { api, ApiFailure, newIdempotencyKey } from "@/lib/api";
 import type { Booking, GatewayOrder } from "@/lib/contract";
 import { clock, inr } from "@/lib/format";
-import { local } from "@/lib/session";
+import { cachedPasses, cachePasses, getSession } from "@/lib/session";
 import { track } from "@/lib/track";
 
 /** S04 Passes: DRV-10, DRV-11, DRV-12, GST-02. Passes are cached on this device for offline viewing. */
@@ -24,11 +24,12 @@ export function PassesView() {
 
   const load = useCallback(async () => {
     setErr("");
+    const userId = getSession()?.user.id;
     try {
       const r = await api.bookings();
-      setList(r); local("passes", r);
+      setList(r); if (userId) cachePasses(userId, r);
     } catch (e) {
-      const cached = local<Booking[]>("passes");
+      const cached = cachedPasses(userId);
       if (cached) setList(cached);
       setErr(e instanceof ApiFailure ? e.message : "Couldn't load passes.");
     }
@@ -37,7 +38,7 @@ export function PassesView() {
   useEffect(() => {
     if (!mounted) return;
     if (session) void load();
-    else setList(local<Booking[]>("passes") ?? null);
+    else setList(null); // signed out: never show a cached list (shared devices)
   }, [mounted, session, load]);
 
   async function extend(b: Booking) {

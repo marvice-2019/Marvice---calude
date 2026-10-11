@@ -33,14 +33,25 @@ async function raw(path: string, o: Opts, token?: string): Promise<Response> {
   }
 }
 
-async function refreshSession(): Promise<string | null> {
-  const s = getSession();
-  if (!s) return null;
-  const r = await raw("/v1/auth/refresh", { method: "POST", body: { refresh: s.refresh } });
-  if (!r.ok) { clearSession(); return null; }
-  const t = C.Refreshed.parse(await r.json());
-  setSession({ ...s, ...t });
-  return t.access;
+// The API rotates refresh tokens and revokes the old one, so two refreshes with the same token
+// would make the second fail. One refresh at a time per tab; another tab may have rotated it already.
+let inflight: Promise<string | null> | null = null;
+function refreshSession(): Promise<string | null> {
+  inflight ??= (async () => {
+    const s = getSession();
+    if (!s) return null;
+    const r = await raw("/v1/auth/refresh", { method: "POST", body: { refresh: s.refresh } });
+    if (!r.ok) {
+      const now = getSession();
+      if (now && now.refresh !== s.refresh) return now.access; // another tab refreshed first
+      clearSession();
+      return null;
+    }
+    const t = C.Refreshed.parse(await r.json());
+    setSession({ ...s, ...t });
+    return t.access;
+  })().finally(() => { inflight = null; });
+  return inflight;
 }
 
 /** One request: attaches the session, refreshes once on 401, and validates the response against the contract. */

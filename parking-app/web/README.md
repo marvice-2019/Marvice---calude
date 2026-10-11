@@ -44,8 +44,12 @@ CHROME_PATH=... npm run lighthouse -- <url> [url...]   # fails under 90 for perf
 | happy path: search → lot → checkout → pass | DRV-01, DRV-02, DRV-04, GST-01, DRV-10 |
 | Park now: lot code from the board, live pass | DRV-09, DRV-12 (no cancel) |
 | promo code: errors, FIRST50 carried into the payment | DRV-06 |
-| failed and cancelled payments | DRV-04 |
+| failed and cancelled payments, then a retry: one booking only | DRV-04 (idempotency) |
+| Razorpay: a failed attempt then a successful retry in the same modal | DRV-04 (no double charge) |
+| sign-in return path, sign-out wipes device data, promo refused at booking | DRV-03, DRV-06, security |
 | search validation and public SEO lot page | DRV-01, S12 |
+
+The Razorpay test swaps in a stand-in `checkout.js` that fails once, then succeeds, the way Razorpay's in-modal retry behaves. The suite raises the API's per-IP OTP limit with `RATE_LIMIT_SCALE=50` (every test signs in from 127.0.0.1); the 5-per-number limit still applies.
 
 Stage 5 results (11 Oct 2026), Lighthouse mobile profile:
 

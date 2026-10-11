@@ -25,6 +25,11 @@ export async function knownOtp(phone: string): Promise<string> {
   return code;
 }
 
+/** Bookings in the database for a phone (any status), to prove retries don't hold extra bays. */
+export async function bookingCount(phone: string): Promise<number> {
+  return (await q<{ n: number }>("SELECT count(*)::int AS n FROM bookings b JOIN users u ON u.id = b.user_id WHERE u.phone = $1", ["+91" + phone]))[0].n;
+}
+
 /** Plays Razorpay's server: a signed payment.captured webhook for the order the app opened. */
 export async function capture(orderId: string, amount: number) {
   const raw = JSON.stringify({ event: "payment.captured", payload: { payment: { entity: { id: "pay_" + randomBytes(6).toString("hex"), order_id: orderId, amount, method: "upi", fee: 300 } } } });

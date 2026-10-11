@@ -42,7 +42,14 @@ export function LotCheckout({ p, initial }: { p: CheckoutParams; initial: LotDet
   const [full, setFull] = useState<ApiError["alternatives"] | null>(null);
   const [order, setOrder] = useState<{ order: GatewayOrder; bookingId: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const idem = useRef(newIdempotencyKey());
+  // One Idempotency-Key per distinct booking request. Retrying the same request (network drop, 5xx,
+  // payment cancelled or failed) reuses it, so the API replays the same booking instead of holding
+  // a second bay. A new key only when the request changes or the API definitively refused it (4xx).
+  const idem = useRef<{ fp: string; key: string } | null>(null);
+  const keyFor = (fp: string) => {
+    if (!idem.current || idem.current.fp !== fp) idem.current = { fp, key: newIdempotencyKey() };
+    return idem.current.key;
+  };
   const startedAt = useRef(Date.now());
 
   useEffect(() => {
@@ -107,20 +114,24 @@ export function LotCheckout({ p, initial }: { p: CheckoutParams; initial: LotDet
   async function book() {
     setBusy(true); setErr("");
     try {
-      const r = await api.createBooking({
-        lot_id: p.id, source: p.mode === "now" ? "park_now" : "prebook", vehicle_kind: p.vehicle,
+      const body = {
+        lot_id: p.id, source: p.mode === "now" ? "park_now" as const : "prebook" as const, vehicle_kind: p.vehicle,
         ...(p.mode === "now" ? { hours: p.hours } : { from: p.from, to: p.to }),
         plate: normPlate(plate), // the API reuses the driver's vehicle with this plate, or adds it
         promo: appliedPromo
-      }, idem.current);
+      };
+      const r = await api.createBooking(body, keyFor(JSON.stringify(body)));
       api.setPreferences({ payment_method: method }).catch(() => {});
       setOrder({ order: r.razorpay_order, bookingId: r.booking.id });
       setStep("paying");
     } catch (e2) {
       const f = e2 instanceof ApiFailure ? e2 : null;
-      idem.current = newIdempotencyKey();
+      if (f && f.status >= 400 && f.status < 500) idem.current = null; // refused: nothing was booked
       if (f?.code === "lot_full") { setErr("This lot just filled up. Try a nearby lot."); setFull(f.body?.alternatives ?? []); }
-      else if (f?.code === "promo_invalid") { setPromoErr(f.message); setAppliedPromo(undefined); setPromoOk(""); }
+      else if (f?.code === "promo_invalid") {
+        // Back to the price without the promo, so the button never shows a total we won't charge.
+        setPromoErr(f.message); setAppliedPromo(undefined); setPromoOk(""); if (detail) setQuote(detail.quote);
+      }
       else setErr(f?.message ?? "Couldn't start the payment. Try again.");
       setStep("form");
     } finally { setBusy(false); }
@@ -135,7 +146,7 @@ export function LotCheckout({ p, initial }: { p: CheckoutParams; initial: LotDet
       return;
     }
     track("payment_failed", { method, amount: o?.order.amount, error_code: r, seconds_since_checkout_start: secs });
-    idem.current = newIdempotencyKey();
+    // Keep the key: paying again reopens the same order for the same held bay.
     setStep("form");
     setErr(r === "failed" ? "Payment didn't go through. You weren't charged." : "Payment cancelled. You weren't charged.");
   }, [order, method, router]);
