@@ -165,6 +165,28 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Checked:** forged pings get the same answer and change nothing; channel ids are uuids and tokens 48 hex characters compared in constant time; the claim, renew and stop queries are sound; tokens that can't be refreshed only mark the calendar; the connections ↔ push import cycle is safe; the scope change doesn't break existing connections.
 - **To confirm against real Google:** that `freeBusy.query` works with only `calendar.events.freebusy` (Google's reference lists it; the fake doesn't check scopes).
 
+## B7 evidence (2026-10-11, Postgres 16.15, production build)
+
+- 333 tests pass with `TEST_DATABASE_URL` set. No migration.
+- **Against Postgres:** the host's cancel records cancelled_by host and queues the guest and host cancellation emails, and a paid booking's payment goes to refund; the host's move cancels the old booking as moved by the host, confirms the new time, carries the payment, and refuses a taken time; no-show only after the start, both ways; another host's booking is not found for every action.
+- **Negative tests** (guard set aside, test fails): host scoping of no-show, the start-time rule on no-show, recording who moved the booking.
+- **End to end on a production build (16 of 16):** the detail page offers cancel and move; cancel asks first, records the host and reason, and the guest is told the host cancelled; move lists free times, lands on the new booking, cancels the old one as moved by the host, and the guest gets "Priya Raman moved your booking to a new time"; no-show is recorded, shown on the page and the list, and undone; another host gets 404. All earlier suites pass again (B5b 28, B5a 26, B4 23, B3 10, B2b 12, sign-in 15).
+
+## Production addresses for hourhand.cloud
+
+Set `BETTER_AUTH_URL=https://hourhand.cloud` in Coolify. Register exactly these:
+
+| Where | What to enter |
+| --- | --- |
+| Google Cloud → OAuth client → Authorized redirect URIs | `https://hourhand.cloud/api/auth/callback/google` and `https://hourhand.cloud/api/calendars/google/callback` |
+| Google Cloud → OAuth consent screen → Authorized domains | `hourhand.cloud` (home page and privacy policy must be on this domain for verification) |
+| Microsoft Entra → app → Authentication → Web redirect URIs (B6) | `https://hourhand.cloud/api/auth/callback/microsoft` and `https://hourhand.cloud/api/calendars/microsoft/callback` |
+| Razorpay Dashboard → Webhooks (your plans) | `https://hourhand.cloud/api/webhooks/razorpay`, events `subscription.*` |
+| Stripe Dashboard → Webhooks (if you get Stripe) | `https://hourhand.cloud/api/webhooks/stripe` |
+| Google Calendar instant sync | nothing to register: Hourhand tells Google `https://hourhand.cloud/api/webhooks/google-calendar` itself |
+| Resend → Domains | `mail.hourhand.cloud`, then `EMAIL_FROM=Hourhand <bookings@mail.hourhand.cloud>`; add the SPF, DKIM and DMARC records Resend shows to the domain's DNS |
+| DNS | an A record for `hourhand.cloud` (and `www`) pointing at the Coolify server; Coolify issues the certificate |
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |

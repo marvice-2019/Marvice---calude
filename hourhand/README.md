@@ -132,6 +132,16 @@ Hosts on Solo or Duo can charge guests for an event type, in rupees through Razo
 - **Free hosts:** a priced event of a host whose plan lapsed can't be booked; guests are told to contact the host.
 - **Not built:** Stripe for non-INR (Stripe is invite-only for Indian businesses), partial refunds or cancellation fees, deposits, payment links for existing bookings, and the host's own webhook (not needed: Hourhand checks Razorpay itself).
 
+## Host actions on a booking
+
+From Dashboard → Bookings → a booking, the host can:
+
+- **Cancel** an upcoming booking (any time, with an optional reason, after a confirm step). The guest is told the host cancelled, and a paid booking is refunded in full from the host's Razorpay account.
+- **Move** it to another free time (the same free-time rules as booking). The guest is emailed "<host> moved your booking"; a paid booking keeps its payment.
+- **Mark a no-show** once the booking has started, and undo it. The bookings list shows it.
+
+A booking still waiting on payment, or already cancelled, has no actions.
+
 ## What is fake today
 
 - **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Instant sync needs a public https address, so on localhost busy times are at most 5 minutes old.

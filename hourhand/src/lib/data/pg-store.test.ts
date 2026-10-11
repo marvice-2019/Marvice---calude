@@ -249,7 +249,6 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
     });
   });
   describe("host actions", () => {
-    const notifications = async (id: string) => (await pool.query("select * from notifications where booking_id = $1", [id])).rows.map((r) => JSON.stringify(r));
     const pay = (b: { id: string }) => pool.query("insert into payments (booking_id, host_id, provider, amount_minor, currency, status) values ($1, $2, 'razorpay', 50000, 'INR', 'paid')", [b.id, priya.id]);
     const paymentOf = async (id: string) => (await pool.query("select booking_id, status from payments where booking_id = $1", [id])).rows;
     const book = (iso: string, key: string) => store.createBooking({ eventTypeId: coaching.id, startAt: at(iso), idempotencyKey: key, invitee: guest });
@@ -259,7 +258,8 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       await pay(b);
       await expect(store.cancelBooking(arun.id, b.id, "host")).rejects.toBeInstanceOf(NotFoundError);
       expect(await store.cancelBooking(priya.id, b.id, "host", "Called away")).toMatchObject({ status: "cancelled", cancelledBy: "host", cancelReason: "Called away" });
-      expect((await notifications(b.id)).filter((n) => n.includes("cancelled")).length).toBeGreaterThan(0);
+      const kinds = (await pool.query("select kind from notifications where booking_id = $1 and status = 'queued'", [b.id])).rows.map((r) => r.kind);
+      expect(kinds).toEqual(expect.arrayContaining(["cancelled_guest", "cancelled_host"]));
       expect(await paymentOf(b.id)).toEqual([{ booking_id: b.id, status: "refund_pending" }]);
     });
 
