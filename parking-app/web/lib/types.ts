@@ -12,6 +12,7 @@ export type Quote = {
 export type LotSummary = {
   id: string; name: string; code: string; address: string; kind: string; covered: boolean;
   ev_chargers: number; open_24h: boolean; status: "open" | "full" | "gate_down" | "closed"; valet?: boolean;
+  lat?: number; lng?: number; // present in search results (map pins)
 };
 export type SearchRow = { lot: LotSummary; distance_m: number; quote: Quote; spots_left: number };
 export type LotDetail = LotSummary & { city: string; capacity_car: number; capacity_bike: number; lat: number; lng: number; opens_at: string | null; closes_at: string | null };

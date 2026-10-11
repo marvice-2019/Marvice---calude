@@ -26,6 +26,7 @@ export function publicRoutes(app: FastifyInstance, deps: Deps) {
     const { rows } = await deps.db.query(
       `SELECT l.id, l.name, l.code, l.address, l.kind, l.covered, l.ev_chargers, l.open_24h, l.status,
               ST_Distance(l.geo, ST_MakePoint($2, $1)::geography)::int AS distance_m,
+              ST_Y(l.geo::geometry) AS lat, ST_X(l.geo::geometry) AS lng,
               EXISTS (SELECT 1 FROM valet_desks d WHERE d.lot_id = l.id AND d.is_live) AS valet
        FROM lots l
        WHERE l.is_live AND l.status <> 'closed' AND ST_DWithin(l.geo, ST_MakePoint($2, $1)::geography, 3000)

@@ -1,4 +1,4 @@
-name: parking-app web
+name: parking-app web and mobile
 
 on:
   push:
@@ -71,3 +71,20 @@ jobs:
             parking-app/web/test-results
             api.log
             parking-app/web/web.log
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: parking-app/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: node scripts/sync-shared.mjs --check
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci
+      - run: npx expo export --platform web
