@@ -5,10 +5,14 @@ import { SyncLight } from "@/components/SyncLight";
 import { focusRing } from "@/components/ui/focus";
 import { store } from "@/lib/data";
 import { summarizeSync } from "@/lib/sync";
+import { requireUser } from "@/lib/auth/session";
+import { authEnabled } from "@/lib/auth/auth";
+import { signOut } from "@/lib/auth/actions";
+import { Button } from "@/components/ui/Button";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   await connection(); // render per request: the sync light shows minutes since the last check
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   const sync = summarizeSync(await store.listCalendarConnections(user.id), new Date());
   const brand = (
     <Link href="/dashboard/event-types" className={`inline-flex min-h-11 items-center rounded-sm font-display text-lg text-text ${focusRing}`}>
@@ -32,7 +36,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <MobileMenu />
             {brand}
           </div>
-          <SyncLight status={sync.status} minutesAgo={sync.minutesAgo} />
+          <div className="flex items-center gap-2">
+            <SyncLight status={sync.status} minutesAgo={sync.minutesAgo} />
+            {authEnabled() && (
+              <form action={signOut}>
+                <Button type="submit" variant="ghost" size="sm">
+                  Sign out
+                </Button>
+              </form>
+            )}
+          </div>
         </header>
         <main id="main" className="mx-auto max-w-(--hh-content-max) px-4 py-6 lg:px-8">
           {children}

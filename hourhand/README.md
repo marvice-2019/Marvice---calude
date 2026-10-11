@@ -36,11 +36,29 @@ The Postgres integration tests in `src/lib/data/pg-store.test.ts` are skipped un
 TEST_DATABASE_URL=postgres://user@localhost:5432/hourhand_test npm run test
 ```
 
+## Sign-in
+
+Sign-in uses [Better Auth](https://www.better-auth.com) and needs `HOURHAND_DATA=postgres`. In memory mode there are no accounts: the dashboard opens as the demo host and `/sign-in` says so.
+
+- **Email magic link:** `/sign-in` emails a one-time link that expires after 15 minutes. Until mail is wired up (round B3), the link is printed to the server log as `[dev] magic link for …` in development. In production, a missing `RESEND_API_KEY` makes sending fail loudly. `HOURHAND_MAIL_TO_LOG=1` lets a production build print the link instead; it exists only for end-to-end tests and must never be set on a real deployment.
+- **Google:** the button appears only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Add `https://<your-domain>/api/auth/callback/google` (and `http://localhost:3000/api/auth/callback/google` for local work) as a redirect URI in the Google Cloud console.
+- **Sessions:** an httpOnly, SameSite=Lax cookie, `Secure` on https. Every dashboard page and server action checks the session itself through `requireUser()` in `src/lib/auth/session.ts`; there is no middleware-only check. Settings has "Sign out of all devices".
+- **New hosts** get a booking-link slug from their name or email (`src/lib/auth/slug.ts`).
+
+Environment variables for sign-in:
+
+| variable | needed for |
+| --- | --- |
+| `BETTER_AUTH_URL` | the public base URL, for example `https://hourhand.app` |
+| `BETTER_AUTH_SECRET` | signing sessions; a long random string (`openssl rand -hex 32`) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in (optional) |
+| `RESEND_API_KEY`, `EMAIL_FROM` | sending sign-in links (round B3) |
+
 ## What is fake today
 
-- **Current user:** fixed to Priya. There is no sign-in yet; `/login` is a placeholder.
 - **Calendar sync:** none. Busy times and the sync status come from the seed.
-- **Payments, email, WhatsApp, sign-in:** not wired up. They will need: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `RESEND_API_KEY`.
+- **Email:** sign-in links go to the server log until round B3.
+- **Payments, WhatsApp, Microsoft and iCloud calendars:** not wired up. They will need: `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
 
 ## Layout
 

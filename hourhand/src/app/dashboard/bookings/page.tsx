@@ -2,11 +2,12 @@ import Link from "next/link";
 import { upcomingFirst } from "@/lib/booking";
 import { store } from "@/lib/data";
 import { formatDate, formatTime, zoneName } from "@/lib/format";
+import { requireUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function BookingsPage() {
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   const all = await store.listBookings(user.id);
   const { bookings, now } = upcomingFirst(all);
   const tz = user.timezone;

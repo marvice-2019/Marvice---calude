@@ -6,8 +6,6 @@ import {
 } from "./types";
 
 const MIN = 60_000;
-/** Until auth lands, the current user is the seeded demo host. */
-const CURRENT_USER_SLUG = "priya";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Ids come from URLs and forms; anything that is not a uuid cannot match a row (and would make Postgres raise 22P02). */
 const isId = (id: string) => UUID.test(id);
@@ -140,9 +138,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
 
   return {
     async getCurrentUser() {
-      const user = await this.getUserBySlug(CURRENT_USER_SLUG);
-      if (!user) throw new Error(`The demo host "${CURRENT_USER_SLUG}" is missing; run npm run db:seed`);
-      return user;
+      throw new Error("In Postgres mode the current user comes from the session: use requireUser() from @/lib/auth/session");
     },
     async getUser(id) {
       if (!isId(id)) return null;

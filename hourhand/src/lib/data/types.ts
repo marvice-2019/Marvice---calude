@@ -152,6 +152,7 @@ export class SlotTakenError extends Error {
 
 /** The data layer every screen talks to. The Postgres version implements the same interface. */
 export interface DataStore {
+  /** Memory mode only: the seeded demo host. Postgres throws; screens use requireUser() from @/lib/auth/session. */
   getCurrentUser(): Promise<User>;
   getUserBySlug(slug: string): Promise<User | null>;
   getUser(id: string): Promise<User | null>;

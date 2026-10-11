@@ -5,7 +5,8 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 | Round | Scope | Status |
 | --- | --- | --- |
 | B1 | Postgres data layer: migrations, `PgStore` behind `DataStore`, seed, second-host isolation tests | **done** (2026-10-11) |
-| B2 | Better Auth: email magic link, Google sign-in, httpOnly sessions, sign out everywhere, account deletion | not started |
+| B2a | Better Auth: email magic link, Google sign-in (switched on by env), httpOnly sessions, sign out everywhere | **done** (2026-10-11) |
+| B2b | Ownership checks in the nine data methods without a user id, account deletion, rate limits on sign-in | not started |
 | B3 | Email (Resend) and pg-boss jobs: confirmation and reminder emails, retries, dead-letter log | not started |
 | B4 | Google Calendar: free/busy, writing booked events, push channels and incremental sync, sync health | not started |
 | B5 | Payments in test mode: Razorpay (INR) and Stripe (USD), Checkout and portal, signed and deduplicated webhooks | not started |
@@ -26,6 +27,13 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - Two simultaneous bookings for one slot: exactly one wins. With the exclusion-violation mapping removed, 3 tests fail.
 - A second host sees none of Priya's event types, bookings or schedules. With the user filter removed from one read, the isolation test fails.
 - End to end with `HOURHAND_DATA=postgres`: slots 200, book 201, retry 200 same booking, same slot 409, reschedule 201, retry 200, cancel 200, unknown link 404, dashboards 200.
+
+## B2a evidence (2026-10-11, Postgres 16.15, production build)
+
+- 102 tests pass with `TEST_DATABASE_URL` set (92 without). Migration 0002 applies on top of 0001; a second run applies nothing.
+- Sign-in end to end, 15 of 15 checks: signed-out dashboard redirects to `/sign-in`; magic link signs Priya in with an `HttpOnly; SameSite=Lax` cookie; she sees her event types and bookings and none of Arun's; a used link fails with `INVALID_TOKEN`; a new email signs up and gets the slug `newhost`; "sign out of all devices" kills an older session; the public booking page and slots API still work signed out.
+- Calling a dashboard server action directly with no session is redirected to sign-in and changes nothing. With that action's session check removed, the same call switched Priya's event type off; restored, it is blocked again.
+- Better Auth writes its own non-uuid ids into the verification table, so the auth tables' ids are `text` (references to `users` stay `uuid`).
 
 ## Things only you can do (start the slow ones this week)
 
@@ -58,6 +66,7 @@ GOOGLE_CLIENT_SECRET=
 TOKEN_ENCRYPTION_KEY=
 RESEND_API_KEY=
 EMAIL_FROM=
+HOURHAND_MAIL_TO_LOG=
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
 RAZORPAY_WEBHOOK_SECRET=

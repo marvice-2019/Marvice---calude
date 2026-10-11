@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { EventTypeInUseError, SlugTakenError, store, type QuestionDraft } from "@/lib/data";
 import { SLUG_TAKEN, validateEventType, validateQuestions, type EventTypeErrors, type EventTypeForm, type QuestionErrors } from "@/lib/event-types";
+import { requireUser } from "@/lib/auth/session";
 
 export type SaveResult =
   | { ok: true; id: string; slug: string }
@@ -16,7 +17,7 @@ function refresh(userSlug: string, id?: string) {
 
 /** Creates the event type when `id` is null, otherwise updates it. Saves details, rules and questions together. */
 export async function saveEventType(id: string | null, form: EventTypeForm, questions: QuestionDraft[]): Promise<SaveResult> {
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   const others = (await store.listEventTypes(user.id)).filter((e) => e.id !== id).map((e) => e.slug);
   const details = validateEventType(form, others);
   const checked = validateQuestions(questions);
@@ -35,14 +36,14 @@ export async function saveEventType(id: string | null, form: EventTypeForm, ques
 }
 
 export async function setEventTypeActive(id: string, active: boolean): Promise<void> {
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   await store.setEventTypeActive(user.id, id, active === true);
   refresh(user.slug, id);
 }
 
 /** Returns the reason when the event type can't be deleted. */
 export async function deleteEventType(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await store.getCurrentUser();
+  const user = await requireUser();
   try {
     await store.deleteEventType(user.id, id);
   } catch (e) {
