@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
+import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const display = Fraunces({ subsets: ["latin"], variable: "--hh-font-display", display: "swap" });
@@ -15,7 +16,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The head script sets data-theme before paint, which React didn't render: hence suppressHydrationWarning on <html> only.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       {/* Font variables sit on body so they override the fallback stacks defined on :root in tokens.css. */}
       <body className={`${display.variable} ${sans.variable} bg-bg font-sans text-text antialiased`}>{children}</body>
     </html>

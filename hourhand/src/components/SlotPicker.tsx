@@ -26,6 +26,9 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const noSubscribe = () => () => {};
 const detectZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+/** The device's zone; null on the server and the first client render. */
+export const useDeviceZone = () => useSyncExternalStore(noSubscribe, detectZone, () => null);
+
 type Month = { y: number; m: number }; // m is 0-11
 type Loaded = { key: string; slots: string[] | null }; // null slots = failed
 
@@ -38,7 +41,7 @@ const monthLabel = ({ y, m }: Month) => new Intl.DateTimeFormat("en-IN", { month
 
 /** Month calendar plus the open times of the chosen day, in a zone the guest can change. */
 export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkToken, initialAt, onPick }: PickerProps) {
-  const detected = useSyncExternalStore(noSubscribe, detectZone, () => null);
+  const detected = useDeviceZone();
   const [chosenZone, setChosenZone] = useState<string | null>(null);
   const tz = chosenZone ?? detected;
   const cycle = useTimeFormat();

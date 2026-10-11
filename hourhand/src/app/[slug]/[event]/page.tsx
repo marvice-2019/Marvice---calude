@@ -21,7 +21,7 @@ export default async function PublicEventPage({ params, searchParams }: { params
       <p className="mt-2 text-text-muted">{eventType.durationMinutes} min{eventType.priceMinor !== null && ` · ${formatMoney(eventType.priceMinor, "INR")}`}</p>
       {eventType.description && <p className="mt-2 text-text">{eventType.description}</p>}
       <BookingFlow
-        slug={host.slug} event={eventType.slug} initialAt={typeof at === "string" ? at : undefined} bookingWindowDays={eventType.bookingWindowDays} questions={questions}
+        slug={host.slug} event={eventType.slug} host={{ name: host.name, timezone: host.timezone }} initialAt={typeof at === "string" ? at : undefined} bookingWindowDays={eventType.bookingWindowDays} questions={questions}
         paid={eventType.priceMinor !== null ? { price: formatMoney(eventType.priceMinor, "INR"), hostName: host.name, eventName: eventType.name } : null}
       />
       <BookingFooter hostId={host.id} />

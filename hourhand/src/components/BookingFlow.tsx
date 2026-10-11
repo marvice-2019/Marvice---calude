@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { focusRing } from "@/components/ui/focus";
 import { formatDate, zoneName } from "@/lib/format";
+import { zoneCheck } from "@/lib/tz-confirm";
 import { LocalTime } from "./LocalTime";
 import { payWithRazorpay, type CheckoutPayment } from "./razorpay-checkout";
-import { SlotPicker } from "./SlotPicker";
+import { SlotPicker, useDeviceZone } from "./SlotPicker";
+import { useTimeFormat } from "./useTimeFormat";
 
 export interface FlowQuestion { id: string; label: string; kind: string; required: boolean }
 
@@ -23,10 +25,12 @@ interface Props {
   linkToken?: string;
   /** Open the picker on this suggested time's day. */
   initialAt?: string;
+  /** Whose page this is, so the form can show the time on their clock too. */
+  host: { name: string; timezone: string };
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
@@ -35,7 +39,7 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
       </div>
       {picked && (
         <DetailsForm
-          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={paid}
+          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={paid} host={host}
           onPick={(slot) => setPicked({ slot, tz: picked.tz })} onBack={() => setPicked(null)}
         />
       )}
@@ -44,11 +48,11 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
 }
 
 interface FormProps {
-  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"];
+  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"]; host: Props["host"];
   onPick: (slot: string) => void; onBack: () => void;
 }
 
-function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, onPick, onBack }: FormProps) {
+function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, onPick, onBack }: FormProps) {
   const router = useRouter();
   // A new key starts a fresh attempt; it changes only after an attempt is over (payment couldn't start, or the hold ran out).
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
@@ -103,9 +107,15 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, onPick
     router.push(`/${slug}/${event}/booked/${h.bookingId}`);
   }
   const start = new Date(slot);
+  const device = useDeviceZone();
+  const cycle = useTimeFormat();
+  const zone = zoneCheck(start, tz, device, host, cycle);
+  const [zoneConfirmed, setZoneConfirmed] = useState(false);
+  const [zoneError, setZoneError] = useState(false);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (zone.confirm && !zoneConfirmed) { setZoneError(true); document.getElementById("zone-confirm")?.focus(); return; }
     const data = new FormData(e.currentTarget);
     const answers = Object.fromEntries(questions.map((q) => [q.id, String(data.get(`q_${q.id}`) ?? "")]));
     setBusy(true); setFailed(false); setLimited(false); setExpired(false);
@@ -142,8 +152,25 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, onPick
     <form onSubmit={submit} noValidate className="mt-6 grid max-w-md gap-4">
       <div>
         <p className="font-semibold text-text">{formatDate(start, tz)}, <LocalTime date={start} tz={tz} /> {zoneName(tz)}</p>
+        {zone.hostLine && <p className="text-sm text-text-muted">That&apos;s {zone.hostLine}.</p>}
         <button type="button" onClick={onBack} className={`min-h-11 text-sm font-semibold text-accent underline ${focusRing}`}>Pick another time</button>
       </div>
+      {zone.confirm && (
+        <div className={`grid gap-2 rounded-md p-4 ${zoneError ? "bg-danger-bg" : "bg-warning-bg"}`}>
+          <p className="text-text">
+            These times are in {zoneName(tz)}, but your device is set to {zoneName(device as string)}.
+          </p>
+          <label className="flex min-h-11 items-start gap-3 text-text">
+            <input
+              id="zone-confirm" type="checkbox" checked={zoneConfirmed} aria-invalid={zoneError || undefined} aria-describedby={zoneError ? "zone-confirm-error" : undefined}
+              onChange={(e) => { setZoneConfirmed(e.target.checked); setZoneError(false); }}
+              className={`mt-1 h-5 w-5 accent-accent ${focusRing}`}
+            />
+            <span>I&apos;ll be in {zoneName(tz)} at that time</span>
+          </label>
+          {zoneError && <p id="zone-confirm-error" className="text-sm text-danger" role="alert">Confirm your time zone, or pick another time in your own.</p>}
+        </div>
+      )}
       {taken && (
         <div className="rounded-md bg-danger-bg p-4" role="alert">
           <p className="text-danger">That time was just taken. Here are the next open times:</p>

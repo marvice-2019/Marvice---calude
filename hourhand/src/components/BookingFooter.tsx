@@ -3,6 +3,7 @@ import { hostPlan } from "@/lib/billing/account";
 import { LIMITS } from "@/lib/billing/plans";
 import { getPool } from "@/lib/data/pg-store";
 import { LegalLinks } from "./LegalLinks";
+import { ThemeSwitch } from "./ThemeSwitch";
 
 /**
  * Under a host's booking pages: "Booked with Hourhand" on the Free plan only (the demo data counts as Free), and on
@@ -18,6 +19,7 @@ export async function BookingFooter({ hostId }: { hostId: string }) {
         </p>
       )}
       <LegalLinks className="justify-center" />
+      <ThemeSwitch />
     </footer>
   );
 }
