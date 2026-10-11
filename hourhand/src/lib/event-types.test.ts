@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createMemoryStore } from "./data/memory-store";
 import { buildSeed } from "./data/seed";
 import { EventTypeInUseError, type EventTypeDraft } from "./data/types";
-import { SLUG_TAKEN, slugify, validateEventType, validateQuestions, type EventTypeForm } from "./event-types";
+import { PRICE_INVALID, SLUG_TAKEN, priceGateError, priceInput, slugify, validateEventType, validateQuestions, type EventTypeForm } from "./event-types";
 
 const NOW = new Date("2026-10-10T06:00:00Z");
 
 const valid: EventTypeForm = {
   name: "30-min strategy call", slug: "strategy", durationMinutes: "30", description: "  Plan the next quarter.  ",
   locationKind: "zoom", locationValue: "", minNoticeMinutes: "240", bookingWindowDays: "60", startIncrementMinutes: "15",
-  bufferBeforeMinutes: "0", bufferAfterMinutes: "10", dailyLimit: "", cancelCutoffMinutes: "120",
+  bufferBeforeMinutes: "0", bufferAfterMinutes: "10", dailyLimit: "", cancelCutoffMinutes: "120", price: "",
 };
 
 function draft(overrides: Partial<EventTypeForm> = {}): EventTypeDraft {
@@ -17,6 +17,31 @@ function draft(overrides: Partial<EventTypeForm> = {}): EventTypeDraft {
   if (!result.ok) throw new Error(JSON.stringify(result.errors));
   return result.value;
 }
+
+describe("priceGateError", () => {
+  const ok = { priceMinor: 49900, demo: false, plan: "solo", razorpayConnected: true } as const;
+
+  it("lets a paid-plan host with Razorpay connected set a price", () => {
+    expect(priceGateError(ok)).toBeNull();
+    expect(priceGateError({ ...ok, plan: "duo" })).toBeNull();
+  });
+
+  it("refuses a price on the demo data", () => {
+    expect(priceGateError({ ...ok, demo: true })).toBe("Prices can't be set on the demo data.");
+  });
+
+  it("refuses a price on the Free plan", () => {
+    expect(priceGateError({ ...ok, plan: "free" })).toBe("Charging guests needs the Solo or Duo plan.");
+  });
+
+  it("refuses a price until Razorpay is connected", () => {
+    expect(priceGateError({ ...ok, razorpayConnected: false })).toBe("Connect Razorpay first, so payments go to your account.");
+  });
+
+  it("always allows a free event", () => {
+    expect(priceGateError({ priceMinor: null, demo: true, plan: "free", razorpayConnected: false })).toBeNull();
+  });
+});
 
 describe("validateEventType", () => {
   it("accepts valid input and returns typed values", () => {
@@ -26,9 +51,26 @@ describe("validateEventType", () => {
       value: {
         name: "30-min strategy call", slug: "strategy", description: "Plan the next quarter.", durationMinutes: 30, minNoticeMinutes: 240,
         bookingWindowDays: 60, startIncrementMinutes: 15, bufferBeforeMinutes: 0, bufferAfterMinutes: 10, dailyLimit: null,
-        cancelCutoffMinutes: 120, location: { kind: "zoom", value: null },
+        cancelCutoffMinutes: 120, priceMinor: null, currency: null, location: { kind: "zoom", value: null },
       },
     });
+  });
+
+  it.each([
+    ["", null, null], ["  ", null, null], ["499", 49900, "INR"], ["499.5", 49950, "INR"], ["499.50", 49950, "INR"], ["1", 100, "INR"],
+    ["500000", 50_000_000, "INR"],
+  ] as const)("reads price %j as %j paise", (price, priceMinor, currency) => {
+    const value = draft({ price });
+    expect([value.priceMinor, value.currency]).toEqual([priceMinor, currency]);
+  });
+
+  it.each(["0", "0.99", "-1", "abc", "1.234", "5000001", "500000.01", "1,000", ".5", "1e3"])("rejects price %j", (price) => {
+    const result = validateEventType({ ...valid, price }, []);
+    expect(result).toEqual({ ok: false, errors: { price: PRICE_INVALID } });
+  });
+
+  it("shows a saved price back as rupees", () => {
+    expect([priceInput(null), priceInput(49900), priceInput(49950), priceInput(49905), priceInput(100)]).toEqual(["", "499", "499.50", "499.05", "1"]);
   });
 
   it.each(["4", "721", "", "30.5", "abc"])("rejects duration %j", (durationMinutes) => {

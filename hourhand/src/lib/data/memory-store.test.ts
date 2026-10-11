@@ -58,6 +58,19 @@ describe("memory store createBooking", () => {
     expect(coaching[0].label).toBe("What would you like to work on?");
   });
 
+  it("stores a price with its currency on update, and clears both for a free event", async () => {
+    const { store, host } = await setup();
+    const draft = {
+      name: "Intro", slug: "intro", description: null, durationMinutes: 15, minNoticeMinutes: 240, bookingWindowDays: 60, startIncrementMinutes: 15,
+      bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null, cancelCutoffMinutes: 0, location: null,
+    };
+    const priced = await store.updateEventType(host.id, "evt_intro", { ...draft, priceMinor: 49900, currency: "INR" });
+    expect([priced.priceMinor, priced.currency]).toEqual([49900, "INR"]);
+    expect((await store.getEventType(host.id, "evt_intro"))?.priceMinor).toBe(49900);
+    const free = await store.updateEventType(host.id, "evt_intro", { ...draft, priceMinor: null, currency: null });
+    expect([free.priceMinor, free.currency]).toEqual([null, null]);
+  });
+
   it("keeps a question id that belongs to the same event type", async () => {
     const { store } = await setup();
     const [saved] = await store.saveQuestions("usr_priya", "evt_coaching", [{ label: "Goal?", kind: "long_text", required: true, choices: [], id: "q_goal" }]);

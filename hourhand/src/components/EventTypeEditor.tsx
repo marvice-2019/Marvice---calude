@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type KeyboardEvent, type ReactNode } from "react";
 import { deleteEventType, saveEventType } from "@/app/dashboard/event-types/actions";
@@ -17,7 +18,7 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-const DETAIL_FIELDS: (keyof EventTypeForm)[] = ["name", "slug", "durationMinutes", "description", "locationKind", "locationValue"];
+const DETAIL_FIELDS: (keyof EventTypeForm)[] = ["name", "slug", "durationMinutes", "price", "description", "locationKind", "locationValue"];
 const PRESET_DURATIONS = [15, 30, 45, 60];
 
 const LOCATIONS: { kind: LocationKind | ""; label: string }[] = [
@@ -204,6 +205,20 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
             <div className="mt-3">{numberField("durationMinutes", "Custom length", "minutes", "Between 5 minutes and 12 hours.")}</div>
           ) : errors.durationMinutes && <p className="mt-1 text-sm text-danger">{errors.durationMinutes}</p>}
         </fieldset>
+        <div>
+          <Label htmlFor="f-price">Price (₹)</Label>
+          <Input
+            id="f-price" inputMode="decimal" value={form.price} onChange={(e) => set("price")(e.target.value)} error={errors.price}
+            aria-describedby="f-price-hint" className="max-w-32" placeholder="Free"
+          />
+          <p id="f-price-hint" className="mt-1 text-sm text-text-muted">Leave empty for a free event. Razorpay&apos;s fee comes out of what you receive.</p>
+          {errors.price && (
+            <div className="flex flex-wrap gap-x-4">
+              <Link href="/dashboard/plan" className="inline-flex min-h-11 items-center font-semibold text-accent underline">See plans</Link>
+              <Link href="/dashboard/integrations" className="inline-flex min-h-11 items-center font-semibold text-accent underline">Connect Razorpay</Link>
+            </div>
+          )}
+        </div>
         <div>
           <Label htmlFor="f-location">Where you meet</Label>
           <select id="f-location" value={form.locationKind} onChange={(e) => set("locationKind")(e.target.value)} className={`h-11 ${fieldClasses(false)}`}>

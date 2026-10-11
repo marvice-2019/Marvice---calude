@@ -52,8 +52,11 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   function fields(draft: EventTypeDraft): Omit<EventTypeDraft, "location"> {
-    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes } = draft;
-    return { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes };
+    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency } = draft;
+    return {
+      name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
+      priceMinor, currency: priceMinor === null ? null : currency,
+    };
   }
 
   function setLocation(eventTypeId: string, draft: EventTypeDraft) {
