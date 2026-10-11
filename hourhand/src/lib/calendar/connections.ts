@@ -64,20 +64,53 @@ export async function saveConnection(
 
 /** An access token for the connection, refreshed and re-sealed when it has less than a minute left. */
 export async function accessTokenFor(pool: Db, providers: CalendarProviders, key: Buffer, connectionId: string, now = new Date()): Promise<string> {
-  const { rows: [row] } = await pool.query("select user_id, provider, account_email, credentials_encrypted from calendar_connections where id = $1", [connectionId]);
-  if (!row) throw new CalendarApiError("Calendar connection no longer exists", { retryable: false, revoked: true });
-  const providerId = row.provider as CalendarProviderId;
-  const provider = providers[providerId];
-  if (!provider) throw new CalendarApiError(`${PROVIDER_NAMES[providerId] ?? row.provider} calendars are not configured on this server`, { retryable: false });
-  const aad = aadFor(row.provider, row.user_id, row.account_email);
-  const creds = unseal<Credentials>(key, row.credentials_encrypted, aad);
-  if (creds.accessToken && creds.expiresAt && new Date(creds.expiresAt).getTime() - now.getTime() > 60_000) return creds.accessToken;
-  const fresh = await provider.refresh(creds.refreshToken, now);
-  const next: Credentials = { ...creds, accessToken: fresh.accessToken, expiresAt: fresh.expiresAt.toISOString() };
-  // Microsoft rotates refresh tokens and the old one stops working, so a new one replaces it.
-  if (fresh.refreshToken) next.refreshToken = fresh.refreshToken;
-  await pool.query("update calendar_connections set credentials_encrypted = $2, updated_at = $3 where id = $1", [connectionId, seal(key, next, aad), now]);
-  return fresh.accessToken;
+  const read = async (db: Db) => {
+    const { rows: [row] } = await db.query("select user_id, provider, account_email, credentials_encrypted from calendar_connections where id = $1", [connectionId]);
+    if (!row) throw new CalendarApiError("Calendar connection no longer exists", { retryable: false, revoked: true });
+    const providerId = row.provider as CalendarProviderId;
+    const provider = providers[providerId];
+    if (!provider) throw new CalendarApiError(`${PROVIDER_NAMES[providerId] ?? row.provider} calendars are not configured on this server`, { retryable: false });
+    const aad = aadFor(row.provider, row.user_id, row.account_email);
+    const sealed = row.credentials_encrypted as Buffer;
+    const creds = unseal<Credentials>(key, sealed, aad);
+    const valid = Boolean(creds.accessToken && creds.expiresAt && new Date(creds.expiresAt).getTime() - now.getTime() > 60_000);
+    return { provider, aad, sealed, creds, valid };
+  };
+  const first = await read(pool);
+  if (first.valid) return first.creds.accessToken as string;
+
+  // Microsoft rotates refresh tokens and may refuse one that was already redeemed, so two callers refreshing at once could
+  // disconnect a healthy connection or keep the older token. Refreshes take turns per connection; the lock is session-level
+  // and needs one connection for lock, refresh and unlock, so a pool lends a dedicated client.
+  const isPool = typeof (pool as Partial<pg.Pool>).connect === "function" && !("release" in pool);
+  const client = isPool ? await (pool as pg.Pool).connect() : null;
+  const db: Db = client ?? pool;
+  const lockKey = [connectionId];
+  let unlockError: Error | undefined;
+  try {
+    await db.query("select pg_advisory_lock(hashtext('cal-refresh:' || $1::text))", lockKey);
+    try {
+      // Whoever held the lock may have just refreshed.
+      const { provider, aad, sealed, creds, valid } = await read(db);
+      if (valid) return creds.accessToken as string;
+      const fresh = await provider.refresh(creds.refreshToken, now);
+      const next: Credentials = { ...creds, accessToken: fresh.accessToken, expiresAt: fresh.expiresAt.toISOString() };
+      if (fresh.refreshToken) next.refreshToken = fresh.refreshToken;
+      // A reconnect that saved new credentials meanwhile wins; this token still works for this call.
+      await db.query("update calendar_connections set credentials_encrypted = $2, updated_at = $3 where id = $1 and credentials_encrypted = $4",
+        [connectionId, seal(key, next, aad), now, sealed]);
+      return fresh.accessToken;
+    } finally {
+      if (client) {
+        // A connection that can't unlock is thrown away instead of going back to the pool, which ends its lock.
+        await db.query("select pg_advisory_unlock(hashtext('cal-refresh:' || $1::text))", lockKey).catch((e: Error) => { unlockError = e; });
+      } else {
+        await db.query("select pg_advisory_unlock(hashtext('cal-refresh:' || $1::text))", lockKey);
+      }
+    }
+  } finally {
+    client?.release(unlockError);
+  }
 }
 
 /** Disconnects a host's own connection: asks the provider to drop the grant, then deletes it with its calendars and busy times. */
