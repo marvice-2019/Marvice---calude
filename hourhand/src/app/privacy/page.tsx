@@ -121,7 +121,7 @@ export default function PrivacyPage() {
           <li>delete your data, where we don&apos;t need to keep it by law.</li>
         </ul>
         <p className={p}>
-          Write to our grievance officer at <a className={a} href="mailto:Yuvarajgs@marvice.in">Yuvarajgs@marvice.in</a>. We will reply within one working day and act within 30 days. If you are not happy with our answer, you can complain to the Data Protection Board of India, or, in the UK or EU, to your local data protection authority.
+          Write to our grievance officer at <a className={a} href="mailto:Yuvarajgs@marvice.in">Yuvarajgs@marvice.in</a>. We will acknowledge your request within 3 working days and act on it within 30 days. If you are not happy with our answer, you can complain to the Data Protection Board of India, or, in the UK or EU, to your local data protection authority.
         </p>
         <p className={p}>If you booked with a host, the host decides what to ask you and keeps their own records of your booking. You can also contact them directly.</p>
 
