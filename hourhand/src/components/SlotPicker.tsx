@@ -13,6 +13,8 @@ interface PickerProps {
   bookingWindowDays: number;
   /** When rescheduling: the booking's manage token, so its own time doesn't hide slots. */
   manageToken?: string;
+  /** Booking through a single-use link: times come from the link's event type. */
+  linkToken?: string;
   /** Called with the chosen slot (ISO instant) and the zone the guest was viewing times in. */
   onPick: (slot: string, tz: string) => void;
 }
@@ -33,7 +35,7 @@ const shift = ({ y, m }: Month, by: number): Month => ({ y: y + Math.floor((m + 
 const monthLabel = ({ y, m }: Month) => new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(Date.UTC(y, m, 1));
 
 /** Month calendar plus the open times of the chosen day, in a zone the guest can change. */
-export function SlotPicker({ slug, event, bookingWindowDays, manageToken, onPick }: PickerProps) {
+export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkToken, onPick }: PickerProps) {
   const detected = useSyncExternalStore(noSubscribe, detectZone, () => null);
   const [chosenZone, setChosenZone] = useState<string | null>(null);
   const tz = chosenZone ?? detected;
@@ -56,7 +58,10 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, onPick
     const key = `${sy}-${sm}-${attempt}`;
     const from = new Date(Math.max(now.getTime(), Date.UTC(sy, sm, 1) - DAY));
     const to = new Date(Date.UTC(sy, sm + 1, 1) + DAY);
-    const params = new URLSearchParams({ slug, event, from: from.toISOString(), to: to.toISOString() });
+    // A single-use link names its own host and event type; the slug pair is only for the public page.
+    const params = linkToken
+      ? new URLSearchParams({ link: linkToken, from: from.toISOString(), to: to.toISOString() })
+      : new URLSearchParams({ slug, event, from: from.toISOString(), to: to.toISOString() });
     if (manageToken) params.set("token", manageToken);
     let live = true;
     fetch(`/api/slots?${params}`)
@@ -64,7 +69,7 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, onPick
       .then((body: { slots: string[] }) => live && setLoaded({ key, slots: body.slots }))
       .catch(() => live && setLoaded({ key, slots: null }));
     return () => { live = false; };
-  }, [sy, sm, attempt, slug, event, manageToken, now]);
+  }, [sy, sm, attempt, slug, event, manageToken, linkToken, now]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, string[]>();

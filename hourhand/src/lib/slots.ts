@@ -115,3 +115,35 @@ export function computeSlots(input: SlotInput): Date[] {
   }
   return slots.sort((a, b) => a.getTime() - b.getTime());
 }
+
+export interface OneOffSlotInput {
+  /** The start times the host offered. */
+  times: Date[];
+  durationMinutes: number;
+  busyBlocks: Range[];
+  bookings: SlotInput["bookings"];
+  now: Date;
+  rangeStart: Date;
+  rangeEnd: Date;
+  syncStale: boolean;
+}
+
+/**
+ * Free times for a one-off meeting: the offered times still in the future and inside the range that clash with nothing
+ * (busy calendar time, a confirmed booking, or a payment hold still running). No buffers, notice or working hours: the
+ * host picked these times by hand. A stale calendar offers nothing, as for every other event type.
+ */
+export function computeOneOffSlots(input: OneOffSlotInput): Date[] {
+  const { times, durationMinutes, busyBlocks, bookings, now, rangeStart, rangeEnd, syncStale } = input;
+  if (syncStale) return [];
+  const duration = durationMinutes * MIN;
+  const live = bookings.filter((b) => b.status === "confirmed" || (b.status === "pending_payment" && b.holdExpiresAt !== null && b.holdExpiresAt > now));
+  const blocked: [number, number][] = [
+    ...live.map((b): [number, number] => [b.bufferedStart.getTime(), b.bufferedEnd.getTime()]),
+    ...busyBlocks.map((b): [number, number] => [b.start.getTime(), b.end.getTime()]),
+  ];
+  return times
+    .filter((t) => t.getTime() > now.getTime() && t >= rangeStart && t < rangeEnd)
+    .filter((t) => !blocked.some(([s, e]) => overlaps(t.getTime(), t.getTime() + duration, s, e)))
+    .sort((a, b) => a.getTime() - b.getTime());
+}

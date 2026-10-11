@@ -45,6 +45,26 @@ export interface EventType {
   hidden: boolean;
   active: boolean;
   position: number;
+  /** A one_off type is a one-off meeting: offered only at its own times, through its single-use link. */
+  kind: "one_on_one" | "group" | "one_off";
+}
+
+/** What the host enters for a one-off meeting. */
+export interface OneOffInput {
+  name: string;
+  durationMinutes: number;
+  location: { kind: LocationKind; value?: string | null };
+  description?: string | null;
+  times: Date[];
+}
+
+/** A one-off meeting the store refused: `field` names what is wrong. */
+export class InvalidOneOffError extends Error {
+  readonly code = "invalid_one_off";
+  constructor(readonly field: "times" | "durationMinutes" | "name", message: string) {
+    super(message);
+    this.name = "InvalidOneOffError";
+  }
 }
 
 export type LocationKind =
@@ -151,7 +171,59 @@ export interface CreateBookingInput {
   idempotencyKey: string;
   /** Set for a paid booking: it starts as pending_payment holding the slot until then, with no emails yet. Postgres only. */
   holdUntil?: Date;
+  /** Book through a single-use link: it must be open and for this event type, and is used up in the same transaction. */
+  bookingLinkToken?: string;
   invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
+}
+
+export type BookingLinkState = "open" | "used" | "expired" | "revoked";
+
+/**
+ * A single-use booking link. `state` is derived: used when a booking made through it exists that the system didn't
+ * cancel (a lapsed payment hold frees it); otherwise revoked, then expired, then open.
+ */
+export interface BookingLink {
+  id: string;
+  eventTypeId: string;
+  label: string | null;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+  createdAt: Date;
+  state: BookingLinkState;
+  usedBy: { bookingId: string; guestName: string; startAt: Date } | null;
+}
+
+export type ResolvedBookingLink =
+  | { status: "open"; link: BookingLink; host: User; eventType: EventType }
+  | { status: "used" | "expired" | "revoked" | "not_found" };
+
+/** Someone already booked through this single-use link (or won the race to). */
+/**
+ * True when `err` is the error class named `name`. Matches the name each class sets, not instanceof: a Next production
+ * build bundles a route and the data store separately, each with its own copy of these classes, so instanceof fails across
+ * them (a booking race answered 500 instead of 409 because of it). Names are string literals, so minifying keeps them.
+ */
+export function isNamedError<T extends Error = Error>(err: unknown, name: string): err is T {
+  return err instanceof Error && err.name === name;
+}
+
+export class LinkUsedError extends Error {
+  readonly code = "link_used";
+  constructor() {
+    super("This link has already been used");
+    this.name = "LinkUsedError";
+  }
+}
+
+/** A booking link that can't be booked through: unknown (or for another event type), expired or revoked. */
+export class LinkUnavailableError extends Error {
+  readonly code = "link_unavailable";
+  readonly status: "used" | "expired" | "revoked" | "not_found";
+  constructor(status: "used" | "expired" | "revoked" | "not_found") {
+    super(status === "not_found" ? "Booking link not found" : `This link is ${status}`);
+    this.name = "LinkUnavailableError";
+    this.status = status;
+  }
 }
 
 /** Mirrors the bookings.no_double_booking exclusion constraint (Postgres 23P01). */
@@ -231,12 +303,28 @@ export interface DataStore {
   deleteAccount(userId: string, now?: Date): Promise<BookingWithInvitee[]>;
   /** Permanently removes accounts deleted more than 30 days before `now`, with everything they own. Returns how many. */
   purgeDeletedAccounts(now?: Date): Promise<number>;
+  /** Throws NotFoundError unless the event type is `hostId`'s and active. The raw token is returned only here. */
+  createBookingLink(hostId: string, eventTypeId: string, opts: { label?: string; expiresAt?: Date | null }, now: Date): Promise<{ link: BookingLink; token: string }>;
+  /** Newest first. */
+  listBookingLinks(hostId: string, now: Date): Promise<BookingLink[]>;
+  /** Throws NotFoundError unless it is `hostId`'s link and open at `now`. */
+  revokeBookingLink(hostId: string, linkId: string, now: Date): Promise<BookingLink>;
+  /** Public: what `/l/{token}` shows. Only an open link reveals its host and event type. */
+  /** `idempotencyKey`: a retried submit whose own booking is what uses the link gets it back as open. */
+  resolveBookingLink(token: string, now: Date, opts?: { idempotencyKey?: string }): Promise<ResolvedBookingLink>;
+  /**
+   * A hidden one_off event type at the given times, with a single-use link to it that expires at the last time; all in one
+   * write. Throws InvalidOneOffError unless there are 1–20 distinct future times and the duration is 5–720 minutes.
+   */
+  createOneOffMeeting(hostId: string, input: OneOffInput, now: Date): Promise<{ eventType: EventType; link: BookingLink; token: string }>;
+  /** The offered start times of a one_off event type, earliest first. */
+  listOneOffTimes(eventTypeId: string): Promise<Date[]>;
 }
 
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

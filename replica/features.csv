@@ -13,7 +13,7 @@ Multiple duration options on one event type,event types,should,yes,no,S05; help 
 "Minimum notice, booking window, start increments",event types,must,yes,yes,"slot engine, tested"
 Buffers before and after meetings,event types,must,yes,yes,"slot engine + booking overlap check, tested"
 Daily / weekly booking limits,event types,should,yes,partial,daily limit editable and enforced by slot engine; no weekly limit
-Hidden event types (link only),event types,should,yes,no,S04; API EventType hidden flag
+Hidden event types (link only),event types,should,yes,yes,"B8: 'Only people with the link can book' in the editor; off the profile, own URL still books"
 Custom questions on the booking form,booking,must,yes,yes,required questions enforced; answers saved with question label and shown to host
 "Group event type (one host, many invitees, seat limit)",event types,could,yes,no,S05; API kind=group
 Public profile page listing event types,booking,must,yes,yes,"S13 lists active, non-hidden event types"
@@ -25,7 +25,7 @@ Guest reschedule via emailed link,booking,must,yes,yes,"S18 + B3: atomic move, n
 Cancellation policy text and cut-off,booking,should,yes,partial,cut-off enforced on cancel; no policy text field in the UI yet
 Prefill guest details via link parameters,booking,could,yes,no,help prefill
 Embed booking page on a website (inline / popup),sharing,should,yes,no,help embed options
-One-off meeting and single-use links,sharing,should,yes,no,S19; API one-off event type; help single-use
+One-off meeting and single-use links,sharing,should,yes,yes,"B8: single-use links (hashed, used once, revocable) and one-off meetings with up to 20 hand-picked times, on the Links page"
 "Meetings list: upcoming, past, cancelled",host,must,yes,yes,"S11 lists bookings upcoming first, cancelled marked"
 "Meeting detail with cancel, reschedule, mark no-show",host,must,yes,yes,"B7: host cancel with reason, move to a free time, no-show and undo"
 Confirmation email + calendar invite to host and guest,notifications,must,yes,yes,B3: emails with .ics to both; B4: event in the host's calendar with Meet link
@@ -43,7 +43,7 @@ Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integratio
 Never offer a slot when calendar sync is stale,integrations,must,no,yes,slot engine refuses stale sync; real Google sync since B4
 One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,must,no,yes,"B5a: cancel, pause and resume, renewal email 7 days ahead"
 Human support reply under 1 business day; WhatsApp/callback on paid plans,support,should,no,no,fix 3: support (14 reviews/2 sources); ops not code
-Date overrides + block-a-week + recurring + one-off links (web and mobile),availability,must,no,partial,"web: overrides + block a stretch of days (up to 62); no recurring or one-off links, no mobile"
+Date overrides + block-a-week + recurring + one-off links (web and mobile),availability,must,no,partial,"web: overrides, block a stretch of days, one-off links (B8); no recurring sessions, no mobile"
 Mobile app parity with web; save confirmation; crash-free >=99.5%,mobile,must,no,no,fix 5: bugs (26 reviews/2 sources)
 Time zone confirm step and explicit AM/PM or 24h toggle,booking,should,no,no,fix 6: thin (2 reviews/1 source) but cheap
 Low-cost second seat or flat 2-person price,pricing,should,no,no,fix 7: seats (5 reviews/3 sources) -> /replica-launch

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "./pg-store";
-import { NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
+import { LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type DataStore, type EventType, type EventTypeDraft, type User } from "./types";
 
 const URL_ = process.env.TEST_DATABASE_URL;
 const MIN = 60_000;
@@ -285,12 +285,153 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect((await store.setNoShow(priya.id, b.id, false, after)).invitee.noShowAt).toBeNull();
     });
   });
+
+  describe("single-use booking links", () => {
+    const now = () => new Date();
+    let n = 0;
+    /** A fresh far-future slot and request key per booking, so link tests never collide on the slot. */
+    const book = (eventTypeId: string, token: string | undefined, name = "Meera Iyer") => {
+      n += 1;
+      return store.createBooking({
+        eventTypeId, startAt: new Date(at("2033-01-03T04:00:00Z").getTime() + n * 24 * 60 * MIN), idempotencyKey: `pg-link-${n}`,
+        bookingLinkToken: token, invitee: { ...guest, name },
+      });
+    };
+    const stateOf = async (id: string) => (await store.listBookingLinks(priya.id, now())).find((l) => l.id === id)!;
+
+    it("creates an open link, lists it newest first and stores only the token's hash", async () => {
+      const first = await store.createBookingLink(priya.id, coaching.id, { label: "For Ravi" }, now());
+      const second = await store.createBookingLink(priya.id, intro.id, {}, now());
+      expect(first.link).toMatchObject({ eventTypeId: coaching.id, label: "For Ravi", expiresAt: null, revokedAt: null, state: "open", usedBy: null });
+      expect(first.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+      const ids = (await store.listBookingLinks(priya.id, now())).map((l) => l.id);
+      expect(ids.indexOf(second.link.id)).toBeLessThan(ids.indexOf(first.link.id));
+      expect(await store.listBookingLinks(arun.id, now())).not.toContainEqual(expect.objectContaining({ id: first.link.id }));
+
+      const { rows } = await pool.query("select token_hash from booking_links where id = $1", [first.link.id]);
+      expect(rows[0].token_hash).not.toBe(first.token);
+      expect(rows[0].token_hash).toMatch(/^[0-9a-f]{64}$/);
+      const leaked = await pool.query("select count(*)::int as n from booking_links l where l::text like '%' || $1 || '%'", [first.token]);
+      expect(leaked.rows[0].n).toBe(0);
+    });
+
+    it("won't make a link for another host's event type", async () => {
+      await expect(store.createBookingLink(arun.id, coaching.id, {}, now())).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it("resolves open, unknown, revoked and expired tokens; only open carries the host and event type", async () => {
+      const open = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      const resolved = await store.resolveBookingLink(open.token, now());
+      expect(resolved).toMatchObject({ status: "open", link: { id: open.link.id }, host: { id: priya.id }, eventType: { id: coaching.id } });
+      expect(await store.resolveBookingLink("no-such-token", now())).toEqual({ status: "not_found" });
+
+      const revoked = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      expect(await store.revokeBookingLink(priya.id, revoked.link.id, now())).toMatchObject({ state: "revoked" });
+      expect(await store.resolveBookingLink(revoked.token, now())).toEqual({ status: "revoked" });
+      await expect(book(coaching.id, revoked.token)).rejects.toMatchObject({ name: "LinkUnavailableError", status: "revoked" });
+
+      const expired = await store.createBookingLink(priya.id, coaching.id, { expiresAt: at("2020-01-01T00:00:00Z") }, now());
+      expect(expired.link.state).toBe("expired");
+      expect(await store.resolveBookingLink(expired.token, now())).toEqual({ status: "expired" });
+      await expect(book(coaching.id, expired.token)).rejects.toMatchObject({ name: "LinkUnavailableError", status: "expired" });
+      await expect(book(coaching.id, "no-such-token")).rejects.toMatchObject({ name: "LinkUnavailableError", status: "not_found" });
+    });
+
+    it("revoking another host's link is not found", async () => {
+      const { link } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      await expect(store.revokeBookingLink(arun.id, link.id, now())).rejects.toBeInstanceOf(NotFoundError);
+      expect((await stateOf(link.id)).state).toBe("open");
+    });
+
+    it("booking through a link uses it up; a second booking is LinkUsedError", async () => {
+      const { link, token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      const booking = await book(coaching.id, token, "Ravi Kumar");
+      const used = await stateOf(link.id);
+      expect(used).toMatchObject({ state: "used", usedBy: { bookingId: booking.id, guestName: "Ravi Kumar", startAt: booking.startAt } });
+      expect(await store.resolveBookingLink(token, now())).toEqual({ status: "used" });
+      await expect(book(coaching.id, token)).rejects.toBeInstanceOf(LinkUsedError);
+      await expect(store.revokeBookingLink(priya.id, link.id, now())).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it("the same request again (same key) returns its booking instead of LinkUsedError", async () => {
+      const { token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      n += 1;
+      const input = {
+        eventTypeId: coaching.id, startAt: new Date(at("2033-01-03T04:00:00Z").getTime() + n * 24 * 60 * MIN), idempotencyKey: `pg-link-retry-${n}`,
+        bookingLinkToken: token, invitee: { ...guest, name: "Retry Guest" },
+      };
+      const first = await store.createBooking(input);
+      expect((await store.createBooking(input)).id).toBe(first.id);
+      await expect(book(coaching.id, token)).rejects.toBeInstanceOf(LinkUsedError);
+    });
+
+    it("a payment hold uses the link; once the hold lapses, booking through the link works again", async () => {
+      const { link, token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      n += 1;
+      const held = await store.createBooking({
+        eventTypeId: coaching.id, startAt: new Date(at("2033-01-03T04:00:00Z").getTime() + n * 24 * 60 * MIN), idempotencyKey: `pg-link-${n}`,
+        bookingLinkToken: token, holdUntil: new Date(Date.now() + 15 * MIN), invitee: { ...guest, name: "Held Guest" },
+      });
+      expect(held.status).toBe("pending_payment");
+      expect((await stateOf(link.id)).state).toBe("used");
+      await expect(book(coaching.id, token)).rejects.toBeInstanceOf(LinkUsedError);
+      // The guest never pays: the hold runs out, and the next booking through the link expires it and goes ahead.
+      await pool.query("update bookings set hold_expires_at = now() - interval '1 minute' where id = $1", [held.id]);
+      // Before anything sweeps the lapsed hold, the guest reopening the link must see it open, not "already used".
+      expect(await store.resolveBookingLink(token, now())).toMatchObject({ status: "open" });
+      const after = await book(coaching.id, token, "Second Guest");
+      expect(after.status).toBe("confirmed");
+      expect(await stateOf(link.id)).toMatchObject({ state: "used", usedBy: { bookingId: after.id } });
+    });
+
+    describe("racing bookings", () => {
+      // Each insert through a link sleeps, so both racers pass their link check before either commits unless the link row lock serialises them.
+      beforeAll(async () => {
+        await pool.query(`create or replace function test_slow_link_insert() returns trigger language plpgsql as $$
+          begin if new.booking_link_id is not null then perform pg_sleep(0.3); end if; return new; end $$`);
+        await pool.query("create trigger test_slow_link_insert before insert on bookings for each row execute function test_slow_link_insert()");
+      });
+      afterAll(async () => {
+        await pool.query("drop trigger if exists test_slow_link_insert on bookings");
+        await pool.query("drop function if exists test_slow_link_insert()");
+      });
+
+      it("two concurrent bookings on one link: exactly one succeeds, the other is LinkUsedError", async () => {
+        const { token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+        const results = await Promise.allSettled([book(coaching.id, token), book(coaching.id, token)]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+        expect(rejected).toHaveLength(1);
+        expect(rejected[0].reason).toBeInstanceOf(LinkUsedError);
+      });
+    });
+
+    it("a booking the system cancelled frees the link; a guest-cancelled one keeps it used", async () => {
+      const { link, token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      const lapsed = await book(coaching.id, token);
+      await pool.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system' where id = $1", [lapsed.id]);
+      expect(await stateOf(link.id)).toMatchObject({ state: "open", usedBy: null });
+      expect(await store.resolveBookingLink(token, now())).toMatchObject({ status: "open" });
+
+      const second = await book(coaching.id, token);
+      expect((await stateOf(link.id)).usedBy?.bookingId).toBe(second.id);
+      await store.cancelBooking(priya.id, second.id, "guest");
+      expect((await stateOf(link.id)).state).toBe("used");
+      await expect(book(coaching.id, token)).rejects.toBeInstanceOf(LinkUsedError);
+    });
+
+    it("a link for one event type can't book another", async () => {
+      const { link, token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      await expect(book(intro.id, token)).rejects.toMatchObject({ name: "LinkUnavailableError", status: "not_found" });
+      expect((await stateOf(link.id)).state).toBe("open");
+    });
+  });
 });
 
 function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
-    startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit,
+    startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit, hidden: e.hidden,
     cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, location: null,
   };
 }

@@ -1,5 +1,5 @@
 import { freeSlots, slotTaken, type HandlerResult } from "./booking";
-import { RequestKeyConflictError, SlotTakenError, type BookingWithInvitee, type DataStore } from "./data/types";
+import { isNamedError, type BookingWithInvitee, type DataStore } from "./data/types";
 
 const MIN = 60_000;
 const MAX_REASON = 500;
@@ -74,8 +74,8 @@ async function moveBooking(store: DataStore, booking: BookingWithInvitee, input:
     const moved = await store.rescheduleBooking(booking.hostId, booking.id, start, idempotencyKey, by);
     return { status: 201, body: { bookingId: moved.id, manageToken: moved.invitee.manageToken } };
   } catch (err) {
-    if (err instanceof SlotTakenError) return slotTaken(store, host, eventType, start, now, booking.id);
-    if (err instanceof RequestKeyConflictError) return { status: 409, body: { error: "key_conflict" } };
+    if (isNamedError(err, "SlotTakenError")) return slotTaken(store, host, eventType, start, now, booking.id);
+    if (isNamedError(err, "RequestKeyConflictError")) return { status: 409, body: { error: "key_conflict" } };
     throw err;
   }
 }

@@ -3,9 +3,11 @@ import { datesInRange } from "../availability";
 import { kickJobs } from "../jobs/kick";
 import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
 import { queueBookingNotifications } from "./notifications";
+import { hashLinkToken, newLinkToken } from "../links";
+import { checkOneOff, oneOffSlug } from "./one-off";
 import {
-  EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
-  type EventType, type EventTypeDraft, type Interval, type User,
+  EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingLink,
+  type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval, type User,
 } from "./types";
 
 const MIN = 60_000;
@@ -27,13 +29,14 @@ const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format
 const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"] });
 
 const EVENT = `id, user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
-  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position`;
+  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind`;
 const toEventType = (r: Row): EventType => ({
   id: r.id as string, userId: r.user_id as string, scheduleId: r.schedule_id as string | null, name: r.name as string, slug: r.slug as string,
   description: r.description as string | null, durationMinutes: r.duration_minutes as number, minNoticeMinutes: r.min_notice_minutes as number,
   bookingWindowDays: r.booking_window_days as number, startIncrementMinutes: r.start_increment_minutes as number, bufferBeforeMinutes: r.buffer_before_minutes as number,
   bufferAfterMinutes: r.buffer_after_minutes as number, dailyLimit: r.daily_limit as number | null, cancelCutoffMinutes: r.cancel_cutoff_minutes as number,
   priceMinor: r.price_minor as number | null, currency: r.currency as EventType["currency"], hidden: r.hidden as boolean, active: r.active as boolean, position: r.position as number,
+  kind: r.kind as EventType["kind"],
 });
 
 const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
@@ -53,6 +56,23 @@ const toBooking = (r: Row): BookingWithInvitee => ({
     noShowAt: (r.no_show_at as Date | null) ?? null,
   },
 });
+
+/** The derived "used" rule, over bookings aliased b: any booking made through the link except one the system cancelled. */
+// A booking uses its link unless the system cancelled it, or it is a payment hold whose time has run out (the payment check
+// cancels those within a minute; until then the guest must not be told the link is used).
+const USES_LINK = "not ((b.status = 'cancelled' and b.cancelled_by = 'system') or (b.status = 'pending_payment' and b.hold_expires_at <= now()))";
+const LINK = `select l.id, l.user_id, l.event_type_id, l.label, l.expires_at, l.revoked_at, l.created_at,
+  u.id as used_booking_id, u.name as used_guest_name, u.start_at as used_start_at
+  from booking_links l
+  left join lateral (select b.id, i.name, b.start_at from bookings b join invitees i on i.booking_id = b.id
+    where b.booking_link_id = l.id and ${USES_LINK} order by b.created_at desc limit 1) u on true`;
+const toLink = (r: Row, now: Date): BookingLink => {
+  const expiresAt = (r.expires_at as Date | null) ?? null;
+  const revokedAt = (r.revoked_at as Date | null) ?? null;
+  const usedBy = r.used_booking_id ? { bookingId: r.used_booking_id as string, guestName: r.used_guest_name as string, startAt: r.used_start_at as Date } : null;
+  const state = usedBy ? "used" : revokedAt ? "revoked" : expiresAt && expiresAt.getTime() <= now.getTime() ? "expired" : "open";
+  return { id: r.id as string, eventTypeId: r.event_type_id as string, label: (r.label as string | null) ?? null, expiresAt, revokedAt, createdAt: r.created_at as Date, state, usedBy };
+};
 
 const code = (error: unknown) => (error as { code?: string }).code;
 
@@ -84,7 +104,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
    * Inserts a booking (confirmed, or pending_payment with a hold) and its invitee. The no_double_booking constraint is the
    * overlap guard (23P01); it covers holds too, so this host's lapsed holds are cancelled first and never block the insert.
    */
-  async function insertBooking(client: pg.PoolClient, input: CreateBookingInput, movingId: string | null): Promise<string> {
+  async function insertBooking(client: pg.PoolClient, input: CreateBookingInput, movingId: string | null, linkId: string | null = null): Promise<string> {
     if (!isId(input.eventTypeId)) throw new Error(`Unknown event type ${input.eventTypeId}`);
     await expireHolds(client, input.eventTypeId);
     const { rows } = await client.query(
@@ -96,10 +116,10 @@ export function createPgStore(pool: pg.Pool): DataStore {
     const startAt = input.startAt;
     const endAt = new Date(startAt.getTime() + et.duration_minutes * MIN);
     const inserted = await client.query(
-      `insert into bookings (event_type_id, host_id, start_at, end_at, buffered_start, buffered_end, status, location_kind, idempotency_key, rescheduled_from_id, hold_expires_at)
-       values ($1,$2,$3,$4,$5,$6,$10,$7,$8,$9,$11) returning id`,
+      `insert into bookings (event_type_id, host_id, start_at, end_at, buffered_start, buffered_end, status, location_kind, idempotency_key, rescheduled_from_id, hold_expires_at, booking_link_id)
+       values ($1,$2,$3,$4,$5,$6,$10,$7,$8,$9,$11,$12) returning id`,
       [input.eventTypeId, et.user_id, startAt, endAt, new Date(startAt.getTime() - et.buffer_before_minutes * MIN), new Date(endAt.getTime() + et.buffer_after_minutes * MIN),
-        et.location_kind, input.idempotencyKey, movingId, input.holdUntil ? "pending_payment" : "confirmed", input.holdUntil ?? null]);
+        et.location_kind, input.idempotencyKey, movingId, input.holdUntil ? "pending_payment" : "confirmed", input.holdUntil ?? null, linkId]);
     const id = inserted.rows[0].id as string;
     const i = input.invitee;
     await client.query("insert into invitees (booking_id, host_id, name, email, timezone, phone, answers) values ($1,$2,$3,$4,$5,$6,$7)",
@@ -115,6 +135,31 @@ export function createPgStore(pool: pg.Pool): DataStore {
     await client.query(
       `update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'system', cancel_reason = 'Payment not completed', hold_expires_at = null
        where host_id = (select user_id from event_types where id = $1) and status = 'pending_payment' and hold_expires_at < now()`, [eventTypeId]);
+  }
+
+  /**
+   * Uses up the single-use link for this booking, inside its transaction; returns the link id to record on it. The row
+   * lock serialises bookings on one link, and the used check is a separate statement so its fresh snapshot sees a
+   * booking the lock holder just committed.
+   */
+  async function takeLink(client: pg.PoolClient, input: CreateBookingInput, token: string): Promise<string> {
+    if (!isId(input.eventTypeId)) throw new Error(`Unknown event type ${input.eventTypeId}`);
+    // A lapsed payment hold made through the link frees it once cancelled by the system.
+    await expireHolds(client, input.eventTypeId);
+    const { rows } = await client.query("select id, event_type_id, expires_at, revoked_at from booking_links where token_hash = $1 for update", [hashLinkToken(token)]);
+    const link = rows[0];
+    if (!link || link.event_type_id !== input.eventTypeId) throw new LinkUnavailableError("not_found");
+    // The same request again (same key) isn't a second use: the insert below returns that booking instead.
+    const used = await client.query(`select 1 from bookings b where b.booking_link_id = $1 and ${USES_LINK} and b.idempotency_key <> $2`, [link.id, input.idempotencyKey]);
+    if (used.rowCount) throw new LinkUsedError();
+    if (link.revoked_at) throw new LinkUnavailableError("revoked");
+    if (link.expires_at && (link.expires_at as Date).getTime() <= Date.now()) throw new LinkUnavailableError("expired");
+    return link.id as string;
+  }
+
+  async function linkRows(db: Db, where: string, values: unknown[], now: Date): Promise<{ userId: string; link: BookingLink }[]> {
+    const { rows } = await db.query(`${LINK} where ${where} order by l.created_at desc`, values);
+    return rows.map((r) => ({ userId: r.user_id as string, link: toLink(r, now) }));
   }
 
   /** A key already used for this same request returns its booking; a key used for anything else is a conflict. */
@@ -151,7 +196,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
   }
 
   const draftValues = (d: EventTypeDraft) => [d.name, d.slug, d.description, d.durationMinutes, d.minNoticeMinutes, d.bookingWindowDays, d.startIncrementMinutes,
-    d.bufferBeforeMinutes, d.bufferAfterMinutes, d.dailyLimit, d.cancelCutoffMinutes, d.priceMinor, d.priceMinor === null ? null : d.currency];
+    d.bufferBeforeMinutes, d.bufferAfterMinutes, d.dailyLimit, d.cancelCutoffMinutes, d.priceMinor, d.priceMinor === null ? null : d.currency, d.hidden];
 
   async function slugSafe<T>(work: () => Promise<T>): Promise<T> {
     try {
@@ -182,7 +227,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async listEventTypes(userId) {
       if (!isId(userId)) return [];
-      return (await pool.query(`select ${EVENT} from event_types where user_id = $1 order by position, created_at`, [userId])).rows.map(toEventType);
+      return (await pool.query(`select ${EVENT} from event_types where user_id = $1 and kind <> 'one_off' order by position, created_at`, [userId])).rows.map(toEventType);
     },
     async getEventType(userId, id) {
       if (!isId(userId) || !isId(id)) return null;
@@ -192,7 +237,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
     async getPublicEventType(hostSlug, eventSlug) {
       const host = await this.getUserBySlug(hostSlug);
       if (!host) return null;
-      const { rows } = await pool.query(`select ${EVENT} from event_types where user_id = $1 and slug = $2 and active`, [host.id, eventSlug]);
+      const { rows } = await pool.query(`select ${EVENT} from event_types where user_id = $1 and slug = $2 and active and kind <> 'one_off'`, [host.id, eventSlug]);
       return rows[0] ? { host, eventType: toEventType(rows[0]) } : null;
     },
     async listEventLocations(userId, eventTypeId) {
@@ -254,7 +299,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
       if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
         const id = await tx(async (client) => {
-          const newId = await insertBooking(client, input, null);
+          const linkId = input.bookingLinkToken === undefined ? null : await takeLink(client, input, input.bookingLinkToken);
+          const newId = await insertBooking(client, input, null, linkId);
           // A held booking says nothing yet: its emails and calendar write go out once the payment is confirmed.
           if (!input.holdUntil) await queueBookingNotifications(client, newId, "booked", new Date());
           return newId;
@@ -264,6 +310,29 @@ export function createPgStore(pool: pg.Pool): DataStore {
       } catch (error) {
         return settle(error, input.idempotencyKey, isSameRequest);
       }
+    },
+    async createOneOffMeeting(hostId, input, now) {
+      if (!isId(hostId)) throw new NotFoundError("User");
+      const times = checkOneOff(input, now);
+      const token = newLinkToken();
+      const { eventType, linkId } = await tx(async (client) => {
+        const { rows } = await client.query(
+          `insert into event_types (user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, buffer_before_minutes, buffer_after_minutes, kind, hidden)
+           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2, $3, $4, $5, 0, 730, 0, 0, 'one_off', true)
+           returning ${EVENT}`, [hostId, input.name.trim(), oneOffSlug(), input.description ?? null, input.durationMinutes]);
+        const created = toEventType(rows[0]);
+        await client.query("insert into event_locations (event_type_id, kind, value, position) values ($1,$2,$3,0)", [created.id, input.location.kind, input.location.value ?? null]);
+        await client.query("insert into one_off_times (event_type_id, start_at) select $1, unnest($2::timestamptz[])", [created.id, times]);
+        const link = await client.query("insert into booking_links (user_id, event_type_id, token_hash, expires_at) values ($1,$2,$3,$4) returning id",
+          [hostId, created.id, hashLinkToken(token), times[times.length - 1]]);
+        return { eventType: created, linkId: link.rows[0].id as string };
+      });
+      const [{ link }] = await linkRows(pool, "l.id = $1", [linkId], now);
+      return { eventType, link, token };
+    },
+    async listOneOffTimes(eventTypeId) {
+      if (!isId(eventTypeId)) return [];
+      return (await pool.query("select start_at from one_off_times where event_type_id = $1 order by start_at", [eventTypeId])).rows.map((r) => r.start_at as Date);
     },
     async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey, by = "guest") {
       if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
@@ -279,7 +348,9 @@ export function createPgStore(pool: pg.Pool): DataStore {
           // Both statements commit together or not at all.
           await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = 'Rescheduled' where id = $1", [bookingId, by]);
           const { name, email, timezone, phone, answers } = invitee;
-          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId);
+          // The move keeps the booking's single-use link, so the link shows the current time.
+          const linkId = (await client.query("select booking_link_id from bookings where id = $1", [bookingId])).rows[0].booking_link_id as string | null;
+          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId, linkId);
           // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
           // A calendar write already running for the old booking is left to finish; the move waits for it and then moves its event.
           await client.query(
@@ -354,8 +425,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
       return slugSafe(() => tx(async (client) => {
         const { rows } = await client.query(
           `insert into event_types (user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
-             buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, position)
-           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
+             buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, position)
+           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
              (select coalesce(max(position), -1) + 1 from event_types where user_id = $1))
            returning ${EVENT}`, [userId, ...draftValues(draft)]);
         const eventType = toEventType(rows[0]);
@@ -369,7 +440,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
         const { rows } = await client.query(
           `update event_types set name = $3, slug = $4, description = $5, duration_minutes = $6, min_notice_minutes = $7, booking_window_days = $8,
              start_increment_minutes = $9, buffer_before_minutes = $10, buffer_after_minutes = $11, daily_limit = $12, cancel_cutoff_minutes = $13,
-             price_minor = $14, currency = $15
+             price_minor = $14, currency = $15, hidden = $16
            where user_id = $1 and id = $2 returning ${EVENT}`, [userId, id, ...draftValues(draft)]);
         await setLocation(client, id, draft);
         return toEventType(rows[0]);
@@ -421,6 +492,45 @@ export function createPgStore(pool: pg.Pool): DataStore {
         }
         return saved;
       });
+    },
+    async createBookingLink(hostId, eventTypeId, opts, now) {
+      const eventType = await owned(pool, hostId, eventTypeId);
+      // A one-off meeting has exactly one link, made with it; a second would let it be booked twice.
+      if (!eventType.active || eventType.kind === "one_off") throw new NotFoundError("Event type");
+      const token = newLinkToken();
+      const { rows } = await pool.query("insert into booking_links (user_id, event_type_id, token_hash, label, expires_at) values ($1,$2,$3,$4,$5) returning id",
+        [hostId, eventTypeId, hashLinkToken(token), opts.label ?? null, opts.expiresAt ?? null]);
+      const [{ link }] = await linkRows(pool, "l.id = $1", [rows[0].id], now);
+      return { link, token };
+    },
+    async listBookingLinks(hostId, now) {
+      if (!isId(hostId)) return [];
+      return (await linkRows(pool, "l.user_id = $1", [hostId], now)).map((r) => r.link);
+    },
+    async revokeBookingLink(hostId, linkId, now) {
+      if (!isId(hostId) || !isId(linkId)) throw new NotFoundError("Booking link");
+      return tx(async (client) => {
+        // Locked like a booking through it would, so a revoke and a booking can't both win.
+        const locked = await client.query("select 1 from booking_links where id = $1 and user_id = $2 for update", [linkId, hostId]);
+        if (!locked.rowCount) throw new NotFoundError("Booking link");
+        const [{ link }] = await linkRows(client, "l.id = $1", [linkId], now);
+        if (link.state !== "open") throw new NotFoundError("Booking link");
+        await client.query("update booking_links set revoked_at = $2 where id = $1", [linkId, now]);
+        return { ...link, revokedAt: now, state: "revoked" as const };
+      });
+    },
+    async resolveBookingLink(token, now, opts) {
+      const [found] = await linkRows(pool, "l.token_hash = $1", [hashLinkToken(token)], now);
+      if (!found) return { status: "not_found" };
+      // A retried submit (same key) whose booking is what uses the link still reaches it, so it gets its booking back.
+      const usedOnlyByThisRequest = found.link.state === "used" && opts?.idempotencyKey !== undefined && !(await pool.query(
+        `select 1 from bookings b where b.booking_link_id = $1 and ${USES_LINK} and b.idempotency_key <> $2`, [found.link.id, opts.idempotencyKey])).rowCount;
+      if (found.link.state !== "open" && !usedOnlyByThisRequest) return { status: found.link.state };
+      // A closed account or a link turned off reads as unknown: nothing about the host leaks.
+      const host = await this.getUser(found.userId);
+      const eventType = host && await this.getEventType(host.id, found.link.eventTypeId);
+      if (!host || !eventType?.active) return { status: "not_found" };
+      return { status: "open", link: found.link, host, eventType };
     },
   };
 }

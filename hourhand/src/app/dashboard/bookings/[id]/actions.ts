@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { store } from "@/lib/data";
-import { NotFoundError } from "@/lib/data/types";
+import { isNamedError, NotFoundError } from "@/lib/data/types";
 import { handleHostReschedule } from "@/lib/manage";
 
 // Each action checks the session itself; the store methods only touch bookings whose host_id is the signed-in host.
@@ -19,7 +19,7 @@ async function run(id: string, change: () => Promise<string>): Promise<never> {
   try {
     target = await change();
   } catch (error) {
-    if (!(error instanceof NotFoundError)) throw error;
+    if (!(isNamedError(error, "NotFoundError"))) throw error;
     target = `${page(id)}?error=not_found`;
   }
   revalidatePath("/dashboard/bookings");

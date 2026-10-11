@@ -17,7 +17,7 @@ export function baseSlug(email: string, name?: string | null): string {
 
 /** Top-level paths the app owns. A host with one of these slugs would have a booking page nobody can reach. */
 export const RESERVED_SLUGS = new Set([
-  "about", "admin", "api", "app", "auth", "b", "billing", "blog", "dashboard", "help", "login", "logout",
+  "about", "admin", "api", "app", "auth", "b", "billing", "l", "blog", "dashboard", "help", "login", "logout",
   "onboarding", "pricing", "privacy", "settings", "sign-in", "sign-out", "sign-up", "signin", "signup",
   "static", "support", "terms", "www",
 ]);

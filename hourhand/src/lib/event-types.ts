@@ -37,6 +37,8 @@ export interface EventTypeForm {
   cancelCutoffMinutes: string;
   /** Rupees as typed. Blank means free. */
   price: string;
+  /** Left off the public profile; its own link still books. */
+  hidden: boolean;
 }
 
 export type EventTypeErrors = Partial<Record<keyof EventTypeForm, string>>;
@@ -95,7 +97,10 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
 
   // The form arrives from the client, so check every field is text before using string methods on it.
   for (const key of Object.keys(NEW_EVENT_TYPE_FORM) as (keyof EventTypeForm)[]) {
-    if (typeof form[key] !== "string") errors[key] = "Enter text for this field.";
+    if (key === "hidden") {
+      // A checkbox: true or false (an older client may leave it out, which means shown).
+      if (form.hidden !== undefined && typeof form.hidden !== "boolean") errors.hidden = "Choose whether it shows on your booking page.";
+    } else if (typeof form[key] !== "string") errors[key] = "Enter text for this field.";
   }
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
@@ -113,7 +118,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
     errors.slug = SLUG_TAKEN;
   }
 
-  const number = (key: keyof EventTypeForm, min: number, max: number, message: string): number => {
+  const number = (key: Exclude<keyof EventTypeForm, "hidden">, min: number, max: number, message: string): number => {
     const n = whole(form[key]);
     if (n === null || n < min || n > max) errors[key] = message;
     return n ?? 0;
@@ -145,7 +150,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
     value: {
       name, slug, description: form.description.trim() || null, durationMinutes, minNoticeMinutes, bookingWindowDays,
       startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
-      priceMinor, currency: priceMinor === null ? null : "INR",
+      priceMinor, currency: priceMinor === null ? null : "INR", hidden: form.hidden === true,
       location: form.locationKind ? { kind: form.locationKind, value: valueLabel ? locationValue : null } : null,
     },
   };
@@ -155,7 +160,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
 export const NEW_EVENT_TYPE_FORM: EventTypeForm = {
   name: "", slug: "", durationMinutes: "30", description: "", locationKind: "google_meet", locationValue: "", minNoticeMinutes: "240",
   bookingWindowDays: "60", startIncrementMinutes: "30", bufferBeforeMinutes: "0", bufferAfterMinutes: "0", dailyLimit: "", cancelCutoffMinutes: "0",
-  price: "",
+  price: "", hidden: false,
 };
 
 /** The editor's values for a saved event type and its first location. */
@@ -166,7 +171,7 @@ export function toForm(et: EventType, location: EventLocation | undefined): Even
     bookingWindowDays: String(et.bookingWindowDays), startIncrementMinutes: String(et.startIncrementMinutes),
     bufferBeforeMinutes: String(et.bufferBeforeMinutes), bufferAfterMinutes: String(et.bufferAfterMinutes),
     dailyLimit: et.dailyLimit === null ? "" : String(et.dailyLimit), cancelCutoffMinutes: String(et.cancelCutoffMinutes),
-    price: priceInput(et.priceMinor),
+    price: priceInput(et.priceMinor), hidden: et.hidden,
   };
 }
 
