@@ -46,7 +46,7 @@ Both apps together come to **4.6 GB** at their ceilings. The rest of the box is 
 Do staging first, run the checks below on it, then repeat for production.
 
 1. **Project.** Coolify → Projects → New → `Bayline`. Create two environments: `staging` and `production`.
-2. **Resource.** In `staging` → New Resource → *Public/Private Repository (GitHub App)* → `marvice-2019/marvice---calude`, branch `main` (or the release branch), Build Pack **Docker Compose**, Base Directory `/`, Docker Compose Location `/deploy/parking-app/docker-compose.yml`.
+2. **Resource.** In `staging` → New Resource → *Public/Private Repository (GitHub App)* → `marvice-2019/marvice---calude`, branch `claude/kind-euler-089qgi` for staging until it is merged, then `main`, Build Pack **Docker Compose**, Base Directory `/`, Docker Compose Location `/deploy/parking-app/docker-compose.yml`.
 3. **Environment variables.** Open *Environment Variables* → *Developer view*, paste `env/staging.example`, then fill the values:
    - `POSTGRES_PASSWORD`, `JWT_SECRET`, `INTERNAL_TOKEN`: generate each with `openssl rand -hex 32`. Tick **Is Secret** (and **Is Build Time** off).
    - Razorpay keys and webhook secret, the S3 keys, and `SENTRY_DSN`: tick **Is Secret**.
