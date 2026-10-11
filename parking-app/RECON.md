@@ -43,6 +43,24 @@ Parking.com has a big app (20,084 iOS ratings, 4.5 stars) with lots of inventory
 | Cashless tip to the valet | Not documented in any source found | No; **Proposed** as a differentiator |
 | Key-tag ↔ ticket ↔ plate audit trail (fraud control) | SMS Valet ("no fraud") | No |
 
+## iOS app walkthrough [V] (your screenshots, iOS app 3.68.0, Bengaluru, 11 Oct 2026; saved in `recon/parking-com-ios-3.68.0/`)
+
+| Screen | What it shows (verified) | What it means for Bayline |
+|---|---|---|
+| 01 Home | "Find parking near me"; Book a Reservation with a **Daily / Monthly** toggle; **Scan to Pay or Enter**: scan a QR **or** type a **5-digit Zone #** | Confirms that drive-up pay by zone code is a core flow, as in our Park now. Our codes (BLR101) are shorter and say which city; keep them |
+| 02, 04 Map | Map with your location, a filter chip, search, and **entrance / exit time** pickers | Same pattern as ours |
+| 05 List view (Bengaluru) | **Empty: zero lots** | **[V] Parking.com has no inventory in India.** The market is open; supply is the race |
+| 03 Filters | Garage: pre-purchase available, accepts coupons, **park & pay with phone**, **open gate with phone**, motorcycle, EV charging. **Valet: yes / self-park / either.** Facility: indoor / outdoor / either | Valet is only a filter: they list valet garages but there's no valet flow. Add the same filters, plus **two-wheeler first** for India |
+| 06 Menu | Find Parking, Favorites, My Coupons, **Where I Parked**, Monthly Accounts, My Account, Settings, Support; "Powered by SP+" | **Where I Parked** and **My Coupons** (a coupon wallet) are features we don't have |
+| 07, 08 Favorites / Coupons empty | Friendly empty states with a "Find parking" button | Our empty states already follow this |
+| 09, 10 Where I Parked / Mark Place | Save the spot by current location or by **scanning the garage QR**; notes for **section, floor, space #** | Add to the pass: "Mark my spot" with floor and bay, plus photo (our improvement) |
+| 11–13 Account | Sign up with **email, mobile (+1 default), first and last name, password + confirm**; email + password login; also creates a **Metropolis account** | Heavy sign-up that explains the login and password-reset complaints in reviews. Our phone OTP and guest checkout beat it |
+| 14 Monthly Parking | A **separate web portal** with its own email + password login (plus Google) | Two logins for one customer. Ours keeps monthly in the same app and account |
+| 15 Settings | Only policy links: ALPR usage & privacy, CCPA, privacy policy, a Chevy Bolt EV notice | No notification, vehicle or payment settings. Ours: vehicles, payment preference, WhatsApp alerts, language |
+| 16 Support | FAQs, email support, call support | Add WhatsApp chat support, which is how Indian users expect to reach support |
+
+**UrbanParking is still [GAP].** None of these screenshots are of it. If it's your own Emergent build, sharing its source or an export works as well as screenshots.
+
 ## iOS app facts [V] ([App Store lookup](https://itunes.apple.com/lookup?id=1414389805&country=us))
 
 | Field | Value |
@@ -123,6 +141,9 @@ Praise is rare and is about the location of the lot, not the app.
 
 6. **Valet mode at the same lots and venues** (new, from the valet reference): digital ticket at drop-off, damage photos, "request my car" with live ETA, cashless pay and tip, venue validation, and a valet staff app with key-tag tracking. It unlocks restaurants, hotels, hospitals and malls that run valet, at higher revenue per car than self-park.
 
+7. **Where I Parked inside the pass** (from screenshots 09–10): floor, bay and a photo, saved automatically for valet and monthly bays. One tap from the pass, not a separate menu item.
+8. **India filters:** two-wheeler first, covered, EV, valet/self-park, open-24h, women-safe-lit (proposed; needs operator data).
+
 ## What the Bayline prototype is still missing
 
 1. ✅ Done 11 Oct. **"Park now".** Drive-up pay by lot or zone number, with no pre-booking.
@@ -136,7 +157,8 @@ Praise is rare and is about the location of the lot, not the app.
 ## Gaps to close before building
 
 - [GAP] Play Store numbers (installs, Android rating, data safety). Check on a phone.
-- [GAP] Parking.com's own fees and cancellation policy. Book one test reservation in the US app and screenshot each step; it's free to cancel if their policy allows.
+- [V] Parking.com has no lots in Bengaluru (screenshot 05), so a fee comparison only matters for the US.
+- [GAP] Parking.com's own fees and cancellation policy (US only). Book one test reservation in the US app and screenshot each step; it's free to cancel if their policy allows.
 - [GAP] Their live web search flow. Walk it on a desktop browser and screenshot it; automation was blocked here.
 
 - [GAP] UrbanParking's screens and flows. Send screenshots of each tab from your phone, or share access to its source.
