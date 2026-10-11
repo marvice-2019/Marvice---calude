@@ -772,3 +772,9 @@ export function tNodes(locale: Locale, key: GuestKey, nodes: Record<string, Reac
     return createElement(Fragment, { key: i }, name && name in nodes ? nodes[name] : part);
   });
 }
+
+/** The catalog key for each kind of meeting place (email keeps its own English labels). */
+export const LOCATION_KEYS = {
+  google_meet: "locGoogleMeet", zoom: "locZoom", teams: "locTeams", phone_host_calls: "locPhoneHostCalls",
+  phone_guest_calls: "locPhoneGuestCalls", in_person: "locInPerson", custom: "locCustom", ask_guest: "locAskGuest",
+} as const satisfies Record<string, GuestKey>;

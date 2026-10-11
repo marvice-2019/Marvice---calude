@@ -6,9 +6,10 @@ import { Input, Label } from "@/components/ui/Input";
 import { focusRing } from "@/components/ui/focus";
 import { dayKey } from "@/lib/format";
 import { useDeviceZone } from "./SlotPicker";
+import { t, type Locale } from "@/lib/i18n/guest";
 
 /** "Day full? Get an email if a time opens": the guest's day, in their zone, to the waitlist. */
-export function WaitlistForm({ slug, event, hostName }: { slug: string; event: string; hostName: string }) {
+export function WaitlistForm({ slug, event, hostName, locale = "en" }: { slug: string; event: string; hostName: string; locale?: Locale }) {
   const tz = useDeviceZone();
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -27,34 +28,38 @@ export function WaitlistForm({ slug, event, hostName }: { slug: string; event: s
       });
       if (res.ok) return setState("done");
       const body = await res.json().catch(() => ({}));
-      setErrors(body.fields ?? { form: res.status === 429 ? "Too many tries. Wait a few minutes and try again." : "That didn't work. Try again." });
+      // Server messages are English; show ours for the fields it names.
+      const fields = (body.fields ?? {}) as Record<string, string>;
+      const mine: Record<string, string> = { name: t(locale, "errName"), email: t(locale, "errEmail"), day: t(locale, "errDay"), timezone: t(locale, "errTimezone") };
+      setErrors(Object.keys(fields).length > 0 ? Object.fromEntries(Object.keys(fields).map((k) => [k, mine[k] ?? fields[k]]))
+        : { form: t(locale, res.status === 429 ? "waitlistTooMany" : "waitlistFailed") });
     } catch {
-      setErrors({ form: "Couldn't reach Hourhand. Check your connection and try again." });
+      setErrors({ form: t(locale, "offline") });
     }
     setState("idle");
   }
 
   return (
     <details className="mt-6 rounded-md border border-border p-4">
-      <summary className={`min-h-11 cursor-pointer content-center font-semibold text-text ${focusRing}`}>Day full? Get an email if a time opens</summary>
+      <summary className={`min-h-11 cursor-pointer content-center font-semibold text-text ${focusRing}`}>{t(locale, "waitlistSummary")}</summary>
       {state === "done" ? (
-        <p role="status" className="mt-3 text-text">You&apos;re on the list. If a time with {hostName} opens on that day, we&apos;ll email you once.</p>
+        <p role="status" className="mt-3 text-text">{t(locale, "waitlistDone", { host: hostName })}</p>
       ) : (
         <form onSubmit={submit} className="mt-3 grid gap-3" noValidate>
           <div>
-            <Label htmlFor="wl-day">Day</Label>
+            <Label htmlFor="wl-day">{t(locale, "day")}</Label>
             <Input id="wl-day" name="day" type="date" min={today} defaultValue={today} required error={errors.day} />
           </div>
           <div>
-            <Label htmlFor="wl-name">Your name</Label>
+            <Label htmlFor="wl-name">{t(locale, "yourName")}</Label>
             <Input id="wl-name" name="name" autoComplete="name" required maxLength={100} error={errors.name} />
           </div>
           <div>
-            <Label htmlFor="wl-email">Email</Label>
+            <Label htmlFor="wl-email">{t(locale, "email")}</Label>
             <Input id="wl-email" name="email" type="email" autoComplete="email" required error={errors.email} />
           </div>
           {(errors.form || errors.timezone) && <p role="alert" className="text-sm text-danger">{errors.form ?? errors.timezone}</p>}
-          <Button type="submit" disabled={state === "sending"}>{state === "sending" ? "Adding you…" : "Join the waitlist"}</Button>
+          <Button type="submit" disabled={state === "sending"}>{t(locale, state === "sending" ? "joining" : "joinWaitlist")}</Button>
         </form>
       )}
     </details>

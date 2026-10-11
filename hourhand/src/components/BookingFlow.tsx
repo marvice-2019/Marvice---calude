@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { focusRing } from "@/components/ui/focus";
-import { formatDate, zoneName } from "@/lib/format";
+import { formatDate, formatTime, zoneName } from "@/lib/format";
+import { t, tNodes, type GuestKey, type Locale } from "@/lib/i18n/guest";
 import { zoneCheck } from "@/lib/tz-confirm";
 import { LocalTime } from "./LocalTime";
 import { payWithRazorpay, type CheckoutPayment } from "./razorpay-checkout";
@@ -32,22 +33,25 @@ interface Props {
   maxWeeks?: number;
   /** Booking with a session package (the buyer's token): no payment, one session used per booking. */
   packageToken?: string;
+  /** The guest's language, and "?lang=xx" when they chose it (carried to the next page). */
+  locale?: Locale;
+  langQuery?: string;
   /** Offer the waitlist (needs Postgres; not for single-use links or packages). */
   waitlist?: boolean;
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host, maxWeeks = 1, packageToken, waitlist = false }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host, maxWeeks = 1, packageToken, waitlist = false, locale = "en", langQuery = "" }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
       <div hidden={picked !== null}>
-        <SlotPicker slug={slug} event={event} linkToken={linkToken} initialAt={initialAt} bookingWindowDays={bookingWindowDays} onPick={(slot, tz) => setPicked({ slot, tz })} />
-        {waitlist && <WaitlistForm slug={slug} event={event} hostName={host.name} />}
+        <SlotPicker slug={slug} event={event} linkToken={linkToken} initialAt={initialAt} bookingWindowDays={bookingWindowDays} locale={locale} onPick={(slot, tz) => setPicked({ slot, tz })} />
+        {waitlist && <WaitlistForm slug={slug} event={event} hostName={host.name} locale={locale} />}
       </div>
       {picked && (
         <DetailsForm
-          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={packageToken ? null : paid} host={host} maxWeeks={maxWeeks} packageToken={packageToken}
+          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={packageToken ? null : paid} host={host} maxWeeks={maxWeeks} packageToken={packageToken} locale={locale} langQuery={langQuery}
           onPick={(slot) => setPicked({ slot, tz: picked.tz })} onBack={() => setPicked(null)}
         />
       )}
@@ -56,11 +60,11 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
 }
 
 interface FormProps {
-  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"]; host: Props["host"]; maxWeeks: number; packageToken?: string;
+  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"]; host: Props["host"]; maxWeeks: number; packageToken?: string; locale: Locale; langQuery: string;
   onPick: (slot: string) => void; onBack: () => void;
 }
 
-function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, maxWeeks, packageToken, onPick, onBack }: FormProps) {
+function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, maxWeeks, packageToken, locale, langQuery, onPick, onBack }: FormProps) {
   const router = useRouter();
   // A new key starts a fresh attempt; it changes only after an attempt is over (payment couldn't start, or the hold ran out).
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
@@ -91,7 +95,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
     setCheckoutFailed(false); setNotPaid(false);
     let result;
     try {
-      result = await payWithRazorpay(h.payment, { name: paid?.hostName ?? "", description: paid?.deposit ? `${paid.eventName} (refundable deposit)` : paid?.eventName ?? "", prefill: h.prefill });
+      result = await payWithRazorpay(h.payment, { name: paid?.hostName ?? "", description: paid?.deposit ? t(locale, "depositDescription", { event: paid.eventName }) : paid?.eventName ?? "", prefill: h.prefill });
     } catch {
       setHeld(h);
       setCheckoutFailed(true);
@@ -112,7 +116,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
     } catch {
       // The reconciler confirms a real payment within a minute even if this call never arrives.
     }
-    router.push(`/${slug}/${event}/booked/${h.bookingId}`);
+    router.push(`/${slug}/${event}/booked/${h.bookingId}${langQuery}`);
   }
   const start = new Date(slot);
   const device = useDeviceZone();
@@ -143,7 +147,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
         return;
       }
       if (res.status === 201 || res.status === 200) {
-        router.push(`/${slug}/${event}/booked/${body.bookingId}`);
+        router.push(`/${slug}/${event}/booked/${body.bookingId}${langQuery}`);
         return;
       }
       if (typeof body.error === "string" && body.error.startsWith("link_")) setLinkGone(body.error);
@@ -152,7 +156,12 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
       else if (res.status === 409 && body.error === "weeks_unavailable") setWeeksTaken(body.unavailable ?? []);
       else if ((res.status === 409 && body.error === "attempt_expired") || res.status === 502) { freshAttempt(); setFailed(true); }
       else if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
-      else if (res.status === 400) setErrors(body.fields ?? {});
+      else if (res.status === 400) {
+        // Server messages are English; show ours for the fields it names.
+        const own: Record<string, GuestKey> = { name: "errName", email: "errEmail", phone: "errPhone", timezone: "errTimezone" };
+        const fields = (body.fields ?? {}) as Record<string, string>;
+        setErrors(Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, own[k] ? t(locale, own[k]) : k.startsWith("answers.") ? t(locale, "errAnswer") : v])));
+      }
       else if (res.status === 429) setLimited(true);
       else setFailed(true);
     } catch {
@@ -164,14 +173,14 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
   return (
     <form onSubmit={submit} noValidate className="mt-6 grid max-w-md gap-4">
       <div>
-        <p className="font-semibold text-text">{formatDate(start, tz)}, <LocalTime date={start} tz={tz} /> {zoneName(tz)}</p>
-        {zone.hostLine && <p className="text-sm text-text-muted">That&apos;s {zone.hostLine}.</p>}
-        <button type="button" onClick={onBack} className={`min-h-11 text-sm font-semibold text-accent underline ${focusRing}`}>Pick another time</button>
+        <p className="font-semibold text-text">{formatDate(start, tz, locale)}, <LocalTime date={start} tz={tz} locale={locale} /> {zoneName(tz)}</p>
+        {zone.hostLine && <p className="text-sm text-text-muted">{t(locale, "thatsHost", { time: formatTime(start, host.timezone, cycle, locale), zone: zoneName(host.timezone), name: host.name.split(/\s+/)[0] || host.name })}</p>}
+        <button type="button" onClick={onBack} className={`min-h-11 text-sm font-semibold text-accent underline ${focusRing}`}>{t(locale, "pickAnother")}</button>
       </div>
       {zone.confirm && (
         <div className={`grid gap-2 rounded-md p-4 ${zoneError ? "bg-danger-bg" : "bg-warning-bg"}`}>
           <p className="text-text">
-            These times are in {zoneName(tz)}, but your device is set to {zoneName(device as string)}.
+            {t(locale, "zoneMismatch", { zone: zoneName(tz), device: zoneName(device as string) })}
           </p>
           <label className="flex min-h-11 items-start gap-3 text-text">
             <input
@@ -179,19 +188,19 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
               onChange={(e) => { setZoneConfirmed(e.target.checked); setZoneError(false); }}
               className={`mt-1 h-5 w-5 accent-accent ${focusRing}`}
             />
-            <span>I&apos;ll be in {zoneName(tz)} at that time</span>
+            <span>{t(locale, "zoneConfirm", { zone: zoneName(tz) })}</span>
           </label>
-          {zoneError && <p id="zone-confirm-error" className="text-sm text-danger" role="alert">Confirm your time zone, or pick another time in your own.</p>}
+          {zoneError && <p id="zone-confirm-error" className="text-sm text-danger" role="alert">{t(locale, "zoneError")}</p>}
         </div>
       )}
       {taken && (
         <div className="rounded-md bg-danger-bg p-4" role="alert">
-          <p className="text-danger">That time was just taken. Here are the next open times:</p>
+          <p className="text-danger">{t(locale, "justTaken")}</p>
           <ul className="mt-2 grid gap-2">
             {taken.map((s) => (
               <li key={s}>
                 <Button variant="secondary" className="w-full" onClick={() => { setTaken(null); onPick(s); }}>
-                  {formatDate(new Date(s), tz)}, <LocalTime date={s} tz={tz} /> {zoneName(tz)}
+                  {formatDate(new Date(s), tz, locale)}, <LocalTime date={s} tz={tz} locale={locale} /> {zoneName(tz)}
                 </Button>
               </li>
             ))}
@@ -200,34 +209,34 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
       )}
       {maxWeeks > 1 && (
         <div>
-          <Label htmlFor="weeks">Repeat</Label>
+          <Label htmlFor="weeks">{t(locale, "repeat")}</Label>
           <select
             id="weeks" value={weeks} onChange={(e) => { setWeeks(Number(e.target.value)); setWeeksTaken(null); }}
             className={`mt-1 block h-11 w-full rounded-md border border-border-input bg-card px-3 text-base text-text ${focusRing}`}
           >
-            <option value={1}>Just this once</option>
-            {Array.from({ length: maxWeeks - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>Every week for {n} weeks</option>)}
+            <option value={1}>{t(locale, "justOnce")}</option>
+            {Array.from({ length: maxWeeks - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{t(locale, "everyWeek", { n })}</option>)}
           </select>
         </div>
       )}
       {weeksTaken && (
         <div className="rounded-md bg-danger-bg p-4" role="alert">
-          <p className="text-danger">Nothing is booked yet: {weeksTaken.length === 1 ? "this week isn't" : "these weeks aren't"} free at this time.</p>
+          <p className="text-danger">{t(locale, weeksTaken.length === 1 ? "weekTakenOne" : "weekTakenMany")}</p>
           <ul className="mt-2 list-disc pl-5 text-text">
-            {weeksTaken.map((s) => <li key={s}>{formatDate(new Date(s), tz)}</li>)}
+            {weeksTaken.map((s) => <li key={s}>{formatDate(new Date(s), tz, locale)}</li>)}
           </ul>
-          <p className="mt-2 text-text">Pick fewer weeks, or another time.</p>
+          <p className="mt-2 text-text">{t(locale, "fewerWeeks")}</p>
         </div>
       )}
-      <div><Label htmlFor="name">Your name</Label><Input id="name" name="name" autoComplete="name" required maxLength={100} error={errors.name} /></div>
-      <div><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" autoComplete="email" required error={errors.email} /></div>
-      <div><Label htmlFor="phone">WhatsApp number (optional)</Label><Input id="phone" name="phone" type="tel" autoComplete="tel" error={errors.phone} /></div>
+      <div><Label htmlFor="name">{t(locale, "yourName")}</Label><Input id="name" name="name" autoComplete="name" required maxLength={100} error={errors.name} /></div>
+      <div><Label htmlFor="email">{t(locale, "email")}</Label><Input id="email" name="email" type="email" autoComplete="email" required error={errors.email} /></div>
+      <div><Label htmlFor="phone">{t(locale, "phoneOptional")}</Label><Input id="phone" name="phone" type="tel" autoComplete="tel" error={errors.phone} /></div>
       {questions.map((q) => {
         const id = `q_${q.id}`;
         const err = errors[`answers.${q.id}`];
         return (
           <div key={q.id}>
-            <Label htmlFor={id}>{q.label}{q.required ? "" : " (optional)"}</Label>
+            <Label htmlFor={id}>{q.required ? q.label : t(locale, "optionalLabel", { label: q.label })}</Label>
             {q.kind === "long_text" ? (
               <>
                 <textarea
@@ -244,30 +253,28 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
       })}
       {linkGone && (
         <p className="text-danger" role="alert">
-          {linkGone === "link_used" ? "Someone has already booked with this link. If that was you, check your email for the confirmation." : "This link doesn't work any more. Ask the person who sent it for a new one."}
+          {t(locale, linkGone === "link_used" ? "linkUsed" : "linkGone")}
         </p>
       )}
       {packageRefused && (
         <p className="text-danger" role="alert">
-          {packageRefused === "package_used_up" ? "Your package has no sessions left. Cancel one you've booked to free it, or buy another package."
-            : packageRefused === "package_expired" ? "That time is after your package's end date. Pick an earlier time."
-            : "This package can't book right now. Check the link in your email."}
+          {t(locale, packageRefused === "package_used_up" ? "packageUsedUp" : packageRefused === "package_expired" ? "packageExpired" : "packageOther")}
         </p>
       )}
-      {limited && <p className="text-danger" role="alert">Too many bookings from here in the last hour. Try again later.</p>}
-      {failed && <p className="text-danger" role="alert">Something went wrong. Your time isn&apos;t booked yet. Try again.</p>}
-      {expired && <p className="text-danger" role="alert">Your hold on this time ran out before payment. Book it again if it&apos;s still free.</p>}
-      {unavailable && <p className="text-danger" role="alert">{paid?.hostName ?? "This host"} isn&apos;t taking payments online right now, so this event can&apos;t be booked here. Contact them directly.</p>}
+      {limited && <p className="text-danger" role="alert">{t(locale, "rateLimited")}</p>}
+      {failed && <p className="text-danger" role="alert">{t(locale, "failed")}</p>}
+      {expired && <p className="text-danger" role="alert">{t(locale, "holdExpired")}</p>}
+      {unavailable && <p className="text-danger" role="alert">{t(locale, "paymentsUnavailable", { host: paid?.hostName ?? t(locale, "thisHost") })}</p>}
       {held ? (
         <div className="grid gap-2 rounded-md bg-warning-bg p-4" role="status">
           <p className="text-text">
-            {checkoutFailed ? "Razorpay didn't open. Check your connection and try again." : notPaid ? "That payment didn't go through. Try again, or use another way to pay." : "You haven't paid yet."} Your time is held until{" "}
-            <LocalTime date={held.payment.holdExpiresAt} tz={tz} />.
+            {t(locale, checkoutFailed ? "checkoutFailed" : notPaid ? "notPaid" : "notPaidYet")}{" "}
+            {tNodes(locale, "heldUntil", { time: <LocalTime date={held.payment.holdExpiresAt} tz={tz} locale={locale} /> })}
           </p>
-          <Button type="button" loading={busy} onClick={() => { const h = held; setHeld(null); void pay(h); }}>Pay {paid?.price}</Button>
+          <Button type="button" loading={busy} onClick={() => { const h = held; setHeld(null); void pay(h); }}>{t(locale, "pay", { price: paid?.price ?? "" })}</Button>
         </div>
       ) : (
-        <Button type="submit" loading={busy}>{busy ? "Booking…" : paid ? `Continue to pay ${paid.price}${paid.deposit ? " deposit" : ""}` : packageToken ? (weeks > 1 ? `Book ${weeks} sessions` : "Book with your package") : "Book this time"}</Button>
+        <Button type="submit" loading={busy}>{busy ? t(locale, "booking") : paid ? t(locale, paid.deposit ? "continuePayDeposit" : "continuePay", { price: paid.price }) : packageToken ? (weeks > 1 ? t(locale, "bookSessions", { n: weeks }) : t(locale, "bookWithPackage")) : t(locale, "bookThisTime")}</Button>
       )}
     </form>
   );
