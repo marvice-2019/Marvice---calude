@@ -15,15 +15,27 @@ export function googleEnabled(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+/**
+ * The public base URL that sign-in links are built from. Production must set it: without it Better Auth
+ * falls back to the request's Host header, and a forged Host would put a stranger's domain in a real sign-in email.
+ */
+export function resolveBaseUrl(env: Record<string, string | undefined> = process.env): string | undefined {
+  const url = env.BETTER_AUTH_URL;
+  if (!url && env.NODE_ENV === "production") throw new Error("BETTER_AUTH_URL must be set in production (the public https URL of the app)");
+  return url;
+}
+
 function createAuth() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("HOURHAND_DATA=postgres needs DATABASE_URL to be set");
+  const baseURL = resolveBaseUrl();
   const pool = getPool(url);
   const at = { createdAt: "created_at", updatedAt: "updated_at" };
 
   return betterAuth({
     database: pool,
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL,
+    trustedOrigins: baseURL ? [baseURL] : [],
     advanced: { database: { generateId: false } }, // Postgres fills uuid ids
     user: {
       modelName: "users",
@@ -67,7 +79,7 @@ function createAuth() {
       ? { google: { clientId: process.env.GOOGLE_CLIENT_ID as string, clientSecret: process.env.GOOGLE_CLIENT_SECRET as string } }
       : {},
     plugins: [
-      magicLink({ expiresIn: 15 * 60, sendMagicLink: async ({ email, url }) => deliverMagicLink(email, url) }),
+      magicLink({ expiresIn: 15 * 60, storeToken: "hashed", sendMagicLink: async ({ email, url }) => deliverMagicLink(email, url) }),
       nextCookies(), // must stay last
     ],
   });

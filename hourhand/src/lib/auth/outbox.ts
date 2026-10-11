@@ -19,6 +19,8 @@ export async function deliverMagicLink(to: string, url: string): Promise<void> {
   if (process.env.NODE_ENV === "production" && process.env.HOURHAND_MAIL_TO_LOG !== "1") {
     throw new Error("RESEND_API_KEY is not set, so sign-in links cannot be emailed");
   }
-  devOutbox().push({ to, url, sentAt: new Date() });
+  const outbox = devOutbox();
+  outbox.push({ to, url, sentAt: new Date() });
+  if (outbox.length > 50) outbox.splice(0, outbox.length - 50);
   console.info(`[dev] magic link for ${to}: ${url}`);
 }

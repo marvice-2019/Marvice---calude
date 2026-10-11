@@ -28,6 +28,11 @@ describe("baseSlug", () => {
 });
 
 describe("uniqueSlug", () => {
+  it("never hands out a path the app owns", async () => {
+    expect(await uniqueSlug("x@example.com", "Dashboard", async () => false)).toBe("dashboard-2");
+    expect(await uniqueSlug("sign-in@example.com", null, async () => false)).toBe("sign-in-2");
+    expect(await uniqueSlug("login@example.com", null, async () => false)).toBe("login-2");
+  });
   it("adds a number when the base is taken", async () => {
     const taken = new Set(["meera", "meera-2"]);
     expect(await uniqueSlug("meera@example.com", null, async (s) => taken.has(s))).toBe("meera-3");

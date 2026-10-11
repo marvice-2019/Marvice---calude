@@ -15,8 +15,16 @@ export function baseSlug(email: string, name?: string | null): string {
   return cleaned.length >= 3 ? cleaned : `host-${cleaned || "new"}`.replace(/-+$/g, "");
 }
 
-/** The first free slug: the base, then base-2, base-3 … and finally a random suffix. */
-export async function uniqueSlug(email: string, name: string | null | undefined, isTaken: (slug: string) => Promise<boolean>): Promise<string> {
+/** Top-level paths the app owns. A host with one of these slugs would have a booking page nobody can reach. */
+export const RESERVED_SLUGS = new Set([
+  "about", "admin", "api", "app", "auth", "b", "billing", "blog", "dashboard", "help", "login", "logout",
+  "onboarding", "pricing", "privacy", "settings", "sign-in", "sign-out", "sign-up", "signin", "signup",
+  "static", "support", "terms", "www",
+]);
+
+/** The first free slug: the base, then base-2, base-3 … and finally a random suffix. Reserved words count as taken. */
+export async function uniqueSlug(email: string, name: string | null | undefined, isTakenInDb: (slug: string) => Promise<boolean>): Promise<string> {
+  const isTaken = async (slug: string) => RESERVED_SLUGS.has(slug) || isTakenInDb(slug);
   const base = baseSlug(email, name);
   if (!(await isTaken(base))) return base;
   for (let n = 2; n <= 20; n++) {

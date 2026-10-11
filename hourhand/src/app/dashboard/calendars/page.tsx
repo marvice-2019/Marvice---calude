@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { requireUser } from "@/lib/auth/session";
 
-export default function CalendarsPage() {
+export default async function CalendarsPage() {
+  await requireUser();
   return (
     <div>
       <h1 className="font-display text-xl text-text">Calendars</h1>

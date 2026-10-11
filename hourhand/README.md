@@ -49,7 +49,8 @@ Environment variables for sign-in:
 
 | variable | needed for |
 | --- | --- |
-| `BETTER_AUTH_URL` | the public base URL, for example `https://hourhand.app` |
+| `BETTER_AUTH_URL` | the public base URL, for example `https://hourhand.app`. **Required in production**: without it sign-in links would be built from the request's Host header, so the app refuses to start |
+| `HOURHAND_ALLOW_MEMORY` | `1` only for a public demo. A production server refuses `HOURHAND_DATA=memory` (no sign-in) without it |
 | `BETTER_AUTH_SECRET` | signing sessions; a long random string (`openssl rand -hex 32`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in (optional) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | sending sign-in links (round B3) |

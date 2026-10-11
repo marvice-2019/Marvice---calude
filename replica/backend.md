@@ -35,6 +35,13 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - Calling a dashboard server action directly with no session is redirected to sign-in and changes nothing. With that action's session check removed, the same call switched Priya's event type off; restored, it is blocked again.
 - Better Auth writes its own non-uuid ids into the verification table, so the auth tables' ids are `text` (references to `users` stay `uuid`).
 
+## B2a security review (fresh-context reviewer)
+
+- **Fixed (medium):** sign-in links could be built from a forged Host header if `BETTER_AUTH_URL` was unset. Production now refuses to start without it, and Better Auth only trusts that origin. A test fails when the guard is removed.
+- **Fixed (low):** reserved slugs (`dashboard`, `sign-in`, `api` …); magic-link tokens stored hashed (checked: the emailed token appears nowhere in the database); dev outbox capped at 50; every dashboard page checks the session itself; a production server refuses memory mode unless `HOURHAND_ALLOW_MEMORY=1`.
+- **Accepted for now:** two first-time sign-ups racing for the same slug — the unique constraint holds and the loser asks for a new link. Magic-link slugs come from the email's local part until onboarding lets hosts choose one.
+- After the fixes: 109 tests pass against Postgres, and the 15-check sign-in run passes again.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
@@ -67,6 +74,7 @@ TOKEN_ENCRYPTION_KEY=
 RESEND_API_KEY=
 EMAIL_FROM=
 HOURHAND_MAIL_TO_LOG=
+HOURHAND_ALLOW_MEMORY=
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
 RAZORPAY_WEBHOOK_SECRET=

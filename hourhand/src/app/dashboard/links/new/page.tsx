@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { requireUser } from "@/lib/auth/session";
 
-export default function NewLinkPage() {
+export default async function NewLinkPage() {
+  await requireUser();
   return (
     <div>
       <h1 className="font-display text-xl text-text">New one-off link</h1>

@@ -4,10 +4,22 @@ import type { DataStore } from "./types";
 
 export * from "./types";
 
+/**
+ * Memory mode has no sign-in, so a production server refuses it unless HOURHAND_ALLOW_MEMORY=1 says it is a demo.
+ * `next build` itself runs as production and is allowed through.
+ */
+export function assertMemoryAllowed(env: Record<string, string | undefined> = process.env): void {
+  if (env.NODE_ENV !== "production" || env.NEXT_PHASE === "phase-production-build" || env.HOURHAND_ALLOW_MEMORY === "1") return;
+  throw new Error("A production server needs HOURHAND_DATA=postgres. Demo data has no sign-in; set HOURHAND_ALLOW_MEMORY=1 only for a public demo.");
+}
+
 /** HOURHAND_DATA=memory (default) or postgres. Postgres needs DATABASE_URL; there is no fallback to memory. */
 function createStore(): DataStore {
   const kind = process.env.HOURHAND_DATA ?? "memory";
-  if (kind === "memory") return createMemoryStore();
+  if (kind === "memory") {
+    assertMemoryAllowed();
+    return createMemoryStore();
+  }
   if (kind !== "postgres") throw new Error(`HOURHAND_DATA must be "memory" or "postgres", got "${kind}"`);
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("HOURHAND_DATA=postgres needs DATABASE_URL to be set");
