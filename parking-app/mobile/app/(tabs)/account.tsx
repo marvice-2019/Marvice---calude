@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, ScrollView, Switch, View } from "react-native";
 import { SignIn } from "@/components/SignIn";
@@ -29,6 +30,13 @@ export default function Account() {
         <T variant="display" style={{ fontSize: 30 }}>{me.user.full_name ?? me.user.phone}</T>
         <T variant="muted">Vehicles: {me.vehicles.map(v => v.plate).join(", ") || "none yet"}</T>
       </Card>
+      {["operator_staff", "operator_admin", "platform_admin"].includes(me.user.role) && (
+        <Card style={{ backgroundColor: c.kerbSoft }}>
+          <T variant="title">Gate staff</T>
+          <T variant="muted">Scan passes, check cars in and out, and see today&apos;s arrivals. Works without signal.</T>
+          <Button kind="kerb" title="Open staff mode" onPress={() => router.push("/staff")} />
+        </Card>
+      )}
       <Card>
         <T variant="title">Preferences</T>
         <T variant="label">Usual payment</T>

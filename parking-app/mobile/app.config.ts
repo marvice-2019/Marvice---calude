@@ -48,6 +48,7 @@ const config: ExpoConfig = {
     ["expo-splash-screen", { image: "./assets/splash-icon.png", backgroundColor: "#081633", imageWidth: 160 }],
     ["expo-location", { locationWhenInUsePermission: "Bayline uses your location only when you tap Near me, to show parking around you. It isn't tracked or stored." }],
     ["expo-notifications", { color: "#1446A0" }],
+    ["expo-camera", { cameraPermission: "Bayline staff mode uses the camera only to scan pass QR codes at the gate.", recordAudioAndroid: false }],
     "./plugins/withUpiQueries"
   ],
   experiments: { typedRoutes: true },

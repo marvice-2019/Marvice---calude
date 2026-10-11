@@ -46,3 +46,23 @@ export type Me = {
 };
 
 export type ApiError = { error: string; message: string; alternatives?: { id: string; name: string; code: string }[] };
+
+// ---- Operator and admin (stage 7) ----
+export type Role = "driver" | "operator_staff" | "operator_admin" | "platform_admin";
+export type LotStatus = "open" | "full" | "gate_down" | "closed";
+export type OpsLot = { id: string; name: string; code: string; address: string; status: LotStatus; capacity_car: number; capacity_bike: number;
+  operator: string; my_role: Role; parked_now: number; expected_today: number };
+export type Arrival = { id: string; code: string; plate: string; vehicle: string; source: string; status: string; from: string; to: string };
+export type RateCard = { id: string; vehicle: string; hourly_paise: number; daily_cap_paise: number | null; monthly_paise: number | null;
+  valid_from: string | null; valid_to: string | null; current: boolean };
+export type MoneySplit = { gross_paise: number; commission_paise: number; commission_gst_paise: number; tds_paise: number; tcs_paise: number; net_paise: number };
+export type Dashboard = { bookings: number; parking_revenue_paise: number; parked_now: number; capacity_car: number; status: LotStatus; occupancy_pct: number;
+  by_hour: { hour: string; arrivals: number; occupied: number }[]; revenue: MoneySplit & { gst_collected_paise: number } };
+export type MonthlyRow = { id: string; status: string; starts_on: string; price_paise: number; bay_label: string | null; lot_id: string; lot_name: string; lot_code: string; plate: string; phone_masked: string };
+export type Payout = MoneySplit & { id: string; period_start: string; period_end: string; payments_count: number; status: "pending" | "processing" | "paid" | "failed";
+  razorpay_transfer_id: string | null; transferred_at?: string | null; failure_reason: string | null; operator?: string; has_account?: boolean };
+export type GateResult = { result: "ok"; duplicate?: boolean; booking?: { id: string; code: string; plate?: string; ends?: string };
+  overstay?: { hours: number; amount_paise: number; message: string; payment_link: string } | null; monthly_pass?: { id: string; bay: string | null } };
+export type AdminOperator = { id: string; legal_name: string; pan: string; gstin: string | null; commission_bps: number; route_account_id: string | null; lots: number; live_lots: number };
+export type AuditEntry = { id: number; at: string; action: string; entity: string; entity_id: string | null; before: unknown; after: unknown; actor_phone: string | null; actor_role: string | null };
+export type Promo = { code: string; percent_off: number; max_off_paise: number; first_booking_only: boolean; weekend_only: boolean; max_uses: number | null; used_count: number; valid_from: string | null; valid_to: string | null; active: boolean };

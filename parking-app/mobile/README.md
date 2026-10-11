@@ -13,6 +13,7 @@ Expo SDK 57 (the npm `latest` tag on 11 Oct 2026; SDK 58 was still `next`), Reac
 | Valet | Live status and ETA, tip chips, validation code, nearby desks with GST | VAL-02–05 |
 | Monthly | Request a monthly bay | MON-01 |
 | Account | Preferences, data export, sign out, delete | ACC-01, ACC-02 |
+| Staff mode (`app/staff.tsx`, from Account for staff roles) | Scan pass QR (camera) or type plate, check in/out, overstay to collect, offline scan queue, today's arrivals | OPS-01, OPS-02, DRV-13 |
 
 ## How the pieces work
 
@@ -41,6 +42,7 @@ EAS profiles are in `eas.json` (development, preview APK, production). No store 
 
 ## Needs a real device
 
+- Staff mode: QR scanning with the back camera in a dim basement, and a queued scan sending itself when signal returns.
 - Razorpay sheet, UPI intent hand-off to GPay/PhonePe/Paytm, and the iOS cancel error code.
 - Map tiles (Android needs the Maps key).
 - Location prompt wording on both platforms.

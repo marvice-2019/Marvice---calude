@@ -26,6 +26,7 @@ export default function Root() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="lot/[id]" options={{ title: "", headerBackTitle: "Lots" }} />
         <Stack.Screen name="park-now" options={{ title: "Park now", presentation: "modal" }} />
+        <Stack.Screen name="staff" options={{ title: "Staff mode" }} />
       </Stack>
     </>
   );

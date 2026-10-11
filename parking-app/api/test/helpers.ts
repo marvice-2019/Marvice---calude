@@ -54,7 +54,15 @@ export async function setup() {
       headers: { "content-type": "application/json", "x-razorpay-signature": sig, "x-razorpay-event-id": eventId } });
   }
 
-  return { app, deps, db, payments, notify, otpBox, login, webhook };
+  /** Any signed webhook body (e.g. Route transfer events). */
+  async function rawWebhook(body: object, eventId = "evt_" + randomBytes(6).toString("hex")) {
+    const raw = JSON.stringify(body);
+    const sig = createHmac("sha256", WEBHOOK_SECRET).update(raw).digest("hex");
+    return app.inject({ method: "POST", url: "/v1/webhooks/razorpay", payload: raw,
+      headers: { "content-type": "application/json", "x-razorpay-signature": sig, "x-razorpay-event-id": eventId } });
+  }
+
+  return { app, deps, db, payments, notify, otpBox, login, webhook, rawWebhook };
 }
 
 export type Ctx = Awaited<ReturnType<typeof setup>>;

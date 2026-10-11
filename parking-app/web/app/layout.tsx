@@ -43,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/parking/chinnaswamy-stadium">Chinnaswamy Stadium</Link>
             <Link href="/list-your-space">List your space</Link>
             <Link href="/park-now">Park now with a code</Link>
+            <Link href="/ops">Operator login</Link>
           </nav>
         </footer>
         <TabBar />

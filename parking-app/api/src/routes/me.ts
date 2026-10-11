@@ -7,8 +7,8 @@ import { HttpError, parse, Plate, Uuid } from "../http.js";
 const driver = requireRole("driver");
 
 export function meRoutes(app: FastifyInstance, deps: Deps) {
-  // DRV-07: what checkout prefills.
-  app.get("/v1/me", { preHandler: driver }, async (req) => {
+  // DRV-07: what checkout prefills. Any signed-in role can read its own profile (the consoles use it to pick a view).
+  app.get("/v1/me", { preHandler: requireRole("driver", "operator_staff", "operator_admin", "platform_admin") }, async (req) => {
     const u = currentUser(req);
     const user = (await deps.db.query("SELECT id, phone, full_name, email, role, default_vehicle_id, payment_method, alerts_enabled, language FROM users WHERE id = $1", [u.sub])).rows[0];
     const vehicles = (await deps.db.query("SELECT id, plate, kind, nickname FROM vehicles WHERE user_id = $1 ORDER BY plate", [u.sub])).rows;

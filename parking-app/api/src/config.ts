@@ -14,7 +14,10 @@ const Env = z.object({
   INTERNAL_TOKEN: z.string().min(16),
   PLATFORM_FEE_PAISE: z.coerce.number().int().default(1500),
   COMMISSION_BPS: z.coerce.number().int().default(1500),
-  TDS_BPS: z.coerce.number().int().default(100), // 1% under 194-O; confirm with CA
+  // Payout deductions in basis points; confirm all three with a CA before go-live.
+  TDS_BPS: z.coerce.number().int().min(0).max(1000).default(10),        // 0.1%: s.194-O rate from 1 Oct 2024 (was 1%)
+  TCS_BPS: z.coerce.number().int().min(0).max(1000).default(50),        // 0.5%: GST TCS s.52, Notification 15/2024-CT (was 1%)
+  COMMISSION_GST_BPS: z.coerce.number().int().min(0).max(2800).default(1800), // 18% GST on the platform's commission
   RATE_LIMIT_MAX: z.coerce.number().int().default(120),
   RATE_LIMIT_SCALE: z.coerce.number().int().min(1).default(1) // tests raise per-route limits; keep 1 in production
 });

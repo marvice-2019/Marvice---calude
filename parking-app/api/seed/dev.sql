@@ -37,4 +37,11 @@ INSERT INTO promo_codes (code, percent_off, max_off_paise, first_booking_only, v
 VALUES ('FIRST50',50,10000,true,tstzrange('-infinity',NULL)) ON CONFLICT DO NOTHING;
 INSERT INTO promo_codes (code, percent_off, max_off_paise, weekend_only, valid)
 VALUES ('WEEKEND20',20,20000,true,tstzrange('-infinity',NULL)) ON CONFLICT DO NOTHING;
+-- Demo logins for the consoles (OTP is printed in the API log in dev). Numbers are the reserved 90000001xx range.
+INSERT INTO users (phone, role) VALUES ('+919000000100','platform_admin'), ('+919000000101','operator_admin'), ('+919000000102','operator_staff')
+ON CONFLICT (phone) DO UPDATE SET role = EXCLUDED.role;
+INSERT INTO operator_members (operator_id, user_id, role)
+SELECT '00000000-0000-4000-8000-000000000001', u.id, u.role FROM users u WHERE u.phone IN ('+919000000101','+919000000102')
+ON CONFLICT DO NOTHING;
+UPDATE operators SET gstin = '29AAAPS1234A1Z5' WHERE id = '00000000-0000-4000-8000-000000000001' AND gstin IS NULL;
 COMMIT;

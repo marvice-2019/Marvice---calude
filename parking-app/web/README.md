@@ -20,6 +20,8 @@ The look is "dusk on the ring road": a deep-blue dusk hero with moving tail-ligh
 | `/list-your-space` | Owner lead form | OWN-01 |
 | `/parking/[slug]` | SEO landing page per area, mall or stadium, with ItemList JSON-LD | SEO |
 | `/sitemap.xml`, `/robots.txt` | Generated from the API's destinations | SEO |
+| `/ops` | Operator console: lot status (notifies booked drivers), today's arrivals, cars-parked-by-hour chart, money split, rate scheduling, monthly approvals, payouts and CSV | OPS-01..05, MON-02 |
+| `/admin` | Platform admin: weekly payout run and Route transfers, operator KYC and payout accounts, refunds, promos, audit log | ADM-01..03 |
 
 The Razorpay checkout script loads only when someone presses Pay (`lib/pay.ts`).
 

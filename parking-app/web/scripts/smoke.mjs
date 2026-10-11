@@ -75,7 +75,8 @@ const ev = await req(`/api/bff/v1/lots/search?lat=12.9756&lng=77.6066&${range}&f
 check("EV filter keeps only lots with chargers", ev.json.length > 0 && ev.json.every(r => r.lot.ev_chargers > 0));
 const dests = await req("/api/bff/v1/destinations?q=mall");
 check("destination search finds malls", Array.isArray(dests.json) && dests.json.some(d => d.kind === "mall"));
-check("BFF refuses paths outside the allow-list", (await req("/api/bff/v1/admin/promos", { method: "POST", body: {} })).status === 404);
+check("BFF refuses paths outside the allow-list (internal jobs)", (await req("/api/bff/v1/internal/jobs/monthly-billing", { method: "POST", body: {} })).status === 404);
+check("admin API through the BFF still needs a session", (await req("/api/bff/v1/admin/promos")).status === 401);
 
 const mg = search.json.find(r => r.lot.code === "BLR101");
 const lotPage = await req(`/lots/${mg.lot.id}?${range}`);

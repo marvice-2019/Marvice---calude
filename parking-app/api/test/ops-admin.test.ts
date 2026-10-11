@@ -65,17 +65,17 @@ describe("OPS-04 lot status", () => {
 });
 
 describe("OPS-05 dashboard and payouts", () => {
-  it("computes weekly payouts (gross, 15% commission, 1% TDS) and serves CSV", async () => {
+  it("computes weekly payouts (gross, 15% commission + GST, 0.1% TDS) and serves CSV", async () => {
     const d = await ctx.login("9400000004");
     await bookAndPay(ctx, d, s.lot, 30, 3); // ₹120 parking
-    const istToday = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
-    const rows = await computePayouts(ctx.deps, istToday);
+    const ist = new Date(Date.now() + 330 * 60_000); ist.setUTCDate(ist.getUTCDate() - ((ist.getUTCDay() + 6) % 7));
+    const rows = await computePayouts(ctx.deps, ist.toISOString().slice(0, 10)); // Monday of this IST week
     const mine = rows.find(r => r.operator_id === s.op)!;
     expect(mine.commission_paise).toBe(Math.round(mine.gross_paise * 0.15));
-    expect(mine.net_paise).toBe(mine.gross_paise - mine.commission_paise - mine.tds_paise);
+    expect(mine.net_paise).toBe(mine.gross_paise - mine.commission_paise - mine.commission_gst_paise - mine.tds_paise - mine.tcs_paise);
     const csv = await ctx.app.inject({ method: "GET", url: "/v1/ops/payouts", headers: { ...s.opAdmin.h, accept: "text/csv" } });
     expect(csv.headers["content-type"]).toContain("text/csv");
-    expect(csv.body.split("\n")[0]).toBe("period_start,period_end,gross_inr,commission_inr,tds_inr,net_inr,status");
+    expect(csv.body.split("\n")[0]).toBe("period_start,period_end,payments,gross_inr,commission_inr,gst_on_commission_inr,tds_194o_inr,tcs_gst_inr,net_inr,status,transfer_id");
     const dash = await ctx.app.inject({ method: "GET", url: `/v1/ops/dashboard?lot_id=${s.lot}&from=${encodeURIComponent(iso(-86_400_000))}&to=${encodeURIComponent(iso(86_400_000))}`, headers: s.opAdmin.h });
     expect(dash.json().bookings).toBeGreaterThanOrEqual(1);
     const otherOp = await ctx.app.inject({ method: "GET", url: `/v1/ops/dashboard?lot_id=${s.lotOther}&from=${encodeURIComponent(iso(-86_400_000))}&to=${encodeURIComponent(iso(86_400_000))}`, headers: s.opAdmin.h });

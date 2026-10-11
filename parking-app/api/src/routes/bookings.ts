@@ -168,6 +168,8 @@ export function bookingRoutes(app: FastifyInstance, deps: Deps) {
     const result = await tx(deps.db, async c => {
       const first = await c.query("INSERT INTO webhook_events (event_id) VALUES ($1) ON CONFLICT DO NOTHING", [eventId]);
       if (!first.rowCount) return "duplicate";
+      const trf = evt?.payload?.transfer?.entity;
+      if (trf?.id && (evt.event === "transfer.processed" || evt.event === "transfer.failed")) return onTransfer(c, evt.event, trf);
       const pay = evt?.payload?.payment?.entity;
       if (!pay?.order_id) return "ignored";
       if (evt.event === "payment.captured") return onCaptured(c, deps, pay);
@@ -176,6 +178,16 @@ export function bookingRoutes(app: FastifyInstance, deps: Deps) {
     });
     return reply.code(200).send({ ok: true, result });
   });
+}
+
+// Route transfer outcome for an operator payout (OPS-05).
+async function onTransfer(c: Tx, event: string, trf: { id: string; error?: { description?: string } }) {
+  const ok = event === "transfer.processed";
+  const r = await c.query(
+    `UPDATE payouts SET status = $2, transferred_at = CASE WHEN $3 THEN now() END, failure_reason = $4
+     WHERE razorpay_transfer_id = $1 AND status = 'processing' RETURNING id`,
+    [trf.id, ok ? "paid" : "failed", ok, ok ? null : trf.error?.description ?? "Transfer failed"]);
+  return r.rowCount ? (ok ? "payout_paid" : "payout_failed") : "unknown_transfer";
 }
 
 async function onFailed(c: Tx, pay: { order_id: string }) {
@@ -189,7 +201,7 @@ async function onCaptured(c: Tx, deps: Deps, pay: { id: string; order_id: string
   if (!p) return "unknown_order";
   if (p.status === "captured") return "already_captured";
   if (pay.amount !== p.amount_paise) throw new HttpError(400, "amount_mismatch", `Captured ${pay.amount} != expected ${p.amount_paise}`);
-  await c.query("UPDATE payments SET status = 'captured', razorpay_payment_id = $2, method = $3, gateway_fee_paise = $4 WHERE id = $1",
+  await c.query("UPDATE payments SET status = 'captured', captured_at = now(), razorpay_payment_id = $2, method = $3, gateway_fee_paise = $4 WHERE id = $1",
     [p.id, pay.id, pay.method ?? null, pay.fee ?? null]);
 
   let taxable = 0, gst = 0;

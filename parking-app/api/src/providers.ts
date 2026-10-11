@@ -6,6 +6,8 @@ export type Order = { id: string; amountPaise: number; currency: "INR" };
 export interface Payments {
   createOrder(amountPaise: number, receipt: string): Promise<Order>;
   refund(razorpayPaymentId: string, amountPaise: number): Promise<{ id: string }>;
+  /** Razorpay Route direct transfer to an operator's linked account (acc_…). */
+  transfer(accountId: string, amountPaise: number, notes: Record<string, string>): Promise<{ id: string }>;
   verifyWebhook(rawBody: string, signature: string | undefined): boolean;
   keyId: string;
 }
@@ -36,15 +38,20 @@ export function razorpay(cfg: Config): Payments {
     async refund(paymentId, amountPaise) {
       return call<{ id: string }>(`/payments/${encodeURIComponent(paymentId)}/refund`, { amount: amountPaise });
     },
+    // Route direct transfer: POST /v1/transfers. Verify in Razorpay test mode before the first live payout.
+    async transfer(account, amountPaise, notes) {
+      return call<{ id: string }>("/transfers", { account, amount: amountPaise, currency: "INR", notes });
+    },
     verifyWebhook: (raw, sig) => hmacOk(cfg.RAZORPAY_WEBHOOK_SECRET, raw, sig)
   };
 }
 
 // Dev and test stand-in: same interface, no network. Never used in production (config refuses).
-export function fakePayments(cfg: Config): Payments & { orders: Order[]; refunds: { paymentId: string; amountPaise: number }[] } {
-  const orders: Order[] = [], refunds: { paymentId: string; amountPaise: number }[] = [];
+export function fakePayments(cfg: Config): Payments & { orders: Order[]; refunds: { paymentId: string; amountPaise: number }[]; transfers: { account: string; amountPaise: number; id: string }[] } {
+  const orders: Order[] = [], refunds: { paymentId: string; amountPaise: number }[] = [], transfers: { account: string; amountPaise: number; id: string }[] = [];
   return {
-    keyId: "rzp_test_fake", orders, refunds,
+    keyId: "rzp_test_fake", orders, refunds, transfers,
+    async transfer(account, amountPaise) { const t = { account, amountPaise, id: "trf_" + randomBytes(7).toString("hex") }; transfers.push(t); return { id: t.id }; },
     async createOrder(amountPaise) { const o = { id: "order_" + randomBytes(7).toString("hex"), amountPaise, currency: "INR" as const }; orders.push(o); return o; },
     async refund(paymentId, amountPaise) { refunds.push({ paymentId, amountPaise }); return { id: "rfnd_" + randomBytes(7).toString("hex") }; },
     verifyWebhook: (raw, sig) => hmacOk(cfg.RAZORPAY_WEBHOOK_SECRET, raw, sig)
