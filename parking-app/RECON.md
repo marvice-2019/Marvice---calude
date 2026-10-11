@@ -1,10 +1,12 @@
-# Parking.com recon: website, iOS app, Android app
+# Recon: Parking.com (self-park marketplace) + UrbanParking (valet)
 
 Researched 11 Oct 2026; re-checked the same day with /replica-recon (App Store data unchanged; Play Store and website still unreadable). Each line is marked **[V]** (verified from a primary source, linked), **[E]** (estimate or inference) or **[GAP]** (could not get the data).
 
 ## Verdict
 
 Parking.com has a big app (20,084 iOS ratings, 4.5 stars) with lots of inventory, but its recent experience is bad. Of the 50 newest App Store reviews, 40 are 1-star, and they keep naming the same five things: saved cards not reusing, payment errors, login loops, lost sessions and confusing time pickers. Copy its feature set but beat it on checkout: saved vehicle and card, UPI in one tap, guest checkout that never loses the pass, and a clear time picker.
+
+**Valet (added 11 Oct, second reference: UrbanParking).** Parking.com treats valet as an afterthought: it has only "text the attendant about pick-up timing". Indian valet today runs on paper tickets or SMS-only tools such as SMS Valet. One app that does self-park **and** valet (digital ticket, request my car, live ETA, damage photos at handover, cashless tip, and a staff app to match) is a gap neither reference fills. That is the "better and best" angle.
 
 ## Who runs it
 
@@ -18,6 +20,28 @@ Parking.com has a big app (20,084 iOS ratings, 4.5 stars) with lots of inventory
 - **Park+.** [V] Drive-in pay or pre-book; earns 10–15% commission on drive-in bookings plus monthly passes (₹1,800 per site, ₹2,500 city-wide); active in Delhi NCR, Mumbai, Bengaluru, Hyderabad and Pune with about 50,000 slots ([Outlook Business](https://www.outlookbusiness.com/big-idea/that-raw-nerve-in-personal-mobility-park-has-found-a-way-around-it-6256)). [E] Those figures come from an older profile; Park+ has grown since then into FASTag and car services, so confirm its current numbers before pitching against it.
 - **ParkZebra.** [V] A Bengaluru startup for searching, reserving and pre-paying parking at business parks, hospitals and malls ([The Week](https://www.theweek.in/news/sci-tech/parkzebra-app-aims-easing-parking.html)). [GAP] Its current status is unknown; the article is undated.
 - **Get My Parking.** [E] A B2B vendor of white-label parking apps and gate hardware for cities, airports and corporates, so it is a possible supplier or partner rather than a consumer rival.
+
+## UrbanParking (valet reference) [GAP for its own screens]
+
+- **[V]** The link `valet-hub-46.preview.emergentagent.com/account` is a single-page app titled "UrbanParking". Every path returns the same empty shell to non-browser fetches (`/`, `/account`, `/manifest.json`, `/asset-manifest.json`); `/api/` and `/api/openapi.json` return 404. Checked 11 Oct 2026.
+- **[V]** No live product called UrbanParking with valet turned up in search. The nearest name is UrbanPark, a self-park app on the App Store since 2020 with no valet ([mwm.ai](https://mwm.ai/apps/urbanpark/1516448474)).
+- **[E]** It looks like an Emergent-built prototype (a preview subdomain), not a launched product. Its features can't be verified from here, and browser automation is blocked in this session.
+- **[GAP]** Its screens, account fields and flows. Cheapest fix: open it on your phone and send screenshots of every tab (2 minutes). I'll then mark each valet item below as [V] and match or beat it.
+
+### Valet category baseline [E]: what comparable valet products document
+
+| Valet feature | Where it's documented | Bayline today |
+|---|---|---|
+| Digital ticket instead of paper (QR/SMS) | [SMS Valet](https://www.capterra.in/software/189003/sms-valet), [ValetPlus](https://apps.apple.com/us/app/valetplus/id6739880682) | No (self-park pass only) |
+| Request my car (app or SMS), with queue position and ETA | SMS Valet, ValetPlus, [ValPark](https://gust.com/companies/valparkmobile) | No |
+| Real-time car tracking (parked, retrieving, ready at podium) | ValetPlus | No |
+| Damage check: photos at handover and return | SMS Valet ("damage reporting") | No |
+| Validation by venue (restaurant or mall pays) | SMS Valet ("multiple validation methods") | No |
+| VIP / repeat-guest quick check-in | SMS Valet ("automated VIP check-in") | No (saved plate covers part of it) |
+| Cashless payment | ValPark, ValetPlus | Yes, for self-park |
+| Valet staff app (key tag, slot, runner assignment) | [The Valet App, Amano McGann](https://apps.apple.com/app/id1043007379) | Partly (gate scan only) |
+| Cashless tip to the valet | Not documented in any source found | No; **Proposed** as a differentiator |
+| Key-tag ↔ ticket ↔ plate audit trail (fraud control) | SMS Valet ("no fraud") | No |
 
 ## iOS app facts [V] ([App Store lookup](https://itunes.apple.com/lookup?id=1414389805&country=us))
 
@@ -97,6 +121,8 @@ Praise is rare and is about the location of the lot, not the app.
 4. **WhatsApp pass and expiry alerts.** This replaces Apple Wallet for most Indian users and fixes "my session isn't showing".
 5. **Venue and event pages** (stadiums, metro stations, malls, hospitals). Parking.com and SP+ use these for SEO, and they're cheap to generate from lot data.
 
+6. **Valet mode at the same lots and venues** (new, from the valet reference): digital ticket at drop-off, damage photos, "request my car" with live ETA, cashless pay and tip, venue validation, and a valet staff app with key-tag tracking. It unlocks restaurants, hotels, hospitals and malls that run valet, at higher revenue per car than self-park.
+
 ## What the Bayline prototype is still missing
 
 1. ✅ Done 11 Oct. **"Park now".** Drive-up pay by lot or zone number, with no pre-booking.
@@ -113,6 +139,9 @@ Praise is rare and is about the location of the lot, not the app.
 - [GAP] Parking.com's own fees and cancellation policy. Book one test reservation in the US app and screenshot each step; it's free to cancel if their policy allows.
 - [GAP] Their live web search flow. Walk it on a desktop browser and screenshot it; automation was blocked here.
 
+- [GAP] UrbanParking's screens and flows. Send screenshots of each tab from your phone, or share access to its source.
+- [GAP] Valet pricing in Bengaluru (flat ₹ per car at malls and hotels, typical tip). Call 3 venues, or ask a valet operator you know.
+
 ## Sources (all checked 11 Oct 2026)
 
 - [App Store lookup API, id 1414389805](https://itunes.apple.com/lookup?id=1414389805&country=us)
@@ -124,3 +153,9 @@ Praise is rare and is about the location of the lot, not the app.
 - [Payments Dive: Metropolis computer-vision checkout](https://www.paymentsdive.com/news/metropolis-sp-plus-parking-automation-billion-acquisition-contactless-payment/695970/)
 - [Outlook Business: Park+ profile](https://www.outlookbusiness.com/big-idea/that-raw-nerve-in-personal-mobility-park-has-found-a-way-around-it-6256)
 - [The Week: ParkZebra](https://www.theweek.in/news/sci-tech/parkzebra-app-aims-easing-parking.html)
+- [UrbanParking preview](https://valet-hub-46.preview.emergentagent.com/account) (empty shell to fetchers)
+- [UrbanPark on mwm.ai](https://mwm.ai/apps/urbanpark/1516448474)
+- [SMS Valet on Capterra India](https://www.capterra.in/software/189003/sms-valet)
+- [ValetPlus on the App Store](https://apps.apple.com/us/app/valetplus/id6739880682)
+- [ValPark Mobile on Gust](https://gust.com/companies/valparkmobile)
+- [The Valet App (Amano McGann)](https://apps.apple.com/app/id1043007379)
