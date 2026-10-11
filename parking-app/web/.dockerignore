@@ -1,0 +1,10 @@
+node_modules
+.next
+e2e
+test-results
+scripts
+*.log
+*.tsbuildinfo
+.env
+.env.*
+README.md

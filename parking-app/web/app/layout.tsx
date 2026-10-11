@@ -25,7 +25,8 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const demo = process.env.DEV_FAKE_PAY === "1";
+  // Read at build time (static pages): the staging image is built with DEV_FAKE_PAY=1, production never.
+  const demo = process.env.DEV_FAKE_PAY === "1" && process.env.APP_ENV !== "production";
   return (
     <html lang="en-IN" className={`${archivo.variable} ${atkinson.variable} ${plex.variable}`}>
       <body>

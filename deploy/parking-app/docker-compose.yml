@@ -1,0 +1,128 @@
+# Bayline on Coolify (Docker Compose build pack). One file, two Coolify apps: staging and production,
+# differing only in their environment variables (see env/*.example). Coolify's Traefik provides TLS and
+# the domains, so no service publishes a host port. Secrets live in Coolify's environment store, never in git.
+#
+# Memory budget (16 GB VPS shared with Coolify, n8n and other apps); see README for the full table.
+name: bayline
+
+x-api-build: &api-build
+  context: ../../parking-app/api
+  args:
+    NODE_IMAGE: ${NODE_IMAGE:-node:22.23.3-bookworm-slim}
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bayline
+      POSTGRES_USER: bayline
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Coolify}
+    command: >
+      postgres -c shared_buffers=${PG_SHARED_BUFFERS:-256MB} -c effective_cache_size=${PG_CACHE_SIZE:-768MB}
+               -c max_connections=60 -c log_min_duration_statement=500 -c timezone=UTC
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bayline -d bayline"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits: { memory: "${PG_MEM_LIMIT:-1536M}" }
+
+  migrate:
+    # One-shot: applies parking-app/api/migrations in order, then exits. API waits for it to succeed.
+    build: *api-build
+    command: ["node", "dist/src/migrate.js"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgres://bayline:${POSTGRES_PASSWORD}@postgres:5432/bayline
+    depends_on:
+      postgres: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: 256M }
+
+  api:
+    build: *api-build
+    restart: unless-stopped
+    expose: ["3000"]
+    environment:
+      NODE_ENV: production
+      APP_ENV: ${APP_ENV:?staging or production}
+      PORT: "3000"
+      DATABASE_URL: postgres://bayline:${POSTGRES_PASSWORD}@postgres:5432/bayline
+      JWT_SECRET: ${JWT_SECRET:?}
+      WEB_ORIGIN: ${WEB_ORIGIN:?https URL of the web app}
+      OTP_PROVIDER: ${OTP_PROVIDER:-console}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:?}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?}
+      N8N_NOTIFY_URL: ${N8N_NOTIFY_URL:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      PLATFORM_FEE_PAISE: ${PLATFORM_FEE_PAISE:-1500}
+      COMMISSION_BPS: ${COMMISSION_BPS:-1500}
+      TDS_BPS: ${TDS_BPS:-10}
+      TCS_BPS: ${TCS_BPS:-50}
+      COMMISSION_GST_BPS: ${COMMISSION_GST_BPS:-1800}
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    deploy:
+      resources:
+        limits: { memory: "${API_MEM_LIMIT:-512M}" }
+
+  web:
+    build:
+      context: ../../parking-app/web
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22.23.3-bookworm-slim}
+        APP_ENV: ${APP_ENV:?staging or production}
+        DEV_FAKE_PAY: ${DEV_FAKE_PAY:-0}
+        SITE_URL: ${WEB_ORIGIN:?}
+    restart: unless-stopped
+    expose: ["3001"]
+    environment:
+      APP_ENV: ${APP_ENV}
+      API_URL: http://api:3000
+      SITE_URL: ${WEB_ORIGIN}
+      DEV_FAKE_PAY: ${DEV_FAKE_PAY:-0}
+      # only read when DEV_FAKE_PAY=1 outside production (signs fake webhooks for the test gateway)
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:?}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: "${WEB_MEM_LIMIT:-512M}" }
+
+  backup:
+    build:
+      context: ./backup
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22.23.3-bookworm-slim}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://bayline:${POSTGRES_PASSWORD}@postgres:5432/bayline
+      S3_BUCKET: ${S3_BUCKET:?}
+      S3_PREFIX: ${S3_PREFIX:-bayline}
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_AT_UTC: ${BACKUP_AT_UTC:-21:00}
+      RCLONE_CONFIG_S3_TYPE: s3
+      RCLONE_CONFIG_S3_PROVIDER: ${S3_PROVIDER:-Other}
+      RCLONE_CONFIG_S3_ENDPOINT: ${S3_ENDPOINT:?}
+      RCLONE_CONFIG_S3_REGION: ${S3_REGION:-auto}
+      RCLONE_CONFIG_S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?}
+      RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?}
+    depends_on:
+      postgres: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { memory: 256M }
+
+volumes:
+  pgdata:

@@ -7,7 +7,8 @@ import { apiBase } from "@/lib/session";
 // Never set DEV_FAKE_PAY in production; the deploy stage refuses to.
 export async function POST(req: Request) {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-  if (process.env.DEV_FAKE_PAY !== "1" || !secret) return NextResponse.json({ error: "not_found", message: "Not found." }, { status: 404 });
+  // Never in production, even if DEV_FAKE_PAY is set by mistake (deploy/parking-app sets APP_ENV per environment).
+  if (process.env.APP_ENV === "production" || process.env.DEV_FAKE_PAY !== "1" || !secret) return NextResponse.json({ error: "not_found", message: "Not found." }, { status: 404 });
   const { order_id, amount, outcome } = await req.json() as { order_id: string; amount: number; outcome?: "captured" | "failed" };
   if (!/^order_[a-f0-9]+$/.test(order_id ?? "")) return NextResponse.json({ error: "bad_order", message: "Unknown order." }, { status: 400 });
   const raw = JSON.stringify({ event: outcome === "failed" ? "payment.failed" : "payment.captured",

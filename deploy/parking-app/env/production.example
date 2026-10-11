@@ -1,0 +1,35 @@
+# Bayline PRODUCTION environment template. Paste into the production Coolify app; mark secrets as Secrets.
+# The API refuses to start in production with test Razorpay keys, the fake gateway or console OTP.
+APP_ENV=production
+WEB_ORIGIN=https://bayline.example
+DEV_FAKE_PAY=0
+
+POSTGRES_PASSWORD=
+JWT_SECRET=
+INTERNAL_TOKEN=
+RAZORPAY_WEBHOOK_SECRET=
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+OTP_PROVIDER=msg91
+N8N_NOTIFY_URL=
+SENTRY_DSN=
+
+PLATFORM_FEE_PAISE=1500
+COMMISSION_BPS=1500
+TDS_BPS=10
+TCS_BPS=50
+COMMISSION_GST_BPS=1800
+
+S3_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=bayline-backups
+S3_PREFIX=production
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+BACKUP_RETENTION_DAYS=14
+
+PG_MEM_LIMIT=1536M
+PG_SHARED_BUFFERS=384MB
+PG_CACHE_SIZE=1GB
+API_MEM_LIMIT=512M
+WEB_MEM_LIMIT=512M
