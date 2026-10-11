@@ -23,7 +23,7 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **No pg-boss: the `notifications` table is the queue.** The schema already had it, with a dedupe key per email. Rows are queued in the same transaction as the booking change (outbox pattern), claimed with `FOR UPDATE SKIP LOCKED` and a 5-minute lease, retried with backoff, and left as `failed` with `last_error` when they run out (the dead-letter log). One less dependency and one less set of tables to run and back up.
 - **The job runner lives in the web process** (`src/instrumentation.ts`), not a separate service: one container on the VPS, and a booking wakes it at once so confirmations go out in under a second. It is safe to run on several servers; `HOURHAND_WORKER=0` turns it off on a server.
 - **Resend's idempotency key is the notification id**, so a crash between sending and recording the send can't email anyone twice (Resend drops the repeat for 24 hours).
-- **Free/busy, not event lists, for conflicts.** It needs only the `calendar.freebusy` scope and returns exactly what the slot engine needs. Events are written with `calendar.events.owned`, which can't touch calendars shared with the host. No full `calendar` scope anywhere.
+- **Free/busy, not event lists, for conflicts.** It needs only a free/busy scope and returns exactly what the slot engine needs. Since B4b that scope is `calendar.events.freebusy` (availability on the calendars the host can see) rather than `calendar.freebusy`: both are read-only availability, but only the first lets Hourhand watch calendars for changes. Events are written with `calendar.events.owned`, which can't touch calendars shared with the host. No full `calendar` scope anywhere.
 - **Hourhand sends the guest emails, not Google** (`sendUpdates=none`): one consistent message with the manage link, instead of two. The guest is still on the event as an attendee.
 - **Calendar writes go through the email queue** (`channel = 'calendar'`), so they get the same claiming, retries and dead-letter log, and commit with the booking.
 - **Double booking is impossible at the database.** The `no_double_booking` exclusion constraint is the guard. The app maps its violation to "slot taken" with the next free slots.
@@ -148,12 +148,21 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Accepted (low):** a refund the host already part-made in their own Razorpay dashboard counts as the refund. Hourhand refunds the full amount only when Razorpay shows none.
 - **Checked:** the signature uses the order id from the database; amount and currency are compared; a cancelled booking is never revived; expire and confirm are serialized by the row lock; no HTTP calls inside database transactions; keys are bound to their host; every action checks the session; no keys in responses or logs.
 
+## B4b evidence (2026-10-11, Postgres 16.15, production build, fake Google)
+
+- 323 tests pass with `TEST_DATABASE_URL` set. Migration 0007 applies on top of 0006.
+- **Checked against Google's docs (read 2026-10-11):** `events.watch` accepts `calendar.events.freebusy` and `calendar.events.owned` but not `calendar.freebusy`; `freeBusy.query` accepts `calendar.events.freebusy`. Pings carry no details, only channel id, token and resource state; channels expire (a week by default) and are renewed with a new id; `channels.stop` takes the id and resource id; the address must be https with a valid certificate.
+- **Against Postgres:** each checked calendar gets one channel with its own token, unchecked ones none; a channel is renewed a day before it ends and the old one stopped; unchecking stops it; a calendar Google won't watch is noted, retried a day later, and its connection keeps syncing; only a ping with the right channel and token (state `exists`/`not_exists`) brings the sync forward, a wrong token, unknown channel, missing token or the start-up `sync` ping changes nothing; disconnecting stops the channels before revoking the grant.
+- **Negative tests** (guard set aside, test fails): the token check, the state check, stopping the old channel on renewal, stopping on uncheck, the retry wait after a refused watch, stopping channels on disconnect.
+- **End to end on a production build against a fake Google (23 of 23, 4 new):** the job runner asks Google to watch the checked calendar, pointing at the ping endpoint with its own token; a ping with the wrong token answers the same and changes nothing; a real ping makes a newly busy time disappear from the booking page within seconds. B5b (28), B5a (26), B3 (10), B2b (12) and sign-in (15) pass again.
+- **Not yet run against real Google:** needs a public https address (Coolify) and the new scope on your OAuth consent screen.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
 | --- | --- | --- |
 | Create a Google Cloud project with an OAuth client (web), redirect URI `https://<domain>/api/auth/callback/google`, plus `http://localhost:3000/...` for dev | 30 min | B2 |
-| Enable the Google Calendar API and **submit OAuth verification** for the `calendar.events` and `calendar.freebusy` scopes. Until it is approved, the app is limited to 100 test users | **2–6 weeks** | B4, public launch |
+| Enable the Google Calendar API and **submit OAuth verification** for the `calendar.calendarlist.readonly`, `calendar.events.freebusy` and `calendar.events.owned` scopes (add exactly these on the consent screen first; B4b swapped `calendar.freebusy` for `calendar.events.freebusy`). Until it is approved, the app is limited to 100 test users | **2–6 weeks** | B4, public launch |
 | Resend account, domain `mail.<domain>` with SPF, DKIM, DMARC `p=none` | 1 day for DNS | B3 |
 | Razorpay account (test mode keys) and KYC for live; turn on Subscriptions; create the 4 Plans and the webhook (see README → Plans and billing) | KYC takes days | B5 |
 | Stripe account (test mode keys); 2 Products with monthly and yearly Prices, Customer Portal on, webhook (see README) | 30 min | B5 |
