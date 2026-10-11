@@ -1,0 +1,7 @@
+node_modules/
+.next/
+next-env.d.ts
+.env*
+test-results/
+*.tsbuildinfo
+e2e-report/

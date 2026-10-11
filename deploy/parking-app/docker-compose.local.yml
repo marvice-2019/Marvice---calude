@@ -1,0 +1,45 @@
+# LOCAL GATE ONLY — never used on Coolify. Layer it on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml --env-file env/local.example up -d --build
+# Adds: loopback-only host ports for testing, a fake S3 (rclone serve s3) for the backup round trip, and an optional
+# CA bundle build secret for machines behind a TLS-inspecting proxy (BUILD_CA_FILE).
+services:
+  api:
+    build:
+      secrets: [ca]
+    ports: ["127.0.0.1:13000:3000"]
+  migrate:
+    build:
+      secrets: [ca]
+  web:
+    build:
+      secrets: [ca]
+      # next/font downloads Google Fonts at build time; pass the host proxy through when there is one
+      # (host network so a loopback-only proxy is reachable). HTTP(S)_PROXY are Docker's predefined
+      # build args and are not kept in image history.
+      network: host
+      args:
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-}
+    ports: ["127.0.0.1:13001:3001"]
+  backup:
+    build:
+      secrets: [ca]
+    depends_on:
+      s3: { condition: service_started }
+  s3:
+    # Same image as backup (has rclone); serves an S3 API from a local folder so backups exercise the real S3 path.
+    build:
+      context: ./backup
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22.23.3-bookworm-slim}
+      secrets: [ca]
+    entrypoint: ["rclone"]
+    command: ["serve", "s3", "/var/lib/backup/bucket-root", "--addr", ":9000", "--auth-key", "${S3_ACCESS_KEY_ID},${S3_SECRET_ACCESS_KEY}", "--force-path-style"]
+    expose: ["9000"]
+    healthcheck:
+      disable: true
+
+secrets:
+  ca:
+    file: ${BUILD_CA_FILE:-/dev/null}

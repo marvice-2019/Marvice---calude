@@ -1,0 +1,90 @@
+name: parking-app web and mobile
+
+on:
+  push:
+    paths: ["parking-app/**", ".github/workflows/parking-web.yml"]
+  pull_request:
+    paths: ["parking-app/**", ".github/workflows/parking-web.yml"]
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      # CI-only throwaway values; real secrets live in Coolify, never in the repo.
+      DATABASE_URL: postgres://postgres:ci@127.0.0.1:5432/postgres
+      JWT_SECRET: ci-only-ci-only-ci-only-ci-only-0123456789
+      RAZORPAY_WEBHOOK_SECRET: ci-webhook
+      INTERNAL_TOKEN: ci-internal-token-0123
+      RATE_LIMIT_SCALE: "50"
+      PORT: "3999"
+      API_URL: http://127.0.0.1:3999
+      DEV_FAKE_PAY: "1"
+      SITE_URL: http://localhost:3001
+      WEB_URL: http://localhost:3001
+      API_LOG: ${{ github.workspace }}/api.log
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: API build, migrate, seed
+        working-directory: parking-app/api
+        run: |
+          npm ci
+          npm run build
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS btree_gist; CREATE EXTENSION IF NOT EXISTS pgcrypto"
+          node dist/src/migrate.js
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f seed/dev.sql
+          nohup node dist/src/server.js > "$API_LOG" 2>&1 &
+          for i in $(seq 1 30); do node -e 'fetch(process.env.API_URL+"/v1/destinations").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))' && break; sleep 1; done
+      - name: Web lint, typecheck, build
+        working-directory: parking-app/web
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Start web and smoke test
+        working-directory: parking-app/web
+        run: |
+          nohup npx next start -p 3001 > web.log 2>&1 &
+          sleep 5
+          npm run smoke
+      - name: Browser end-to-end at 390 px and 1280 px
+        working-directory: parking-app/web
+        run: |
+          npm i --no-save @playwright/test@1.56.1
+          npx playwright install --with-deps chromium
+          npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-traces
+          path: |
+            parking-app/web/test-results
+            api.log
+            parking-app/web/web.log
+
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: parking-app/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: node scripts/sync-shared.mjs --check
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- --ci
+      - run: npx expo export --platform web

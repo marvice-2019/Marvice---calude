@@ -1,0 +1,29 @@
+# Bayline STAGING environment template. Paste the keys into the Coolify app's Environment Variables
+# and mark every secret as a Secret. Never commit filled-in values.
+APP_ENV=staging
+WEB_ORIGIN=https://staging.bayline.example
+DEV_FAKE_PAY=1
+
+POSTGRES_PASSWORD=
+JWT_SECRET=
+INTERNAL_TOKEN=
+RAZORPAY_WEBHOOK_SECRET=
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+OTP_PROVIDER=console
+N8N_NOTIFY_URL=
+SENTRY_DSN=
+
+S3_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=bayline-backups
+S3_PREFIX=staging
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+BACKUP_RETENTION_DAYS=14
+
+PG_MEM_LIMIT=768M
+PG_SHARED_BUFFERS=128MB
+PG_CACHE_SIZE=384MB
+API_MEM_LIMIT=384M
+WEB_MEM_LIMIT=384M

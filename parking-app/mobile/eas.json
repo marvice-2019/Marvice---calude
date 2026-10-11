@@ -1,0 +1,20 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "EXPO_PUBLIC_API_URL": "http://10.0.2.2:3000", "EXPO_PUBLIC_DEV_PAY_URL": "http://10.0.2.2:3001/api/dev/pay" }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_API_URL": "https://api-staging.bayline.example" }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": { "EXPO_PUBLIC_API_URL": "https://api.bayline.example" }
+    }
+  },
+  "submit": { "production": {} }
+}
