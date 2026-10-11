@@ -136,7 +136,8 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 | Resend account, domain `mail.<domain>` with SPF, DKIM, DMARC `p=none` | 1 day for DNS | B3 |
 | Razorpay account (test mode keys) and KYC for live; turn on Subscriptions; create the 4 Plans and the webhook (see README → Plans and billing) | KYC takes days | B5 |
 | Stripe account (test mode keys); 2 Products with monthly and yearly Prices, Customer Portal on, webhook (see README) | 30 min | B5 |
-| Ask your CA how GST invoices for Razorpay subscription charges should be issued (Razorpay's invoice settings vs your own invoicing) | 1 call | B5, before live |
+| In Razorpay (test mode first), set the business and GST invoice details: **Marvice Media Private Limited**, GSTIN **33AAMCM6642H1ZB** (Tamil Nadu), 37, Veeraragavapuram, Ekkadu Post, Tiruvallur, Tamil Nadu 602021; GST invoices at 18% on plan amounts set before tax. Decided 2026-10-11: invoices are issued from the Tamil Nadu registration | 15 min | B5 |
+| One test-mode payment end to end (test keys, 4 test Plans, webhook); check the plan turns Solo, then swap to live keys. Regenerate the live key pair shared in chat on 2026-10-11 before going live | 20 min | B5, before live |
 | Meta WhatsApp Business account; submit utility templates for confirmation and reminder | 1–7 days per template | later |
 | DLT registration of the entity, sender ID and SMS templates (for example via MSG91) | **days to weeks** | later |
 | Trademark search for "Hourhand" before buying the domain | 1 day | launch |
