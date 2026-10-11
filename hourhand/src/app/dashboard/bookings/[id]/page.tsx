@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +11,8 @@ import { formatMoney } from "@/lib/billing/plans";
 import { formatDate, formatTime, zoneName } from "@/lib/format";
 import { getPool } from "@/lib/data/pg-store";
 import { bookingPayment, type BookingPaymentSummary } from "@/lib/payments/booking-payments";
+import { GUEST_LOCATION_LABELS } from "@/lib/location-labels";
+import { waLink, waNumber, whatsappMessage, type WhatsAppKind } from "@/lib/whatsapp";
 import { cancelAsHost, rescheduleAsHost, setNoShow } from "./actions";
 
 const PAYMENT_WORDS: Record<BookingPaymentSummary["status"], string> = {
@@ -58,6 +61,7 @@ export default async function BookingDetailPage({ params, searchParams }: { para
   const done = query.done && Object.hasOwn(DONE, query.done) ? DONE[query.done] : null;
   const error = query.error && Object.hasOwn(ERRORS, query.error) ? ERRORS[query.error] : null;
   const payment = authEnabled() ? await bookingPayment(getPool(process.env.DATABASE_URL as string), user.id, booking.id) : null;
+  const whatsapp = upcoming ? await whatsappLinks(user, booking) : null;
   return (
     <div>
       <h1 className="font-display text-xl text-text">Booking with {booking.invitee.name}</h1>
@@ -90,6 +94,25 @@ export default async function BookingDetailPage({ params, searchParams }: { para
           <div key={a.questionId}><dt className="text-sm text-text-muted">{a.label}</dt><dd className="whitespace-pre-line text-text">{a.answer}</dd></div>
         ))}
       </dl>
+      {upcoming && (
+        <section aria-labelledby="whatsapp" className="mt-6 grid max-w-xl gap-2">
+          <h2 id="whatsapp" className="font-display text-lg text-text">Message on WhatsApp</h2>
+          {whatsapp ? (
+            <>
+              <p className="text-sm text-text-muted">Opens WhatsApp on your phone or computer with the message written. You send it from your own number.</p>
+              <div className="flex flex-wrap gap-2">
+                {whatsapp.map((w) => (
+                  <a key={w.kind} href={w.href} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-md border border-border px-3 font-semibold text-accent underline">
+                    {w.label}
+                  </a>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-text-muted">{booking.invitee.name} didn&apos;t leave a WhatsApp number, so you can only email them.</p>
+          )}
+        </section>
+      )}
       {upcoming && (
         <section aria-labelledby="actions" className="mt-6 grid max-w-xl gap-4">
           <h2 id="actions" className="font-display text-lg text-text">Change this booking</h2>
@@ -149,4 +172,27 @@ export default async function BookingDetailPage({ params, searchParams }: { para
       <Link href="/dashboard/bookings" className="mt-4 inline-flex min-h-11 items-center font-semibold text-accent underline">Back to bookings</Link>
     </div>
   );
+}
+
+const WHATSAPP_LABELS: Record<WhatsAppKind, string> = { confirmation: "Send confirmation", reminder: "Send reminder", manage: "Send change-or-cancel link" };
+
+/** One wa.me link per message, or null when the guest left no usable number. */
+async function whatsappLinks(
+  user: { id: string; name: string },
+  booking: NonNullable<Awaited<ReturnType<typeof store.getBooking>>>,
+): Promise<{ kind: WhatsAppKind; label: string; href: string }[] | null> {
+  const number = waNumber(booking.invitee.phone);
+  if (!number) return null;
+  const [eventType, locations, h] = await Promise.all([
+    store.getEventType(user.id, booking.eventTypeId), store.listEventLocations(user.id, booking.eventTypeId), headers(),
+  ]);
+  const origin = process.env.BETTER_AUTH_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
+  const kind = booking.locationKind;
+  const value = locations.find((l) => l.kind === kind)?.value ?? null;
+  const where = kind ? `${GUEST_LOCATION_LABELS[kind]}${booking.joinUrl ? `: ${booking.joinUrl}` : value ? `: ${value}` : ""}` : null;
+  const ctx = {
+    guestName: booking.invitee.name, hostName: user.name, eventName: eventType?.name ?? "booking", startAt: booking.startAt,
+    guestTimezone: booking.invitee.timezone, where, manageUrl: `${origin.replace(/\/+$/, "")}/b/${booking.invitee.manageToken}`,
+  };
+  return (Object.keys(WHATSAPP_LABELS) as WhatsAppKind[]).map((k) => ({ kind: k, label: WHATSAPP_LABELS[k], href: waLink(number, whatsappMessage(k, ctx)) }));
 }
