@@ -150,7 +150,7 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 
 ## B4b evidence (2026-10-11, Postgres 16.15, production build, fake Google)
 
-- 323 tests pass with `TEST_DATABASE_URL` set. Migration 0007 applies on top of 0006.
+- 325 tests pass with `TEST_DATABASE_URL` set. Migration 0007 applies on top of 0006.
 - **Checked against Google's docs (read 2026-10-11):** `events.watch` accepts `calendar.events.freebusy` and `calendar.events.owned` but not `calendar.freebusy`; `freeBusy.query` accepts `calendar.events.freebusy`. Pings carry no details, only channel id, token and resource state; channels expire (a week by default) and are renewed with a new id; `channels.stop` takes the id and resource id; the address must be https with a valid certificate.
 - **Against Postgres:** each checked calendar gets one channel with its own token, unchecked ones none; a channel is renewed a day before it ends and the old one stopped; unchecking stops it; a calendar Google won't watch is noted, retried a day later, and its connection keeps syncing; only a ping with the right channel and token (state `exists`/`not_exists`) brings the sync forward, a wrong token, unknown channel, missing token or the start-up `sync` ping changes nothing; disconnecting stops the channels before revoking the grant.
 - **Negative tests** (guard set aside, test fails): the token check, the state check, stopping the old channel on renewal, stopping on uncheck, the retry wait after a refused watch, stopping channels on disconnect.
