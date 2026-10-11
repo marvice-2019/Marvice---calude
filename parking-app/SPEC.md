@@ -1,11 +1,12 @@
 # Bayline build spec (MVP, Bengaluru)
 
-Stage 3 of the Replica pipeline, 11 Oct 2026. Built from `RECON.md`, `README.md`, `schema.sql` and `prototype/index.html`. Anything none of those support is marked **Proposed**, with the reason.
+Stage 3 of the Replica pipeline, 11 Oct 2026 (rerun after stage 2 added valet). Built from `RECON.md`, `README.md`, `schema.sql` and `prototype/index.html`. Anything none of those support is marked **Proposed**, with the reason.
 
 ## 1. Scope
 
 **MVP in (one city: Bengaluru):**
-- Drivers: search, pre-book, Park now, pay by UPI, card or netbanking, digital pass, extend, cancel, promo codes, saved profile, favourites, monthly passes.
+- Drivers: search by area or venue with recent searches, filters, pre-book, Park now by digits-only lot code, pay by UPI, card or netbanking, digital pass, Mark my spot, extend, cancel, promo codes, saved profile, favourites, monthly passes, phone-OTP account with alerts and data controls.
+- Valet: drop-off with digital ticket, key tag and 4 handover photos; request my car with live arrival time; venue validation; cashless tip; damage report; valet staff queue.
 - Operators: staff check-in and check-out, dashboard, rate cards, lot status, payouts.
 - Platform admin: lot onboarding, refunds, promos.
 - Channels: website (Next.js) and an iOS and Android app (Expo).
@@ -13,7 +14,8 @@ Stage 3 of the Replica pipeline, 11 Oct 2026. Built from `RECON.md`, `README.md`
 **MVP out:**
 - ANPR cameras (QR or plate typed by the attendant only)
 - dynamic and demand pricing
-- valet and "text the attendant"
+- "text the attendant" free-text chat (valet status updates replace it)
+- live GPS of the valet runner (status steps only)
 - event ticket bundles
 - multiple cities
 - corporate accounts
@@ -29,6 +31,9 @@ Stage 3 of the Replica pipeline, 11 Oct 2026. Built from `RECON.md`, `README.md`
 | View own passes, extend, cancel | ✓ (via phone OTP) | ✓ | – | – | ✓ (support) |
 | Save lots, saved profile | – | ✓ | – | – | – |
 | Request monthly pass | – | ✓ | – | – | – |
+| Valet: drop off, request car, tip, report damage | ✓ (phone OTP) | ✓ | – | – | – |
+| Valet: take handover photos, park, retrieve | – | – | ✓ (valet staff at own desks) | ✓ | – |
+| Create venue validation codes | – | – | – | ✓ (own desks) | ✓ |
 | Check vehicles in and out at own lot | – | – | ✓ | ✓ | – |
 | Set lot status (open, full, gate down) | – | – | ✓ | ✓ | ✓ |
 | Edit rate cards, approve monthly passes | – | – | – | ✓ (own lots) | ✓ |
@@ -42,7 +47,7 @@ A guest is a driver who has verified a phone number by OTP but has not set up a 
 ### Search and book
 
 **DRV-01 Search lots.**
-- Given a selected area, arrival time and leaving time, when the driver searches, then live lots within 3 km show with distance, lot code, price per hour, total including GST, and spots left, sorted by nearest.
+- Given a selected area or venue, arrival time and leaving time, when the driver searches, then live lots within 3 km show with distance, lot code, price per hour, total including GST, and spots left, sorted by nearest.
 - Leaving before arrival shows "Leaving time must be after arrival. Move it later."
 - More than 30 days shows "Bookings run up to 30 days. For longer stays, use Monthly."
 
@@ -78,7 +83,7 @@ A guest is a driver who has verified a phone number by OTP but has not set up a 
 - With no saved lots, the filter shows "No saved lots yet. Open a lot and tap Save to keep it here for next time."
 
 **DRV-09 Park now.**
-- Given a valid lot code (e.g. `BLR101`, spaces and hyphens ignored) and a duration of 1, 2, 3, 4 or 8 h, when the driver pays, then the pass starts at the current minute and is live immediately.
+- Given a valid lot code typed as digits on a number pad (`101`) or in full (`BLR101`, spaces and hyphens ignored) and a duration of 1, 2, 3, 4 or 8 h, when the driver pays, then the pass starts at the current minute and is live immediately.
 - An unknown code shows "No lot with code <CODE>. Check the board at the entrance, or pick a lot above."
 
 **DRV-10 Passes.**
@@ -95,6 +100,61 @@ A guest is a driver who has verified a phone number by OTP but has not set up a 
 
 **DRV-13 Overstay.**
 - Given a pass whose end time has passed, when staff check the vehicle out, then each started hour is charged at the lot rate plus GST, as an exit payment through UPI collect or a payment link sent on WhatsApp.
+
+**DRV-14 Mark my spot.**
+- Given a live or upcoming pass, when the driver saves a floor, bay, note or photo, then the pass shows "Your spot: Floor B2 · Bay 47" with the photo thumbnail.
+- Saving with all four empty shows "Add a floor, bay, note or photo so you can find your car later."
+- A non-image file shows "Choose a photo (JPG or PNG)."; photos are resized to at most 320 px before upload.
+
+**DRV-15 Venue search and recent searches.**
+- Given the destination box, when the driver types an area or venue (mall, hospital, stadium, office park), then results re-centre on it and it is added to the last 4 recent searches.
+- An unknown place shows "We don't cover "<text>" yet. Try an area like Indiranagar or a mall like UB City."
+- "Near me" uses device location; if permission is refused, it shows MG Road and says so.
+
+**DRV-16 Filters.**
+- Given the filter chips (Saved, Two-wheeler bays, Covered, EV charging, Valet, Open 24 h), when chips are on, then only lots matching all of them show.
+- With no match, the list shows "No lots match these filters. Turn one off to see more."; with only Saved on and no favourites, it shows the DRV-08 empty message.
+
+### Valet
+
+**VAL-01 Drop off.**
+- Given a live valet desk, when the driver gives a valid plate and mobile number, then a ticket `VT-XXXX` is created with a key tag and the 4 handover photos taken by staff, and it is sent on WhatsApp.
+- Invalid plate or phone shows the DRV-04 plate or phone message.
+- A key tag already on an open ticket at the same desk is refused with "Key tag K-23 is already in use. Pick another tag."
+
+**VAL-02 Request my car.**
+- Given a `parked` ticket, when the driver requests the car, then the bill shows the valet fee, 18% GST, the tip and the total; on capture the ticket becomes `requested` and shows "Ready in about N min".
+- Payment failure leaves the ticket `parked` with "Payment didn't go through. You weren't charged."
+
+**VAL-03 Venue validation.**
+- Given a desk with a validation programme, when the driver enters today's code, then the fee and GST become ₹0 and only the tip (if any) is charged.
+- With no tip, the button reads "Bring my car" and no payment is taken.
+- A wrong or expired code shows "That code didn't work. Ask the counter for today's validation code."
+
+**VAL-04 Tip.**
+- Given the tip chips (No tip, ₹20, ₹50, ₹100), when one is chosen, then it is added outside GST and paid out 100% to the valet who retrieved the car.
+
+**VAL-05 Live status and ready.**
+- Given a requested ticket, when staff move it to `coming` and then `ready`, then the driver's timeline updates and at `ready` a push and WhatsApp say "Your car is at the porch. Show ticket VT-XXXX."
+- "I've got my car" closes the ticket and sends the receipt.
+
+**VAL-06 Damage report.**
+- Given a `ready` or just-closed ticket (within 15 minutes), when the driver submits where on the car and a photo, then a report is stored against the ticket and the operator is alerted.
+- A report without a photo shows "Add a photo of the damage so we can compare it."
+
+**VAL-07 Staff queue.**
+- Given valet staff at their own desk, when they open the queue, then requested tickets show oldest first with plate, key tag and bay, and they can move each one `requested → coming → ready`.
+- Staff of another operator get 403.
+
+### Account
+
+**ACC-01 Preferences.**
+- Given a signed-in driver, when they toggle the expiry alert or pick a language, then the choice is saved.
+- Kannada and Hindi show "Kannada and Hindi arrive before launch. Showing English for now." until translations ship. (**Proposed** timing: before launch.)
+
+**ACC-02 My data.**
+- Given a signed-in driver, when they request a data export, then it arrives on WhatsApp within 7 days.
+- "Delete my account" asks for confirmation, then follows the DPDP erasure rule in §8; active passes stay valid until they end.
 
 ### Guest
 
@@ -171,6 +231,11 @@ A guest is a driver who has verified a phone number by OTP but has not set up a 
 | S09 | Staff scan | App | Camera scanner, plate entry, today's arrivals | Check in, check out, set lot status | Offline queue count; red or green result | OPS-01, OPS-02, OPS-04, DRV-13 |
 | S10 | Operator dashboard | Web | Occupancy, bookings, revenue, rate cards, monthly requests, payouts | Edit rates, approve monthly, export CSV | No data for period | OPS-03, OPS-04, OPS-05, MON-02 |
 | S11 | Admin console | Web | Operators, lots, bookings, promos, audit log | Onboard, go live, refund, manage promos | – | ADM-01, ADM-02, ADM-03 |
+| S13 | Valet (driver) | Both | Active tickets with timeline, arrival time, handover photos, fee; nearby valet desks | Drop off, request car, validate, tip, I've got my car, report damage | "No car with a valet right now…" empty state | VAL-01, VAL-02, VAL-03, VAL-04, VAL-05, VAL-06 |
+| S14 | Valet staff queue | App | Requested and in-progress tickets: plate, key tag, bay | Start retrieval, car at porch | Empty queue; offline banner | VAL-07, VAL-05 |
+| S15 | Mark my spot (sheet on pass) | Both | Floor, bay, note, photo | Save, edit | Empty-save and bad-file errors | DRV-14 |
+| S16 | Search box + filter chips (part of S01) | Both | Destination with suggestions, recent searches, chips | Pick place, near me, toggle filters | Unknown-place message; no-match message | DRV-15, DRV-16 |
+| S17 | Account settings | Both | Phone, vehicle, payment, alert toggle, language, data controls | Toggle, change, export, delete | – | ACC-01, ACC-02 |
 | S12 | SEO area and lot pages | Web | Server-rendered lot list per area, prices, JSON-LD | Book CTA → S02 | – | DRV-01, DRV-02 |
 
 ## 5. API contract
@@ -182,7 +247,7 @@ Base path `/v1`. JSON throughout, with zod validation. Money is in paise. Every 
 | POST | /auth/otp | public | `{phone}` | `{sent:true}` | 400 bad phone, 429 | – | DRV-03 |
 | POST | /auth/verify | public | `{phone, otp}` | `{access, refresh, user}` | 401 wrong OTP | – | DRV-03, GST-01, GST-02 |
 | POST | /auth/refresh | refresh | `{refresh}` | `{access}` | 401 | – | DRV-03 |
-| GET | /lots/search | public | `?lat&lng&from&to&vehicle&sort` | `[{lot, distance_m, quote}]` | 400 invalid range | – | DRV-01 |
+| GET | /lots/search | public | `?lat&lng&from&to&vehicle&sort&filters=covered,ev,valet,h24,bike,saved` | `[{lot, distance_m, quote, valet}]` | 400 invalid range | – | DRV-01, DRV-15, DRV-16 |
 | GET | /lots/by-code/:code | public | – | `{lot}` | 404 | – | DRV-09 |
 | GET | /lots/:id | public | `?from&to&vehicle` | `{lot, quote}` | 404 | – | DRV-02 |
 | POST | /quotes | public | `{lot_id, from, to, vehicle, promo?}` | `{base, discount, fee, gst, total, promo_error?}` | 400, 404 | – | DRV-02, DRV-06 |
@@ -207,6 +272,20 @@ Base path `/v1`. JSON throughout, with zod validation. Money is in paise. Every 
 | POST | /admin/lots | platform admin | lot fields | `{lot, code}` | 400, 409 code taken | – | ADM-01 |
 | POST | /admin/refunds | platform admin | `{booking_id, amount}` | `{refund}` | 409 over-refund | ✓ | ADM-02 |
 | POST | /admin/promos | platform admin | promo fields | `{promo}` | 400, 409 exists | – | ADM-03 |
+| GET | /destinations | public | `?q` | `[{name, kind, lat, lng}]` | – | – | DRV-15 |
+| POST | /bookings/:id/spot | owner | `{floor?, bay?, note?, photo_key?}` | `{spot}` | 400 empty, 404 | – | DRV-14 |
+| POST | /uploads | driver/staff | `{content_type}` | `{upload_url, key}` (pre-signed, 5 MB max, images only) | 400 type | – | DRV-14, VAL-01, VAL-06 |
+| PUT | /me/preferences | driver | `{alerts, language}` (extends the DRV-07 body) | `{preferences}` | 400 | – | ACC-01 |
+| POST | /me/data-export | driver | – | 202 | 429 | – | ACC-02 |
+| GET | /valet/desks | public | `?lat&lng` | `[{desk, fee, validator, eta}]` | – | – | VAL-01 |
+| POST | /valet/tickets | op staff | `{desk_id, plate, phone, key_tag, photo_keys[4]}` | `{ticket}` | 409 key tag in use, 400 photos ≠ 4 | client id | VAL-01 |
+| GET | /valet/tickets | driver/guest | – | `[ticket]` | – | – | VAL-05 |
+| POST | /valet/tickets/:id/request | owner | `{validation_code?, tip_paise}` | `{ticket, razorpay_order?}` | 409 not parked, 422 bad code | ✓ | VAL-02, VAL-03, VAL-04 |
+| POST | /valet/tickets/:id/collected | owner | – | `{ticket}` | 409 not ready | – | VAL-05 |
+| POST | /valet/tickets/:id/damage | owner | `{where, photo_key}` | 201 | 400 no photo, 410 too late | – | VAL-06 |
+| GET | /ops/valet/queue | op staff | `?desk_id` | `[ticket]` | 403 | – | VAL-07 |
+| PUT | /ops/valet/tickets/:id/status | op staff | `{status: coming\|ready, bay?}` | `{ticket}` | 403, 409 bad transition | – | VAL-05, VAL-07 |
+| POST | /ops/valet/validations | op admin | `{desk_id, validator, code, valid_from, valid_to}` | `{validation}` | 409 exists | – | VAL-03 |
 | POST | /leads/owners | public | `{name, phone, address, bays}` | 201 | 400, 429 | – | OWN-01 (**Proposed**) |
 
 ## 6. Business rules
@@ -229,6 +308,15 @@ Base path `/v1`. JSON throughout, with zod validation. Money is in paise. Every 
   - Due by the 5th; reminders on the 3rd and 5th; paused after the 7th.
   - Six-month minimum for operator contracts (business term). There is no driver minimum.
 - **Promos.** At most one code per booking, checked at quote time and again at booking time. `used_count` increments on capture, not on hold.
+- **Valet.**
+  - The driver pays a flat desk fee + 18% GST when requesting the car, never at drop-off.
+  - A valid validation code sets the fee and GST to 0 and bills the venue monthly at fee + GST.
+  - Tips: chips of ₹0, 20, 50 or 100, outside GST, paid 100% to the retrieving valet weekly. The platform absorbs the gateway fee on tips.
+  - Status moves only forward: dropped → parked → requested → coming → ready → closed.
+  - One open ticket per key tag per desk (database guard).
+  - Damage reports are accepted until 15 minutes after the ticket closes.
+  - Platform commission is 15% of the fee (paid or validated).
+- **Lot codes.** Printed as "BLR 101". Drivers type the digits; the API accepts digits or the full code.
 - **Payout.** Weekly (Monday) payout = gross parking − discount funded by the operator (none in the MVP; the platform funds promos) − 15% commission − TDS/TCS. Confirm the tax treatment with a CA.
 
 ## 7. Notifications
@@ -242,6 +330,9 @@ Base path `/v1`. JSON throughout, with zod validation. Money is in paise. Every 
 | Monthly approved | WhatsApp | "Your monthly bay {bay} at {lot} is approved. Pay {amount} incl. GST: {link}" | MON-02 |
 | Monthly due | WhatsApp | "Monthly parking at {lot}: {amount} due by the 5th. Pay: {link}" | 3rd and 5th of the month |
 | Monthly paused | WhatsApp | "Your monthly pass at {lot} is paused for non-payment. Pay to restore entry: {link}" | 8th |
+| Valet ticket created | WhatsApp | "Your valet ticket {code} at {desk}. Key tag {tag}. Handover photos: {link}. Request your car here: {link}" | VAL-01 |
+| Car ready | Push + WhatsApp | "Your car is at the porch. Show ticket {code}." | VAL-05 |
+| Damage report received | WhatsApp (driver + operator) | "We've got your report for {code}. The operator replies within 24 hours." | VAL-06 |
 | OTP | SMS | "{otp} is your Bayline code. Valid for 5 minutes." | DRV-03 |
 
 WhatsApp templates need Meta approval as utility templates before launch. They are sent from n8n through the BSP.
@@ -277,19 +368,24 @@ WhatsApp templates need Meta approval as utility templates before launch. They a
 | pass_extended / pass_cancelled | hours, amount | Retention |
 | lot_saved | lot_id | Retention |
 | monthly_requested / monthly_activated | lot_id | Monthly |
+| destination_selected | name, kind, from_recent | Search → book |
+| filter_toggled | filter, on, results_count | Search → book |
+| spot_marked | has_photo, floor_set | Retention |
+| valet_dropoff / valet_requested / valet_ready / valet_collected | desk_id, validated, tip_paise, seconds_request_to_ready | Valet (target: ready ≤ desk ETA) |
+| valet_damage_reported | desk_id, where | Valet quality |
 | owner_calc_used / owner_lead_submitted | bays, payout | Supply |
 
-## 10. Milestones (reconciled with the README's 530 h)
+## 10. Milestones (reconciled with the README's 620 h)
 
 | Pipeline stage | Covers README phases | Hours |
 |---|---|---|
-| 4 API | Data + auth (40), booking + payments (70), search backend (25), monthly backend (15) | 150 |
-| 5 Web | Web app (70), SEO area pages (25) | 95 |
-| 6 Mobile | Mobile app (110) | 110 |
-| 7 Ops | Operator side (80), admin (30), monthly approvals (15) | 125 |
+| 4 API | Data + auth (40), booking + payments (70), search backend (25), monthly backend (15), valet API (30) | 180 |
+| 5 Web | Web app (70), SEO area pages (25), valet screens (15) | 110 |
+| 6 Mobile | Mobile app (110), valet and photo capture (25) | 135 |
+| 7 Ops | Operator side (80), admin (30), monthly approvals (15), valet staff queue + validations (20) | 145 |
 | 8 Deploy | From QA + release (20) | 20 |
 | 9 Launch | Store release + QA (30) | 30 |
-| **Total** | | **530** |
+| **Total** | | **620** |
 
 ## 11. Open questions
 
@@ -303,3 +399,7 @@ WhatsApp templates need Meta approval as utility templates before launch. They a
 | 6 | WhatsApp BSP: Interakt or Gupshup; template approval lead time | Marketing | Before stage 8 |
 | 7 | Map tiles: MapTiler or Google Maps (cost at expected loads) | Tech lead | Before stage 5 |
 | 8 | First 15–25 lots signed (supply risk from README) | Sales | Before stage 9 |
+| 9 | Are tips outside GST if the platform only collects them for the valet? | CA | Before stage 4 valet payments |
+| 10 | Invoicing venues for validated valet visits: monthly, with GST, and who is the supplier? | CA | Before stage 7 |
+| 11 | Liability for damage in valet custody; is photo evidence enough for a claim? Insurance cover? | Lawyer + insurer | Before first valet desk goes live |
+| 12 | Photo storage: S3-compatible bucket on the VPS or managed; retention period for handover photos (proposed 30 days) | Tech lead | Before stage 8 |
