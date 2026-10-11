@@ -39,6 +39,8 @@ export interface BookingMailContext {
   dashboardUrl: string;
   /** For late_host: how many minutes late the guest said they'll be. */
   runningLateMinutes?: number | null;
+  /** For cancelled_guest after the host cancelled: free times to book instead, nearest the cancelled one. */
+  rebook?: { at: Date; url: string }[];
 }
 
 export interface RenderedMail { subject: string; text: string; html: string; attachments?: Attachment[]; replyTo?: string }
@@ -62,11 +64,12 @@ function where(c: BookingMailContext): string | null {
 }
 
 type Row = [label: string, value: string];
-type Block = { heading: string; intro: string; rows: Row[]; link?: { label: string; url: string }; note?: string; footer: string };
+type Block = { heading: string; intro: string; rows: Row[]; link?: { label: string; url: string }; choices?: { heading: string; items: { label: string; url: string }[] }; note?: string; footer: string };
 
 function toText(b: Block): string {
   const lines = [b.heading, "", b.intro, "", ...b.rows.map(([k, v]) => `${k}: ${v}`)];
   if (b.link) lines.push("", `${b.link.label}: ${b.link.url}`);
+  if (b.choices) lines.push("", b.choices.heading, ...b.choices.items.map((i) => `- ${i.label}: ${i.url}`));
   if (b.note) lines.push("", b.note);
   lines.push("", "—", b.footer);
   return lines.join("\n");
@@ -79,11 +82,15 @@ function toHtml(b: Block): string {
     ? `<p style="margin:24px 0"><a href="${escapeHtml(b.link.url)}" style="background:#16181d;color:#ffffff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${escapeHtml(b.link.label)}</a></p>`
     : "";
   const note = b.note ? `<p style="margin:16px 0;color:#5b6170">${escapeHtml(b.note)}</p>` : "";
+  const choices = b.choices
+    ? `<p style="margin:24px 0 8px;font-weight:600;color:#16181d">${escapeHtml(b.choices.heading)}</p>` + b.choices.items.map((i) =>
+      `<p style="margin:0 0 8px"><a href="${escapeHtml(i.url)}" style="border:1px solid #16181d;color:#16181d;padding:8px 14px;border-radius:6px;text-decoration:none;display:inline-block">${escapeHtml(i.label)}</a></p>`).join("")
+    : "";
   return `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f6f4;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5">
 <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:10px;padding:28px">
 <h1 style="margin:0 0 12px;font-size:20px;color:#16181d">${escapeHtml(b.heading)}</h1>
 <p style="margin:0 0 16px;color:#16181d">${escapeHtml(b.intro)}</p>
-<table role="presentation" style="border-collapse:collapse">${rows}</table>${link}${note}
+<table role="presentation" style="border-collapse:collapse">${rows}</table>${link}${choices}${note}
 <p style="margin:28px 0 0;font-size:13px;color:#8a8f9c">${escapeHtml(b.footer)}</p>
 </div></body></html>`;
 }
@@ -153,6 +160,9 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
         heading: "Your booking is cancelled",
         intro: c.cancelledBy === "guest" ? `Hi ${c.guestName}, you cancelled your time with ${host}.` : `Hi ${c.guestName}, ${host} cancelled your booking.`,
         rows: guestRows(c), note: cancelNote(c, "guest"), footer: guestFooter(c),
+        ...(c.cancelledBy === "host" && c.rebook?.length ? {
+          choices: { heading: `Book another time with ${host}`, items: c.rebook.map((s) => ({ label: when(s.at, c.guestTimezone, "12h"), url: s.url })) },
+        } : {}),
       }, { replyTo: c.hostEmail });
     case "cancelled_host":
       return render(`Cancelled: ${c.guestName}, ${c.eventName}, ${formatDate(c.startAt, c.hostTimezone)}`, {

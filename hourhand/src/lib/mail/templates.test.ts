@@ -26,6 +26,18 @@ describe("booking emails", () => {
     expect(m.text + m.html).not.toContain("guest-only-manage-token");
   });
 
+  it("offers the host-cancelled guest other times in their own zone, and only then", () => {
+    const rebook = [{ at: new Date("2026-11-04T09:00:00Z"), url: "https://hourhand.test/priya/coaching?at=2026-11-04T09%3A00%3A00.000Z&x=<b>" }];
+    const byHost = renderBookingMail("cancelled_guest", { ...ctx, cancelledBy: "host", rebook });
+    expect(byHost.text).toContain("Book another time with Priya Sharma");
+    expect(byHost.text).toContain("9:00 am Europe/London: https://hourhand.test/priya/coaching?at=");
+    expect(byHost.html).toContain("&amp;x=&lt;b&gt;");
+    expect(byHost.html).not.toContain("<b>");
+    expect(renderBookingMail("cancelled_guest", { ...ctx, cancelledBy: "guest", rebook }).text).not.toContain("Book another time");
+    expect(renderBookingMail("cancelled_guest", { ...ctx, cancelledBy: "host", rebook: [] }).text).not.toContain("Book another time");
+    expect(renderBookingMail("cancelled_host", { ...ctx, cancelledBy: "host", rebook }).text).not.toContain("Book another time");
+  });
+
   it("shows the guest their own time zone and the host theirs", () => {
     expect(renderBookingMail("booked_guest", ctx).text).toContain("4:30 am Europe/London");
     expect(renderBookingMail("booked_host", ctx).text).toContain("10:00 IST");

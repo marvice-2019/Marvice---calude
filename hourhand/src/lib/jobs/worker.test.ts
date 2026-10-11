@@ -155,6 +155,31 @@ describe.skipIf(!BASE)("email queue (TEST_DATABASE_URL)", () => {
     expect(sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"))!.text).toContain("Travelling");
   });
 
+  it("when the host cancels, the guest's email offers three free times that open the booking page on that day", async () => {
+    const b = await book();
+    await store.cancelBooking(priya.id, b.id, "host", "Called away");
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl });
+    const mail = sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"))!;
+    expect(mail.text).toContain(`Book another time with ${priya.name}`);
+    const urls = [...mail.text.matchAll(new RegExp(`${baseUrl}/${priya.slug}/${coaching.slug}\\?at=([^\\s]+)`, "g"))].map((m) => decodeURIComponent(m[1]));
+    expect(urls).toHaveLength(3);
+    const times = urls.map((u) => new Date(u).getTime());
+    expect(times).toEqual([...times].sort((x, y) => x - y));
+    expect(times.every((t) => t > Date.now() && t !== b.startAt.getTime())).toBe(true);
+    expect(mail.html).toContain(`${priya.slug}/${coaching.slug}?at=`);
+  });
+
+  it("a guest's own cancel offers no other times", async () => {
+    const b = await book();
+    await store.cancelBooking(priya.id, b.id, "guest");
+    const { mailer, sent } = fakeMailer();
+    await processDueNotifications(pool, mailer, { baseUrl });
+    const mail = sent.find((m) => m.to === guest.email && m.subject.startsWith("Cancelled"))!;
+    expect(mail.text).not.toContain("Book another time");
+    expect(mail.text).not.toContain("?at=");
+  });
+
   it("a reminder already claimed for a booking that was cancelled is skipped at send time", async () => {
     const b = await book();
     // Simulate a cancellation that bypassed the queue update: the reminder stays queued.

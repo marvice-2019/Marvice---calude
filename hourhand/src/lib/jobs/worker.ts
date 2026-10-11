@@ -10,6 +10,8 @@ import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { MailError, type Mailer } from "../mail/mailer";
 import { renderBookingMail, renderCalendarAlert, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
 import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
+import { freeSlots } from "../booking";
+import { createPgStore } from "../data/pg-store";
 
 // Runs due rows of the notifications queue: emails, and writes to the host's calendar (Google or Microsoft). Several workers can run
 // at once: each claims rows with FOR UPDATE SKIP LOCKED and a lease (locked_until), so a row is never run by two
@@ -54,7 +56,7 @@ const CONTEXT = `
     prev.start_at as previous_start_at, prev.external_event_id as previous_event_id, prev.external_calendar_id as previous_calendar_id,
     prev.join_url as previous_join_url, prev.cancelled_by as previous_cancelled_by,
     i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.answers, i.manage_token, i.reminders_opt_out, i.running_late_minutes,
-    e.name as event_name,
+    e.name as event_name, e.slug as event_slug, e.kind as event_kind, e.active as event_active, b.event_type_id, u.slug as host_slug,
     (select p.amount_minor from payments p where p.booking_id = b.id and p.status in ('paid', 'refund_pending', 'refunded')
       order by p.created_at desc limit 1) as paid_minor,
     coalesce(u.name, '') as host_name, u.email as host_email, u.timezone as host_timezone, u.time_format as host_time_format,
@@ -98,6 +100,34 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
     manageUrl: `${baseUrl}/b/${r.manage_token as string}`, dashboardUrl: `${baseUrl}/dashboard/bookings/${r.id as string}`,
     runningLateMinutes: (r.running_late_minutes as number | null) ?? null,
   };
+}
+
+const REBOOK_DAYS = 21;
+
+/**
+ * When the host cancels, the guest's email offers the three free times nearest the one that was cancelled, each opening
+ * the booking page on that day. Worked out as of when the email was queued, so a retried send has the same body.
+ * None for a guest's own cancel, a one-off meeting (link only) or an event type that's switched off.
+ */
+async function rebookSuggestions(pool: pg.Pool, r: ContextRow, baseUrl: string): Promise<{ at: Date; url: string }[]> {
+  if (r.cancelled_by !== "host" || r.event_kind === "one_off" || !r.event_active || !r.host_slug || !r.event_slug) return [];
+  const store = createPgStore(pool);
+  const [host, eventType] = await Promise.all([store.getUser(r.host_id as string), store.getEventType(r.host_id as string, r.event_type_id as string)]);
+  if (!host || !eventType) return [];
+  const asOf = new Date(r.queued_at as Date);
+  let slots: Date[];
+  try {
+    slots = await freeSlots(store, host, eventType, asOf, new Date(asOf.getTime() + REBOOK_DAYS * 86_400_000), asOf);
+  } catch (error) {
+    // Suggestions are a nicety: the cancellation itself must still reach the guest.
+    console.error("rebook suggestions failed", { bookingId: r.id, error });
+    return [];
+  }
+  const target = new Date(r.start_at as Date).getTime();
+  // Not the time the host just cancelled: they can't make it.
+  return slots.filter((s) => s.getTime() !== target).sort((a, b) => Math.abs(a.getTime() - target) - Math.abs(b.getTime() - target)).slice(0, 3)
+    .sort((a, b) => a.getTime() - b.getTime())
+    .map((at) => ({ at, url: `${baseUrl}/${host.slug}/${eventType.slug}?at=${encodeURIComponent(at.toISOString())}` }));
 }
 
 const isCalendarJob = (kind: NotificationKind): kind is CalendarJobKind => kind.startsWith("calendar_") && kind !== "calendar_alert_host";
@@ -323,7 +353,10 @@ export async function processDueNotifications(
       } else {
         const mail = c.kind === "calendar_alert_host" ? await renderAlert(pool, c, opts.baseUrl)
           : c.kind === "renewal_reminder_host" ? await renderRenewal(pool, c, opts.baseUrl)
-          : renderBookingMail(c.kind as BookingEmailKind, toContext(r, opts.baseUrl));
+          : renderBookingMail(c.kind as BookingEmailKind, {
+            ...toContext(r, opts.baseUrl),
+            ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),
+          });
         if ("skip" in mail) { await skip(c, mail.skip); continue; }
         ({ id: providerId } = await mailer.send({ ...mail, to: c.recipient, idempotencyKey: `notification-${c.id}` }));
       }

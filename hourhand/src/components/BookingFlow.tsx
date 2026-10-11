@@ -21,15 +21,17 @@ interface Props {
   paid?: { price: string; hostName: string; eventName: string } | null;
   /** Booking through a single-use link: times and the booking go through the link, which is used up by the booking. */
   linkToken?: string;
+  /** Open the picker on this suggested time's day. */
+  initialAt?: string;
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
       <div hidden={picked !== null}>
-        <SlotPicker slug={slug} event={event} linkToken={linkToken} bookingWindowDays={bookingWindowDays} onPick={(slot, tz) => setPicked({ slot, tz })} />
+        <SlotPicker slug={slug} event={event} linkToken={linkToken} initialAt={initialAt} bookingWindowDays={bookingWindowDays} onPick={(slot, tz) => setPicked({ slot, tz })} />
       </div>
       {picked && (
         <DetailsForm

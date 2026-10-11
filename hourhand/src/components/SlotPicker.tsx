@@ -15,6 +15,8 @@ interface PickerProps {
   manageToken?: string;
   /** Booking through a single-use link: times come from the link's event type. */
   linkToken?: string;
+  /** Open on this time's day (an ISO instant), e.g. from a "book again" email suggestion. */
+  initialAt?: string;
   /** Called with the chosen slot (ISO instant) and the zone the guest was viewing times in. */
   onPick: (slot: string, tz: string) => void;
 }
@@ -35,7 +37,7 @@ const shift = ({ y, m }: Month, by: number): Month => ({ y: y + Math.floor((m + 
 const monthLabel = ({ y, m }: Month) => new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(Date.UTC(y, m, 1));
 
 /** Month calendar plus the open times of the chosen day, in a zone the guest can change. */
-export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkToken, onPick }: PickerProps) {
+export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkToken, initialAt, onPick }: PickerProps) {
   const detected = useSyncExternalStore(noSubscribe, detectZone, () => null);
   const [chosenZone, setChosenZone] = useState<string | null>(null);
   const tz = chosenZone ?? detected;
@@ -44,9 +46,12 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkTo
   const [month, setMonth] = useState<Month | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [day, setDay] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  // Until the guest picks a month or day themselves, a suggested time opens its own month and day.
+  const initial = initialAt && !Number.isNaN(Date.parse(initialAt)) && Date.parse(initialAt) > now.getTime() ? new Date(initialAt) : null;
+  const day = picked ?? (month === null && initial && tz ? dayKey(initial, tz) : null);
 
-  const shown = month ?? (tz ? monthOf(now, tz) : null);
+  const shown = month ?? (tz ? monthOf(initial ?? now, tz) : null);
   const firstMonth = tz ? monthOf(now, tz) : null;
   const lastMonth = tz ? monthOf(new Date(now.getTime() + bookingWindowDays * DAY), tz) : null;
   const sy = shown?.y;
@@ -87,7 +92,7 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkTo
   const failed = !loading && loaded?.slots === null;
   const canPrev = shown.y * 12 + shown.m > firstMonth.y * 12 + firstMonth.m;
   const canNext = shown.y * 12 + shown.m < lastMonth.y * 12 + lastMonth.m;
-  const goMonth = (by: number) => { setMonth(shift(shown, by)); setDay(null); };
+  const goMonth = (by: number) => { setMonth(shift(shown, by)); setPicked(null); };
   const zoneLabel = `Times shown in ${zoneName(tz)}${tz === detected ? " (your time)" : ""}`;
 
   const daysInMonth = new Date(Date.UTC(shown.y, shown.m + 1, 0)).getUTCDate();
@@ -121,7 +126,7 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkTo
               const open = byDay.has(k);
               return (
                 <button
-                  key={k} type="button" disabled={!open} onClick={() => setDay(k)} aria-pressed={day === k}
+                  key={k} type="button" disabled={!open} onClick={() => setPicked(k)} aria-pressed={day === k}
                   aria-label={`${formatDate(new Date(`${k}T12:00:00Z`), "UTC")}${open ? ", times available" : ", no times"}`}
                   className={`h-11 rounded-md text-sm ${focusRing} ${open ? "font-bold text-text hover:bg-surface" : "text-text-muted opacity-60"} ${day === k ? "bg-accent text-on-accent hover:bg-accent" : ""}`}
                 >
