@@ -5,6 +5,7 @@ import { queueRenewalReminders } from "../billing/reminders";
 import { purgeClosedAccounts } from "../data/account-lifecycle";
 import type { Mailer } from "../mail/mailer";
 import { processRefunds, reconcilePayments, type PaymentCheckDeps } from "../payments/booking-payments";
+import { reconcilePurchases } from "../packages/packages";
 import { setJobKick } from "./kick";
 import { BATCH_SIZE, processDueNotifications, type CalendarDeps } from "./worker";
 
@@ -48,6 +49,7 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
         // Its own catch: a payment check that fails must not hold up the emails below.
         if (opts.payments) await reconcilePayments({ pool: opts.pool, ...opts.payments }, new Date()).catch((error) => console.error("[jobs] payment check failed", error));
         if (opts.payments) await processRefunds({ pool: opts.pool, ...opts.payments }, new Date()).catch((error) => console.error("[jobs] refunds failed", error));
+        if (opts.payments) await reconcilePurchases({ pool: opts.pool, ...opts.payments }, new Date()).catch((error) => console.error("[jobs] package check failed", error));
         // A full batch means more may be due: keep going until a batch comes back short.
         for (;;) {
           const r = await processDueNotifications(opts.pool, opts.mailer, { baseUrl: opts.baseUrl, calendar: opts.calendar });

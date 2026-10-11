@@ -1,7 +1,8 @@
 // Razorpay's hosted Checkout, loaded only on the page that needs it. The guest pays the host's own Razorpay account;
 // the browser result is only a hint, and the server checks it with Razorpay before confirming anything.
 
-export interface CheckoutPayment { keyId: string; orderId: string; amount: number; currency: string; holdExpiresAt: string }
+/** holdExpiresAt is set for a booking (its slot is held until then); a package purchase has no hold. */
+export interface CheckoutPayment { keyId: string; orderId: string; amount: number; currency: string; holdExpiresAt?: string }
 export interface CheckoutResult { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }
 
 interface RazorpayInstance { open(): void }
@@ -35,7 +36,7 @@ export async function payWithRazorpay(payment: CheckoutPayment, info: { name: st
       key: payment.keyId, order_id: payment.orderId, amount: payment.amount, currency: payment.currency,
       name: info.name, description: info.description, prefill: info.prefill,
       // Checkout closes itself when the hold runs out, so nobody pays for a time that's no longer held.
-      timeout: Math.max(1, Math.floor((new Date(payment.holdExpiresAt).getTime() - Date.now()) / 1000)),
+      ...(payment.holdExpiresAt ? { timeout: Math.max(1, Math.floor((new Date(payment.holdExpiresAt).getTime() - Date.now()) / 1000)) } : {}),
       handler: (r: CheckoutResult) => resolve(r),
       modal: { ondismiss: () => resolve(null) },
     });

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { PackageUnavailableError } from "../packages/packages";
 import { datesInRange } from "../availability";
 import { overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
@@ -160,6 +161,8 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
         if (repeat.eventTypeId === input.eventTypeId && repeat.rescheduledFromId === null) return repeat;
         throw new RequestKeyConflictError();
       }
+      // Packages are paid through Razorpay, which needs Postgres; the demo data has none.
+      if (input.packageToken !== undefined) throw new PackageUnavailableError("not_found");
       const link = input.bookingLinkToken === undefined ? null : openLink(input.bookingLinkToken, input.eventTypeId, input.idempotencyKey);
       const booking = build(input, null);
       // A weekly series is built in full before any of it is saved, so a clash in a later week saves nothing.

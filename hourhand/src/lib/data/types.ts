@@ -183,6 +183,8 @@ export interface CreateBookingInput {
   bookingLinkToken?: string;
   /** Book the same time this many weeks running (2+), all or none. The returned booking is the first week. */
   weeks?: number;
+  /** Pay with a session package (its buyer's token): one credit per booking, checked and used in the same write. Postgres only. */
+  packageToken?: string;
   invitee: { name: string; email: string; timezone: string; phone: string | null; answers: InviteeAnswer[] };
 }
 

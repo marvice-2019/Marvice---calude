@@ -229,6 +229,29 @@ export function renderRenewalReminder(a: { planName: string; price: string; rene
   });
 }
 
+export interface PackageMailContext {
+  hostName: string; hostEmail: string; guestName: string; guestEmail: string; packageName: string; eventName: string;
+  sessions: number; priceMinor: number; expiresAt: Date; timezone: string; buyerUrl: string; dashboardUrl: string;
+}
+
+/** A paid session package: the buyer's private link to book their sessions, or the host's note of the sale. */
+export function renderPackageMail(kind: "package_guest" | "package_host", c: PackageMailContext): RenderedMail {
+  const until = formatDate(c.expiresAt, c.timezone);
+  const rows: Row[] = [["Package", c.packageName], ["Sessions", `${c.sessions} × ${c.eventName}`], ["Paid", formatMoney(c.priceMinor, "INR")], ["Book by", until]];
+  if (kind === "package_guest") {
+    return render(`Your ${c.sessions} sessions with ${c.hostName}`, {
+      heading: "Your package is ready", intro: `Hi ${c.guestName}, thanks for buying ${c.packageName}. Book your sessions any time before ${until}.`,
+      rows, link: { label: "Book your sessions", url: c.buyerUrl },
+      note: "Keep this email: the link is yours alone and shows how many sessions you have left. Cancel a session in time and you get it back.",
+      footer: `Sent by Hourhand for ${c.hostName}. Reply to this email to reach them.`,
+    }, { replyTo: c.hostEmail });
+  }
+  return render(`Package sold: ${c.guestName}, ${c.packageName}`, {
+    heading: "You sold a package", intro: `${c.guestName} <${c.guestEmail}> bought ${c.packageName}. The money went to your Razorpay account.`,
+    rows, link: { label: "Open in Hourhand", url: c.dashboardUrl }, footer: "Sent by Hourhand about your booking page.",
+  }, { replyTo: c.guestEmail });
+}
+
 export function renderMagicLink(url: string): RenderedMail {
   return render("Your Hourhand sign-in link", {
     heading: "Sign in to Hourhand", intro: "Use the button below to sign in. The link works once and expires in 15 minutes.",

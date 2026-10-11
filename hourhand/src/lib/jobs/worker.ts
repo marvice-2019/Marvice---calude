@@ -8,7 +8,7 @@ import type { InviteeAnswer, LocationKind } from "../data/types";
 import type { HourCycle } from "../format";
 import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { MailError, type Mailer } from "../mail/mailer";
-import { renderBookingMail, renderCalendarAlert, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
+import { renderBookingMail, renderCalendarAlert, renderPackageMail, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
 import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
 import { freeSlots } from "../booking";
 import { createPgStore } from "../data/pg-store";
@@ -290,6 +290,22 @@ async function renderRenewal(pool: pg.Pool, c: Claimed, baseUrl: string): Promis
   });
 }
 
+async function renderPackage(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
+  const m = /^purchase:([0-9a-f-]{36}):package_(guest|host)$/.exec(c.dedupe_key);
+  if (!m) return { skip: "not a package email" };
+  const { rows: [p] } = await pool.query(
+    `select p.guest_name, p.guest_email, p.sessions, p.price_minor, p.expires_at, p.token, p.status, k.name as package_name, e.name as event_name,
+       u.name as host_name, u.email as host_email, u.timezone
+     from package_purchases p join packages k on k.id = p.package_id join event_types e on e.id = p.event_type_id join users u on u.id = p.host_id
+     where p.id = $1`, [m[1]]);
+  if (!p || p.status !== "paid") return { skip: "package not paid" };
+  return renderPackageMail(c.kind as "package_guest" | "package_host", {
+    hostName: p.host_name, hostEmail: p.host_email, guestName: p.guest_name, guestEmail: p.guest_email, packageName: p.package_name, eventName: p.event_name,
+    sessions: p.sessions, priceMinor: p.price_minor, expiresAt: p.expires_at, timezone: p.timezone,
+    buyerUrl: `${baseUrl}/p/${p.token}`, dashboardUrl: `${baseUrl}/dashboard/packages`,
+  });
+}
+
 export async function processDueNotifications(
   pool: pg.Pool, mailer: Mailer, opts: { baseUrl: string; now?: Date; limit?: number; calendar?: CalendarDeps | null },
 ): Promise<WorkerResult> {
@@ -330,7 +346,7 @@ export async function processDueNotifications(
       continue;
     }
     // Host emails about their account rather than a booking.
-    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host";
+    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host";
     if (!isAccountMail) {
       if (!r?.id) { await skip(c, "booking no longer exists"); continue; }
       const why = skipReason(c.kind, r, now);
@@ -372,6 +388,7 @@ export async function processDueNotifications(
       } else {
         const mail = c.kind === "calendar_alert_host" ? await renderAlert(pool, c, opts.baseUrl)
           : c.kind === "renewal_reminder_host" ? await renderRenewal(pool, c, opts.baseUrl)
+          : c.kind === "package_guest" || c.kind === "package_host" ? await renderPackage(pool, c, opts.baseUrl)
           : renderBookingMail(c.kind as BookingEmailKind, {
             ...toContext(r, opts.baseUrl),
             ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),

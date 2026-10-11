@@ -3,6 +3,7 @@ import { datesInRange } from "../availability";
 import { kickJobs } from "../jobs/kick";
 import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
 import { queueBookingNotifications } from "./notifications";
+import { takeCredits } from "../packages/packages";
 import { hashLinkToken, newLinkToken } from "../links";
 import { checkOneOff, oneOffSlug } from "./one-off";
 import {
@@ -303,6 +304,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
       try {
         const id = await tx(async (client) => {
           const linkId = input.bookingLinkToken === undefined ? null : await takeLink(client, input, input.bookingLinkToken);
+          const weekStarts = Array.from({ length: input.weeks ?? 1 }, (_, i) => new Date(input.startAt.getTime() + i * WEEK));
+          const purchaseId = input.packageToken === undefined ? null : await takeCredits(client, input.packageToken, input.eventTypeId, weekStarts);
           const newId = await insertBooking(client, input, null, linkId);
           // A held booking says nothing yet: its emails and calendar write go out once the payment is confirmed.
           if (!input.holdUntil) await queueBookingNotifications(client, newId, "booked", new Date());
@@ -317,6 +320,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
               await queueBookingNotifications(client, weekId, "booked", new Date(), { confirm: false });
             }
           }
+          if (purchaseId) await client.query("update bookings set package_purchase_id = $2 where id = $1 or series_id = $1", [newId, purchaseId]);
           return newId;
         });
         kickJobs();

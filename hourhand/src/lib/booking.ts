@@ -1,4 +1,5 @@
 import type pg from "pg";
+import type { PackageUnavailableError } from "./packages/packages";
 import { computeOneOffSlots, computeSlots, isSyncStale } from "./slots";
 import { isNamedError, type Booking, type DataStore, type EventType, type LinkUnavailableError, type User } from "./data/types";
 import { BOOKING_LIMITS, type createRateLimiter } from "./rate-limit";
@@ -137,6 +138,8 @@ export interface BookingRequest {
   idempotencyKey: string;
   /** The same time this many weeks running; 1 = just this once. */
   weeks: number;
+  /** Paid for with a session package: its buyer's token. */
+  packageToken: string | null;
 }
 
 export type Validation = { ok: true; value: BookingRequest } | { ok: false; fields: Record<string, string> };
@@ -155,6 +158,8 @@ export function validateBookingRequest(input: unknown): Validation {
   const start = parseInstant(body.start);
   const idempotencyKey = str("idempotencyKey");
   const linkToken = str("linkToken");
+  const packageToken = str("packageToken");
+  if (packageToken.length > 100) fields.packageToken = "That package link isn't valid.";
   if (linkToken.length > 100) fields.linkToken = "That link isn't valid.";
   if (!linkToken && !str("slug")) fields.slug = "Required.";
   if (!linkToken && !str("event")) fields.event = "Required.";
@@ -183,7 +188,7 @@ export function validateBookingRequest(input: unknown): Validation {
   if (Object.keys(fields).length > 0 || !start) return { ok: false, fields };
   return {
     ok: true,
-    value: { slug: str("slug"), event: str("event"), linkToken: linkToken || null, start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey, weeks: weeks as number },
+    value: { slug: str("slug"), event: str("event"), linkToken: linkToken || null, start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey, weeks: weeks as number, packageToken: packageToken || null },
   };
 }
 
@@ -229,13 +234,15 @@ export async function handleCreateBooking(
   const found = await resolveTarget(store, req.slug, req.event, req.linkToken, now, req.idempotencyKey);
   if (isResult(found)) return found;
   const { host, eventType } = found;
+  if (req.packageToken && found.linkToken) return { status: 400, body: { error: "invalid_request", fields: { packageToken: "Use your package link or the single-use link, not both." } } };
   if (req.weeks > 1 && (req.weeks > eventType.maxRepeats || found.linkToken || eventType.priceMinor)) {
     return { status: 400, body: { error: "invalid_request", fields: { weeks: eventType.maxRepeats > 1 ? `Book up to ${eventType.maxRepeats} weeks at a time.` : "This event can't be repeated." } } };
   }
 
   // A repeated submit returns the booking it already made, before the slot re-check (which it would now fail).
   const existing = (await store.listBookings(host.id)).find((b) => b.idempotencyKey === req.idempotencyKey);
-  const priceMinor = eventType.priceMinor;
+  // Paid for with a package: no payment at booking, whatever the event type's price.
+  const priceMinor = req.packageToken ? null : eventType.priceMinor;
   // A priced repeat goes through startPaidBooking below instead, so a still-held booking gets its payment details back.
   if (existing && !priceMinor) return { status: 200, body: { bookingId: existing.id, manageToken: existing.invitee.manageToken } };
   // A priced repeat that is no longer waiting on payment: a confirmed one is simply returned (even if the host has since
@@ -253,6 +260,7 @@ export async function handleCreateBooking(
     eventTypeId: eventType.id, startAt: req.start, idempotencyKey: req.idempotencyKey, ...(req.weeks > 1 ? { weeks: req.weeks } : {}),
     // Used up in the same write as the booking (or its payment hold), so two guests on one link can't both book.
     ...(found.linkToken ? { bookingLinkToken: found.linkToken } : {}),
+    ...(req.packageToken ? { packageToken: req.packageToken } : {}),
     invitee: {
       name: req.name, email: req.email, timezone: req.timezone, phone: req.phone,
       answers: questions.filter((q) => req.answers[q.id]).map((q) => ({ questionId: q.id, label: q.label, answer: req.answers[q.id] })),
@@ -300,6 +308,7 @@ export async function handleCreateBooking(
     if (isNamedError(err, "LinkUsedError")) return linkRefusal("used");
     if (isNamedError<LinkUnavailableError>(err, "LinkUnavailableError")) return linkRefusal(err.status);
     if (isNamedError(err, "PaymentStartError")) return { status: 502, body: { error: "payment_unavailable" } };
+    if (isNamedError<PackageUnavailableError>(err, "PackageUnavailableError")) return { status: 409, body: { error: `package_${err.reason}` } };
     throw err;
   }
 }
