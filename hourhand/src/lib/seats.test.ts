@@ -106,6 +106,20 @@ describe.skipIf(!BASE)("Duo seat (Postgres)", () => {
     await removeSeat(pool, other.id);
   });
 
+  it("caps invitation emails per owner across addresses, and frees an address held by a stale invitation", async () => {
+    // "fresh@" above already counts today; two more fit, the fourth address is refused.
+    const at = (m: number) => new Date(now.getTime() + m * 60_000);
+    await inviteSeat(pool, other, "second@example.com", at(10));
+    await inviteSeat(pool, other, "third@example.com", at(11));
+    await expect(inviteSeat(pool, other, "fourth@example.com", at(12))).rejects.toMatchObject({ code: "too_many" });
+    await removeSeat(pool, other.id);
+    // A week-old invitation nobody accepted no longer blocks another owner.
+    await pool.query("insert into seats (owner_id, member_email, invited_at) values ($1, 'stale@example.com', $2)", [stranger.id, new Date(now.getTime() - 8 * 86_400_000)]);
+    await inviteSeat(pool, other, "stale@example.com", new Date(now.getTime() + 2 * 86_400_000));
+    expect((await pool.query("select owner_id from seats where member_email = 'stale@example.com'")).rows.map((r) => r.owner_id)).toEqual([other.id]);
+    await removeSeat(pool, other.id);
+  });
+
   it("ends at once when the owner's plan lapses, and comes back when it's paid again", async () => {
     await plan(owner, "duo", "cancelled");
     expect(await canActFor(pool, member.id, owner.id)).toBe(false);
