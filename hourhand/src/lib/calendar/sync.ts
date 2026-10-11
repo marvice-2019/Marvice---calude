@@ -49,7 +49,7 @@ export async function syncConnection(pool: pg.Pool, google: GoogleClient, key: B
       const blocks = new Map<string, { start: Date; end: Date }[]>(cals.map((c) => [c.id as string, []]));
       for (let start = from; start < until; start = new Date(start.getTime() + CHUNK_DAYS * DAY)) {
         const end = new Date(Math.min(until.getTime(), start.getTime() + CHUNK_DAYS * DAY));
-        const { busy, errors } = await google.freeBusy(token, cals.map((c) => c.external_id as string), start, end);
+        const { busy, errors } = await google.busy(token, cals.map((c) => c.external_id as string), start, end);
         if (errors.size > 0) {
           const [id, reason] = [...errors][0];
           throw new GoogleApiError(`Google could not read calendar ${id}: ${reason}`, { retryable: true, reason });

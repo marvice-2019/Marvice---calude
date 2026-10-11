@@ -46,7 +46,7 @@ function fakeGoogle() {
       return { accessToken: `at-${s.refreshes}`, expiresAt: new Date(Date.now() + 3600_000) };
     },
     async revoke(token: string) { s.revoked.push(token); },
-    async freeBusy(_t: string, ids: string[]) {
+    async busy(_t: string, ids: string[]) {
       if (s.failFreeBusy) throw s.failFreeBusy;
       if (s.duringFreeBusy) { const run = s.duringFreeBusy; s.duringFreeBusy = null; await run(); }
       const ok = ids.filter((id) => !s.freeBusyErrors.has(id));
@@ -56,8 +56,8 @@ function fakeGoogle() {
       if (s.failInsert) throw s.failInsert;
       if (s.insertGate) await s.insertGate;
       const id = eventIdFor(e.bookingId);
-      s.events.set(id, { calendarId, start: e.start, end: e.end, summary: e.summary, attendee: e.attendee.email, withMeet: e.withMeet });
-      return { id, joinUrl: e.withMeet ? meet(id) : null, conferencePending: false };
+      s.events.set(id, { calendarId, start: e.start, end: e.end, summary: e.summary, attendee: e.attendee.email, withMeet: e.conference === "google_meet" });
+      return { id, joinUrl: e.conference === "google_meet" ? meet(id) : null, conferencePending: false };
     },
     async getEvent(_t: string, _c: string, id: string) {
       return { id, joinUrl: s.events.get(id)?.withMeet ? meet(id) : null, conferencePending: false };
@@ -65,7 +65,7 @@ function fakeGoogle() {
     async moveEvent(_t: string, _c: string, id: string, start: Date, end: Date) {
       const e = s.events.get(id)!;
       s.events.set(id, { ...e, start, end });
-      return { id, joinUrl: e.withMeet ? meet(id) : null, conferencePending: false };
+      return { id, joinUrl: e.conference === "google_meet" ? meet(id) : null, conferencePending: false };
     },
     async deleteEvent(_t: string, _c: string, id: string) { s.events.delete(id); },
   };

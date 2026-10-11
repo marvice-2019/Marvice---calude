@@ -1,6 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { seal, unseal } from "../crypto/seal";
-import { REQUIRED_SCOPES } from "./google";
 
 // The "connect Google Calendar" handshake. Before sending the host to Google we put a sealed, short-lived cookie in
 // their browser holding a random state and the PKCE verifier, tied to their user id. The callback only goes ahead when
@@ -43,8 +42,5 @@ export function checkOAuthCallback(key: Buffer, cookie: string | undefined, stat
   return { ok: true, verifier: pending.verifier };
 }
 
-/** Google lets people untick permissions on the consent screen; every calendar permission is needed. */
-export function missingScopes(granted: string): string[] {
-  const have = new Set(granted.split(/\s+/));
-  return REQUIRED_SCOPES.filter((s) => !have.has(s));
-}
+/** Moved to the Google client; re-exported for existing callers. */
+export { missingScopes } from "./google";

@@ -170,7 +170,7 @@ async function runCalendarJob(pool: pg.Pool, deps: CalendarDeps, c: Claimed, r: 
     ].join("\n");
     let event = await deps.google.insertEvent(token, cal.externalId, {
       summary, description, start: ctx.startAt, end: ctx.endAt, timeZone: ctx.hostTimezone, location: where,
-      attendee: { email: ctx.guestEmail, name: ctx.guestName }, withMeet: r.booking_location_kind === "google_meet", bookingId: ctx.bookingId,
+      attendee: { email: ctx.guestEmail, name: ctx.guestName }, conference: r.booking_location_kind === "google_meet" ? "google_meet" : r.booking_location_kind === "teams" ? "teams" : null, bookingId: ctx.bookingId,
     });
     // Google creates Meet links asynchronously; give it a moment so the guest's confirmation can carry the link.
     for (let i = 0; i < 3 && event.conferencePending; i++) {

@@ -63,7 +63,7 @@ describe("google client", () => {
 
   it("reports a calendar Google couldn't read as an error, never as free", async () => {
     const f = fake([[200, { calendars: { a: { busy: [{ start: "2026-10-12T04:00:00Z", end: "2026-10-12T05:00:00Z" }] }, b: { errors: [{ reason: "notFound" }] } } }]]);
-    const r = await f.client.freeBusy("at", ["a", "b"], new Date("2026-10-11T00:00:00Z"), new Date("2026-10-20T00:00:00Z"));
+    const r = await f.client.busy("at", ["a", "b"], new Date("2026-10-11T00:00:00Z"), new Date("2026-10-20T00:00:00Z"));
     expect(r.busy.get("a")).toEqual([{ start: new Date("2026-10-12T04:00:00Z"), end: new Date("2026-10-12T05:00:00Z") }]);
     expect(r.busy.has("b")).toBe(false);
     expect(r.errors.get("b")).toBe("notFound");
@@ -71,7 +71,7 @@ describe("google client", () => {
 
   it("creates the event with a fixed id, no Google emails, and a Meet request; a retry that hits 409 reads the existing event", async () => {
     const input = { summary: "Coaching with Kiran", description: "d", start: new Date("2026-11-03T04:30:00Z"), end: new Date("2026-11-03T05:15:00Z"), timeZone: "Asia/Kolkata",
-      location: null, attendee: { email: "k@x.com", name: "Kiran" }, withMeet: true, bookingId: "0b7c2d1e-0000-4000-8000-00000000abcd" };
+      location: null, attendee: { email: "k@x.com", name: "Kiran" }, conference: "google_meet", bookingId: "0b7c2d1e-0000-4000-8000-00000000abcd" };
     const f = fake([[200, { id: eventIdFor(input.bookingId), hangoutLink: "https://meet.google.com/aaa-bbbb-ccc" }]]);
     const r = await f.client.insertEvent("at", "p@gmail.com", input);
     expect(r).toEqual({ id: "hh0b7c2d1e000040008000" + "00000000abcd", joinUrl: "https://meet.google.com/aaa-bbbb-ccc", conferencePending: false });

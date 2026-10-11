@@ -1,7 +1,8 @@
 import type pg from "pg";
 import { checkedCalendarLimit } from "../billing/account";
 import { seal, unseal } from "../crypto/seal";
-import { GoogleApiError, type GoogleCalendarEntry, type GoogleClient, type TokenSet } from "./google";
+import { GoogleApiError, type GoogleClient, type TokenSet } from "./google";
+import type { CalendarEntry } from "./provider";
 import { stopConnectionChannels } from "./push";
 
 // Stored Google connections. Tokens are sealed with TOKEN_ENCRYPTION_KEY and bound to their connection, so neither a
@@ -17,7 +18,7 @@ const aadFor = (userId: string, accountEmail: string) => `google:${userId}:${acc
  * Saves a new or renewed Google connection and its calendars. New connections check the primary calendar for conflicts
  * and use it for booked events, unless the host already has a calendar for booked events.
  */
-export async function saveGoogleConnection(pool: pg.Pool, key: Buffer, userId: string, tokens: TokenSet, calendars: GoogleCalendarEntry[], now: Date): Promise<string> {
+export async function saveGoogleConnection(pool: pg.Pool, key: Buffer, userId: string, tokens: TokenSet, calendars: CalendarEntry[], now: Date): Promise<string> {
   if (!tokens.email) throw new Error("Google did not say which account was connected");
   if (!tokens.refreshToken) throw new Error("Google did not return a refresh token");
   const creds: Credentials = { refreshToken: tokens.refreshToken, accessToken: tokens.accessToken, expiresAt: tokens.expiresAt.toISOString() };
