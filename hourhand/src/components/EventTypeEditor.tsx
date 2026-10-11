@@ -221,9 +221,12 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
         </div>
         <div>
           <Label htmlFor="f-location">Where you meet</Label>
-          <select id="f-location" value={form.locationKind} onChange={(e) => set("locationKind")(e.target.value)} className={`h-11 ${fieldClasses(false)}`}>
+          <select id="f-location" aria-describedby={form.locationKind === "teams" ? "f-location-hint" : undefined} value={form.locationKind} onChange={(e) => set("locationKind")(e.target.value)} className={`h-11 ${fieldClasses(false)}`}>
             {LOCATIONS.map((l) => <option key={l.kind} value={l.kind}>{l.label}</option>)}
           </select>
+          {form.locationKind === "teams" && (
+            <p id="f-location-hint" className="mt-1 text-sm text-text-muted">Teams links are created when bookings go to a work or school Outlook calendar.</p>
+          )}
         </div>
         {valueLabel && (
           <div>
