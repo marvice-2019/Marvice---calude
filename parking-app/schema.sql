@@ -99,9 +99,12 @@ CREATE TABLE bookings (
   period         tstzrange NOT NULL CHECK (upper(period) > lower(period)),
   status         booking_status NOT NULL DEFAULT 'pending_payment',
   base_paise     int NOT NULL,
+  discount_paise int NOT NULL DEFAULT 0 CHECK (discount_paise >= 0 AND discount_paise <= base_paise),
+  promo_code     varchar(20),                                  -- FK added after promo_codes is created
+  source         text NOT NULL DEFAULT 'prebook' CHECK (source IN ('prebook', 'park_now', 'monthly')),
   fee_paise      int NOT NULL,
   gst_paise      int NOT NULL,
-  total_paise    int GENERATED ALWAYS AS (base_paise + fee_paise + gst_paise) STORED,
+  total_paise    int GENERATED ALWAYS AS (base_paise - discount_paise + fee_paise + gst_paise) STORED,
   hold_expires_at timestamptz,                                 -- unpaid holds release after 10 min
   created_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -134,6 +137,30 @@ BEGIN
   RETURNING id INTO v_id;
   RETURN v_id;
 END $$;
+
+-- ---------- promo codes and favourites ----------
+CREATE TABLE promo_codes (
+  code            varchar(20) PRIMARY KEY CHECK (code = upper(code)),
+  percent_off     smallint NOT NULL CHECK (percent_off BETWEEN 1 AND 100),
+  max_off_paise   int NOT NULL CHECK (max_off_paise > 0),
+  first_booking_only boolean NOT NULL DEFAULT false,
+  weekend_only    boolean NOT NULL DEFAULT false,
+  valid           tstzrange NOT NULL DEFAULT tstzrange(now(), NULL),
+  max_uses        int,                          -- NULL = unlimited
+  used_count      int NOT NULL DEFAULT 0
+);
+-- Discount applies to parking (base) before GST; the platform fee is never discounted.
+ALTER TABLE bookings ADD CONSTRAINT bookings_promo_fk FOREIGN KEY (promo_code) REFERENCES promo_codes(code);
+
+CREATE TABLE favourite_lots (
+  user_id    uuid REFERENCES users(id) ON DELETE CASCADE,
+  lot_id     uuid REFERENCES lots(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, lot_id)
+);
+
+-- Drive-up "Park now": each lot has a short code printed on its entrance board.
+ALTER TABLE lots ADD COLUMN code varchar(10) UNIQUE CHECK (code ~ '^[A-Z]{3}[0-9]{3,4}$');
 
 -- ---------- money ----------
 CREATE TYPE payment_status AS ENUM ('created', 'authorized', 'captured', 'failed', 'refunded', 'partially_refunded');

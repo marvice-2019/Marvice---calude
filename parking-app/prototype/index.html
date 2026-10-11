@@ -131,6 +131,27 @@ svg .me{fill:var(--kerb);stroke:var(--ink);stroke-width:1.5}
 .steps{margin:0;padding-left:20px;display:grid;gap:8px}
 input[type=range]{accent-color:var(--sign);width:100%}
 
+.park-now{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--surface);border:2px dashed var(--kerb)}
+.park-now div{display:grid;gap:2px;min-width:0;flex:1 1 260px}
+.park-now span{color:var(--muted);font-size:14px}
+.park-now .btn{width:auto;padding-inline:22px}
+.favtoggle{display:flex;align-items:center;gap:6px;margin-right:8px}
+.favtoggle input{accent-color:var(--sign)}
+.chip.fav{color:var(--sign);border-color:var(--sign);font-weight:700}
+.lotcode{display:inline-block;font-family:var(--f-mono);font-size:13px;background:var(--kerb);color:#0F1B33;border-radius:4px;padding:1px 7px;letter-spacing:.04em}
+.headrow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;clear:both}
+.star{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 12px;font-weight:700}
+.star[aria-pressed="true"]{background:var(--sign);color:var(--on-sign);border-color:var(--sign)}
+.promo{display:flex;gap:8px}
+.promo input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:9px 10px;text-transform:uppercase}
+.promo button{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:0 14px;font-weight:700}
+.ok{color:var(--ok);font-size:13px;min-height:1em}
+.saved-note{font-size:13px;color:var(--muted);background:var(--bg);border-radius:6px;padding:8px 10px}
+.durs{display:flex;gap:8px;flex-wrap:wrap}
+.durs button{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:8px 14px;font-weight:700}
+.durs button[aria-pressed="true"]{background:var(--sign);color:var(--on-sign);border-color:var(--sign)}
+.near{display:grid;gap:8px}
+.near button{display:flex;justify-content:space-between;gap:10px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 84px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:700;z-index:60}
 
 nav.bottom{display:none}
@@ -178,9 +199,14 @@ nav.bottom{display:none}
         </div></div>
     </form>
     <div class="err" id="search-err" role="alert"></div>
+    <div class="park-now">
+      <div><b>Already at the gate?</b><span>Type the lot code from the signboard and pay for the hours you need. No booking needed.</span></div>
+      <button class="btn" id="pn-open" type="button">Park now</button>
+    </div>
     <div class="results-head">
       <h1 id="rhead">Parking near MG Road</h1>
-      <div class="sort"><label for="sort">Sort by</label>
+      <div class="sort"><label class="favtoggle"><input type="checkbox" id="favonly"> Saved lots only</label>
+        <label for="sort">Sort by</label>
         <select id="sort"><option value="dist">Nearest</option><option value="price">Lowest price</option><option value="left">Most spots left</option></select></div>
     </div>
     <div class="find-grid">
@@ -260,7 +286,8 @@ const LOTS = [
   {id:"L8",name:"Airport Long-Stay P4",area:"Devanahalli",x:207,y:24,car:60,bike:25,cap:450,monthly:0,left:120,type:"Open surface",covered:false,ev:true,h24:true,hours:"Open 24 hours"}
 ];
 
-const S = {area:"mg", veh:"car", sort:"dist", sel:null, arrive:null, leave:null, view:"find"};
+LOTS.forEach((l,i)=>l.code="BLR"+(101+i)); // code printed on each lot's entrance board
+const S = {favOnly:false, area:"mg", veh:"car", sort:"dist", sel:null, arrive:null, leave:null, view:"find"};
 const $ = s => document.querySelector(s);
 const inr = n => "₹" + Math.round(n).toLocaleString("en-IN");
 const pad = n => String(n).padStart(2,"0");
@@ -272,12 +299,25 @@ function store(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(
 
 /* ---------- pricing ---------- */
 // Hourly rate per started hour, capped at 8x rate per 24h block. GST 18% on parking + platform fee.
-function quote(lot, veh, a, b){
+// Promo discount comes off the parking amount before GST; the platform fee is never discounted.
+function quote(lot, veh, a, b, promo){
   const rate = veh==="bike" ? lot.bike : lot.car, dayCap = rate*8;
   let hrs = Math.max(1, Math.ceil((b-a)/36e5)), base = 0;
   for(let left=hrs; left>0; left-=24) base += Math.min(Math.min(left,24)*rate, dayCap);
-  const gst = Math.round((base+FEE)*GST);
-  return {hrs, rate, base, fee:FEE, gst, total:base+FEE+gst};
+  const disc = promo ? Math.min(Math.round(base*promo.pct), promo.cap) : 0;
+  const gst = Math.round((base-disc+FEE)*GST);
+  return {hrs, rate, base, disc, code:promo?promo.code:"", fee:FEE, gst, total:base-disc+FEE+gst};
+}
+const PROMOS = {
+  FIRST50:  {pct:.5, cap:100, label:"50% off parking, up to ₹100, on your first booking", ok:()=>!bookings.some(b=>!b.example)},
+  WEEKEND20:{pct:.2, cap:200, label:"20% off parking for Saturday and Sunday arrivals", ok:a=>[0,6].includes(new Date(a).getDay())}
+};
+function findPromo(raw, a){
+  const code=raw.trim().toUpperCase(), p=PROMOS[code];
+  if(!code) return {err:""};
+  if(!p) return {err:`${code} isn't a valid code. Check the spelling, or try FIRST50.`};
+  if(!p.ok(a)) return {err: code==="FIRST50" ? "FIRST50 works on your first booking only." : "WEEKEND20 works only when you arrive on a Saturday or Sunday."};
+  return {promo:{...p, code}};
 }
 function dist(l){const a=AREAS.find(x=>x.id===S.area);return Math.hypot(l.x-a.x,l.y-a.y)*KM_PER_UNIT}
 
@@ -304,7 +344,7 @@ function readTimes(){
 }
 
 function sorted(){
-  const arr=LOTS.map(l=>({l,d:dist(l),q:quote(l,S.veh,S.arrive,S.leave)}));
+  const arr=LOTS.filter(l=>!S.favOnly||favs.has(l.id)).map(l=>({l,d:dist(l),q:quote(l,S.veh,S.arrive,S.leave)}));
   const k={dist:(a,b)=>a.d-b.d,price:(a,b)=>a.q.total-b.q.total,left:(a,b)=>b.l.left-a.l.left}[S.sort];
   return arr.sort(k);
 }
@@ -312,13 +352,15 @@ function renderFind(){
   const area=AREAS.find(a=>a.id===S.area);
   const hrs=quote(LOTS[0],S.veh,S.arrive,S.leave).hrs;
   $("#rhead").textContent=`${S.veh==="bike"?"Bike":"Car"} parking near ${area.name} · ${hrs} h`;
-  $("#list").innerHTML=sorted().map(({l,d,q})=>`
+  const rows=sorted();
+  if(!rows.length){$("#list").innerHTML=`<div class="empty">No saved lots yet. Open a lot and tap Save to keep it here for next time.</div>`;renderMap();return}
+  $("#list").innerHTML=rows.map(({l,d,q})=>`
     <button class="lot" data-lot="${l.id}" aria-current="${S.sel===l.id}">
       <span class="p-sign" aria-hidden="true">P</span>
       <span style="min-width:0">
         <h3>${esc(l.name)}</h3>
-        <div class="meta">${esc(l.area)} · ${d.toFixed(1)} km · ${esc(l.type)}</div>
-        <div class="chips">${l.covered?'<span class="chip">Covered</span>':''}${l.ev?'<span class="chip ev">EV charging</span>':''}<span class="chip">${esc(l.hours)}</span></div>
+        <div class="meta"><span class="lotcode">${l.code}</span> ${esc(l.area)} · ${d.toFixed(1)} km · ${esc(l.type)}</div>
+        <div class="chips">${favs.has(l.id)?'<span class="chip fav">★ Saved</span>':''}${l.covered?'<span class="chip">Covered</span>':''}${l.ev?'<span class="chip ev">EV charging</span>':''}<span class="chip">${esc(l.hours)}</span></div>
         <div class="left ${l.left<10?'low':''}">${l.left<10?`Only ${l.left} spots left`:`${l.left} spots left`}</div>
       </span>
       <span class="price"><b class="num">${inr(q.total)}</b><span>total incl. GST</span><br><span class="num">${inr(q.rate)}/hr</span></span>
@@ -354,53 +396,104 @@ function closeSheet(){$("#sheet").hidden=true;$("#scrim").hidden=true}
 $("#scrim").onclick=closeSheet;
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#sheet").hidden)closeSheet()});
 
-function billHTML(q){return `<div class="bill num">
+function billHTML(q){return `<div class="bill num" id="bill">
   <div><span>Parking · ${q.hrs} h at ${inr(q.rate)}/hr${q.base<q.hrs*q.rate?' (daily cap applied)':''}</span><span>${inr(q.base)}</span></div>
+  ${q.disc?`<div style="color:var(--ok)"><span>Promo ${esc(q.code)}</span><span>−${inr(q.disc)}</span></div>`:''}
   <div><span>Platform fee</span><span>${inr(q.fee)}</span></div>
   <div><span>GST 18%</span><span>${inr(q.gst)}</span></div>
   <div class="tot"><span>Total</span><span>${inr(q.total)}</span></div></div>`}
 
-function openLot(id){
+// opt.now = drive-up "Park now": starts this minute for opt.hrs hours.
+function openLot(id, opt={}){
   S.sel=id; renderFind();
-  const l=LOTS.find(x=>x.id===id), q=quote(l,S.veh,S.arrive,S.leave);
+  const l=LOTS.find(x=>x.id===id);
+  const a=opt.now?new Date(Math.floor(Date.now()/6e4)*6e4):S.arrive, b=opt.now?new Date(+a+opt.hrs*36e5):S.leave;
+  let promo=null, q=quote(l,S.veh,a,b);
+  const p=profile();
   openSheet(`<button class="close" data-close>Close</button>
-    <span class="tag" style="color:var(--sign)">${esc(l.type)}</span>
+    <span class="tag" style="color:var(--sign)">${opt.now?"Park now":esc(l.type)}</span>
     <h2 id="sheet-title">${esc(l.name)}</h2>
-    <div style="color:var(--muted)">${esc(l.area)} · ${dist(l).toFixed(1)} km from ${esc(AREAS.find(a=>a.id===S.area).name)}</div>
+    <div class="headrow"><span style="color:var(--muted)"><span class="lotcode">${l.code}</span> ${esc(l.area)} · ${dist(l).toFixed(1)} km</span>
+      <button class="star" id="star" type="button" aria-pressed="${favs.has(l.id)}">${favs.has(l.id)?"★ Saved":"☆ Save lot"}</button></div>
     <dl class="kv">
-      <dt>Arrive</dt><dd>${fmt(S.arrive)}</dd><dt>Leave</dt><dd>${fmt(S.leave)}</dd>
+      <dt>${opt.now?"Starts":"Arrive"}</dt><dd>${opt.now?"Now · "+a.toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit"}):fmt(a)}</dd><dt>Leave</dt><dd>${fmt(b)}</dd>
       <dt>Vehicle</dt><dd>${S.veh==="bike"?"Two-wheeler":"Car"}</dd><dt>Timings</dt><dd>${esc(l.hours)}</dd>
       <dt>Spots left</dt><dd class="num">${l.left} of ${l.cap}</dd>
       <dt>Facilities</dt><dd>${[l.covered&&"Covered",l.ev&&"EV charging","CCTV","Attendant"].filter(Boolean).join(", ")}</dd>
     </dl>
     ${billHTML(q)}
     <form id="co" class="stack" novalidate>
-      <div class="field"><label for="vno">Vehicle number</label><input id="vno" autocomplete="off" placeholder="KA 01 AB 1234" style="text-transform:uppercase"></div>
-      <div class="field"><label for="mob">Mobile for WhatsApp pass</label><input id="mob" inputmode="numeric" maxlength="10" placeholder="98765 43210"></div>
+      ${p?`<div class="saved-note">Filled from your last booking. Edit anything that changed.</div>`:''}
+      <div class="field"><label for="vno">Vehicle number</label><input id="vno" autocomplete="off" placeholder="KA 01 AB 1234" style="text-transform:uppercase" value="${p?esc(p.vno):''}"></div>
+      <div class="field"><label for="mob">Mobile for WhatsApp pass</label><input id="mob" inputmode="numeric" maxlength="10" placeholder="98765 43210" value="${p?esc(p.mob):''}"></div>
+      <div class="field"><label for="promo">Promo code</label>
+        <div class="promo"><input id="promo" autocomplete="off" placeholder="FIRST50"><button type="button" id="promo-apply">Apply</button></div>
+        <div class="err" id="promo-err" role="alert"></div><div class="ok" id="promo-ok" role="status"></div></div>
       <div class="sec-h">Pay with</div>
       <div class="pay">
-        <label><input type="radio" name="pm" value="UPI" checked> UPI (GPay, PhonePe, Paytm)</label>
-        <label><input type="radio" name="pm" value="Card"> Debit or credit card</label>
-        <label><input type="radio" name="pm" value="Netbanking"> Netbanking</label>
+        ${["UPI|UPI (GPay, PhonePe, Paytm)","Card|Debit or credit card","Netbanking|Netbanking"].map(s=>{const [v,t]=s.split("|");
+          return `<label><input type="radio" name="pm" value="${v}" ${(p?p.pm:"UPI")===v?"checked":""}> ${t}</label>`}).join("")}
       </div>
       <div class="err" id="co-err" role="alert"></div>
-      <button class="btn" type="submit">Pay ${inr(q.total)} and get pass</button>
-      <div style="font-size:12px;color:var(--muted)">Free cancellation until your arrival time. Overstay is charged at ${inr(q.rate)}/hr at exit.</div>
+      <button class="btn" type="submit" id="paybtn">Pay ${inr(q.total)} and get pass</button>
+      <div style="font-size:12px;color:var(--muted)">${opt.now?"Pass is live as soon as you pay. Show it at the gate or give your plate to the attendant.":"Free cancellation until your arrival time."} Overstay is charged at ${inr(q.rate)}/hr at exit.</div>
     </form>`);
   $("#sheet [data-close]").onclick=closeSheet;
-  $("#co").onsubmit=e=>{e.preventDefault();checkout(l,q)};
+  $("#star").onclick=()=>{toggleFav(l.id);const on=favs.has(l.id);$("#star").setAttribute("aria-pressed",on);$("#star").textContent=on?"★ Saved":"☆ Save lot";renderFind()};
+  $("#promo-apply").onclick=()=>{
+    const r=findPromo($("#promo").value,a);
+    $("#promo-err").textContent=r.err||""; promo=r.promo||null; q=quote(l,S.veh,a,b,promo);
+    $("#promo-ok").textContent=promo?`${promo.code} applied: ${promo.label}. You save ${inr(q.disc)}.`:"";
+    $("#bill").outerHTML=billHTML(q); $("#paybtn").textContent=`Pay ${inr(q.total)} and get pass`;
+  };
+  $("#co").onsubmit=e=>{e.preventDefault();checkout(l,q,a,b)};
 }
 
 const VNO=/^[A-Z]{2}\s?\d{1,2}\s?[A-Z]{0,3}\s?\d{4}$|^\d{2}\s?BH\s?\d{4}\s?[A-Z]{1,2}$/;
-function checkout(l,q){
+function checkout(l,q,a,b){
   const v=$("#vno").value.trim().toUpperCase(), m=$("#mob").value.replace(/\D/g,""), err=$("#co-err");
   if(!VNO.test(v)){err.textContent="Enter a valid number plate, for example KA 01 AB 1234 or 22 BH 1234 AB.";return}
   if(!/^[6-9]\d{9}$/.test(m)){err.textContent="Enter a 10-digit Indian mobile number starting with 6, 7, 8 or 9.";return}
   const id="BL-"+Math.random().toString(36).slice(2,7).toUpperCase();
   const pm=document.querySelector("input[name=pm]:checked").value;
-  bookings.unshift({id,lot:l.id,veh:S.veh,vno:v,arrive:+S.arrive,leave:+S.leave,total:q.total,pm,example:false});
-  save(); closeSheet(); go("passes"); toast(`Booked. Pass ${id} is ready.`);
+  bookings.unshift({id,lot:l.id,veh:S.veh,vno:v,mob:m,arrive:+a,leave:+b,total:q.total,promo:q.code,pm,example:false});
+  store("bayline.profile",{vno:v,mob:m,pm});
+  save(); closeSheet(); go("passes"); toast(`Paid. Pass ${id} sent to WhatsApp +91 ${m.slice(0,5)} ${m.slice(5)}.`);
 }
+
+/* ---------- saved profile + favourites ---------- */
+function profile(){return store("bayline.profile")}
+const favs=new Set(store("bayline.favs")||[]);
+function toggleFav(id){favs.has(id)?favs.delete(id):favs.add(id);store("bayline.favs",[...favs])}
+
+/* ---------- park now (drive-up) ---------- */
+function openParkNow(){
+  let hrs=2;
+  const near=LOTS.map(l=>({l,d:dist(l)})).sort((x,y)=>x.d-y.d).slice(0,3);
+  openSheet(`<button class="close" data-close>Close</button>
+    <span class="tag" style="color:var(--sign)">Park now</span>
+    <h2 id="sheet-title">Pay at the lot</h2>
+    <p style="color:var(--muted);margin:4px 0 0">The lot code is on the yellow board at the entrance.</p>
+    <form id="pn" class="stack" novalidate>
+      <div class="field"><label for="pn-code">Lot code</label><input id="pn-code" class="mono" autocomplete="off" placeholder="BLR101" style="text-transform:uppercase"></div>
+      <div class="sec-h" style="margin:0">Or pick a lot near ${esc(AREAS.find(x=>x.id===S.area).name)}</div>
+      <div class="near">${near.map(({l,d})=>`<button type="button" data-near="${l.code}"><span><span class="lotcode">${l.code}</span> ${esc(l.name)}</span><span class="num" style="color:var(--muted)">${d.toFixed(1)} km</span></button>`).join("")}</div>
+      <div class="sec-h" style="margin:0">How long?</div>
+      <div class="durs" role="group" aria-label="Duration">${[1,2,3,4,8].map(h=>`<button type="button" data-h="${h}" aria-pressed="${h===hrs}">${h} h</button>`).join("")}</div>
+      <div class="err" id="pn-err" role="alert"></div>
+      <button class="btn" type="submit">Continue to pay</button>
+    </form>`);
+  $("#sheet [data-close]").onclick=closeSheet;
+  document.querySelectorAll("[data-near]").forEach(btn=>btn.onclick=()=>{$("#pn-code").value=btn.dataset.near});
+  document.querySelectorAll("[data-h]").forEach(btn=>btn.onclick=()=>{hrs=+btn.dataset.h;document.querySelectorAll("[data-h]").forEach(x=>x.setAttribute("aria-pressed",x===btn))});
+  $("#pn").onsubmit=e=>{e.preventDefault();
+    const code=$("#pn-code").value.replace(/[\s-]/g,"").toUpperCase(), l=LOTS.find(x=>x.code===code);
+    if(!l){$("#pn-err").textContent=code?`No lot with code ${code}. Check the board at the entrance, or pick a lot above.`:"Enter the lot code, or pick a lot above.";return}
+    openLot(l.id,{now:true,hrs});
+  };
+}
+$("#pn-open").onclick=openParkNow;
+$("#favonly").onchange=e=>{S.favOnly=e.target.checked;renderFind()};
 
 /* ---------- passes ---------- */
 let bookings = store("bayline.bookings") || [];
@@ -426,7 +519,8 @@ function renderPasses(){
       <div class="pb"><span class="status ${st[1]}">${st[0]}</span>
       <canvas data-code="${b.id}" aria-label="Entry code for ${b.id}"></canvas>
       <dl class="kv" style="margin:0"><dt>Pass</dt><dd class="mono">${b.id}</dd><dt>Vehicle</dt><dd class="mono">${esc(b.vno)}</dd>
-      <dt>From</dt><dd>${fmt(new Date(b.arrive))}</dd><dt>Until</dt><dd>${fmt(new Date(b.leave))}</dd><dt>Paid</dt><dd class="num">${inr(b.total)} · ${b.pm}</dd></dl>
+      <dt>From</dt><dd>${fmt(new Date(b.arrive))}</dd><dt>Until</dt><dd>${fmt(new Date(b.leave))}</dd><dt>Paid</dt><dd class="num">${inr(b.total)} · ${b.pm}${b.promo?` · ${esc(b.promo)}`:''}</dd>
+      ${b.mob?`<dt>Sent to</dt><dd class="num">WhatsApp +91 ${esc(b.mob.slice(0,5))} ${esc(b.mob.slice(5))}</dd>`:''}</dl>
       <div class="row2">${now<b.leave?`<button class="btn" data-ext="${b.id}">Extend 1 hour</button>`:''}${now<b.arrive?`<button class="btn ghost" data-cancel="${b.id}">Cancel free</button>`:''}</div></div></article>`}).join("");
   el.querySelectorAll("canvas").forEach(c=>drawCode(c,c.dataset.code));
   el.querySelectorAll("[data-ext]").forEach(btn=>btn.onclick=()=>{const b=bookings.find(x=>x.id===btn.dataset.ext),l=LOTS.find(x=>x.id===b.lot);

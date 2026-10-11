@@ -99,10 +99,10 @@ Praise is rare and is about the location of the lot, not the app.
 
 ## What the Bayline prototype is still missing
 
-1. **"Park now".** Drive-up pay by lot or zone number, with no pre-booking.
-2. **Saved vehicle and card for returning drivers.** The prototype asks for the plate every time.
-3. **Guest purchase linked to a phone number.** The pass should survive account creation.
-4. **Favourites ("Park here again")** and promo codes. The schema also needs a `promo_codes` table.
+1. ✅ Done 11 Oct. **"Park now".** Drive-up pay by lot or zone number, with no pre-booking.
+2. ✅ Done 11 Oct. **Saved vehicle, mobile and payment method for returning drivers.**
+3. ✅ Done 11 Oct. **Guest purchase linked to a phone number.** Each pass records the WhatsApp number it was sent to.
+4. ✅ Done 11 Oct. **Favourites and promo codes** (FIRST50, WEEKEND20), plus `promo_codes` and `favourite_lots` tables in the schema.
 5. **Directions hand-off to Google Maps** and an expiry alert 15 minutes before the end.
 6. **Venue and event search** (metro stations, stadiums, hospitals).
 7. **Live lot status** set by operator staff (gate down, lot full, entrance closed).
