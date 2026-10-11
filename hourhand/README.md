@@ -40,12 +40,12 @@ TEST_DATABASE_URL=postgres://user@localhost:5432/hourhand_test npm run test
 
 Sign-in uses [Better Auth](https://www.better-auth.com) and needs `HOURHAND_DATA=postgres`. In memory mode there are no accounts: the dashboard opens as the demo host and `/sign-in` says so.
 
-- **Email magic link:** `/sign-in` emails a one-time link that expires after 15 minutes. Until mail is wired up (round B3), the link is printed to the server log as `[dev] magic link for …` in development. In production, a missing `RESEND_API_KEY` makes sending fail loudly. `HOURHAND_MAIL_TO_LOG=1` lets a production build print the link instead; it exists only for end-to-end tests and must never be set on a real deployment.
+- **Email magic link:** `/sign-in` emails a one-time link that expires after 15 minutes. It goes out through Resend straight away (not through the queue). Without `RESEND_API_KEY` in development, the link is printed to the server log as `[dev] magic link for …`. In production, a missing `RESEND_API_KEY` stops the server from starting. `HOURHAND_MAIL_TO_LOG=1` lets a production build print the link instead; it exists only for end-to-end tests and must never be set on a real deployment.
 - **Google:** the button appears only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set. Add `https://<your-domain>/api/auth/callback/google` (and `http://localhost:3000/api/auth/callback/google` for local work) as a redirect URI in the Google Cloud console.
 - **Sessions:** an httpOnly, SameSite=Lax cookie, `Secure` on https. Every dashboard page and server action checks the session itself through `requireUser()` in `src/lib/auth/session.ts`; there is no middleware-only check. Settings has "Sign out of all devices".
 - **Ownership:** every data-layer method that touches a host's records takes that host's id and enforces it in the query. Another host's record reads as "not found".
 - **Rate limits:** sign-in links are limited to 3 per email and 10 per address every 10 minutes (sign-in page), and Better Auth limits its own endpoints (5 link requests per address per 10 minutes) in production. Counts are kept in memory, which fits one web container.
-- **Deleting an account:** Settings → Delete your account (type your email to confirm). Links stop at once, upcoming bookings are cancelled, every session ends and the account can't sign back in. `npm run db:purge-deleted` permanently removes accounts closed more than 30 days ago; run it nightly (round B3 moves it into the job queue).
+- **Deleting an account:** Settings → Delete your account (type your email to confirm). Links stop at once, upcoming bookings are cancelled, every session ends and the account can't sign back in. The job runner permanently deletes accounts closed more than 30 days ago, checking every hour; `npm run db:purge-deleted` does the same by hand. Guests of the cancelled bookings get a cancellation email.
 - **New hosts** get a booking-link slug from their name or email (`src/lib/auth/slug.ts`).
 
 Environment variables for sign-in:
@@ -57,12 +57,23 @@ Environment variables for sign-in:
 | `HOURHAND_ALLOW_MEMORY` | `1` only for a public demo. A production server refuses `HOURHAND_DATA=memory` (no sign-in) without it |
 | `BETTER_AUTH_SECRET` | signing sessions; a long random string (`openssl rand -hex 32`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in (optional) |
-| `RESEND_API_KEY`, `EMAIL_FROM` | sending sign-in links (round B3) |
+| `RESEND_API_KEY`, `EMAIL_FROM` | sending email. `EMAIL_FROM` is a sender on your verified Resend domain, for example `Hourhand <bookings@mail.hourhand.app>`. **Required in production** |
+| `HOURHAND_WORKER` | `0` to run a server without the job runner (only if another process runs it) |
+
+## Email and jobs
+
+Booking emails are queued in the `notifications` table inside the same transaction as the booking change, so a booking never exists without its emails (and a failed booking sends none). A job runner inside the server process (`src/instrumentation.ts`, Postgres mode only) sends them:
+
+- **What is sent:** the guest's confirmation (with a calendar file) and the host's notice on booking; reminders to the guest 24 hours and 1 hour before (only those still in the future when booked); "moved" emails on a reschedule; cancellation emails to both on a cancel. When a host closes their account, only the guests are emailed.
+- **When:** a booking change wakes the runner at once; otherwise it checks every 15 seconds.
+- **Retries:** a temporary failure (rate limit, Resend outage, network) is retried after 1, 5, 30 and 120 minutes. After 5 attempts, or on a permanent error such as a rejected address, the row ends as `failed` with `last_error`. That is the dead-letter log: `select kind, recipient, last_error from notifications where status = 'failed'`.
+- **Never twice:** each row is claimed with `FOR UPDATE SKIP LOCKED` and a 5-minute lease, and its id is sent to Resend as the idempotency key, so several servers can run the runner and a crash mid-send does not email twice.
+- **Never stale:** a reminder for a cancelled or already-started booking, or any booking email after the meeting has ended, is skipped and recorded as `skipped` with the reason.
 
 ## What is fake today
 
 - **Calendar sync:** none. Busy times and the sync status come from the seed.
-- **Email:** sign-in links go to the server log until round B3.
+- **Email in development:** without `RESEND_API_KEY`, every email is printed to the server log instead of sent.
 - **Payments, WhatsApp, Microsoft and iCloud calendars:** not wired up. They will need: `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`.
 
 ## Layout

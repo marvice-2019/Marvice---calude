@@ -146,3 +146,40 @@ describe("request key message", () => {
     expect(validateBookingRequest({ ...good("2026-10-20T05:30:00.000Z"), idempotencyKey: "short" })).toMatchObject({ fields: { idempotencyKey: "Request key must be 8–100 characters." } });
   });
 });
+
+/** Slots at least three hours apart, so test bookings never overlap each other. */
+async function spacedSlots(store: ReturnType<typeof fresh>): Promise<string[]> {
+  const out: string[] = [];
+  for (const s of await firstSlots(store)) if (!out.length || new Date(s).getTime() - new Date(out.at(-1)!).getTime() >= 3 * 3_600_000) out.push(s);
+  return out;
+}
+
+describe("booking rate limits", () => {
+  it("refuses an 11th new booking from one address within the hour, but never a repeated submit", async () => {
+    const { createRateLimiter } = await import("./rate-limit");
+    const store = fresh();
+    const slots = await spacedSlots(store);
+    const limit = { clientKey: "203.0.113.7", limiter: createRateLimiter(() => now.getTime()) };
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      const res = await handleCreateBooking(store, { ...good(slots[i], `key-limit-${i}-abcd`), email: `g${i}@example.com` }, now, limit);
+      statuses.push(res.status);
+    }
+    expect(statuses.slice(0, 10).every((s) => s === 201)).toBe(true);
+    expect(statuses[10]).toBe(429);
+    const repeat = await handleCreateBooking(store, { ...good(slots[0], "key-limit-0-abcd"), email: "g0@example.com" }, now, limit);
+    expect(repeat.status).toBe(200);
+  });
+
+  it("refuses a 6th booking for one guest email within the hour, from any address", async () => {
+    const { createRateLimiter } = await import("./rate-limit");
+    const store = fresh();
+    const slots = await spacedSlots(store);
+    const limiter = createRateLimiter(() => now.getTime());
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      statuses.push((await handleCreateBooking(store, good(slots[i], `key-mail-${i}-abcd`), now, { clientKey: `198.51.100.${i}`, limiter })).status);
+    }
+    expect(statuses).toEqual([201, 201, 201, 201, 201, 429]);
+  });
+});

@@ -1,4 +1,4 @@
-// Permanently removes accounts closed more than 30 days ago. Run nightly (round B3 moves this into the job queue).
+// Permanently removes accounts closed more than 30 days ago. The job runner does this every hour; this script is for running it by hand.
 // Usage: DATABASE_URL=postgres://… node scripts/purge-deleted.ts
 import pg from "pg";
 import { purgeClosedAccounts } from "../src/lib/data/account-lifecycle.ts";

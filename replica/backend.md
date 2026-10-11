@@ -7,7 +7,7 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 | B1 | Postgres data layer: migrations, `PgStore` behind `DataStore`, seed, second-host isolation tests | **done** (2026-10-11) |
 | B2a | Better Auth: email magic link, Google sign-in (switched on by env), httpOnly sessions, sign out everywhere | **done** (2026-10-11) |
 | B2b | Ownership checks in the nine data methods without a user id, account deletion, rate limits on sign-in | **done** (2026-10-11) |
-| B3 | Email (Resend) and pg-boss jobs: confirmation and reminder emails, retries, dead-letter log | not started |
+| B3 | Email (Resend) and the job queue: confirmation, reminder, reschedule and cancellation emails, retries, dead-letter log, hourly purge, booking rate limits | **done** (2026-10-11) |
 | B4 | Google Calendar: free/busy, writing booked events, push channels and incremental sync, sync health | not started |
 | B5 | Payments in test mode: Razorpay (INR) and Stripe (USD), Checkout and portal, signed and deduplicated webhooks | not started |
 | later | Microsoft Graph, iCloud CalDAV, WhatsApp Cloud API, DLT SMS, Zoom | not started |
@@ -19,6 +19,9 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Scripts run on Node 22's built-in TypeScript support** (`node scripts/migrate.ts`), not tsx. Scripts use explicit `.ts` relative imports and `import type`, never `@/` aliases.
 - **Rescheduling cancels the old booking, then inserts the new one, in one transaction.** The exclusion constraint is not deferrable, so inserting first would reject moving a booking by less than its own length. If the insert fails, the old booking stays confirmed.
 - **Slugs are case-insensitive** in Postgres (`citext`).
+- **No pg-boss: the `notifications` table is the queue.** The schema already had it, with a dedupe key per email. Rows are queued in the same transaction as the booking change (outbox pattern), claimed with `FOR UPDATE SKIP LOCKED` and a 5-minute lease, retried with backoff, and left as `failed` with `last_error` when they run out (the dead-letter log). One less dependency and one less set of tables to run and back up.
+- **The job runner lives in the web process** (`src/instrumentation.ts`), not a separate service: one container on the VPS, and a booking wakes it at once so confirmations go out in under a second. It is safe to run on several servers; `HOURHAND_WORKER=0` turns it off on a server.
+- **Resend's idempotency key is the notification id**, so a crash between sending and recording the send can't email anyone twice (Resend drops the repeat for 24 hours).
 - **Double booking is impossible at the database.** The `no_double_booking` exclusion constraint is the guard. The app maps its violation to "slot taken" with the next free slots.
 
 ## B1 evidence (2026-10-11, Postgres 16.15)
@@ -60,6 +63,16 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Open (medium, needs production):** check what `x-forwarded-for` looks like behind Coolify's Traefik for IPv6 and (if used) Cloudflare. If IPv6 visitors arrive as a Docker gateway address, the per-address limits would treat them all as one; set `TRUSTED_PROXIES` to the Traefik container's address only.
 - **Follow-ups (low):** a booking or a session created in the same instant as an account closes can survive; the dashboard is still blocked, and B3's emails reach those guests.
 
+## B3 evidence (2026-10-11, Postgres 16.15, production build)
+
+- 163 tests pass with `TEST_DATABASE_URL` set (136 without; 27 Postgres tests skip). Migration 0003 applies on top of 0002.
+- **Queue, against Postgres:** a booking queues the guest confirmation, the host notice and the 24-hour and 1-hour reminders in its own transaction; due rows are sent once; reminders go out when due; a temporary failure is retried 4 times and then ends as `failed`; a permanent error fails at once; cancelling queues both cancellation emails and stops the reminders; rescheduling sends "moved" emails and stops the old reminders; closing an account emails only the guests; three workers at once send each email exactly once; a row held by a dead worker is picked up after its lease.
+- **Negative tests** (fix set aside, test fails): without `SKIP LOCKED`, the parallel-workers test sends duplicates; notifying the host on their own account closure, keeping reminders on cancel, dropping the send-time cancel check and retrying permanent errors each fail their test; removing the booking rate limit fails both limit tests.
+- **Templates:** guest input is escaped in HTML, subjects stay on one line, host emails never contain the guest's manage link, each side sees their own time zone.
+- **Resend contract:** the request carries the key, the idempotency key and Resend's field names (`reply_to`, `content_type`); 429, 409 and 5xx are retried, other 4xx are not; the key never appears in an error. Checked against Resend's API reference (send-email and errors pages, read 2026-10-11). **Not yet sent for real**: needs your `RESEND_API_KEY` and verified domain.
+- **End to end on a production build:** the runner starts with the server; a booking's confirmation reached the (log) mailer 0.2 s after the booking; the host notice, the manage link, the queue state, the guest cancellation, both cancellation emails and the skipped reminders all check out (10 of 10). Sign-in (15 of 15) and B2b (12 of 12) pass again.
+- **Booking rate limits:** 10 new bookings per client address and 5 per guest email per hour, because every booking now sends email to the address the form gives. A repeated submit is never refused.
+
 ## Things only you can do (start the slow ones this week)
 
 | Task | Lead time | Needed for |
@@ -93,6 +106,7 @@ RESEND_API_KEY=
 EMAIL_FROM=
 HOURHAND_MAIL_TO_LOG=
 HOURHAND_ALLOW_MEMORY=
+HOURHAND_WORKER=
 TRUSTED_PROXIES=
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
@@ -109,7 +123,7 @@ Rounds after B1 add their variables here as they land.
 - [ ] secrets only in env vars, nothing in client bundles. All env files except the example are git-ignored since B1
 - [ ] input validated on the server on every route (booking and manage routes: done in the fake-data rounds; host actions: done)
 - [x] authorisation checked on every read and write, tested with a second user (B2b closed the nine-method gap). B1: every data method that takes a user id is tested against a second host (Arun) and returns nothing. **Open:** nine methods take no user id (`listEventLocations`, `listCustomQuestions`, `cancelBooking`, `rescheduleBooking`, `saveWeeklyHours`, `saveDateOverride`, `deleteDateOverride`, `blockDateRange`, `saveQuestions`) and rely on the caller's ownership check; B2 adds that check with the session. Calendar list methods filter by user but have no second-host test yet
-- [ ] rate limits on auth, sign up, and anything that sends email or SMS (sign-in: done in B2b; booking and slot endpoints, email and SMS sends: still to do)
+- [ ] rate limits on auth, sign up, and anything that sends email or SMS (sign-in: done in B2b; new bookings, which send email: done in B3; slot endpoint and SMS: still to do)
 - [ ] webhooks verify signatures and dedupe on `webhook_events`
 - [ ] uploads: size and type limits, served from a separate bucket or domain (avatars only)
 - [ ] no user data in URLs or logs (manage links use an opaque token, not an email)
