@@ -4,7 +4,7 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 
 | Round | Scope | Status |
 | --- | --- | --- |
-| B1 | Postgres data layer: migrations, `PgStore` behind `DataStore`, seed, second-host isolation tests | in progress |
+| B1 | Postgres data layer: migrations, `PgStore` behind `DataStore`, seed, second-host isolation tests | **done** (2026-10-11) |
 | B2 | Better Auth: email magic link, Google sign-in, httpOnly sessions, sign out everywhere, account deletion | not started |
 | B3 | Email (Resend) and pg-boss jobs: confirmation and reminder emails, retries, dead-letter log | not started |
 | B4 | Google Calendar: free/busy, writing booked events, push channels and incremental sync, sync health | not started |
@@ -15,7 +15,17 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 
 - **Plain SQL through `pg`, not Drizzle.** `replica/schema.sql` is already tested on Postgres 16, and the TypeScript types already exist in `src/lib/data/types.ts`. An ORM would mean keeping a second copy of the schema in sync. Migrations are numbered `.sql` files applied by `scripts/migrate.ts` and tracked in `schema_migrations`.
 - **Store selection is explicit.** `HOURHAND_DATA=memory|postgres`. If `postgres` is chosen without `DATABASE_URL`, the app refuses to start. It never falls back silently to memory.
+- **Scripts run on Node 22's built-in TypeScript support** (`node scripts/migrate.ts`), not tsx. Scripts use explicit `.ts` relative imports and `import type`, never `@/` aliases.
+- **Rescheduling cancels the old booking, then inserts the new one, in one transaction.** The exclusion constraint is not deferrable, so inserting first would reject moving a booking by less than its own length. If the insert fails, the old booking stays confirmed.
+- **Slugs are case-insensitive** in Postgres (`citext`).
 - **Double booking is impossible at the database.** The `no_double_booking` exclusion constraint is the guard. The app maps its violation to "slot taken" with the next free slots.
+
+## B1 evidence (2026-10-11, Postgres 16.15)
+
+- 93 tests pass with `TEST_DATABASE_URL` set (83 without; the 10 Postgres tests skip).
+- Two simultaneous bookings for one slot: exactly one wins. With the exclusion-violation mapping removed, 3 tests fail.
+- A second host sees none of Priya's event types, bookings or schedules. With the user filter removed from one read, the isolation test fails.
+- End to end with `HOURHAND_DATA=postgres`: slots 200, book 201, retry 200 same booking, same slot 409, reschedule 201, retry 200, cancel 200, unknown link 404, dashboards 200.
 
 ## Things only you can do (start the slow ones this week)
 
@@ -60,9 +70,9 @@ Rounds after B1 add their variables here as they land.
 
 ## Security checklist
 
-- [ ] secrets only in env vars, `.env*` in `.gitignore`, nothing in client bundles
+- [ ] secrets only in env vars, nothing in client bundles. All env files except the example are git-ignored since B1
 - [ ] input validated on the server on every route (booking and manage routes: done in the fake-data rounds; host actions: done)
-- [ ] authorisation checked on every read and write, tested with a second user (B1 tests the data layer; B2 wires the session in)
+- [ ] authorisation checked on every read and write, tested with a second user. B1: every data method that takes a user id is tested against a second host (Arun) and returns nothing. **Open:** nine methods take no user id (`listEventLocations`, `listCustomQuestions`, `cancelBooking`, `rescheduleBooking`, `saveWeeklyHours`, `saveDateOverride`, `deleteDateOverride`, `blockDateRange`, `saveQuestions`) and rely on the caller's ownership check; B2 adds that check with the session. Calendar list methods filter by user but have no second-host test yet
 - [ ] rate limits on auth, sign up, and anything that sends email or SMS
 - [ ] webhooks verify signatures and dedupe on `webhook_events`
 - [ ] uploads: size and type limits, served from a separate bucket or domain (avatars only)
