@@ -13,7 +13,7 @@ import type { Plan } from "../billing/plans";
 import { handleConfirmPayment } from "./confirm-handler";
 import { keyPairAuth } from "./host-razorpay";
 import { razorpayOrders } from "./razorpay-orders";
-import { applyCapturedPayment, confirmPayment, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, processRefunds, reconcilePayments, startPaidBooking } from "./booking-payments";
+import { applyCapturedPayment, bookingPayment, confirmPayment, HOLD_MINUTES, PaymentStartError, PaymentVerifyError, processRefunds, reconcilePayments, startPaidBooking } from "./booking-payments";
 
 const BASE = process.env.TEST_DATABASE_URL;
 const auth = keyPairAuth("rzp_test_abcdefgh12", "k");
@@ -231,6 +231,13 @@ describe.skipIf(!BASE)("paid bookings (Postgres)", () => {
     expect((await payment(r.booking.id))[0]).toMatchObject({ status: "refund_pending", provider_payment_id: pay.id, paid_at: expect.any(Date) });
     expect(await applyCapturedPayment(pool, r.booking.id, pay.id, new Date())).toBe("refund_pending");
   });
+  it("a host sees the payment on their own booking, and nobody else's", async () => {
+    const r = await startPaidBooking({ pool, store, auth, orders: fakeRazorpay().orders }, input(), new Date());
+    expect(await bookingPayment(pool, r.booking.hostId, r.booking.id)).toMatchObject({ status: "pending" });
+    const arun = (await store.getUserBySlug("arun"))!;
+    expect(await bookingPayment(pool, arun.id, r.booking.id)).toBeNull();
+  });
+
   it("closing the host's account releases a held booking (checked inside a rolled-back transaction)", async () => {
     const fake = fakeRazorpay();
     const r = await startPaidBooking({ pool, store, auth, orders: fake.orders }, input(), new Date());

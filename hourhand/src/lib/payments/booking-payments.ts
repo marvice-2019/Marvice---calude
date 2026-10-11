@@ -290,3 +290,12 @@ export async function processRefunds(deps: PaymentCheckDeps & { pool: pg.Pool },
   }
   return result;
 }
+
+export interface BookingPaymentSummary { amountMinor: number; status: "pending" | "paid" | "failed" | "refunded" | "refund_pending"; lastError: string | null }
+
+/** The latest payment on one of the host's own bookings, for the host's dashboard. Another host's booking reads as null. */
+export async function bookingPayment(db: Pick<pg.Pool, "query">, hostId: string, bookingId: string): Promise<BookingPaymentSummary | null> {
+  const { rows: [p] } = await db.query(
+    `select amount_minor, status, last_error from payments where booking_id = $1 and host_id = $2 order by created_at desc limit 1`, [bookingId, hostId]);
+  return p ? { amountMinor: p.amount_minor, status: p.status, lastError: p.last_error } : null;
+}
