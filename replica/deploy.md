@@ -80,7 +80,11 @@ Generate the two random values on your own machine with `openssl rand -hex 32` (
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | from Entra (section 6) | for Outlook and Sign in with Microsoft |
 | `TRUSTED_PROXIES` | leave unset (defaults cover Coolify's Docker network) | no |
 
-Never set `HOURHAND_ALLOW_MEMORY`, `HOURHAND_MAIL_TO_LOG`, `HOURHAND_E2E`, `GOOGLE_API_BASE_URL` or `RAZORPAY_API_BASE_URL` in production; they exist for local testing only.
+Never set `HOURHAND_ALLOW_MEMORY`, `HOURHAND_MAIL_TO_LOG`, `HOURHAND_E2E`, `GOOGLE_API_BASE_URL`, `RAZORPAY_API_BASE_URL`, `MICROSOFT_LOGIN_BASE_URL`, `MICROSOFT_GRAPH_BASE_URL` or `ICLOUD_CALDAV_URL` in production; they exist for local testing only.
+
+iCloud calendars need no server keys: each host connects with their own Apple ID and app-specific password, sealed with `TOKEN_ENCRYPTION_KEY`.
+
+**Batches A–C (2026-10-11):** migrations now run to `0020` (0019 is skipped on purpose); the container applies them on start, as before. No new required variables. Monthly earnings emails, waitlist emails, Duo invitations and waitlist cleanup run inside the existing job runner. Profile photos are stored in Postgres (up to 2 MB each), so they are in your database backups.
 
 ## 6. Microsoft Entra (for B6: Outlook, Teams links, Sign in with Microsoft)
 
