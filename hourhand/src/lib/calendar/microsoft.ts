@@ -2,6 +2,7 @@
 // school and personal Microsoft accounts can connect. Endpoints are injectable so tests and the end-to-end run can
 // point at a fake Microsoft.
 
+import { TZDate } from "@date-fns/tz";
 import {
   CalendarApiError, type BusyRange, type CalendarEntry, type CalendarProvider, type EventInput, type EventResult, type RefreshedToken, type TokenSet,
 } from "./provider";
@@ -113,10 +114,12 @@ export function microsoftClient(opts: { clientId: string; clientSecret: string; 
     if (res.ok || o.okStatuses?.includes(res.status)) return { status: res.status, body };
     const code = body.error?.code ?? null;
     const message = `Microsoft ${method} ${url.pathname} ${res.status} ${code ?? ""}: ${body.error?.message ?? ""}`.trim();
+    // A 401 can be transient (clock skew near expiry, a CAE claims challenge, replication lag), so it retries with a
+    // fresh token. Only a removed permission is final here; a dead grant shows up as invalid_grant at the token endpoint.
     throw new MicrosoftApiError(message, {
       status: res.status, reason: code,
-      retryable: res.status === 429 || res.status >= 500,
-      revoked: res.status === 401 || code === "InvalidAuthenticationToken" || (res.status === 403 && code === "ErrorAccessDenied"),
+      retryable: res.status === 401 || res.status === 429 || res.status >= 500,
+      revoked: res.status === 403 && code === "ErrorAccessDenied",
     });
   }
 
@@ -181,45 +184,56 @@ export function microsoftClient(opts: { clientId: string; clientSecret: string; 
     },
 
     async listCalendars(accessToken): Promise<CalendarEntry[]> {
-      type Cal = { id: string; name?: string; isDefaultCalendar?: boolean; canEdit?: boolean; allowedOnlineMeetingProviders?: string[] };
-      const out: CalendarEntry[] = [];
+      type Cal = { id: string; name?: string; isDefaultCalendar?: boolean; canEdit?: boolean; allowedOnlineMeetingProviders?: string[]; owner?: { address?: string } };
+      const cals: Cal[] = [];
       let next: string | undefined = "/me/calendars";
       let query: Record<string, string> | undefined = { $select: "id,name,isDefaultCalendar,canEdit,allowedOnlineMeetingProviders,owner" };
       while (next) {
         const { body }: { body: { value?: Cal[]; "@odata.nextLink"?: string } } = await api(accessToken, "GET", next, { query });
-        for (const c of body.value ?? []) {
-          out.push({
-            id: c.id, name: c.name ?? c.id, primary: c.isDefaultCalendar === true, accessRole: c.canEdit ? "owner" : "reader",
-            teams: (c.allowedOnlineMeetingProviders ?? []).includes("teamsForBusiness"),
-          });
-        }
+        cals.push(...(body.value ?? []));
         next = body["@odata.nextLink"];
         query = undefined; // the next link already carries the query
       }
-      return out;
+      // canEdit is also true for a calendar someone shared with edit rights; only the host's own calendars take bookings.
+      const me = cals.find((c) => c.isDefaultCalendar)?.owner?.address?.toLowerCase();
+      const own = (c: Cal) => c.isDefaultCalendar === true || (!!me && c.owner?.address?.toLowerCase() === me);
+      return cals.map((c) => ({
+        id: c.id, name: c.name ?? c.id, primary: c.isDefaultCalendar === true,
+        accessRole: c.canEdit ? (own(c) ? "owner" : "writer") : "reader",
+        teams: (c.allowedOnlineMeetingProviders ?? []).includes("teamsForBusiness"),
+      }));
     },
 
     /**
      * Busy ranges per calendar, from each calendar's view (getSchedule doesn't work for personal accounts). A calendar
      * Graph won't let us read goes in `errors`; an expired token, a rate limit or an outage fails the whole call.
      */
-    async busy(accessToken, calendarIds, timeMin, timeMax) {
-      type Ev = { start: { dateTime: string }; end: { dateTime: string }; showAs?: string; isCancelled?: boolean };
+    async busy(accessToken, calendarIds, timeMin, timeMax, busyOpts) {
+      type Ev = { start: { dateTime: string }; end: { dateTime: string }; showAs?: string; isCancelled?: boolean; isAllDay?: boolean };
+      // An all-day event is a date, not an instant: with the UTC Prefer header Graph returns it as UTC midnight to
+      // midnight. It blocks the host's own day, so its dates are read as midnight in the host's zone.
+      const zone = busyOpts?.timeZone;
+      const at = (t: { dateTime: string }, allDay: boolean) => {
+        if (!allDay || !zone) return parseGraphUtc(t);
+        const [y, m, d] = t.dateTime.slice(0, 10).split("-").map(Number);
+        return new Date(new TZDate(y, m - 1, d, zone).getTime());
+      };
       const busy = new Map<string, BusyRange[]>();
       const errors = new Map<string, string>();
       for (const id of calendarIds) {
         const ranges: BusyRange[] = [];
         let next: string | undefined = `/me/calendars/${encodeURIComponent(id)}/calendarView`;
         let query: Record<string, string> | undefined = {
-          startDateTime: timeMin.toISOString(), endDateTime: timeMax.toISOString(), $select: "start,end,showAs,isCancelled", $top: "200",
+          startDateTime: timeMin.toISOString(), endDateTime: timeMax.toISOString(), $select: "start,end,showAs,isCancelled,isAllDay", $top: "200",
         };
         try {
           while (next) {
             const { body }: { body: { value?: Ev[]; "@odata.nextLink"?: string } } =
               await api(accessToken, "GET", next, { query, headers: { prefer: 'outlook.timezone="UTC"' } });
             for (const e of body.value ?? []) {
-              if (e.isCancelled || e.showAs === "free" || e.showAs === "workingElsewhere") continue;
-              ranges.push({ start: parseGraphUtc(e.start), end: parseGraphUtc(e.end) });
+              if (e.isCancelled || e.showAs === "free") continue;
+              const allDay = e.isAllDay === true;
+              ranges.push({ start: at(e.start, allDay), end: at(e.end, allDay) });
             }
             next = body["@odata.nextLink"];
             query = undefined;
@@ -233,15 +247,19 @@ export function microsoftClient(opts: { clientId: string; clientSecret: string; 
       return { busy, errors };
     },
 
-    /** `transactionId` = the booking id: Graph won't create a second event for a retried create with the same one. */
+    /**
+     * `transactionId` = the booking id: Graph won't create a second event for a retried create with the same one.
+     * No `attendees`: Graph can't create, move or delete an event without mailing them, and that invitation would carry
+     * the host-only description. Hourhand emails the guest itself; the guest's name and email go in the body instead.
+     */
     async insertEvent(accessToken, calendarId, e: EventInput): Promise<EventResult> {
       const teams = e.conference === "teams";
+      const content = e.description.includes(e.attendee.email) ? e.description : `Guest: ${e.attendee.name} <${e.attendee.email}>\n\n${e.description}`;
       const { body } = await api<GraphEvent>(accessToken, "POST", eventPath(calendarId), {
         body: {
-          subject: e.summary, body: { contentType: "text", content: e.description },
+          subject: e.summary, body: { contentType: "text", content },
           start: graphTime(e.start), end: graphTime(e.end),
           ...(e.location ? { location: { displayName: e.location } } : {}),
-          attendees: [{ emailAddress: { address: e.attendee.email, name: e.attendee.name }, type: "required" }],
           transactionId: e.bookingId,
           ...(teams ? { isOnlineMeeting: true, onlineMeetingProvider: "teamsForBusiness" } : {}),
         },

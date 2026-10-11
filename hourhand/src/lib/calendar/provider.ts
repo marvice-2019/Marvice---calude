@@ -63,8 +63,11 @@ export interface CalendarProvider {
   /** Scopes from `granted` (space-separated) that Hourhand needs but the user didn't grant. */
   missingScopes(granted: string): string[];
   listCalendars(accessToken: string): Promise<CalendarEntry[]>;
-  /** Busy times per calendar id. A calendar that can't be read goes in `errors` instead of failing the whole call. */
-  busy(accessToken: string, calendarIds: string[], timeMin: Date, timeMax: Date): Promise<{ busy: Map<string, BusyRange[]>; errors: Map<string, string> }>;
+  /**
+   * Busy times per calendar id. A calendar that can't be read goes in `errors` instead of failing the whole call.
+   * `timeZone` (IANA, the host's) places all-day events on the host's day where the provider returns them as floating dates.
+   */
+  busy(accessToken: string, calendarIds: string[], timeMin: Date, timeMax: Date, opts?: { timeZone?: string }): Promise<{ busy: Map<string, BusyRange[]>; errors: Map<string, string> }>;
   insertEvent(accessToken: string, calendarId: string, e: EventInput): Promise<EventResult>;
   getEvent(accessToken: string, calendarId: string, eventId: string): Promise<EventResult>;
   moveEvent(accessToken: string, calendarId: string, eventId: string, start: Date, end: Date, timeZone: string, summary: string): Promise<EventResult>;

@@ -112,13 +112,23 @@ describe("microsoft client: Graph", () => {
     expect(header(f.calls[1], "authorization")).toBe("Bearer at");
   });
 
+  it("makes only the host's own editable calendars owner; one shared with edit rights is writer", async () => {
+    const f = fake([[200, { value: [
+      { id: "S", name: "Team", canEdit: true, owner: { address: "boss@contoso.com" } },
+      { id: "A", name: "Calendar", isDefaultCalendar: true, canEdit: true, owner: { address: "Me@contoso.com" } },
+      { id: "B", name: "Side", canEdit: true, owner: { address: "me@contoso.com" } },
+      { id: "R", name: "Read-only", canEdit: false, owner: { address: "me@contoso.com" } },
+    ] }]]);
+    expect((await f.client.listCalendars("at")).map((c) => [c.id, c.accessRole])).toEqual([["S", "writer"], ["A", "owner"], ["B", "owner"], ["R", "reader"]]);
+  });
+
   it("won't send the token to a next page outside Graph", async () => {
     const f = fake([[200, { value: [], "@odata.nextLink": "https://evil.test/steal" }]]);
     await expect(f.client.listCalendars("at")).rejects.toBeInstanceOf(MicrosoftApiError);
     expect(f.calls).toHaveLength(1);
   });
 
-  it("reads busy times in UTC, skips free, working-elsewhere and cancelled events, and pages", async () => {
+  it("reads busy times in UTC, skips only free and cancelled events (working elsewhere blocks), and pages", async () => {
     const f = fake([
       [200, { value: [
         { start: { dateTime: "2026-10-12T09:00:00.0000000", timeZone: "UTC" }, end: { dateTime: "2026-10-12T10:00:00.0000000", timeZone: "UTC" }, showAs: "busy", isCancelled: false },
@@ -131,15 +141,27 @@ describe("microsoft client: Graph", () => {
     const r = await f.client.busy("at", ["A"], new Date("2026-10-11T00:00:00Z"), new Date("2026-10-20T00:00:00Z"));
     expect(r.busy.get("A")).toEqual([
       { start: new Date("2026-10-12T09:00:00Z"), end: new Date("2026-10-12T10:00:00Z") },
+      { start: new Date("2026-10-12T15:00:00Z"), end: new Date("2026-10-12T16:00:00Z") },
       { start: new Date("2026-10-13T08:30:00Z"), end: new Date("2026-10-13T09:00:00Z") },
     ]);
     expect(r.errors.size).toBe(0);
     const q = f.calls[0].url.searchParams;
     expect(f.calls[0].url.pathname).toBe("/v1.0/me/calendars/A/calendarView");
-    expect(Object.fromEntries(q)).toEqual({ startDateTime: "2026-10-11T00:00:00.000Z", endDateTime: "2026-10-20T00:00:00.000Z", $select: "start,end,showAs,isCancelled", $top: "200" });
+    expect(Object.fromEntries(q)).toEqual({ startDateTime: "2026-10-11T00:00:00.000Z", endDateTime: "2026-10-20T00:00:00.000Z", $select: "start,end,showAs,isCancelled,isAllDay", $top: "200" });
     expect(header(f.calls[0], "prefer")).toBe('outlook.timezone="UTC"');
     expect(header(f.calls[1], "prefer")).toBe('outlook.timezone="UTC"');
     expect(f.calls[1].url.searchParams.get("$skiptoken")).toBe("p2");
+  });
+
+  it("places an all-day event on the host's day in their time zone, not on the UTC day", async () => {
+    const allDay = { start: { dateTime: "2026-11-03T00:00:00.0000000", timeZone: "UTC" }, end: { dateTime: "2026-11-04T00:00:00.0000000", timeZone: "UTC" }, showAs: "oof", isAllDay: true };
+    const window = [new Date("2026-11-01T00:00:00Z"), new Date("2026-11-10T00:00:00Z")] as const;
+    const f = fake([[200, { value: [allDay] }], [200, { value: [allDay] }]]);
+    expect((await f.client.busy("at", ["A"], ...window, { timeZone: "Asia/Kolkata" })).busy.get("A"))
+      .toEqual([{ start: new Date("2026-11-02T18:30:00Z"), end: new Date("2026-11-03T18:30:00Z") }]);
+    // No zone known: the dates stay as Graph sent them.
+    expect((await f.client.busy("at", ["A"], ...window)).busy.get("A"))
+      .toEqual([{ start: new Date("2026-11-03T00:00:00Z"), end: new Date("2026-11-04T00:00:00Z") }]);
   });
 
   it("reports a calendar Graph won't let us read as an error while the others still return", async () => {
@@ -155,13 +177,15 @@ describe("microsoft client: Graph", () => {
     expect(r.errors.get("gone")).toBe("ErrorItemNotFound");
   });
 
-  it("fails the whole busy call on a rate limit (retryable) or an expired grant (revoked)", async () => {
+  it("fails the whole busy call on a rate limit or a rejected token, both retryable: a Graph 401 never disconnects", async () => {
     const window = [new Date("2026-10-11T00:00:00Z"), new Date("2026-10-20T00:00:00Z")] as const;
     const rate = await fake([[200, { value: [] }], [429, { error: { code: "TooManyRequests" } }]]).client.busy("at", ["A", "B"], ...window).catch((e) => e);
     expect(rate).toBeInstanceOf(MicrosoftApiError);
     expect(rate).toMatchObject({ retryable: true, revoked: false, status: 429 });
     const auth = await fake([[401, { error: { code: "InvalidAuthenticationToken", message: "Access token has expired." } }]]).client.busy("at", ["A"], ...window).catch((e) => e);
-    expect(auth).toMatchObject({ revoked: true, retryable: false });
+    expect(auth).toMatchObject({ revoked: false, retryable: true, status: 401 });
+    const bare = await fake([[401, ""]]).client.listCalendars("at").catch((e) => e);
+    expect(bare).toMatchObject({ revoked: false, retryable: true });
     const outage = await fake([[503, "<html>"]]).client.busy("at", ["A"], ...window).catch((e) => e);
     expect(outage).toMatchObject({ retryable: true });
   });
@@ -171,6 +195,17 @@ describe("microsoft client: Graph", () => {
     expect(await fake([[504, {}]]).client.listCalendars("at").catch((e) => e)).toMatchObject({ revoked: false, retryable: true });
   });
 
+  it("creates an event with no attendees, so Outlook mails the guest nothing; the guest is named in the body", async () => {
+    const f = fake([[201, { id: "AAMk3" }], [201, { id: "AAMk4" }]]);
+    await f.client.insertEvent("at", "A", input);
+    const body = JSON.parse(f.calls[0].init.body as string);
+    expect(body).not.toHaveProperty("attendees");
+    expect(body.body.content).toBe("Guest: Kiran <k@x.com>\n\nNotes");
+    // A description that already names the guest is sent as it is.
+    await f.client.insertEvent("at", "A", { ...input, description: "Kiran (k@x.com) booked" });
+    expect(JSON.parse(f.calls[1].init.body as string).body.content).toBe("Kiran (k@x.com) booked");
+  });
+
   it("creates a Teams event in UTC with the booking id as transactionId and returns the join link", async () => {
     const f = fake([[201, { id: "AAMk1", isOnlineMeeting: true, onlineMeeting: { joinUrl: "https://teams.microsoft.com/l/meetup-join/x" } }]]);
     const r = await f.client.insertEvent("at", "A", { ...input, location: "Room 4" });
@@ -178,10 +213,9 @@ describe("microsoft client: Graph", () => {
     expect(f.calls[0].init.method).toBe("POST");
     expect(f.calls[0].url.pathname).toBe("/v1.0/me/calendars/A/events");
     expect(JSON.parse(f.calls[0].init.body as string)).toEqual({
-      subject: "Coaching with Kiran", body: { contentType: "text", content: "Notes" },
+      subject: "Coaching with Kiran", body: { contentType: "text", content: "Guest: Kiran <k@x.com>\n\nNotes" },
       start: { dateTime: "2026-11-03T04:30:00.000", timeZone: "UTC" }, end: { dateTime: "2026-11-03T05:15:00.000", timeZone: "UTC" },
       location: { displayName: "Room 4" },
-      attendees: [{ emailAddress: { address: "k@x.com", name: "Kiran" }, type: "required" }],
       transactionId: input.bookingId, isOnlineMeeting: true, onlineMeetingProvider: "teamsForBusiness",
     });
   });
