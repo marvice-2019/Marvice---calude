@@ -48,13 +48,14 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [taken, setTaken] = useState<string[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [limited, setLimited] = useState(false);
   const start = new Date(slot);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const answers = Object.fromEntries(questions.map((q) => [q.id, String(data.get(`q_${q.id}`) ?? "")]));
-    setBusy(true); setFailed(false);
+    setBusy(true); setFailed(false); setLimited(false);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST", headers: { "content-type": "application/json" },
@@ -67,6 +68,7 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
       }
       if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
       else if (res.status === 400) setErrors(body.fields ?? {});
+      else if (res.status === 429) setLimited(true);
       else setFailed(true);
     } catch {
       setFailed(true);
@@ -117,6 +119,7 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
           </div>
         );
       })}
+      {limited && <p className="text-danger" role="alert">Too many bookings from here in the last hour. Try again later.</p>}
       {failed && <p className="text-danger" role="alert">Something went wrong. Your time isn&apos;t booked yet. Try again.</p>}
       <Button type="submit" loading={busy}>{busy ? "Booking…" : "Book this time"}</Button>
     </form>

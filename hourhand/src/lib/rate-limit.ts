@@ -62,6 +62,15 @@ export const SIGN_IN_LIMITS = {
 } satisfies Record<string, Limit>;
 
 /**
+ * New bookings send email to whatever address the form gives, so they are limited too: per guest email (stops one inbox
+ * being flooded with confirmations) and per client address (stops one script booking for many addresses).
+ */
+export const BOOKING_LIMITS = {
+  perEmail: { max: 5, windowMs: 60 * 60_000 },
+  perIp: { max: 10, windowMs: 60 * 60_000 },
+} satisfies Record<string, Limit>;
+
+/**
  * The client's address as our reverse proxy saw it. Coolify's Traefik appends the real address to x-forwarded-for,
  * so the rightmost entry is the trustworthy one; anything to its left was sent by the client and can be forged.
  */

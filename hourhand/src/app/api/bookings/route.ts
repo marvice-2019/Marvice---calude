@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { handleCreateBooking } from "@/lib/booking";
 import { store } from "@/lib/data";
+import { clientIp, rateLimiter } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid_request", fields: { body: "Send a JSON body." } }, { status: 400 });
   }
-  const { status, body } = await handleCreateBooking(store, input, new Date());
+  const { status, body } = await handleCreateBooking(store, input, new Date(), { clientKey: clientIp(request.headers), limiter: rateLimiter });
   return NextResponse.json(body, { status });
 }

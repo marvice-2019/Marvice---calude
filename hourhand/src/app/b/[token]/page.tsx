@@ -4,15 +4,12 @@ import { LocalTime } from "@/components/LocalTime";
 import { ManageBooking } from "@/components/ManageBooking";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { store, type LocationKind } from "@/lib/data";
+import { store } from "@/lib/data";
 import { formatDate, zoneName } from "@/lib/format";
+import { GUEST_LOCATION_LABELS as locationLabels } from "@/lib/location-labels";
 
 export const dynamic = "force-dynamic";
 
-const locationLabels: Record<LocationKind, string> = {
-  google_meet: "Google Meet", zoom: "Zoom", teams: "Microsoft Teams", phone_host_calls: "Phone call (the host calls you)",
-  phone_guest_calls: "Phone call (you call the host)", in_person: "In person", custom: "Details from the host", ask_guest: "Your chosen location",
-};
 
 export default async function ManageBookingPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;

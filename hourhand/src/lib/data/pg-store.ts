@@ -1,6 +1,8 @@
 import pg from "pg";
 import { datesInRange } from "../availability";
+import { kickJobs } from "../jobs/kick";
 import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
+import { queueBookingNotifications } from "./notifications";
 import {
   EventTypeInUseError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingWithInvitee, type CreateBookingInput, type DataStore,
   type EventType, type EventTypeDraft, type Interval, type User,
@@ -235,7 +237,12 @@ export function createPgStore(pool: pg.Pool): DataStore {
       const repeat = await byKey(pool, input.idempotencyKey);
       if (repeat) return sameRequestOrConflict(repeat, isSameRequest);
       try {
-        const id = await tx((client) => insertBooking(client, input, null));
+        const id = await tx(async (client) => {
+          const newId = await insertBooking(client, input, null);
+          await queueBookingNotifications(client, newId, "booked", new Date());
+          return newId;
+        });
+        kickJobs();
         return (await bookingWhere(pool, "b.id = $1", [id]))!;
       } catch (error) {
         return settle(error, input.idempotencyKey, isSameRequest);
@@ -255,8 +262,13 @@ export function createPgStore(pool: pg.Pool): DataStore {
           // Both statements commit together or not at all.
           await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = 'guest', cancel_reason = 'Rescheduled' where id = $1", [bookingId]);
           const { name, email, timezone, phone, answers } = invitee;
-          return insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId);
+          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId);
+          // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
+          await client.query("update notifications set status = 'skipped', last_error = 'booking rescheduled', updated_at = now() where booking_id = $1 and status = 'queued'", [bookingId]);
+          await queueBookingNotifications(client, newId, "rescheduled", new Date());
+          return newId;
         });
+        kickJobs();
         return (await bookingWhere(pool, "b.id = $1", [id]))!;
       } catch (error) {
         return settle(error, idempotencyKey, isSameRequest);
@@ -264,9 +276,14 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async cancelBooking(hostId, bookingId, by, reason) {
       if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
-      await pool.query(
-        "update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4 where id = $1 and host_id = $2 and status = 'confirmed'",
-        [bookingId, hostId, by, reason ?? null]);
+      const cancelled = await tx(async (client) => {
+        const { rowCount } = await client.query(
+          "update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4 where id = $1 and host_id = $2 and status = 'confirmed'",
+          [bookingId, hostId, by, reason ?? null]);
+        if (rowCount) await queueBookingNotifications(client, bookingId, "cancelled", new Date());
+        return Boolean(rowCount);
+      });
+      if (cancelled) kickJobs();
       const booking = await bookingWhere(pool, "b.id = $1 and b.host_id = $2", [bookingId, hostId]);
       if (!booking) throw new NotFoundError("Booking");
       return booking;
@@ -339,8 +356,14 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async deleteAccount(userId, now = new Date()) {
       if (!isId(userId)) throw new NotFoundError("Account");
-      const ids = await tx((client) => closeAccount(client, userId, now));
+      const ids = await tx(async (client) => {
+        const closed = await closeAccount(client, userId, now);
+        // Guests of the cancelled bookings hear about it; the host, who is closing the account, does not.
+        for (const id of closed ?? []) await queueBookingNotifications(client, id, "cancelled", now, { notifyHost: false });
+        return closed;
+      });
       if (ids === null) throw new NotFoundError("Account");
+      if (ids.length > 0) kickJobs();
       if (ids.length === 0) return [];
       return (await pool.query(`${BOOKING} where b.id = any($1::uuid[]) order by b.start_at`, [ids])).rows.map(toBooking);
     },

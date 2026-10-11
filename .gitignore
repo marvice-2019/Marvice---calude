@@ -32,3 +32,4 @@ video.marvice.tech/brag-output/work/
 # keel plugin session state (local tool state, not project content)
 .locks/
 design-log/
+.prodscope/

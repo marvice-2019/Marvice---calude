@@ -1,5 +1,6 @@
 import { computeSlots, isSyncStale } from "./slots";
 import { RequestKeyConflictError, SlotTakenError, type Booking, type DataStore, type EventType, type User } from "./data/types";
+import { BOOKING_LIMITS, type createRateLimiter } from "./rate-limit";
 
 const MIN = 60_000;
 const DAY = 86_400_000;
@@ -136,8 +137,13 @@ export async function slotTaken(store: DataStore, host: User, eventType: EventTy
   return { status: 409, body: { error: "slot_taken", nextSlots } };
 }
 
-/** POST /api/bookings */
-export async function handleCreateBooking(store: DataStore, input: unknown, now: Date): Promise<HandlerResult> {
+type Limiter = Pick<ReturnType<typeof createRateLimiter>, "take">;
+
+/**
+ * POST /api/bookings. With `limit`, new bookings are rate limited per client address (see clientIp) and per guest
+ * email; the route always passes it, unit tests of the booking rules leave it out.
+ */
+export async function handleCreateBooking(store: DataStore, input: unknown, now: Date, limit?: { clientKey: string; limiter: Limiter }): Promise<HandlerResult> {
   const v = validateBookingRequest(input);
   if (!v.ok) return { status: 400, body: { error: "invalid_request", fields: v.fields } };
   const req = v.value;
@@ -159,6 +165,11 @@ export async function handleCreateBooking(store: DataStore, input: unknown, now:
   // Server-side re-check: the start must be one the engine offers right now.
   const offered = await freeSlots(store, host, eventType, req.start, new Date(req.start.getTime() + MIN), now);
   if (!offered.some((s) => s.getTime() === req.start.getTime())) return slotTaken(store, host, eventType, req.start, now);
+
+  // Charged only once the request has passed every check, so a guest fixing a mistake or picking another slot isn't refused.
+  if (limit && (!limit.limiter.take(`booking-ip:${limit.clientKey}`, BOOKING_LIMITS.perIp) || !limit.limiter.take(`booking-email:${req.email.toLowerCase()}`, BOOKING_LIMITS.perEmail))) {
+    return { status: 429, body: { error: "too_many_requests" } };
+  }
 
   try {
     const booking = await store.createBooking({
