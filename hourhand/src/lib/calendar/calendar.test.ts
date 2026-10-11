@@ -5,6 +5,7 @@ import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
+import { hostPlan } from "../billing/account";
 import { unseal } from "../crypto/seal";
 import { createPgStore } from "../data/pg-store";
 import type { DataStore, EventType, User } from "../data/types";
@@ -72,6 +73,37 @@ function fakeGoogle() {
     async deleteEvent(_t: string, _c: string, id: string) { s.events.delete(id); },
   };
   return { google: g as unknown as GoogleClient, s };
+}
+
+/** Just enough of Microsoft Graph: Teams links are created asynchronously, and appear once `linkReady` is set. */
+function fakeMicrosoft(teams = true) {
+  const s = { events: new Map<string, { calendarId: string; start: Date; end: Date; withTeams: boolean }>(), linkReady: false, getEvents: 0 };
+  const link = (id: string) => `https://teams.microsoft.com/l/meetup-join/${id}`;
+  const result = (id: string) => {
+    const e = s.events.get(id);
+    if (!e?.withTeams) return { id, joinUrl: null, conferencePending: false };
+    return s.linkReady ? { id, joinUrl: link(id), conferencePending: false } : { id, joinUrl: null, conferencePending: true };
+  };
+  const m = {
+    id: "microsoft",
+    async refresh() { throw new Error("the access token in these tests never needs a refresh"); },
+    async revoke() {},
+    missingScopes: () => [],
+    async listCalendars() { return [{ id: "ms-cal", name: "Calendar", primary: true, accessRole: "owner", teams }]; },
+    async busy(_t: string, ids: string[]) { return { busy: new Map(ids.map((id) => [id, []])), errors: new Map() }; },
+    async insertEvent(_t: string, calendarId: string, e: EventInput) {
+      const id = `ms-${e.bookingId}`;
+      s.events.set(id, { calendarId, start: e.start, end: e.end, withTeams: e.conference === "teams" });
+      return { id, joinUrl: null, conferencePending: e.conference === "teams" };
+    },
+    async getEvent(_t: string, _c: string, id: string) { s.getEvents++; return result(id); },
+    async moveEvent(_t: string, _c: string, id: string, start: Date, end: Date) {
+      s.events.set(id, { ...s.events.get(id)!, start, end });
+      return result(id);
+    },
+    async deleteEvent(_t: string, _c: string, id: string) { s.events.delete(id); },
+  };
+  return { microsoft: m as unknown as CalendarProvider, s };
 }
 
 function recordingMailer() {
@@ -443,6 +475,111 @@ describe.skipIf(!BASE)("Google Calendar (TEST_DATABASE_URL)", () => {
       await processDueNotifications(pool, mailer, { baseUrl, calendar: null, now: new Date(Date.now() + 30_000) });
       expect((await queue(b.id)).find((q) => q.kind === "calendar_create")).toMatchObject({ status: "skipped", last_error: "Google and Microsoft calendars are not configured on this server" });
       expect(sent.filter((m) => m.to === guest.email)).toHaveLength(1);
+    });
+  });
+
+  describe("Teams links", () => {
+    let teamsCall: EventType;
+    const connectMs = (teams: boolean) => saveConnection(pool, key, priya.id, "microsoft", tokens("priya@contoso.com"),
+      [{ id: "ms-cal", name: "Calendar", primary: true, accessRole: "owner", teams }], new Date());
+    const canTeams = async (connectionId: string) =>
+      (await pool.query("select can_teams from calendars where connection_id = $1", [connectionId])).rows.map((r) => r.can_teams);
+    const book = () => store.createBooking({ eventTypeId: teamsCall.id, startAt: nextStart(), idempotencyKey: `teams-${slot}`, invitee: guest });
+    // Hold the calendar write as if another worker had it, so the worker never polls the fake for a pending link.
+    const holdCalendarJob = (bookingId: string) =>
+      pool.query("update notifications set locked_until = now() + interval '1 hour' where booking_id = $1 and channel = 'calendar'", [bookingId]);
+    const bookedMails = (sent: Mail[]) => sent.filter((m) => m.to === guest.email && m.subject.startsWith("Booked"));
+
+    beforeAll(async () => {
+      const { rows: [et] } = await pool.query(
+        `insert into event_types (user_id, name, slug, duration_minutes, booking_window_days)
+         select user_id, 'Teams call', 'teams-call', duration_minutes, booking_window_days from event_types where id = $1 returning id`, [coaching.id]);
+      await pool.query("insert into event_locations (event_type_id, kind, value, position) values ($1, 'teams', null, 0)", [et.id]);
+      teamsCall = (await store.listEventTypes(priya.id)).find((e) => e.id === et.id)!;
+    });
+
+    it("a Teams booking on a Microsoft calendar that allows Teams holds the confirmation until the link arrives, then sends it with the link", async () => {
+      const { microsoft, s } = fakeMicrosoft();
+      await connectMs(true);
+      const b = await book();
+      expect(b.locationKind).toBe("teams");
+      await holdCalendarJob(b.id);
+      const deps = { baseUrl, calendar: { providers: { microsoft }, key } };
+      const { mailer, sent } = recordingMailer();
+      await processDueNotifications(pool, mailer, deps);
+      expect(bookedMails(sent)).toHaveLength(0);
+      expect((await queue(b.id)).find((q) => q.kind === "booked_guest")).toMatchObject({ status: "queued", last_error: "waiting for the video link" });
+
+      // The write runs and the link comes back on the first read after creation.
+      await pool.query("update notifications set locked_until = null where booking_id = $1 and channel = 'calendar'", [b.id]);
+      s.linkReady = true;
+      await processDueNotifications(pool, mailer, deps);
+      await processDueNotifications(pool, mailer, deps);
+      const after = (await store.getBooking(priya.id, b.id))!;
+      expect(after.joinUrl).toBe(`https://teams.microsoft.com/l/meetup-join/ms-${b.id}`);
+      expect(s.events.get(`ms-${b.id}`)).toMatchObject({ calendarId: "ms-cal", withTeams: true });
+      const confirmations = bookedMails(sent);
+      expect(confirmations).toHaveLength(1);
+      expect(confirmations[0].text).toContain(after.joinUrl!);
+    });
+
+    it("a Teams confirmation never waits longer than the video-link limit", async () => {
+      const { microsoft } = fakeMicrosoft();
+      await connectMs(true);
+      const b = await book();
+      await holdCalendarJob(b.id);
+      const deps = { baseUrl, calendar: { providers: { microsoft }, key } };
+      const { mailer, sent } = recordingMailer();
+      await processDueNotifications(pool, mailer, deps);
+      expect(bookedMails(sent)).toHaveLength(0);
+      await processDueNotifications(pool, mailer, { ...deps, now: new Date(Date.now() + (MEET_LINK_WAIT_SECONDS + 5) * 1000) });
+      expect(bookedMails(sent)).toHaveLength(1);
+      expect((await queue(b.id)).find((q) => q.kind === "booked_guest")!.status).toBe("sent");
+    });
+
+    it("a Teams booking going into a Google calendar doesn't wait: Google can't make a Teams link", async () => {
+      const { google } = fakeGoogle();
+      await connect(priya);
+      const b = await book();
+      await holdCalendarJob(b.id);
+      const { mailer, sent } = recordingMailer();
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { google }, key } });
+      expect(bookedMails(sent)).toHaveLength(1);
+    });
+
+    it("a Teams booking on a Microsoft calendar without Teams doesn't wait", async () => {
+      const { microsoft } = fakeMicrosoft(false);
+      await connectMs(false);
+      const b = await book();
+      await holdCalendarJob(b.id);
+      const { mailer, sent } = recordingMailer();
+      await processDueNotifications(pool, mailer, { baseUrl, calendar: { providers: { microsoft }, key } });
+      expect(bookedMails(sent)).toHaveLength(1);
+    });
+
+    it("stores whether each calendar can make Teams meetings, and a reconnect updates it", async () => {
+      const { microsoft } = fakeMicrosoft(true);
+      const listed = await microsoft.listCalendars("at-0");
+      const id = await saveConnection(pool, key, priya.id, "microsoft", tokens("priya@contoso.com"), listed, new Date());
+      expect(await canTeams(id)).toEqual([true]);
+      const again = await saveConnection(pool, key, priya.id, "microsoft", tokens("priya@contoso.com"), await fakeMicrosoft(false).microsoft.listCalendars("at-0"), new Date());
+      expect(again).toBe(id);
+      expect(await canTeams(id)).toEqual([false]);
+      const back = await connectMs(true);
+      expect(await canTeams(back)).toEqual([true]);
+      const googleId = await connect(priya);
+      expect(await canTeams(googleId)).toEqual([null, null]);
+    });
+
+    it("Free's limit of 2 checked calendars counts Google and Microsoft calendars together", async () => {
+      await pool.query("delete from subscriptions where user_id = $1", [priya.id]);
+      expect(await hostPlan(pool, priya.id)).toBe("free");
+      await connect(priya);
+      await connectMs(true);
+      const rows = (await pool.query("select id, external_id, check_conflicts from calendars where user_id = $1", [priya.id])).rows;
+      expect(rows.filter((r) => r.check_conflicts).map((r) => r.external_id).sort()).toEqual(["ms-cal", "priya@gmail.com"]);
+      const team = rows.find((r) => r.external_id.startsWith("team"));
+      expect(await setCheckConflicts(pool, priya.id, team.id, true)).toBe(false);
     });
   });
 });
