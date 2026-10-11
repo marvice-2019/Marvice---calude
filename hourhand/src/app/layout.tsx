@@ -6,8 +6,11 @@ const display = Fraunces({ subsets: ["latin"], variable: "--hh-font-display", di
 const sans = Inter({ subsets: ["latin"], variable: "--hh-font-sans", display: "swap" });
 
 export const metadata: Metadata = {
+  // Absolute URLs for the share image and canonical links; BETTER_AUTH_URL is the public address in production.
+  metadataBase: new URL(process.env.BETTER_AUTH_URL ?? "https://hourhand.cloud"),
   title: "Hourhand",
   description: "Share one link and let people book a time that suits you both.",
+  openGraph: { siteName: "Hourhand", type: "website" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
