@@ -38,12 +38,14 @@ export async function syncDueConnections(pool: pg.Pool, providers: CalendarProvi
 
 export async function syncConnection(pool: pg.Pool, providers: CalendarProviders, key: Buffer, connectionId: string, now = new Date()): Promise<SyncResult> {
   try {
-    const { rows: [conn] } = await pool.query("select user_id, provider from calendar_connections where id = $1", [connectionId]);
+    // The host's zone places all-day events (Outlook returns them as floating dates) on the host's own day.
+    const { rows: [conn] } = await pool.query(
+      "select c.user_id, c.provider, u.timezone from calendar_connections c join users u on u.id = c.user_id where c.id = $1", [connectionId]);
     if (!conn) return { connectionId, ok: false, error: "connection no longer exists" };
     const providerId = conn.provider as CalendarProviderId;
     const provider = providers[providerId];
     if (!provider) throw new CalendarApiError(`${PROVIDER_NAMES[providerId] ?? conn.provider} calendars are not configured on this server`, { retryable: true });
-    const { rows: cals } = await pool.query("select id, external_id from calendars where connection_id = $1 and check_conflicts", [connectionId]);
+    const { rows: cals } = await pool.query("select id, external_id, name from calendars where connection_id = $1 and check_conflicts", [connectionId]);
     if (cals.length > 0) {
       // Far enough ahead to cover the longest booking window the host offers.
       const { rows: [{ days }] } = await pool.query(
@@ -54,10 +56,12 @@ export async function syncConnection(pool: pg.Pool, providers: CalendarProviders
       const blocks = new Map<string, { start: Date; end: Date }[]>(cals.map((c) => [c.id as string, []]));
       for (let start = from; start < until; start = new Date(start.getTime() + CHUNK_DAYS * DAY)) {
         const end = new Date(Math.min(until.getTime(), start.getTime() + CHUNK_DAYS * DAY));
-        const { busy, errors } = await provider.busy(token, cals.map((c) => c.external_id as string), start, end);
+        const { busy, errors } = await provider.busy(token, cals.map((c) => c.external_id as string), start, end, { timeZone: conn.timezone as string });
         if (errors.size > 0) {
-          const [id, reason] = [...errors][0];
-          throw new CalendarApiError(`${PROVIDER_NAMES[providerId]} could not read calendar ${id}: ${reason}`, { retryable: true, reason });
+          // Every unreadable calendar is named, so the host sees all of them, not just the first.
+          const nameOf = (id: string) => (cals.find((c) => c.external_id === id)?.name as string | undefined) || id;
+          const list = [...errors].map(([id, reason]) => `${nameOf(id)} (${reason})`).join("; ");
+          throw new CalendarApiError(`${PROVIDER_NAMES[providerId]} could not read ${errors.size === 1 ? "calendar" : "calendars"} ${list}`, { retryable: true, reason: [...errors][0][1] });
         }
         for (const c of cals) blocks.get(c.id)!.push(...(busy.get(c.external_id) ?? []));
       }

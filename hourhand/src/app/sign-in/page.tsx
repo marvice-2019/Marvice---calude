@@ -9,8 +9,10 @@ import { signInWithGoogle, signInWithMicrosoft } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string; closed?: string }> }) {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string | string[]; closed?: string }> }) {
   const { error, closed } = await searchParams;
+  // Better Auth appends its own error code to our errorCallbackURL, so "error" can arrive more than once.
+  const errors = [error ?? []].flat();
   if (authEnabled() && (await getSignedInUser())) redirect("/dashboard/event-types");
 
   return (
@@ -22,9 +24,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           Your account is closed and you&apos;ve been signed out everywhere. Your data will be deleted in 30 days.
         </p>
       )}
-      {error && (
+      {errors.length > 0 && (
         <p role="alert" className="mt-4 rounded-md bg-danger-bg p-3 text-sm text-danger">
-          {error === "microsoft"
+          {errors.includes("microsoft")
             ? "We couldn't sign you in with Microsoft. If you already have a Hourhand account with that email, sign in with an email link below instead."
             : "That link didn't work. It may have expired or been used already. Ask for a new one below."}
         </p>
