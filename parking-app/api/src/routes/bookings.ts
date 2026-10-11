@@ -10,7 +10,7 @@ import { promoFor, quoteFor, rateFor, spotsLeft, type VehicleKind } from "../ser
 const driver = requireRole("driver");
 
 /** Replays the stored response for a repeated Idempotency-Key; otherwise runs fn and stores its result. */
-async function idempotent(deps: Deps, userId: string, key: string, route: string, fn: () => Promise<{ status: number; body: unknown }>) {
+export async function idempotent(deps: Deps, userId: string, key: string, route: string, fn: () => Promise<{ status: number; body: unknown }>) {
   const prev = await deps.db.query("SELECT status_code, response FROM idempotency_keys WHERE user_id = $1 AND key = $2 AND route = $3", [userId, key, route]);
   if (prev.rows[0]) return { status: prev.rows[0].status_code as number, body: prev.rows[0].response };
   const out = await fn();
@@ -19,12 +19,12 @@ async function idempotent(deps: Deps, userId: string, key: string, route: string
   return out;
 }
 
-async function createPayment(c: Tx, deps: Deps, p: { bookingId?: string; monthlyPassId?: string; purpose: string; amountPaise: number; meta?: object; receipt: string }) {
+async function createPayment(c: Tx, deps: Deps, p: { bookingId?: string; monthlyPassId?: string; valetTicketId?: string; purpose: string; amountPaise: number; meta?: object; receipt: string }) {
   const order = await deps.payments.createOrder(p.amountPaise, p.receipt);
   await c.query(
-    `INSERT INTO payments (booking_id, monthly_pass_id, razorpay_order_id, amount_paise, purpose, meta)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [p.bookingId ?? null, p.monthlyPassId ?? null, order.id, p.amountPaise, p.purpose, JSON.stringify(p.meta ?? {})]);
+    `INSERT INTO payments (booking_id, monthly_pass_id, valet_ticket_id, razorpay_order_id, amount_paise, purpose, meta)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [p.bookingId ?? null, p.monthlyPassId ?? null, p.valetTicketId ?? null, order.id, p.amountPaise, p.purpose, JSON.stringify(p.meta ?? {})]);
   return { id: order.id, amount: order.amountPaise, currency: order.currency, key_id: deps.payments.keyId };
 }
 export { createPayment };
@@ -32,7 +32,8 @@ export { createPayment };
 const bookingView = `
   SELECT b.id, b.code, b.status, b.source, b.vehicle, lower(b.period) AS "from", upper(b.period) AS "to",
          b.base_paise, b.discount_paise, b.fee_paise, b.gst_paise, b.total_paise, b.promo_code,
-         v.plate, l.id AS lot_id, l.name AS lot_name, l.code AS lot_code, u.phone
+         v.plate, l.id AS lot_id, l.name AS lot_name, l.code AS lot_code, u.phone,
+         (SELECT json_build_object('floor', s.floor, 'bay', s.bay, 'note', s.note, 'photo_url', s.photo_url) FROM parked_spots s WHERE s.booking_id = b.id) AS spot
   FROM bookings b JOIN vehicles v ON v.id = b.vehicle_id JOIN lots l ON l.id = b.lot_id JOIN users u ON u.id = b.user_id`;
 
 export function bookingRoutes(app: FastifyInstance, deps: Deps) {
@@ -204,6 +205,12 @@ async function onCaptured(c: Tx, deps: Deps, pay: { id: string; order_id: string
     taxable = p.meta.base_paise; gst = p.meta.gst_paise;
   } else if (p.purpose === "overstay") {
     taxable = p.meta.base_paise; gst = p.meta.gst_paise;
+  } else if (p.purpose === "valet") {
+    // VAL-02: paid request moves the ticket to requested. Tip is outside GST and outside the invoice.
+    await c.query(`UPDATE valet_tickets SET status = 'requested', requested_at = now(), validation_id = $2, fee_paise = $3, gst_paise = $4, tip_paise = $5
+                   WHERE id = $1 AND status = 'parked'`, [p.valet_ticket_id, p.meta.validation_id ?? null, p.meta.fee_paise, p.meta.gst_paise, p.meta.tip_paise]);
+    taxable = p.meta.fee_paise; gst = p.meta.gst_paise;
+    if (taxable === 0) return "captured"; // validated, tip only: no GST invoice
   } else if (p.purpose === "monthly") {
     await c.query("UPDATE monthly_passes SET status = 'active' WHERE id = $1 AND status IN ('approved','paused_unpaid')", [p.monthly_pass_id]);
     taxable = p.meta.base_paise; gst = p.meta.gst_paise;

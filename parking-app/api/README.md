@@ -61,9 +61,19 @@ npm run build && npm test
 | OPS-05 | ops-admin › OPS-05 dashboard and payouts |
 | ADM-01, ADM-02, ADM-03 | ops-admin › ADM-01..03 platform admin |
 | OWN-01 | auth-public › owner lead |
+| DRV-14 | valet › DRV-14 mark my spot |
+| DRV-15, DRV-16 | valet › destinations, filters, digits |
+| VAL-01 | valet › VAL-01 drop off |
+| VAL-02, VAL-03, VAL-04, VAL-05 | valet › request, validate, tip, status, collect |
+| VAL-06 | valet › VAL-06 damage report |
+| VAL-07 | valet › staff queue security and validations |
+| ACC-01, ACC-02 | valet › preferences, data export |
 | Security | bookings › webhook security and replay; drivers only touch their own bookings; ops-admin › other operator's staff |
 
 ## Decisions and deviations
+
+- **Photo storage is a stand-in.** `/v1/uploads` returns a dev placeholder URL; production refuses until SPEC open question #12 (bucket and retention) is decided.
+- **Valet tip and GST:** tips are charged with the request but excluded from the GST invoice, and a validated tip-only payment raises no invoice. This is pending the CA's answer (SPEC open question #9).
 
 - **GST is exact to the paise** (for example ₹159.30, not ₹159), as invoices need. The clickable prototype rounds GST to the rupee for display; the web stage uses this API's numbers.
 - **Migrations use a 50-line runner** (`src/migrate.ts`, ordered `.sql` files, advisory lock) instead of node-pg-migrate. `001_init.sql` is `../schema.sql` unchanged.

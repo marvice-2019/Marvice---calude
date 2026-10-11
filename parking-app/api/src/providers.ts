@@ -78,3 +78,16 @@ export function notifier(cfg: Config, log: { warn: (o: object, m: string) => voi
     }
   };
 }
+
+/* ---------- photo storage (handover photos, spots, damage) ---------- */
+export interface Storage { presignUpload(key: string, contentType: string): Promise<{ upload_url: string; key: string }> }
+
+// SPEC open question #12: bucket not chosen yet. Dev/test returns a local placeholder URL; production refuses.
+export function storage(cfg: Config): Storage {
+  return {
+    async presignUpload(key, contentType) {
+      if (cfg.NODE_ENV === "production") throw new Error("Photo storage is not configured yet (SPEC open question #12)");
+      return { upload_url: `${cfg.WEB_ORIGIN}/dev-uploads/${encodeURIComponent(key)}?type=${encodeURIComponent(contentType)}`, key };
+    }
+  };
+}

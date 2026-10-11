@@ -10,26 +10,30 @@ export function meRoutes(app: FastifyInstance, deps: Deps) {
   // DRV-07: what checkout prefills.
   app.get("/v1/me", { preHandler: driver }, async (req) => {
     const u = currentUser(req);
-    const user = (await deps.db.query("SELECT id, phone, full_name, email, role, default_vehicle_id, payment_method FROM users WHERE id = $1", [u.sub])).rows[0];
+    const user = (await deps.db.query("SELECT id, phone, full_name, email, role, default_vehicle_id, payment_method, alerts_enabled, language FROM users WHERE id = $1", [u.sub])).rows[0];
     const vehicles = (await deps.db.query("SELECT id, plate, kind, nickname FROM vehicles WHERE user_id = $1 ORDER BY plate", [u.sub])).rows;
     const favourites = (await deps.db.query("SELECT lot_id FROM favourite_lots WHERE user_id = $1 ORDER BY created_at DESC", [u.sub])).rows.map(r => r.lot_id);
     const last = (await deps.db.query(
       `SELECT b.vehicle_id, p.method FROM bookings b LEFT JOIN payments p ON p.booking_id = b.id AND p.status = 'captured'
        WHERE b.user_id = $1 AND b.status IN ('confirmed','checked_in','completed') ORDER BY b.created_at DESC LIMIT 1`, [u.sub])).rows[0];
     return { user, vehicles, favourites,
-      preferences: { vehicle_id: user.default_vehicle_id ?? last?.vehicle_id ?? null, payment_method: user.payment_method ?? last?.method ?? null } };
+      preferences: { vehicle_id: user.default_vehicle_id ?? last?.vehicle_id ?? null, payment_method: user.payment_method ?? last?.method ?? null,
+        alerts: user.alerts_enabled, language: user.language } };
   });
 
   app.put("/v1/me/preferences", { preHandler: driver }, async (req) => {
     const u = currentUser(req);
-    const b = parse(z.object({ default_vehicle_id: Uuid.nullable().optional(), payment_method: z.enum(["upi", "card", "netbanking"]).optional() }), req.body);
+    const b = parse(z.object({ default_vehicle_id: Uuid.nullable().optional(), payment_method: z.enum(["upi", "card", "netbanking"]).optional(),
+      alerts: z.boolean().optional(), language: z.enum(["en", "kn", "hi"]).optional() }), req.body);
     if (b.default_vehicle_id) {
       const ok = await deps.db.query("SELECT 1 FROM vehicles WHERE id = $1 AND user_id = $2", [b.default_vehicle_id, u.sub]);
       if (!ok.rowCount) throw new HttpError(404, "vehicle_not_found", "That vehicle isn't on your account.");
     }
     const r = await deps.db.query(
-      `UPDATE users SET default_vehicle_id = COALESCE($2, default_vehicle_id), payment_method = COALESCE($3, payment_method)
-       WHERE id = $1 RETURNING default_vehicle_id, payment_method`, [u.sub, b.default_vehicle_id ?? null, b.payment_method ?? null]);
+      `UPDATE users SET default_vehicle_id = COALESCE($2, default_vehicle_id), payment_method = COALESCE($3, payment_method),
+              alerts_enabled = COALESCE($4, alerts_enabled), language = COALESCE($5, language)
+       WHERE id = $1 RETURNING default_vehicle_id, payment_method, alerts_enabled AS alerts, language`,
+      [u.sub, b.default_vehicle_id ?? null, b.payment_method ?? null, b.alerts ?? null, b.language ?? null]);
     return { preferences: r.rows[0] };
   });
 

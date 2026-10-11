@@ -16,14 +16,23 @@ export function publicRoutes(app: FastifyInstance, deps: Deps) {
   app.get("/v1/lots/search", { config: { rateLimit: { max: 60 * deps.cfg.RATE_LIMIT_SCALE, timeWindow: "1 minute" } } }, async (req) => {
     const q = parse(z.object({
       lat: z.coerce.number().min(-90).max(90), lng: z.coerce.number().min(-180).max(180),
-      from: IsoDate, to: IsoDate, vehicle: Vehicle, sort: z.enum(["dist", "price", "left"]).default("dist")
+      from: IsoDate, to: IsoDate, vehicle: Vehicle, sort: z.enum(["dist", "price", "left"]).default("dist"),
+      filters: z.string().default("").transform(s => s.split(",").map(x => x.trim()).filter(Boolean))
+        .pipe(z.array(z.enum(["covered", "ev", "valet", "h24", "bike", "saved"])))
     }).and(Range), req.query);
+    let userId: string | null = null;
+    if (q.filters.includes("saved")) { try { await req.jwtVerify(); userId = (req.user as { sub: string }).sub; } catch { throw new HttpError(401, "unauthenticated", "Sign in to see your saved lots."); } }
+    const f = new Set(q.filters);
     const { rows } = await deps.db.query(
       `SELECT l.id, l.name, l.code, l.address, l.kind, l.covered, l.ev_chargers, l.open_24h, l.status,
-              ST_Distance(l.geo, ST_MakePoint($2, $1)::geography)::int AS distance_m
+              ST_Distance(l.geo, ST_MakePoint($2, $1)::geography)::int AS distance_m,
+              EXISTS (SELECT 1 FROM valet_desks d WHERE d.lot_id = l.id AND d.is_live) AS valet
        FROM lots l
        WHERE l.is_live AND l.status <> 'closed' AND ST_DWithin(l.geo, ST_MakePoint($2, $1)::geography, 3000)
-       ORDER BY distance_m LIMIT 30`, [q.lat, q.lng]);
+         AND (NOT $3 OR l.covered) AND (NOT $4 OR l.ev_chargers > 0) AND (NOT $5 OR l.open_24h) AND (NOT $6 OR l.capacity_bike > 0)
+         AND (NOT $7 OR EXISTS (SELECT 1 FROM valet_desks d WHERE d.lot_id = l.id AND d.is_live))
+         AND ($8::uuid IS NULL OR EXISTS (SELECT 1 FROM favourite_lots fl WHERE fl.lot_id = l.id AND fl.user_id = $8))
+       ORDER BY distance_m LIMIT 30`, [q.lat, q.lng, f.has("covered"), f.has("ev"), f.has("h24"), f.has("bike"), f.has("valet"), userId]);
     const out = [];
     for (const lot of rows) {
       try {
@@ -38,7 +47,7 @@ export function publicRoutes(app: FastifyInstance, deps: Deps) {
 
   // DRV-09: Park now looks up the code printed on the entrance board.
   app.get("/v1/lots/by-code/:code", async (req) => {
-    const { code } = parse(z.object({ code: z.string().transform(s => s.replace(/[\s-]/g, "").toUpperCase()) }), req.params);
+    const { code } = parse(z.object({ code: z.string().transform(s => { const c = s.replace(/[\s-]/g, "").toUpperCase(); return /^\d{3,5}$/.test(c) ? "BLR" + c : c; }) }), req.params);
     const { rows } = await deps.db.query("SELECT id, name, code, address, status FROM lots WHERE code = $1 AND is_live", [code]);
     if (!rows[0]) throw new HttpError(404, "lot_not_found", `No lot with code ${code}. Check the board at the entrance, or pick a lot nearby.`);
     return { lot: rows[0] };

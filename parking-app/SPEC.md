@@ -284,7 +284,7 @@ Base path `/v1`. JSON throughout, with zod validation. Money is in paise. Every 
 | POST | /valet/tickets/:id/collected | owner | – | `{ticket}` | 409 not ready | – | VAL-05 |
 | POST | /valet/tickets/:id/damage | owner | `{where, photo_key}` | 201 | 400 no photo, 410 too late | – | VAL-06 |
 | GET | /ops/valet/queue | op staff | `?desk_id` | `[ticket]` | 403 | – | VAL-07 |
-| PUT | /ops/valet/tickets/:id/status | op staff | `{status: coming\|ready, bay?}` | `{ticket}` | 403, 409 bad transition | – | VAL-05, VAL-07 |
+| PUT | /ops/valet/tickets/:id/status | op staff | `{status: parked\|coming\|ready, bay?}` (bay required for parked) | `{ticket}` | 403, 409 bad transition | – | VAL-05, VAL-07 |
 | POST | /ops/valet/validations | op admin | `{desk_id, validator, code, valid_from, valid_to}` | `{validation}` | 409 exists | – | VAL-03 |
 | POST | /leads/owners | public | `{name, phone, address, bays}` | 201 | 400, 429 | – | OWN-01 (**Proposed**) |
 

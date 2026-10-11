@@ -9,11 +9,11 @@ describe("DRV-07 saved profile", () => {
   it("prefills vehicle and payment method from the last booking", async () => {
     const d = await ctx.login("9300000001");
     const fresh = (await ctx.app.inject({ method: "GET", url: "/v1/me", headers: d.h })).json();
-    expect(fresh.preferences).toEqual({ vehicle_id: null, payment_method: null });
+    expect(fresh.preferences).toEqual({ vehicle_id: null, payment_method: null, alerts: true, language: "en" }); // ACC-01 added alerts + language
     await bookAndPay(ctx, d, s.lot);
     const me = (await ctx.app.inject({ method: "GET", url: "/v1/me", headers: d.h })).json();
     expect(me.vehicles[0].plate).toBe("KA01AB1234");
-    expect(me.preferences).toEqual({ vehicle_id: me.vehicles[0].id, payment_method: "upi" });
+    expect(me.preferences).toEqual({ vehicle_id: me.vehicles[0].id, payment_method: "upi", alerts: true, language: "en" });
   });
   it("explicit preferences win, and only the user's own vehicles are allowed", async () => {
     const d = await ctx.login("9300000002"), other = await ctx.login("9300000003");
@@ -22,7 +22,7 @@ describe("DRV-07 saved profile", () => {
     const dup = await ctx.app.inject({ method: "POST", url: "/v1/me/vehicles", headers: d.h, payload: { plate: "KA03MM7788" } });
     expect(dup.statusCode).toBe(409);
     const ok = await ctx.app.inject({ method: "PUT", url: "/v1/me/preferences", headers: d.h, payload: { default_vehicle_id: v.id, payment_method: "card" } });
-    expect(ok.json().preferences).toEqual({ default_vehicle_id: v.id, payment_method: "card" });
+    expect(ok.json().preferences).toEqual({ default_vehicle_id: v.id, payment_method: "card", alerts: true, language: "en" });
     const steal = await ctx.app.inject({ method: "PUT", url: "/v1/me/preferences", headers: other.h, payload: { default_vehicle_id: v.id } });
     expect(steal.statusCode).toBe(404);
     const bad = await ctx.app.inject({ method: "POST", url: "/v1/me/vehicles", headers: d.h, payload: { plate: "HELLO" } });

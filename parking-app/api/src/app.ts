@@ -5,7 +5,7 @@ import rateLimit from "@fastify/rate-limit";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import { HttpError } from "./http.js";
-import type { Notifier, OtpSender, Payments } from "./providers.js";
+import type { Notifier, OtpSender, Payments, Storage } from "./providers.js";
 import { authRoutes } from "./auth.js";
 import { publicRoutes } from "./routes/public.js";
 import { bookingRoutes } from "./routes/bookings.js";
@@ -13,8 +13,10 @@ import { meRoutes } from "./routes/me.js";
 import { monthlyRoutes } from "./routes/monthly.js";
 import { opsRoutes } from "./routes/ops.js";
 import { adminRoutes } from "./routes/admin.js";
+import { valetRoutes } from "./routes/valet.js";
+import { extraRoutes } from "./routes/extra.js";
 
-export type Deps = { cfg: Config; db: Db; payments: Payments; otp: OtpSender; notify: Notifier };
+export type Deps = { cfg: Config; db: Db; payments: Payments; otp: OtpSender; notify: Notifier; storage: Storage };
 
 export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
@@ -56,5 +58,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean } = {}): Pro
   monthlyRoutes(app, deps);
   opsRoutes(app, deps);
   adminRoutes(app, deps);
+  valetRoutes(app, deps);
+  extraRoutes(app, deps);
   return app;
 }

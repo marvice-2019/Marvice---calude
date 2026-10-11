@@ -4,7 +4,7 @@ import { afterAll } from "vitest";
 import { buildApp, type Deps } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
 import { createPool } from "../src/db.js";
-import { fakePayments, notifier } from "../src/providers.js";
+import { fakePayments, notifier, storage } from "../src/providers.js";
 
 const ADMIN_URL = process.env.TEST_PG_URL ?? "postgres://postgres@127.0.0.1:54329/postgres";
 const WEBHOOK_SECRET = "whsec_test_" + "x".repeat(20);
@@ -23,7 +23,7 @@ export async function setup() {
   const otpBox = new Map<string, string>();
   const payments = fakePayments(cfg);
   const notify = notifier(cfg, { info: () => {}, warn: () => {} });
-  const deps: Deps = { cfg, db, payments, otp: { async send(p, c) { otpBox.set(p, c); } }, notify };
+  const deps: Deps = { cfg, db, payments, otp: { async send(p, c) { otpBox.set(p, c); } }, notify, storage: storage(cfg) };
   const app = await buildApp(deps, { logger: false });
 
   afterAll(async () => {
