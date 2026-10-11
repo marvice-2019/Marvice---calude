@@ -6,6 +6,7 @@ import { queueBookingNotifications } from "./notifications";
 import { PackageUnavailableError, takeCredits } from "../packages/packages";
 import { hashLinkToken, newLinkToken } from "../links";
 import { checkOneOff, oneOffSlug } from "./one-off";
+import { queueWaitlistFor } from "../waitlist";
 import {
   EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingLink,
   type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval, type User,
@@ -27,8 +28,8 @@ export function getPool(databaseUrl: string): pg.Pool {
   return (shared.__hourhandPool ??= new pg.Pool({ connectionString: databaseUrl }));
 }
 
-const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format";
-const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"] });
+const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format, locale";
+const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"], locale: r.locale as string });
 
 const EVENT = `id, user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
   buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind, max_repeats, deposit_minor`;
@@ -225,6 +226,9 @@ export function createPgStore(pool: pg.Pool): DataStore {
       const { rows } = await pool.query(`select ${USER} from users where id = $1 and deleted_at is null`, [id]);
       return rows[0] ? toUser(rows[0]) : null;
     },
+    async setUserLocale(userId, locale) {
+      await pool.query(`update users set locale = $2 where id = $1`, [userId, locale]);
+    },
     async getUserBySlug(slug) {
       const { rows } = await pool.query(`select ${USER} from users where slug = $1 and deleted_at is null`, [slug]);
       return rows[0] ? toUser(rows[0]) : null;
@@ -383,6 +387,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
             "update notifications set status = 'skipped', last_error = 'booking rescheduled', updated_at = now() where booking_id = $1 and status = 'queued' and not (channel = 'calendar' and locked_until > now())",
             [bookingId]);
           await queueBookingNotifications(client, newId, "rescheduled", new Date());
+          await queueWaitlistFor(client, bookingId, new Date()); // the old time is free now
           // The guest already paid for the old time: the payment follows the booking, with no refund and no new charge.
           await client.query("update payments set booking_id = $2, updated_at = now() where booking_id = $1 and status = 'paid'", [bookingId, newId]);
           return newId;
@@ -406,10 +411,14 @@ export function createPgStore(pool: pg.Pool): DataStore {
             `update bookings w set status = 'cancelled', cancelled_at = now(), cancelled_by = $3, cancel_reason = $4
              from bookings b where b.id = $1 and b.host_id = $2 and b.series_id is not null and w.series_id = b.series_id and w.series_index > b.series_index
                and w.status = 'confirmed' and w.start_at > now() returning w.id`, [bookingId, hostId, by, reason ?? null]);
-          for (const w of later) await queueBookingNotifications(client, w.id, "cancelled", new Date(), { confirm: false });
+          for (const w of later) {
+            await queueBookingNotifications(client, w.id, "cancelled", new Date(), { confirm: false });
+            await queueWaitlistFor(client, w.id, new Date());
+          }
         }
         if (rowCount) {
           await queueBookingNotifications(client, bookingId, "cancelled", new Date());
+          await queueWaitlistFor(client, bookingId, new Date());
           // A paid booking is refunded in full (the guest cancel cutoff is enforced before this); the job runner does the refund.
           await client.query("update payments set status = 'refund_pending', updated_at = now(), checked_at = null where booking_id = $1 and status = 'paid'", [bookingId]);
         }
@@ -428,6 +437,18 @@ export function createPgStore(pool: pg.Pool): DataStore {
         [bookingId, hostId, on ? now : null, now]);
       if (!rowCount) throw new NotFoundError("Booking");
       return (await bookingWhere(pool, "b.id = $1 and b.host_id = $2", [bookingId, hostId]))!;
+    },
+    async getClientNote(hostId, email) {
+      if (!isId(hostId)) return "";
+      const { rows: [r] } = await pool.query("select note from client_notes where host_id = $1 and email = $2", [hostId, email]);
+      return (r?.note as string | undefined) ?? "";
+    },
+    async saveClientNote(hostId, email, note) {
+      if (!isId(hostId)) throw new NotFoundError("User");
+      if (note.trim() === "") await pool.query("delete from client_notes where host_id = $1 and email = $2", [hostId, email]);
+      else await pool.query(
+        `insert into client_notes (host_id, email, note) values ($1, $2, $3)
+         on conflict (host_id, email) do update set note = $3, updated_at = now()`, [hostId, email, note]);
     },
     async markRunningLate(manageToken, minutes, now) {
       return tx(async (client) => {

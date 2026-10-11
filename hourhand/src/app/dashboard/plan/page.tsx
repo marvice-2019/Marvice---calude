@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { focusRing } from "@/components/ui/focus";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 import { getHostSubscription, type HostSubscription } from "@/lib/billing/account";
 import { billingFor } from "@/lib/billing/env";
 import { effectivePlan, LIMITS, PLAN_NAMES, PROVIDER_FOR, priceLine, providerPriceId, type BillingInterval, type Currency, type PaidPlan } from "@/lib/billing/plans";
 import { getPool } from "@/lib/data/pg-store";
+import { SeatForm } from "@/components/SeatForm";
+import { seatFor } from "@/lib/seats";
 import { cancelSubscription, choosePlan, openBillingPortal, pauseSubscription, resumeSubscription } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +30,7 @@ const DONE: Record<string, string> = {
 
 const FEATURES: Record<PaidPlan, string[]> = {
   solo: ["Everything in Free", "Unlimited calendars checked for conflicts", "No Hourhand footer on your booking pages"],
-  duo: ["Everything in Solo", "For an owner plus an assistant, or two co-hosts (adding the second person is coming soon)"],
+  duo: ["Everything in Solo", "A second person at no extra cost: an assistant who manages your bookings, or a co-host with their own page"],
 };
 
 function statusLine(s: HostSubscription, fmt: (d: Date) => string): string {
@@ -42,10 +44,11 @@ function statusLine(s: HostSubscription, fmt: (d: Date) => string): string {
 }
 
 export default async function PlanPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   const params = await searchParams;
   const live = authEnabled();
   const sub = live ? await getHostSubscription(getPool(process.env.DATABASE_URL as string), user.id) : null;
+  const seat = live ? await seatFor(getPool(process.env.DATABASE_URL as string), user.id) : null;
   const holding = Boolean(sub?.subscriptionId) && sub!.plan !== "free" && sub!.status !== "cancelled";
   const currency: Currency = params.currency === "USD" ? "USD" : "INR";
   const interval: BillingInterval = params.interval === "year" ? "year" : "month";
@@ -104,6 +107,17 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
           </div>
         )}
       </Card>
+
+      {live && sub && effectivePlan(sub.plan !== "free" ? { plan: sub.plan, status: sub.status } : null) === "duo" && (
+        <Card className="mt-6 max-w-2xl">
+          <h2 className="font-semibold text-text">Your second person</h2>
+          <p className="mt-1 mb-4 max-w-xl text-text-muted">
+            They sign in with their own email. They get Duo on their own booking page, and can switch to yours to manage bookings, availability,
+            event types, links, clients and packages. Billing, settings, integrations, calendar connections, earnings and invoices stay yours alone.
+          </p>
+          <SeatForm seat={seat} />
+        </Card>
+      )}
 
       {!holding && (
         <>

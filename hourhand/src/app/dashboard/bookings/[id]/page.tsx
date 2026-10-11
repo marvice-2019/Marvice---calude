@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { freeSlots } from "@/lib/booking";
 import { store } from "@/lib/data";
+import { clientKey, sessionNumber } from "@/lib/clients";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/billing/plans";
 import { formatDate, formatTime, zoneName } from "@/lib/format";
 import { getPool } from "@/lib/data/pg-store";
@@ -44,7 +45,7 @@ type Query = { done?: string; error?: string; confirm?: string; reschedule?: str
 export default async function BookingDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Query> }) {
   const { id } = await params;
   const query = await searchParams;
-  const user = await requireUser();
+  const user = await requireHost();
   const booking = await store.getBooking(user.id, id);
   if (!booking) notFound();
   const now = new Date();
@@ -62,11 +63,19 @@ export default async function BookingDetailPage({ params, searchParams }: { para
   const error = query.error && Object.hasOwn(ERRORS, query.error) ? ERRORS[query.error] : null;
   const payment = authEnabled() ? await bookingPayment(getPool(process.env.DATABASE_URL as string), user.id, booking.id) : null;
   const whatsapp = upcoming ? await whatsappLinks(user, booking) : null;
-  const series = booking.seriesId ? (await store.listBookings(user.id)).filter((b) => b.seriesId === booking.seriesId) : [];
+  const allBookings = await store.listBookings(user.id);
+  const series = booking.seriesId ? allBookings.filter((b) => b.seriesId === booking.seriesId) : [];
+  const nth = sessionNumber(allBookings, booking);
+  const clientNote = await store.getClientNote(user.id, booking.invitee.email);
   const laterWeeks = series.filter((b) => (b.seriesIndex ?? 0) > (booking.seriesIndex ?? 0) && b.status === "confirmed" && b.startAt > now).length;
   return (
     <div>
       <h1 className="font-display text-xl text-text">Booking with {booking.invitee.name}</h1>
+      <p className="mt-1 text-sm text-text-muted">
+        {nth > 1 ? `Returning client, session ${nth}` : nth === 1 ? "First session" : ""}{nth > 0 && " · "}
+        <Link href={`/dashboard/clients/${clientKey(booking.invitee.email)}`} className="font-semibold text-accent underline">Client history and notes</Link>
+      </p>
+      {clientNote && <p className="mt-3 max-w-xl whitespace-pre-line rounded-md bg-surface p-3 text-sm text-text"><span className="font-semibold">Your note: </span>{clientNote}</p>}
       {done && <p role="status" className="mt-4 max-w-xl text-success">{done}</p>}
       {error && <p role="alert" className="mt-4 rounded-md bg-danger-bg p-3 text-sm text-danger">{error}</p>}
       <dl className="mt-4 grid max-w-md gap-3">

@@ -28,7 +28,7 @@ export function buildSeed(now: Date): Seed {
     new Date(new TZDate(local.getFullYear(), local.getMonth(), local.getDate() + daysToMonday + 7 + dayOffset, h, m, TZ).getTime());
   const dateOf = (dayOffset: number) => at(dayOffset, 12).toISOString().slice(0, 10);
 
-  const priya: User = { id: "usr_priya", email: "priya@example.in", name: "Priya Raman", slug: "priya", timezone: TZ, timeFormat: "12h" };
+  const priya: User = { id: "usr_priya", email: "priya@example.in", name: "Priya Raman", slug: "priya", timezone: TZ, timeFormat: "12h", locale: "en" };
   const schedule: AvailabilitySchedule = { id: "sch_priya", userId: priya.id, name: "Working hours", timezone: TZ, isDefault: true };
   const weekday = [
     { from: "10:00", to: "13:00" },

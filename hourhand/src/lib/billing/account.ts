@@ -36,7 +36,13 @@ export async function getHostSubscription(db: Db, userId: string): Promise<HostS
 /** The plan the host gets right now: Free unless a paid subscription is active or retrying a payment. */
 export async function hostPlan(db: Db, userId: string): Promise<Plan> {
   const s = await getHostSubscription(db, userId);
-  return effectivePlan(s && s.plan !== "free" ? { plan: s.plan, status: s.status } : null);
+  const own = effectivePlan(s && s.plan !== "free" ? { plan: s.plan, status: s.status } : null);
+  if (own !== "free") return own;
+  // The second person on someone's Duo plan gets Duo too, while that plan is paid (the owner's own subscription only).
+  const { rows: [seat] } = await db.query(
+    `select o.plan, o.status from seats s join users u on u.id = s.owner_id join subscriptions o on o.user_id = s.owner_id
+     where s.member_id = $1 and s.accepted_at is not null and u.deleted_at is null`, [userId]);
+  return seat && effectivePlan({ plan: seat.plan, status: seat.status }) === "duo" ? "duo" : "free";
 }
 
 /** How many calendars the host's plan checks for conflicts at once. */

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { OneOffForm } from "@/components/LinkForms";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewOneOffPage() {
-  const user = await requireUser();
+  const user = await requireHost();
   return (
     <div>
       <Link href="/dashboard/links" className="inline-flex min-h-11 items-center text-sm font-semibold text-accent underline">Links</Link>

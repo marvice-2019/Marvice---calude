@@ -1,3 +1,5 @@
+import { intlTag, type Locale } from "./i18n/guest";
+
 /** Short name for a zone: "IST" for Asia/Kolkata, otherwise the IANA name with spaces. */
 export function zoneName(tz: string): string {
   return tz === "Asia/Kolkata" ? "IST" : tz.replaceAll("_", " ");
@@ -6,14 +8,14 @@ export function zoneName(tz: string): string {
 export type HourCycle = "12h" | "24h";
 
 /** "3:30 pm" in `tz`, or "15:30" with the 24h cycle. */
-export function formatTime(date: Date, tz: string, cycle: HourCycle = "12h"): string {
-  if (cycle === "24h") return new Intl.DateTimeFormat("en-IN", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
-  return new Intl.DateTimeFormat("en-IN", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(date).toLowerCase();
+export function formatTime(date: Date, tz: string, cycle: HourCycle = "12h", locale: Locale = "en"): string {
+  if (cycle === "24h") return new Intl.DateTimeFormat(intlTag(locale), { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
+  return new Intl.DateTimeFormat(intlTag(locale), { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(date).toLowerCase();
 }
 
-/** "Tuesday, 20 October 2026" in `tz`. */
-export function formatDate(date: Date, tz: string): string {
-  return new Intl.DateTimeFormat("en-IN", { timeZone: tz, weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
+/** "Tuesday, 20 October 2026" in `tz`, in the guest's language when one is given. */
+export function formatDate(date: Date, tz: string, locale: Locale = "en"): string {
+  return new Intl.DateTimeFormat(intlTag(locale), { timeZone: tz, weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
 /** Calendar date of an instant in `tz`, as "YYYY-MM-DD". */

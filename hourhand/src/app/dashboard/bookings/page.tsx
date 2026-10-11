@@ -3,12 +3,12 @@ import { isUnpaidRelease } from "@/lib/booking-reasons";
 import { upcomingFirst } from "@/lib/booking";
 import { store } from "@/lib/data";
 import { formatDate, formatTime, zoneName } from "@/lib/format";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function BookingsPage() {
-  const user = await requireUser();
+  const user = await requireHost();
   // Holds that lapsed unpaid were never bookings the host had; leave them out.
   const all = (await store.listBookings(user.id)).filter((b) => !(b.status === "cancelled" && isUnpaidRelease(b.cancelReason)));
   const { bookings, now } = upcomingFirst(all);

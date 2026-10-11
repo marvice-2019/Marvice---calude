@@ -8,6 +8,7 @@ import { focusRing } from "@/components/ui/focus";
 import { formatDate, zoneName } from "@/lib/format";
 import { LocalTime } from "./LocalTime";
 import { SlotPicker } from "./SlotPicker";
+import { t, tNodes, type Locale } from "@/lib/i18n/guest";
 
 interface Props {
   token: string;
@@ -17,23 +18,26 @@ interface Props {
   hostName: string;
   /** Later weeks of this booking's weekly series still to come; 0 when it isn't part of one. */
   laterWeeks?: number;
+  locale?: Locale;
+  /** "?lang=xx" when the guest chose a language, carried to the next page. */
+  langQuery?: string;
 }
 
-function When({ slot, tz }: { slot: string; tz: string }) {
-  return <>{formatDate(new Date(slot), tz)}, <LocalTime date={slot} tz={tz} /> {zoneName(tz)}</>;
+function When({ slot, tz, locale }: { slot: string; tz: string; locale: Locale }) {
+  return <>{formatDate(new Date(slot), tz, locale)}, <LocalTime date={slot} tz={tz} locale={locale} /> {zoneName(tz)}</>;
 }
 
 /** The two things a guest can do with a booking: move it, or cancel it. */
-export function ManageBooking({ token, slug, event, bookingWindowDays, hostName, laterWeeks = 0 }: Props) {
+export function ManageBooking({ token, slug, event, bookingWindowDays, hostName, laterWeeks = 0, locale = "en", langQuery = "" }: Props) {
   return (
     <>
-      <Reschedule token={token} slug={slug} event={event} bookingWindowDays={bookingWindowDays} />
-      <Cancel token={token} hostName={hostName} laterWeeks={laterWeeks} />
+      <Reschedule token={token} slug={slug} event={event} bookingWindowDays={bookingWindowDays} locale={locale} langQuery={langQuery} />
+      <Cancel token={token} hostName={hostName} laterWeeks={laterWeeks} locale={locale} />
     </>
   );
 }
 
-function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "hostName" | "laterWeeks">) {
+function Reschedule({ token, slug, event, bookingWindowDays, locale = "en", langQuery = "" }: Omit<Props, "hostName" | "laterWeeks">) {
   const router = useRouter();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
@@ -52,7 +56,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
       });
       const body = await res.json();
       if (res.status === 201 || res.status === 200) {
-        router.push(`/${slug}/${event}/booked/${body.bookingId}`);
+        router.push(`/${slug}/${event}/booked/${body.bookingId}${langQuery}`);
         return;
       }
       if (res.status === 409 && body.error === "slot_taken") setTaken(body.nextSlots ?? []);
@@ -67,32 +71,32 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
 
   return (
     <section aria-labelledby="reschedule-heading" className="mt-8">
-      <h2 id="reschedule-heading" className="font-semibold text-text">Reschedule</h2>
+      <h2 id="reschedule-heading" className="font-semibold text-text">{t(locale, "reschedule")}</h2>
       <div hidden={picked !== null}>
-        <SlotPicker slug={slug} event={event} bookingWindowDays={bookingWindowDays} manageToken={token} onPick={(slot, tz) => setPicked({ slot, tz })} />
+        <SlotPicker slug={slug} event={event} bookingWindowDays={bookingWindowDays} manageToken={token} locale={locale} onPick={(slot, tz) => setPicked({ slot, tz })} />
       </div>
       {picked && (
         <div className="mt-4 grid max-w-md gap-3">
-          <p className="text-text">New time: <span className="font-semibold"><When slot={picked.slot} tz={picked.tz} /></span></p>
+          <p className="text-text">{tNodes(locale, "newTime", { when: <span className="font-semibold"><When slot={picked.slot} tz={picked.tz} locale={locale} /></span> })}</p>
           {taken && (
             <div className="rounded-md bg-danger-bg p-4" role="alert">
-              <p className="text-danger">That time was just taken. Here are the next open times:</p>
+              <p className="text-danger">{t(locale, "justTaken")}</p>
               <ul className="mt-2 grid gap-2">
                 {taken.map((s) => (
                   <li key={s}>
                     <Button variant="secondary" className="w-full" onClick={() => { setTaken(null); setPicked({ slot: s, tz: picked.tz }); }}>
-                      <When slot={s} tz={picked.tz} />
+                      <When slot={s} tz={picked.tz} locale={locale} />
                     </Button>
                   </li>
                 ))}
               </ul>
             </div>
           )}
-          {failed && <p className="text-danger" role="alert">Something went wrong. Your booking hasn&apos;t moved. Try again.</p>}
-          {pastPackage && <p className="text-danger" role="alert">That time is after your package&apos;s end date. Pick an earlier time.</p>}
-          <Button onClick={confirm} loading={busy}>{busy ? "Moving…" : "Move my booking to this time"}</Button>
+          {failed && <p className="text-danger" role="alert">{t(locale, "moveFailed")}</p>}
+          {pastPackage && <p className="text-danger" role="alert">{t(locale, "packageExpired")}</p>}
+          <Button onClick={confirm} loading={busy}>{t(locale, busy ? "moving" : "moveHere")}</Button>
           <button type="button" onClick={() => { setPicked(null); setTaken(null); }} className={`min-h-11 justify-self-start text-sm font-semibold text-accent underline ${focusRing}`}>
-            Pick another time
+            {t(locale, "pickAnother")}
           </button>
         </div>
       )}
@@ -100,7 +104,7 @@ function Reschedule({ token, slug, event, bookingWindowDays }: Omit<Props, "host
   );
 }
 
-function Cancel({ token, hostName, laterWeeks }: { token: string; hostName: string; laterWeeks: number }) {
+function Cancel({ token, hostName, laterWeeks, locale }: { token: string; hostName: string; laterWeeks: number; locale: Locale }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,21 +124,21 @@ function Cancel({ token, hostName, laterWeeks }: { token: string; hostName: stri
         router.refresh();
         return;
       }
-      if (body.error === "past_cutoff") setError(`This booking can't be cancelled online this close to the start. Contact ${hostName} directly.`);
-      else if (res.status === 400) setError(body.fields?.reason ?? "Check the reason and try again.");
-      else setError("Something went wrong. Your booking is still on. Try again.");
+      if (body.error === "past_cutoff") setError(t(locale, "pastCutoff", { host: hostName }));
+      else if (res.status === 400) setError(t(locale, "checkReason"));
+      else setError(t(locale, "cancelFailed"));
     } catch {
-      setError("Something went wrong. Your booking is still on. Try again.");
+      setError(t(locale, "cancelFailed"));
     }
     setBusy(false);
   }
 
   return (
     <section aria-labelledby="cancel-heading" className="mt-10 max-w-md">
-      <h2 id="cancel-heading" className="font-semibold text-text">Cancel</h2>
+      <h2 id="cancel-heading" className="font-semibold text-text">{t(locale, "cancel")}</h2>
       <form onSubmit={submit} className="mt-2 grid gap-3">
         <div>
-          <Label htmlFor="reason">Reason (optional)</Label>
+          <Label htmlFor="reason">{t(locale, "reasonOptional")}</Label>
           <textarea
             id="reason" name="reason" rows={3} maxLength={500}
             className={`mt-1 block w-full rounded-md border border-border-input bg-card p-3 text-base text-text ${focusRing}`}
@@ -143,11 +147,11 @@ function Cancel({ token, hostName, laterWeeks }: { token: string; hostName: stri
         {laterWeeks > 0 && (
           <label className="flex min-h-11 items-start gap-3 text-text">
             <input type="checkbox" name="laterWeeks" className={`mt-1 h-5 w-5 accent-accent ${focusRing}`} />
-            <span>Also cancel the {laterWeeks === 1 ? "next week" : `${laterWeeks} later weeks`} in this series</span>
+            <span>{laterWeeks === 1 ? t(locale, "alsoCancelNext") : t(locale, "alsoCancelLater", { n: laterWeeks })}</span>
           </label>
         )}
         {error && <p className="text-danger" role="alert">{error}</p>}
-        <Button type="submit" variant="danger" loading={busy}>{busy ? "Cancelling…" : "Cancel booking"}</Button>
+        <Button type="submit" variant="danger" loading={busy}>{t(locale, busy ? "cancelling" : "cancelBooking")}</Button>
       </form>
     </section>
   );

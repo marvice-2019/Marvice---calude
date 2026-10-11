@@ -39,14 +39,14 @@ Notetaker and Callie AI assistant,ai,skip,yes,skip,out of scope: reviewers ask f
 Contacts and Opportunities CRM,crm,skip,yes,skip,out of scope: 'calendar app that desires to be a CRM'
 "Single sign-on, SCIM, admin roles",admin,skip,yes,skip,out of scope: enterprise
 Exchange on-premise calendars,calendar,skip,yes,skip,out of scope at launch: rare for solo coaches
-Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,partial,"Google and Outlook: sync light, email alert on disconnect; no iCloud, no WhatsApp alert"
+Calendar sync health light + disconnect alert (Google/Outlook/iCloud),integrations,must,no,partial,"Google, Outlook and iCloud (CalDAV, app-specific password): sync light, email alert on disconnect; no WhatsApp alert"
 Never offer a slot when calendar sync is stale,integrations,must,no,yes,slot engine refuses stale sync; real Google sync since B4
 One-click cancel; pause stops charges; renewal reminder 7 days ahead,billing,must,no,yes,"B5a: cancel, pause and resume, renewal email 7 days ahead"
 Human support reply under 1 business day; WhatsApp/callback on paid plans,support,should,no,no,fix 3: support (14 reviews/2 sources); ops not code
 Date overrides + block-a-week + recurring + one-off links (web and mobile),availability,must,no,partial,"web: overrides, block a stretch of days, one-off links (B8); no recurring sessions, no mobile"
 Mobile app parity with web; save confirmation; crash-free >=99.5%,mobile,must,no,no,fix 5: bugs (26 reviews/2 sources)
 Time zone confirm step and explicit AM/PM or 24h toggle,booking,should,no,yes,"fix 6: confirm tick when viewing a zone other than the device's, host's time shown; 12h/24h toggle already there"
-Low-cost second seat or flat 2-person price,pricing,should,no,no,fix 7: seats (5 reviews/3 sources) -> /replica-launch
+Low-cost second seat or flat 2-person price,pricing,should,no,yes,"Duo at a flat price: a second person gets Duo on their own page and can manage the owner's bookings; billing, settings, integrations, calendars, earnings and invoices stay the owner's"
 Dark mode,design,could,no,yes,"fix 8: follows the device, plus a Device/Light/Dark switch in settings and on booking pages"
 Send confirmation or reminder on WhatsApp from the host's own number,notifications,should,no,yes,"wa.me buttons on a booking; official WhatsApp API later (B9)"
 Block India's public holidays in one go,availability,should,no,yes,DoPT gazetted list 2026-2027; lunar dates flagged
@@ -56,3 +56,8 @@ Weekly recurring bookings,booking,should,partial,yes,"up to 12 weeks, all or non
 Session packages paid by UPI,payments,should,no,yes,"credits derived from bookings, private buyer link, Razorpay on the host's account"
 Refundable no-show deposit,payments,should,no,yes,refunded a day after the session unless marked a no-show
 GST tax invoices and credit notes to guests,payments,should,no,yes,"CGST Rule 46 particulars, gapless FY numbering, CSV export; CA to confirm"
+Private client notes and session history,crm,should,no,yes,"clients grouped by email, one private note each, returning-client badge on bookings"
+Monthly earnings report,payments,should,no,yes,"IST month: bookings, packages, deposits kept, refunds, GST, fee estimate; emailed on the 1st; CSV for the accountant"
+Waitlist for full days,booking,should,no,yes,"guest leaves an email for a day in their zone; emailed once when a time there frees up; entries deleted a day after"
+Booking page as a mini website,booking,should,no,yes,"photo, headline, about, area, WhatsApp, Instagram, Google reviews link, services with prices, schema.org markup"
+Booking pages in Indian languages,booking,should,no,yes,"Hindi, Tamil, Telugu, Kannada on guest pages; host default plus a switcher; drafts pending native review; guest emails still English"

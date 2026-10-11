@@ -269,6 +269,34 @@ export function renderInvoiceMail(v: { kind: "invoice" | "credit_note"; number: 
   }, { replyTo: v.supplierEmail });
 }
 
+/** Last month in a few figures, with a link to the full report. */
+export function renderEarningsMail(e: { monthLabel: string; netMinor: number; bookingsMinor: number; packagesMinor: number; refundsMinor: number; sessionsHeld: number; noShows: number; url: string }): RenderedMail {
+  return render(`Your ${e.monthLabel} on Hourhand: ${formatMoney(e.netMinor, "INR")}`, {
+    heading: `${e.monthLabel} at a glance`, intro: `Here's how ${e.monthLabel} went.`,
+    rows: [["Net received", formatMoney(e.netMinor, "INR")], ["Bookings", formatMoney(e.bookingsMinor, "INR")], ["Packages", formatMoney(e.packagesMinor, "INR")],
+      ["Refunds", formatMoney(e.refundsMinor, "INR")], ["Sessions held", String(e.sessionsHeld)], ["No-shows", String(e.noShows)]],
+    link: { label: "See the full report", url: e.url }, footer: "Sent by Hourhand once a month.",
+  });
+}
+
+export function renderSeatInviteMail(c: { ownerName: string; ownerEmail: string; url: string }): RenderedMail {
+  return render(`${c.ownerName} added you to their Hourhand plan`, {
+    heading: "You're invited to Hourhand", intro: `${c.ownerName} added you as the second person on their Duo plan. Sign in with this email address to accept.`,
+    rows: [], link: { label: "Sign in to accept", url: c.url },
+    note: "Once you accept, you get your own booking page on Duo and can manage their bookings. If you weren't expecting this, ignore it.",
+    footer: `Sent by Hourhand for ${c.ownerName}. Reply to reach them.`,
+  }, { replyTo: c.ownerEmail });
+}
+
+export function renderWaitlistMail(c: { guestName: string; hostName: string; eventName: string; start: Date; timezone: string; url: string }): RenderedMail {
+  return render(`A time opened up with ${c.hostName}`, {
+    heading: "A time opened up", intro: `Hi ${c.guestName}, a ${c.eventName} time with ${c.hostName} just became free on the day you asked about.`,
+    rows: [["Time", when(c.start, c.timezone, "12h")]], link: { label: "Book it", url: c.url },
+    note: "Everyone on the waitlist for that day gets this email, so it goes to whoever books first. We only send it once.",
+    footer: `Sent by Hourhand for ${c.hostName}.`,
+  });
+}
+
 export function renderMagicLink(url: string): RenderedMail {
   return render("Your Hourhand sign-in link", {
     heading: "Sign in to Hourhand", intro: "Use the button below to sign in. The link works once and expires in 15 minutes.",

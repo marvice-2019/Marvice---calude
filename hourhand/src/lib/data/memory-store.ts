@@ -20,6 +20,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   type LinkRow = { id: string; userId: string; eventTypeId: string; tokenHash: string; label: string | null; expiresAt: Date | null; revokedAt: Date | null; createdAt: Date };
   const links: LinkRow[] = []; // newest last
   const linkOfBooking = new Map<string, string>(); // booking id -> booking link id (bookings.booking_link_id)
+  const clientNotes = new Map<string, string>(); // "<host id>:<lowercased email>" -> the host's note (client_notes)
   const oneOffTimes = new Map<string, Date[]>(); // one_off event type id -> offered start times, earliest first
 
   /** Same derived rule as Postgres. `ignoreKey`: a retried request whose own booking shouldn't count as another use. */
@@ -108,6 +109,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     },
     async getUser(id) {
       return db.users.find((u) => u.id === id && !deleted.has(u.id)) ?? null;
+    },
+    async setUserLocale(userId, locale) {
+      const user = db.users.find((u) => u.id === userId);
+      if (user) user.locale = locale;
     },
     async getUserBySlug(slug) {
       return db.users.find((u) => u.slug === slug && !deleted.has(u.id)) ?? null;
@@ -252,6 +257,14 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       if (!booking) throw new NotFoundError("Booking");
       booking.invitee.noShowAt = on ? now : null;
       return booking;
+    },
+    async getClientNote(hostId, email) {
+      return clientNotes.get(`${hostId}:${email.toLowerCase()}`) ?? "";
+    },
+    async saveClientNote(hostId, email, note) {
+      const key = `${hostId}:${email.toLowerCase()}`;
+      if (note.trim() === "") clientNotes.delete(key);
+      else clientNotes.set(key, note);
     },
     async markRunningLate(manageToken, minutes, now) {
       const booking = db.bookings.find((b) => b.invitee.manageToken === manageToken && b.status === "confirmed");

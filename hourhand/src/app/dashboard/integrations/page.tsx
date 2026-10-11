@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 import { hostPlan } from "@/lib/billing/account";
 import { parseKey } from "@/lib/crypto/seal";
 import { getPool } from "@/lib/data/pg-store";
@@ -32,7 +32,7 @@ function encryptionReady(): boolean {
 }
 
 export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   const params = await searchParams;
   const live = authEnabled();
   const pool = live ? getPool(process.env.DATABASE_URL as string) : null;

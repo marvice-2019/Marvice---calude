@@ -9,7 +9,8 @@ import type { HourCycle } from "../format";
 import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { MailError, type Mailer } from "../mail/mailer";
 import { invoiceById } from "../gst/invoices";
-import { renderBookingMail, renderCalendarAlert, renderInvoiceMail, renderPackageMail, renderRenewalReminder, type BookingMailContext, type RenderedMail } from "../mail/templates";
+import { monthlyEarnings } from "../earnings";
+import { renderBookingMail, renderCalendarAlert, renderEarningsMail, renderInvoiceMail, renderPackageMail, renderRenewalReminder, renderSeatInviteMail, renderWaitlistMail, type BookingMailContext, type RenderedMail } from "../mail/templates";
 import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
 import { freeSlots } from "../booking";
 import { createPgStore } from "../data/pg-store";
@@ -293,6 +294,39 @@ async function renderRenewal(pool: pg.Pool, c: Claimed, baseUrl: string): Promis
   });
 }
 
+async function renderEarnings(pool: pg.Pool, c: Claimed, baseUrl: string, now: Date): Promise<RenderedMail | { skip: string }> {
+  const m = /^earnings:[0-9a-f-]{36}:(\d{4}-\d{2})$/.exec(c.dedupe_key);
+  const e = m ? await monthlyEarnings(pool, c.user_id, m[1], now) : null;
+  if (!e) return { skip: "no report" };
+  const monthLabel = new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${e.month}-01T00:00:00Z`));
+  return renderEarningsMail({ monthLabel, netMinor: e.netMinor, bookingsMinor: e.bookingsMinor, packagesMinor: e.packagesMinor, refundsMinor: e.refundsMinor,
+    sessionsHeld: e.sessions.held, noShows: e.sessions.noShows, url: `${baseUrl}/dashboard/earnings?month=${e.month}` });
+}
+
+/** A Duo owner's invitation to their second person; skipped if it was withdrawn, moved to someone else, or accepted. */
+async function renderSeatInvite(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
+  const { rows: [s] } = await pool.query(
+    `select u.name, u.email from seats s join users u on u.id = s.owner_id
+     where s.owner_id = $1 and s.member_email = $2 and s.accepted_at is null and u.deleted_at is null`, [c.user_id, c.recipient]);
+  if (!s) return { skip: "invitation withdrawn or already accepted" };
+  return renderSeatInviteMail({ ownerName: s.name, ownerEmail: s.email, url: `${baseUrl}/sign-in` });
+}
+
+/** A time opened on a day the guest waited for. The booking is the cancelled one; its start is the freed time. */
+async function renderWaitlist(pool: pg.Pool, c: Claimed, baseUrl: string, now: Date): Promise<RenderedMail | { skip: string }> {
+  const m = /^waitlist:([0-9a-f-]{36})$/.exec(c.dedupe_key);
+  if (!m) return { skip: "not a waitlist email" };
+  const { rows: [w] } = await pool.query(
+    `select w.name, w.timezone, b.start_at, e.name as event_name, e.slug as event_slug, e.active, u.name as host_name, u.slug as host_slug, u.deleted_at
+     from waitlist w join bookings b on b.id = $2 join event_types e on e.id = w.event_type_id join users u on u.id = w.host_id where w.id = $1`, [m[1], c.booking_id]);
+  if (!w) return { skip: "waitlist entry gone" };
+  if (new Date(w.start_at).getTime() <= now.getTime()) return { skip: "the time has passed" };
+  if (!w.active || w.deleted_at || !w.host_slug) return { skip: "event no longer bookable" };
+  const start = new Date(w.start_at);
+  return renderWaitlistMail({ guestName: w.name, hostName: w.host_name, eventName: w.event_name, start, timezone: w.timezone,
+    url: `${baseUrl}/${w.host_slug}/${w.event_slug}?at=${encodeURIComponent(start.toISOString())}` });
+}
+
 async function renderInvoice(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
   const m = /^invoice:([0-9a-f-]{36})$/.exec(c.dedupe_key);
   const v = m ? await invoiceById(pool, m[1]) : null;
@@ -358,7 +392,7 @@ export async function processDueNotifications(
       continue;
     }
     // Host emails about their account rather than a booking.
-    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host" || c.kind === "invoice_guest";
+    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host" || c.kind === "invoice_guest" || c.kind === "earnings_host" || c.kind === "waitlist_guest" || c.kind === "seat_invite";
     if (!isAccountMail) {
       if (!r?.id) { await skip(c, "booking no longer exists"); continue; }
       const why = skipReason(c.kind, r, now);
@@ -382,7 +416,7 @@ export async function processDueNotifications(
         continue;
       }
     }
-    if (isCalendarJob(c.kind) && !opts.calendar) { await skip(c, `${Object.values(PROVIDER_NAMES).join(" and ")} calendars are not configured on this server`); await release(c); continue; }
+    if (isCalendarJob(c.kind) && !opts.calendar) { await skip(c, `${new Intl.ListFormat("en").format(Object.values(PROVIDER_NAMES))} calendars are not configured on this server`); await release(c); continue; }
 
     // Renew the lease for this row only, right before running it. If another worker took the row over, leave it to them.
     const renewed = await pool.query(
@@ -402,6 +436,9 @@ export async function processDueNotifications(
           : c.kind === "renewal_reminder_host" ? await renderRenewal(pool, c, opts.baseUrl)
           : c.kind === "package_guest" || c.kind === "package_host" ? await renderPackage(pool, c, opts.baseUrl)
           : c.kind === "invoice_guest" ? await renderInvoice(pool, c, opts.baseUrl)
+          : c.kind === "earnings_host" ? await renderEarnings(pool, c, opts.baseUrl, now)
+          : c.kind === "waitlist_guest" ? await renderWaitlist(pool, c, opts.baseUrl, now)
+          : c.kind === "seat_invite" ? await renderSeatInvite(pool, c, opts.baseUrl)
           : renderBookingMail(c.kind as BookingEmailKind, {
             ...toContext(r, opts.baseUrl),
             ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { EventTypeEditor } from "@/components/EventTypeEditor";
 import { store } from "@/lib/data";
 import { toForm } from "@/lib/event-types";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export default async function EventTypePage({ params, searchParams }: {
 }) {
   const { id } = await params;
   const { saved } = await searchParams;
-  const user = await requireUser();
+  const user = await requireHost();
   const eventType = await store.getEventType(user.id, id);
   if (!eventType) notFound();
   const [locations, questions] = await Promise.all([store.listEventLocations(user.id, id), store.listCustomQuestions(user.id, id)]);

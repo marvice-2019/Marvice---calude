@@ -7,9 +7,12 @@ import { focusRing } from "./ui/focus";
 
 const items = [
   { href: "/dashboard/bookings", label: "Bookings" },
+  { href: "/dashboard/clients", label: "Clients" },
+  { href: "/dashboard/profile", label: "Your page" },
   { href: "/dashboard/event-types", label: "Event types" },
   { href: "/dashboard/links", label: "Links" },
   { href: "/dashboard/packages", label: "Packages" },
+  { href: "/dashboard/earnings", label: "Earnings" },
   { href: "/dashboard/invoices", label: "Invoices" },
   { href: "/dashboard/availability", label: "Availability" },
   { href: "/dashboard/calendars", label: "Calendars" },
@@ -18,11 +21,14 @@ const items = [
   { href: "/dashboard/settings", label: "Settings" },
 ];
 
-export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+/** Pages a Duo second person can use while managing the owner's account; the rest stay the owner's alone. */
+const SHARED = new Set(["/dashboard/bookings", "/dashboard/clients", "/dashboard/profile", "/dashboard/event-types", "/dashboard/links", "/dashboard/packages", "/dashboard/availability"]);
+
+export function NavLinks({ onNavigate, acting = false }: { onNavigate?: () => void; acting?: boolean }) {
   const pathname = usePathname();
   return (
     <ul className="flex flex-col gap-1">
-      {items.map((item) => {
+      {items.filter((item) => !acting || SHARED.has(item.href)).map((item) => {
         const current = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <li key={item.href}>
@@ -42,7 +48,7 @@ export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 /** Below 1024px the sidebar collapses into this menu in the top bar. */
-export function MobileMenu() {
+export function MobileMenu({ acting = false }: { acting?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="lg:hidden" onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
@@ -57,7 +63,7 @@ export function MobileMenu() {
       </button>
       {open && (
         <nav id="mobile-nav" aria-label="Main" className="absolute inset-x-0 top-full z-10 border-b border-border bg-bg p-4 shadow-pop">
-          <NavLinks onNavigate={() => setOpen(false)} />
+          <NavLinks acting={acting} onNavigate={() => setOpen(false)} />
         </nav>
       )}
     </div>

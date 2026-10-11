@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { store } from "@/lib/data";
 import { isNamedError, LOCATION_KINDS, type InvalidOneOffError, type LocationKind } from "@/lib/data/types";
 import { LOCATION_VALUE_LABEL } from "@/lib/event-types";
@@ -20,7 +20,7 @@ const field = (form: FormData, name: string) => String(form.get(name) ?? "").tri
 const MAX_LABEL = 100;
 
 export async function createSingleUseLink(_prev: LinkFormState, form: FormData): Promise<LinkFormState> {
-  const user = await requireUser();
+  const user = await requireHost();
   const eventTypeId = field(form, "eventTypeId");
   const label = field(form, "label");
   if (!eventTypeId) return { status: "error", message: "Pick the event type the link books." };
@@ -36,7 +36,7 @@ export async function createSingleUseLink(_prev: LinkFormState, form: FormData):
 }
 
 export async function createOneOff(_prev: LinkFormState, form: FormData): Promise<LinkFormState> {
-  const user = await requireUser();
+  const user = await requireHost();
   const name = field(form, "name");
   const duration = Number(field(form, "durationMinutes"));
   const kind = field(form, "locationKind") as LocationKind;
@@ -62,7 +62,7 @@ export async function createOneOff(_prev: LinkFormState, form: FormData): Promis
 }
 
 export async function revokeLink(form: FormData): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHost();
   let target = "/dashboard/links?done=revoked";
   try {
     await store.revokeBookingLink(user.id, field(form, "linkId"), new Date());

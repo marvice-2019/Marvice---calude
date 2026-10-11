@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { ICloudConnectForm } from "@/components/ICloudConnectForm";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
 import { calendarDeps } from "@/lib/calendar/env";
 import { PROVIDER_NAMES } from "@/lib/calendar/provider";
 import { store, type CalendarConnection } from "@/lib/data";
@@ -39,14 +40,15 @@ function health(c: CalendarConnection, now: Date): { tone: string; words: string
 }
 
 export default async function CalendarsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireOwnAccount();
   const params = await searchParams;
   const [connections, calendars] = await Promise.all([store.listCalendarConnections(user.id), store.listCalendars(user.id)]);
   const live = authEnabled();
   const providers = live ? (calendarDeps()?.providers ?? {}) : {};
   const canGoogle = Boolean(providers.google);
   const canOutlook = Boolean(providers.microsoft);
-  const canConnect = canGoogle || canOutlook;
+  const canICloud = Boolean(providers.icloud);
+  const canConnect = canGoogle || canOutlook || canICloud;
   const now = new Date();
 
   return (
@@ -139,6 +141,12 @@ export default async function CalendarsPage({ searchParams }: { searchParams: Pr
             <Link prefetch={false} href="/api/calendars/microsoft/connect" className={buttonClasses()}>
               {connections.length ? "Connect another Outlook account" : "Connect Outlook"}
             </Link>
+          )}
+          {canICloud && (
+            <details className="w-full rounded-md border border-border p-4">
+              <summary className="min-h-11 cursor-pointer content-center font-semibold text-text">{connections.length ? "Connect an iCloud account" : "Connect iCloud"}</summary>
+              <div className="mt-3"><ICloudConnectForm /></div>
+            </details>
           )}
         </div>
       ) : (

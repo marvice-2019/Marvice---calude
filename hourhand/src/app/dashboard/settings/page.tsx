@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
 import { signOutEverywhere } from "@/lib/auth/actions";
-import { requireUser } from "@/lib/auth/session";
+import { requireOwnAccount } from "@/lib/auth/session";
+import { focusRing } from "@/components/ui/focus";
+import { LOCALES, LOCALE_NAMES, isLocale } from "@/lib/i18n/guest";
+import { setBookingLanguage } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
-  const user = await requireUser();
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+  const user = await requireOwnAccount();
+  const { saved } = await searchParams;
   return (
     <div>
       <h1 className="font-display text-xl text-text">Settings</h1>
@@ -23,6 +27,22 @@ export default async function SettingsPage() {
         <h2 className="font-semibold text-text">Appearance</h2>
         <p className="mt-1 text-text-muted">Dark mode is easier on the eyes at night. Device follows your phone or computer setting.</p>
         <ThemeSwitch className="mt-4" />
+      </Card>
+
+      <Card className="mt-6 max-w-xl">
+        <h2 className="font-semibold text-text">Booking page language</h2>
+        <p className="mt-1 text-text-muted">What guests see first on your booking pages. They can switch to another language at the top of the page.</p>
+        <form action={setBookingLanguage} className="mt-4 flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="locale" className="block text-sm font-semibold text-text">Language</label>
+            <select id="locale" name="locale" defaultValue={isLocale(user.locale) ? user.locale : "en"}
+              className={`mt-1 block h-11 rounded-md border border-border-input bg-card px-3 text-base text-text ${focusRing}`}>
+              {LOCALES.map((l) => <option key={l} value={l} lang={l}>{LOCALE_NAMES[l]}</option>)}
+            </select>
+          </div>
+          <Button type="submit">Save</Button>
+        </form>
+        {saved === "language" && <p role="status" className="mt-2 text-success">Saved. New guests see your booking pages in this language.</p>}
       </Card>
 
       <Card className="mt-6 max-w-xl">

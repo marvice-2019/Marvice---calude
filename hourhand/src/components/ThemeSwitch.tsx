@@ -30,19 +30,16 @@ function choose(choice: ThemeChoice) {
 }
 
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
-const OPTIONS: { value: ThemeChoice; label: string }[] = [
-  { value: "system", label: "Device" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-];
+const OPTIONS: ThemeChoice[] = ["system", "light", "dark"];
+const ENGLISH = { legend: "Appearance", system: "Device", light: "Light", dark: "Dark" };
 
 /** Light, dark, or match the device. The server render shows "Device" so hydration matches; the head script has already applied the saved theme. */
-export function ThemeSwitch({ className = "" }: { className?: string }) {
+export function ThemeSwitch({ className = "", labels = ENGLISH }: { className?: string; labels?: typeof ENGLISH }) {
   const current = useSyncExternalStore(subscribe, read, () => "system" as const);
   return (
     <fieldset className={`inline-flex items-center gap-1 rounded-md border border-border p-1 ${className}`}>
-      <legend className="sr-only">Appearance</legend>
-      {OPTIONS.map((o) => (
+      <legend className="sr-only">{labels.legend}</legend>
+      {OPTIONS.map((value) => ({ value, label: labels[value] })).map((o) => (
         <label key={o.value} className={`inline-flex min-h-9 cursor-pointer items-center rounded px-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-focus ${current === o.value ? "bg-surface font-semibold text-text" : "text-text-muted hover:text-text"}`}>
           <input type="radio" name="hh-theme" value={o.value} checked={current === o.value} onChange={() => choose(o.value)} className={`sr-only ${focusRing}`} />
           {o.label}

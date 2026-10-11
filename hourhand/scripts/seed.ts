@@ -13,7 +13,7 @@ function arunSeed(now: Date): Seed {
   const start = new Date(Math.ceil((now.getTime() + 3 * 24 * 60 * MIN) / (60 * MIN)) * 60 * MIN);
   const end = new Date(start.getTime() + 30 * MIN);
   return {
-    users: [{ id: userId, email: "arun@example.in", name: "Arun Iyer", slug: "arun", timezone: "Asia/Kolkata", timeFormat: "24h" }],
+    users: [{ id: userId, email: "arun@example.in", name: "Arun Iyer", slug: "arun", timezone: "Asia/Kolkata", timeFormat: "24h", locale: "en" }],
     schedules: [{ id: "sch_arun", userId, name: "Working hours", timezone: "Asia/Kolkata", isDefault: true }],
     rules: [1, 2, 3, 4, 5].map((d) => ({ id: `rule_a${d}`, scheduleId: "sch_arun", kind: "weekly" as const, weekday: d, onDate: null, intervals: [{ from: "09:00", to: "17:00" }] })),
     eventTypes: [{
