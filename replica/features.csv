@@ -52,3 +52,7 @@ Send confirmation or reminder on WhatsApp from the host's own number,notificatio
 Block India's public holidays in one go,availability,should,no,yes,DoPT gazetted list 2026-2027; lunar dates flagged
 Guest says they're running late,booking,should,no,yes,"5-30 min, from 2 h before to 30 min after start; emails the host once per choice"
 Offer nearest free times when the host cancels,notifications,should,no,yes,three one-tap links in the guest's cancellation email
+Weekly recurring bookings,booking,should,partial,yes,"up to 12 weeks, all or none, cancel this and later weeks"
+Session packages paid by UPI,payments,should,no,yes,"credits derived from bookings, private buyer link, Razorpay on the host's account"
+Refundable no-show deposit,payments,should,no,yes,refunded a day after the session unless marked a no-show
+GST tax invoices and credit notes to guests,payments,should,no,yes,"CGST Rule 46 particulars, gapless FY numbering, CSV export; CA to confirm"

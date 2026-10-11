@@ -170,6 +170,13 @@ A booking still waiting on payment, or already cancelled, has no actions.
 - **Appearance**: dark mode follows the device; Settings and every booking page also have a Device / Light / Dark switch, kept per browser.
 - **Time-zone check**: if a guest looks at times in a zone other than their device's, the booking form asks them to confirm they'll be in that zone. It also shows the time on the host's clock when the two differ.
 
+## Money features for coaches, tutors and consultants
+
+- **Weekly repeats**: on a free event type, set "Weekly repeats" (up to 12). Guests then pick "Every week for N weeks". Every week is checked and booked together, or none are: if a later week isn't free, the guest is told which. Each week is an ordinary booking with its own reminders, calendar event and change link. The first week's confirmation lists every date and adds them all to the guest's calendar. Guests and hosts can cancel one week, or that week and the later ones, in one step.
+- **Session packages** (Dashboard → Packages): sell N sessions of one event type for one price, paid by UPI, card or netbanking straight into your Razorpay. The booking page shows "Save with N sessions for ₹X". The buyer gets a private link showing how many sessions are left and the end date, and books from there with nothing to pay. A session cancelled in time goes back into the package. Packages need a paid plan and Razorpay; there are no automatic refunds (refund from Razorpay if needed).
+- **No-show deposit** (event type → No-show deposit): a free event type can ask for a refundable deposit to hold the time. It's refunded in full a day after the session, unless you mark a no-show before then, and whenever the booking is cancelled in time. You can set a price or a deposit, not both, and there are no weekly repeats with a deposit.
+- **GST invoices** (Dashboard → Invoices): if you're GST-registered, add your legal name, address, GSTIN, SAC and rate. Every guest who pays you a price (a booking or a package) then gets a tax invoice by email, numbered PREFIX/FY/serial. A refund issues a credit note. Prices are taken as including GST. Place of supply is your registered state, since guests' addresses aren't collected. Deposits aren't invoiced. You can download a month as CSV for your accountant. **Check your SAC, rate and invoice format with your CA before relying on it.**
+
 ## What is fake today
 
 - **Calendar in demo mode:** the seed's "Work" calendar is demo data with no tokens; the sync leaves it alone. Instant sync needs a public https address, so on localhost busy times are at most 5 minutes old.
