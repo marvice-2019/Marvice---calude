@@ -22,6 +22,7 @@ describe("plans", () => {
     expect(effectivePlan({ plan: "solo", status: "active" })).toBe("solo");
     expect(effectivePlan({ plan: "solo", status: "past_due" })).toBe("solo");
     expect(effectivePlan({ plan: "duo", status: "paused" })).toBe("free");
+    expect(effectivePlan({ plan: "duo", status: "unpaid" })).toBe("free");
     expect(effectivePlan({ plan: "duo", status: "cancelled" })).toBe("free");
   });
 });

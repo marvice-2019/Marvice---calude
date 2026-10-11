@@ -6,7 +6,7 @@ import { authEnabled } from "@/lib/auth/auth";
 import { requireUser } from "@/lib/auth/session";
 import { getHostSubscription, type HostSubscription } from "@/lib/billing/account";
 import { billingFor } from "@/lib/billing/env";
-import { LIMITS, PLAN_NAMES, PROVIDER_FOR, priceLine, providerPriceId, type BillingInterval, type Currency, type PaidPlan } from "@/lib/billing/plans";
+import { effectivePlan, LIMITS, PLAN_NAMES, PROVIDER_FOR, priceLine, providerPriceId, type BillingInterval, type Currency, type PaidPlan } from "@/lib/billing/plans";
 import { getPool } from "@/lib/data/pg-store";
 import { cancelSubscription, choosePlan, openBillingPortal, pauseSubscription, resumeSubscription } from "./actions";
 
@@ -34,6 +34,7 @@ const FEATURES: Record<PaidPlan, string[]> = {
 function statusLine(s: HostSubscription, fmt: (d: Date) => string): string {
   const end = s.currentPeriodEnd ? fmt(s.currentPeriodEnd) : null;
   if (s.status === "paused") return "Paused. Paid features are off and you aren't being charged.";
+  if (s.status === "unpaid") return `${PLAN_NAMES[s.plan]} is on hold: the renewal payment failed and the provider stopped retrying. Paid features are off until the card is updated.`;
   if (s.status === "past_due") return "Your last payment didn't go through. The provider is retrying; update your card to keep the plan.";
   if (s.status === "cancelled") return end ? `Ended ${end}.` : "Ended.";
   if (s.cancelAtPeriodEnd) return end ? `Cancelled. Your plan stays on until ${end}, then you move to Free.` : "Cancelled. Your plan stays on until the end of this period.";
@@ -69,18 +70,18 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
       </p>
 
       {params.checkout === "done" && (
-        <p role="status" className="mt-4 max-w-xl text-success">Payment received. Your plan switches on as soon as the provider confirms it, usually within a minute. Refresh to see it.</p>
+        <p role="status" className="mt-4 max-w-xl text-success">Checkout finished. Your plan switches on as soon as the payment provider confirms the payment, usually within a minute. Refresh to see it.</p>
       )}
       {params.checkout === "cancelled" && <p role="status" className="mt-4 text-text-muted">Checkout closed. Nothing was charged.</p>}
       {params.done && DONE[params.done] && <p role="status" className="mt-4 max-w-xl text-success">{DONE[params.done]}</p>}
       {params.error && <p role="alert" className="mt-4 max-w-xl text-danger">{ERRORS[params.error] ?? ERRORS.provider}</p>}
 
       <Card className="mt-6 max-w-2xl">
-        <h2 className="font-semibold text-text">Current plan: {holding ? PLAN_NAMES[sub!.plan] : "Free"}</h2>
+        <h2 className="font-semibold text-text">Current plan: {PLAN_NAMES[effectivePlan(sub && sub.plan !== "free" ? { plan: sub.plan, status: sub.status } : null)]}</h2>
         {sub && sub.plan !== "free" && <p className="mt-1 text-text-muted">{statusLine(sub, fmt)}</p>}
         {holding && (
           <div className="mt-4 flex flex-wrap gap-2">
-            {sub!.status === "active" && !sub!.cancelAtPeriodEnd && (
+            {(sub!.status === "active" || sub!.status === "past_due" || sub!.status === "unpaid") && !sub!.cancelAtPeriodEnd && (
               <form action={cancelSubscription}>
                 <Button type="submit" variant="secondary" size="sm">Cancel renewal</Button>
               </form>

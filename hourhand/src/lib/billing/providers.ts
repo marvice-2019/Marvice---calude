@@ -68,7 +68,7 @@ async function send(f: Fetch, url: string, init: RequestInit, what: string): Pro
 // ---------- Razorpay ----------
 
 const RAZORPAY_STATUS: Record<string, SubscriptionStatus | null> = {
-  created: null, authenticated: null, active: "active", pending: "past_due", halted: "past_due",
+  created: null, authenticated: null, active: "active", pending: "past_due", halted: "unpaid",
   paused: "paused", cancelled: "cancelled", completed: "cancelled", expired: "cancelled",
 };
 
@@ -120,7 +120,7 @@ export function formEncode(params: Record<string, unknown>, prefix = ""): string
 }
 
 const STRIPE_STATUS: Record<string, SubscriptionStatus | null> = {
-  active: "active", trialing: "active", past_due: "past_due", unpaid: "past_due", paused: "paused",
+  active: "active", trialing: "active", past_due: "past_due", unpaid: "unpaid", paused: "paused",
   canceled: "cancelled", incomplete_expired: "cancelled", incomplete: null,
 };
 

@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { planForPriceId, type Provider } from "./plans";
-import type { BillingProvider, ProviderSubscription } from "./providers";
+import { BillingApiError, type BillingProvider, type ProviderSubscription } from "./providers";
 import type { WebhookEvent } from "./webhooks";
 
 // Saving a subscription's state. Webhooks only say "subscription X changed"; Hourhand re-reads X from the provider under
@@ -31,12 +31,13 @@ export async function saveSubscription(db: Db, sub: ProviderSubscription, env: E
   const current = rows[0];
   const sameSub = current?.provider_subscription_id === sub.id;
   if (current && !sameSub && current.provider_subscription_id) {
-    const currentLive = current.plan !== "free" && (current.status === "active" || current.status === "past_due");
-    const incomingLive = sub.status === "active" || sub.status === "past_due" || sub.status === "paused";
-    if (currentLive && !incomingLive) return { saved: false, reason: "older_subscription" };
-    if (currentLive && incomingLive) {
+    // "Held" is anything not ended: a paused or unpaid subscription is still the host's, and can come back.
+    const currentHeld = current.plan !== "free" && current.status !== "cancelled";
+    const incomingHeld = sub.status !== "cancelled";
+    if (currentHeld && !incomingHeld) return { saved: false, reason: "older_subscription" };
+    if (currentHeld && incomingHeld) {
       // Two paying subscriptions for one host: the checkout guard should prevent it, so a person must refund one.
-      console.error(`[billing] host ${sub.userId} has two live subscriptions: ${current.provider_subscription_id} and ${sub.id}. Cancel and refund one.`);
+      console.error(`[billing] host ${sub.userId} has two open subscriptions: ${current.provider_subscription_id} and ${sub.id}. Cancel and refund one.`);
     }
   }
 
@@ -102,7 +103,14 @@ export async function handleWebhook(pool: pg.Pool, provider: BillingProvider, ev
     await pool.query("update webhook_events set processed_at = $3, error = null where provider = $1 and external_id = $2", [providerName, event.eventId, now]);
     return outcome;
   } catch (error) {
-    await pool.query("update webhook_events set error = $3 where provider = $1 and external_id = $2", [providerName, event.eventId, String((error as Error).message).slice(0, 500)]);
+    const message = String((error as Error).message).slice(0, 500);
+    if (error instanceof BillingApiError && !error.retryable && error.status !== null && error.status >= 400 && error.status < 500) {
+      // Retrying can't help (a subscription from another account, or test mode): keep the error, stop the retries.
+      await pool.query("update webhook_events set processed_at = $3, error = $4 where provider = $1 and external_id = $2", [providerName, event.eventId, now, message]);
+      console.warn(`[billing] ${providerName} event ${event.eventId} (${event.type}) dropped: ${message}`);
+      return "ignored";
+    }
+    await pool.query("update webhook_events set error = $3 where provider = $1 and external_id = $2", [providerName, event.eventId, message]);
     throw error;
   }
 }

@@ -7,7 +7,7 @@ import { migrate } from "../../../scripts/migrate";
 import { seed } from "../../../scripts/seed";
 import { createPgStore } from "../data/pg-store";
 import type { User } from "../data/types";
-import { formEncode, razorpayProvider, stripeProvider, type BillingProvider, type ProviderSubscription } from "./providers";
+import { BillingApiError, formEncode, razorpayProvider, stripeProvider, type BillingProvider, type ProviderSubscription } from "./providers";
 import { handleWebhook, saveSubscription, syncSubscription } from "./sync";
 import { cancelPlan, hostPlan, startCheckout } from "./account";
 import { queueRenewalReminders } from "./reminders";
@@ -44,8 +44,8 @@ describe("provider clients", () => {
     expect(JSON.parse(calls[0].body)).toMatchObject({ plan_id: "plan_solo_m", total_count: 120, notes: { user_id: "u1" } });
   });
 
-  it("Razorpay: maps statuses, and a halted subscription still counts as retrying payment", async () => {
-    const statuses: Record<string, string | null> = { created: null, authenticated: null, active: "active", halted: "past_due", paused: "paused", cancelled: "cancelled", completed: "cancelled" };
+  it("Razorpay: maps statuses; halted (retries given up) is unpaid, not still retrying", async () => {
+    const statuses: Record<string, string | null> = { created: null, authenticated: null, active: "active", pending: "past_due", halted: "unpaid", paused: "paused", cancelled: "cancelled", completed: "cancelled" };
     for (const [rz, ours] of Object.entries(statuses)) {
       const { f } = fakeFetch(() => ({ body: { id: "sub_1", plan_id: "plan_solo_m", status: rz, current_end: 1_900_000_000, customer_id: "cust_1", notes: { user_id: "u1" } } }));
       const s = await razorpayProvider({ keyId: "k", keySecret: "s", fetchImpl: f }).getSubscription("sub_1");
@@ -196,6 +196,26 @@ describe.skipIf(!BASE)("saving subscriptions (TEST_DATABASE_URL)", () => {
     expect(await row()).toMatchObject({ provider_subscription_id: "sub_new", plan: "duo", status: "active" });
   });
 
+  it("a late cancellation of an old subscription doesn't replace a newer one that is paused", async () => {
+    await save(sub({ id: "sub_old" }));
+    await save(sub({ id: "sub_new" }));
+    await save(sub({ id: "sub_new", status: "paused", providerStatus: "paused" }));
+    expect(await save(sub({ id: "sub_old", status: "cancelled", providerStatus: "cancelled" }))).toEqual({ saved: false, reason: "older_subscription" });
+    expect(await row()).toMatchObject({ provider_subscription_id: "sub_new", status: "paused" });
+  });
+
+  it("a webhook for a subscription the provider says doesn't exist is recorded and dropped, not retried forever", async () => {
+    const p = fakeProvider(new Map());
+    p.getSubscription = async () => { throw new BillingApiError("Razorpay 400 BAD_REQUEST_ERROR: not found", 400, false); };
+    const event = { provider: "razorpay" as const, eventId: "evt_gone", type: "subscription.charged", subscriptionId: "sub_other_account" };
+    expect(await handleWebhook(pool, p, event, {}, env)).toBe("ignored");
+    const r = (await pool.query("select processed_at, error from webhook_events where external_id = 'evt_gone'")).rows[0];
+    expect(r.processed_at).not.toBeNull();
+    expect(r.error).toContain("not found");
+    p.getSubscription = async () => { throw new BillingApiError("Razorpay 503", 503, true); };
+    await expect(handleWebhook(pool, p, { ...event, eventId: "evt_outage" }, {}, env)).rejects.toThrow("503");
+  });
+
   it("a new subscription replaces a cancelled one", async () => {
     await save(sub({ id: "sub_old", status: "cancelled", providerStatus: "cancelled" }));
     await save(sub({ id: "sub_new" }));
@@ -310,6 +330,13 @@ describe.skipIf(!BASE)("saving subscriptions (TEST_DATABASE_URL)", () => {
       await saveGoogleConnection(pool, key, priya.id, tokens("two@x.com"), [{ id: "two@x.com", name: "z", primary: true, accessRole: "owner" }], new Date());
       expect((await ids()).filter((r) => r.check_conflicts)).toHaveLength(2);
       expect(await setCheckConflicts(pool, priya.id, b.id, false)).toBe(true);
+      // Several "on" toggles at the same moment: only as many as fit under the limit go through.
+      await pool.query("update calendars set check_conflicts = false where user_id = $1", [priya.id]);
+      const all = await ids();
+      const results = await Promise.all(all.map((r) => setCheckConflicts(pool, priya.id, r.id, true)));
+      expect(results.filter(Boolean)).toHaveLength(2);
+      expect((await ids()).filter((r) => r.check_conflicts)).toHaveLength(2);
+      await pool.query("update calendars set check_conflicts = (id = $2) where user_id = $1", [priya.id, a.id]);
       await save(sub());
       expect(await setCheckConflicts(pool, priya.id, b.id, true)).toBe(true);
       expect(await setCheckConflicts(pool, priya.id, c.id, true)).toBe(true);

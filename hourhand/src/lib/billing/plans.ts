@@ -62,11 +62,12 @@ export function planForPriceId(provider: Provider, id: string, env: Env = proces
   return null;
 }
 
-export type SubscriptionStatus = "active" | "paused" | "past_due" | "cancelled";
+/** past_due: the provider is still retrying a renewal. unpaid: it has stopped retrying until the card is updated. */
+export type SubscriptionStatus = "active" | "paused" | "past_due" | "unpaid" | "cancelled";
 
 /**
  * The plan a host gets right now. A paid plan counts while active or while a renewal payment is being retried; a
- * paused or cancelled subscription falls back to Free (pausing stops billing, so it stops paid features too).
+ * paused, unpaid or cancelled subscription falls back to Free (no payment, no paid features).
  */
 export function effectivePlan(sub: { plan: Plan; status: SubscriptionStatus } | null): Plan {
   if (!sub) return "free";

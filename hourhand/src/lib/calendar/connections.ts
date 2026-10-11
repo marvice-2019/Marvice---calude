@@ -92,13 +92,25 @@ export async function disconnectConnection(pool: Db, google: GoogleClient | null
  * Turns conflict checking on or off for one of the host's calendars. Turning one on fails (returns false) when the
  * host's plan already checks as many calendars as it allows; turning one off always works.
  */
-export async function setCheckConflicts(pool: Db, userId: string, calendarId: string, on: boolean): Promise<boolean> {
-  const limit = on ? await checkedCalendarLimit(pool, userId) : Infinity;
-  const { rowCount } = await pool.query(
-    `update calendars set check_conflicts = $3, updated_at = now() where id = $1 and user_id = $2
-       and (not $3 or $4::int is null or (select count(*) from calendars o where o.user_id = $2 and o.check_conflicts and o.id <> $1) < $4::int)`,
-    [calendarId, userId, on, Number.isFinite(limit) ? limit : null]);
-  return Boolean(rowCount);
+export async function setCheckConflicts(pool: pg.Pool, userId: string, calendarId: string, on: boolean): Promise<boolean> {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    // Two "on" toggles at once would each count before the other wrote; take turns per host.
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [`checked-calendars:${userId}`]);
+    const limit = on ? await checkedCalendarLimit(client, userId) : Infinity;
+    const { rowCount } = await client.query(
+      `update calendars set check_conflicts = $3, updated_at = now() where id = $1 and user_id = $2
+         and (not $3 or $4::int is null or (select count(*) from calendars o where o.user_id = $2 and o.check_conflicts and o.id <> $1) < $4::int)`,
+      [calendarId, userId, on, Number.isFinite(limit) ? limit : null]);
+    await client.query("commit");
+    return Boolean(rowCount);
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /** Makes one of the host's own calendars the one booked events go into. Only calendars they own qualify. */
