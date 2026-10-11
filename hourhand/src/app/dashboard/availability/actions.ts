@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { todayIn, validateDateOverride, validateDateRange, validateWeeklyHours, type FieldErrors, type WeeklyHours } from "@/lib/availability";
 import { store, type Interval } from "@/lib/data";
 import { requireUser } from "@/lib/auth/session";
+import { pickHolidayDates } from "@/lib/holidays";
 
 export type FormState = { status: "idle" | "saved" | "error"; errors: FieldErrors; savedAt?: number };
 
@@ -61,5 +62,13 @@ export async function blockDateRangeAction(_prev: FormState, form: FormData): Pr
 export async function deleteDateOverrideAction(form: FormData): Promise<void> {
   const mine = await mySchedule();
   await store.deleteDateOverride(mine.userId, mine.id, String(form.get("date") ?? ""));
+  revalidatePath(PATH);
+}
+
+/** Blocks the ticked gazetted holidays as days off. Only real upcoming holiday dates from the list are accepted. */
+export async function blockHolidaysAction(form: FormData): Promise<void> {
+  const schedule = await mySchedule();
+  const dates = pickHolidayDates(form.getAll("holiday").map(String), todayIn(schedule.timezone, new Date()));
+  for (const date of dates) await store.saveDateOverride(schedule.userId, schedule.id, date, []);
   revalidatePath(PATH);
 }

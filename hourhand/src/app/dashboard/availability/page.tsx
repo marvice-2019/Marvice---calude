@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { todayIn } from "@/lib/availability";
 import { store, type Interval } from "@/lib/data";
-import { deleteDateOverrideAction } from "./actions";
+import { blockHolidaysAction, deleteDateOverrideAction } from "./actions";
+import { upcomingHolidays } from "@/lib/holidays";
 import { requireUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,8 @@ export default async function AvailabilityPage() {
     else if (r.onDate >= today) overrides.push({ date: r.onDate, intervals: r.intervals });
   }
   overrides.sort((a, b) => a.date.localeCompare(b.date));
+  const daysOff = new Set(overrides.filter((o) => o.intervals.length === 0).map((o) => o.date));
+  const holidays = upcomingHolidays(today);
 
   return (
     <div className="space-y-8">
@@ -84,6 +87,32 @@ export default async function AvailabilityPage() {
           <div className="mt-3">
             <BlockRangeForm today={today} />
           </div>
+        </section>
+      </Card>
+
+      <Card>
+        <section aria-labelledby="holidays-heading">
+          <h2 id="holidays-heading" className="font-display text-lg text-text">Holidays</h2>
+          <p className="mt-1 max-w-xl text-text-muted">
+            India&apos;s gazetted holidays for the next year. Tick the ones you take off and nobody can book you on them.
+            Dates marked * follow the moon and can move by a day. For Pongal, Onam, Ugadi and other regional festivals, use &ldquo;Add an override&rdquo; above.
+          </p>
+          {holidays.length === 0 ? (
+            <p className="mt-3 text-text-muted">No holiday dates loaded for the coming year yet.</p>
+          ) : (
+            <form action={blockHolidaysAction} className="mt-4 grid gap-1">
+              {holidays.map((h) => (
+                <label key={h.date} className="flex min-h-11 items-center gap-3">
+                  <input type="checkbox" name="holiday" value={h.date} defaultChecked={false} disabled={daysOff.has(h.date)} className="size-5 accent-accent" />
+                  <span className="text-text">
+                    {longDate(h.date)}: {h.name}{h.lunar ? " *" : ""}
+                    {daysOff.has(h.date) && <span className="ml-2 text-sm text-text-muted">already a day off</span>}
+                  </span>
+                </label>
+              ))}
+              <div className="mt-3"><Button type="submit">Block the ticked days</Button></div>
+            </form>
+          )}
         </section>
       </Card>
     </div>
