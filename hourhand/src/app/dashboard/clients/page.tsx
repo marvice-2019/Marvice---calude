@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { summarizeClients } from "@/lib/clients";
 import { store } from "@/lib/data";
 import { formatDate } from "@/lib/format";
@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const user = await requireUser();
+  const user = await requireHost();
   const { error } = await searchParams;
   const clients = summarizeClients(await store.listBookings(user.id), new Date());
   const tz = user.timezone;

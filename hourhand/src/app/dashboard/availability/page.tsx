@@ -5,7 +5,7 @@ import { todayIn } from "@/lib/availability";
 import { store, type Interval } from "@/lib/data";
 import { blockHolidaysAction, deleteDateOverrideAction } from "./actions";
 import { upcomingHolidays } from "@/lib/holidays";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ const longDate = (date: string) =>
 const hoursText = (intervals: Interval[]) => (intervals.length ? intervals.map((i) => `${i.from}–${i.to}`).join(", ") : "Unavailable");
 
 export default async function AvailabilityPage() {
-  const user = await requireUser();
+  const user = await requireHost();
   const { schedule, rules } = await store.getDefaultSchedule(user.id);
   const today = todayIn(schedule.timezone, new Date());
 

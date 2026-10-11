@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { getPool } from "@/lib/data/pg-store";
 import { isNamedError } from "@/lib/data/types";
 import { removePhoto, saveProfile, savePhoto, validateProfile, type PhotoRejectedError } from "@/lib/profile";
@@ -15,7 +15,7 @@ const DEMO = "Your page needs the database, which this demo copy doesn't have.";
 const field = (form: FormData, name: string) => String(form.get(name) ?? "");
 
 export async function saveProfileAction(_prev: ProfileFormState, form: FormData): Promise<ProfileFormState> {
-  const user = await requireUser();
+  const user = await requireHost();
   if (!authEnabled()) return { status: "error", errors: { form: DEMO } };
   const v = validateProfile(Object.fromEntries(["headline", "bio", "area", "whatsapp", "instagram", "reviewsUrl"].map((k) => [k, field(form, k)])));
   if (!v.ok) return { status: "error", errors: v.errors };
@@ -26,7 +26,7 @@ export async function saveProfileAction(_prev: ProfileFormState, form: FormData)
 }
 
 export async function savePhotoAction(_prev: ProfileFormState, form: FormData): Promise<ProfileFormState> {
-  const user = await requireUser();
+  const user = await requireHost();
   if (!authEnabled()) return { status: "error", errors: { photo: DEMO } };
   const file = form.get("photo");
   if (!(file instanceof File) || file.size === 0) return { status: "error", errors: { photo: "Choose a photo first." } };
@@ -44,7 +44,7 @@ export async function savePhotoAction(_prev: ProfileFormState, form: FormData): 
 }
 
 export async function removePhotoAction(): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHost();
   if (!authEnabled()) return;
   await removePhoto(getPool(process.env.DATABASE_URL as string), user.id);
   revalidatePath("/dashboard/profile");

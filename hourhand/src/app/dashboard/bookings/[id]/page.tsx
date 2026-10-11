@@ -7,7 +7,7 @@ import { freeSlots } from "@/lib/booking";
 import { store } from "@/lib/data";
 import { clientKey, sessionNumber } from "@/lib/clients";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/billing/plans";
 import { formatDate, formatTime, zoneName } from "@/lib/format";
 import { getPool } from "@/lib/data/pg-store";
@@ -45,7 +45,7 @@ type Query = { done?: string; error?: string; confirm?: string; reschedule?: str
 export default async function BookingDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Query> }) {
   const { id } = await params;
   const query = await searchParams;
-  const user = await requireUser();
+  const user = await requireHost();
   const booking = await store.getBooking(user.id, id);
   if (!booking) notFound();
   const now = new Date();

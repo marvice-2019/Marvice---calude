@@ -10,7 +10,7 @@ import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { MailError, type Mailer } from "../mail/mailer";
 import { invoiceById } from "../gst/invoices";
 import { monthlyEarnings } from "../earnings";
-import { renderBookingMail, renderCalendarAlert, renderEarningsMail, renderInvoiceMail, renderPackageMail, renderRenewalReminder, renderWaitlistMail, type BookingMailContext, type RenderedMail } from "../mail/templates";
+import { renderBookingMail, renderCalendarAlert, renderEarningsMail, renderInvoiceMail, renderPackageMail, renderRenewalReminder, renderSeatInviteMail, renderWaitlistMail, type BookingMailContext, type RenderedMail } from "../mail/templates";
 import { PLAN_NAMES, PRICES, priceLine, type BillingInterval, type PaidPlan } from "../billing/plans";
 import { freeSlots } from "../booking";
 import { createPgStore } from "../data/pg-store";
@@ -303,6 +303,15 @@ async function renderEarnings(pool: pg.Pool, c: Claimed, baseUrl: string, now: D
     sessionsHeld: e.sessions.held, noShows: e.sessions.noShows, url: `${baseUrl}/dashboard/earnings?month=${e.month}` });
 }
 
+/** A Duo owner's invitation to their second person; skipped if it was withdrawn, moved to someone else, or accepted. */
+async function renderSeatInvite(pool: pg.Pool, c: Claimed, baseUrl: string): Promise<RenderedMail | { skip: string }> {
+  const { rows: [s] } = await pool.query(
+    `select u.name, u.email from seats s join users u on u.id = s.owner_id
+     where s.owner_id = $1 and s.member_email = $2 and s.accepted_at is null and u.deleted_at is null`, [c.user_id, c.recipient]);
+  if (!s) return { skip: "invitation withdrawn or already accepted" };
+  return renderSeatInviteMail({ ownerName: s.name, ownerEmail: s.email, url: `${baseUrl}/sign-in` });
+}
+
 /** A time opened on a day the guest waited for. The booking is the cancelled one; its start is the freed time. */
 async function renderWaitlist(pool: pg.Pool, c: Claimed, baseUrl: string, now: Date): Promise<RenderedMail | { skip: string }> {
   const m = /^waitlist:([0-9a-f-]{36})$/.exec(c.dedupe_key);
@@ -383,7 +392,7 @@ export async function processDueNotifications(
       continue;
     }
     // Host emails about their account rather than a booking.
-    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host" || c.kind === "invoice_guest" || c.kind === "earnings_host" || c.kind === "waitlist_guest";
+    const isAccountMail = c.kind === "calendar_alert_host" || c.kind === "renewal_reminder_host" || c.kind === "package_guest" || c.kind === "package_host" || c.kind === "invoice_guest" || c.kind === "earnings_host" || c.kind === "waitlist_guest" || c.kind === "seat_invite";
     if (!isAccountMail) {
       if (!r?.id) { await skip(c, "booking no longer exists"); continue; }
       const why = skipReason(c.kind, r, now);
@@ -429,6 +438,7 @@ export async function processDueNotifications(
           : c.kind === "invoice_guest" ? await renderInvoice(pool, c, opts.baseUrl)
           : c.kind === "earnings_host" ? await renderEarnings(pool, c, opts.baseUrl, now)
           : c.kind === "waitlist_guest" ? await renderWaitlist(pool, c, opts.baseUrl, now)
+          : c.kind === "seat_invite" ? await renderSeatInvite(pool, c, opts.baseUrl)
           : renderBookingMail(c.kind as BookingEmailKind, {
             ...toContext(r, opts.baseUrl),
             ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),

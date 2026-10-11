@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { store } from "@/lib/data";
 import { isNamedError, NotFoundError } from "@/lib/data/types";
 import { handleHostReschedule } from "@/lib/manage";
@@ -27,7 +27,7 @@ async function run(id: string, change: () => Promise<string>): Promise<never> {
 }
 
 export async function cancelAsHost(form: FormData): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHost();
   const id = field(form, "bookingId");
   const reason = field(form, "reason");
   if (reason.length > MAX_REASON) redirect(`${page(id)}?confirm=cancel&error=reason_too_long`);
@@ -42,7 +42,7 @@ export async function cancelAsHost(form: FormData): Promise<void> {
 }
 
 export async function rescheduleAsHost(form: FormData): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHost();
   const id = field(form, "bookingId");
   await run(id, async () => {
     const result = await handleHostReschedule(store, user.id, id, { start: field(form, "start"), idempotencyKey: field(form, "key") }, new Date());
@@ -55,7 +55,7 @@ export async function rescheduleAsHost(form: FormData): Promise<void> {
 }
 
 export async function setNoShow(form: FormData): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHost();
   const id = field(form, "bookingId");
   const on = field(form, "on") === "1";
   await run(id, async () => {

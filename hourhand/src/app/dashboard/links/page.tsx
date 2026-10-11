@@ -4,7 +4,7 @@ import { LocalTime } from "@/components/LocalTime";
 import { SingleUseLinkForm } from "@/components/LinkForms";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { store } from "@/lib/data";
 import type { BookingLink } from "@/lib/data/types";
 import { formatDate } from "@/lib/format";
@@ -19,7 +19,7 @@ const STATE: Record<BookingLink["state"], { label: string; className: string }> 
 };
 
 export default async function LinksPage({ searchParams }: { searchParams: Promise<{ done?: string; error?: string }> }) {
-  const user = await requireUser();
+  const user = await requireHost();
   const { done, error } = await searchParams;
   const now = new Date();
   const [links, eventTypes] = await Promise.all([store.listBookingLinks(user.id, now), store.listEventTypes(user.id)]);

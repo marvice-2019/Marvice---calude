@@ -2,14 +2,14 @@ import Link from "next/link";
 import { ProfileForm, ProfilePhotoForm } from "@/components/ProfileForm";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { getPool } from "@/lib/data/pg-store";
 import { getProfile } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfileSettingsPage() {
-  const user = await requireUser();
+  const user = await requireHost();
   const db = authEnabled() ? getPool(process.env.DATABASE_URL as string) : null;
   const profile = db ? await getProfile(db, user.id) : null;
   return (

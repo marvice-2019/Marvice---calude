@@ -279,6 +279,15 @@ export function renderEarningsMail(e: { monthLabel: string; netMinor: number; bo
   });
 }
 
+export function renderSeatInviteMail(c: { ownerName: string; ownerEmail: string; url: string }): RenderedMail {
+  return render(`${c.ownerName} added you to their Hourhand plan`, {
+    heading: "You're invited to Hourhand", intro: `${c.ownerName} added you as the second person on their Duo plan. Sign in with this email address to accept.`,
+    rows: [], link: { label: "Sign in to accept", url: c.url },
+    note: "Once you accept, you get your own booking page on Duo and can manage their bookings. If you weren't expecting this, ignore it.",
+    footer: `Sent by Hourhand for ${c.ownerName}. Reply to reach them.`,
+  }, { replyTo: c.ownerEmail });
+}
+
 export function renderWaitlistMail(c: { guestName: string; hostName: string; eventName: string; start: Date; timezone: string; url: string }): RenderedMail {
   return render(`A time opened up with ${c.hostName}`, {
     heading: "A time opened up", intro: `Hi ${c.guestName}, a ${c.eventName} time with ${c.hostName} just became free on the day you asked about.`,

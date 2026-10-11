@@ -4,7 +4,7 @@ import { PackageForm } from "@/components/PackageForm";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/billing/plans";
 import { store } from "@/lib/data";
 import { getPool } from "@/lib/data/pg-store";
@@ -14,7 +14,7 @@ import { listPackages, listPurchases } from "@/lib/packages/packages";
 export const dynamic = "force-dynamic";
 
 export default async function PackagesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const user = await requireUser();
+  const user = await requireHost();
   const { error } = await searchParams;
   const db = authEnabled() ? getPool(process.env.DATABASE_URL as string) : null;
   const [eventTypes, packages, purchases] = await Promise.all([

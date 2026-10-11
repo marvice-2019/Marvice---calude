@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { clientKey } from "@/lib/clients";
 import { store } from "@/lib/data";
 
@@ -10,7 +10,7 @@ const MAX_NOTE = 5000;
 
 /** Saves the signed-in host's note about one of their own clients (someone who has booked them). */
 export async function saveClientNoteAction(form: FormData): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHost();
   const key = String(form.get("key") ?? "");
   const note = String(form.get("note") ?? "");
   // The email comes from the host's own bookings, never from the form, so a note can only be about their own client.

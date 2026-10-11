@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { authEnabled } from "@/lib/auth/auth";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { getPool } from "@/lib/data/pg-store";
 import { isNamedError } from "@/lib/data/types";
 import { createPackage, setPackageActive, validatePackageForm } from "@/lib/packages/packages";
@@ -16,7 +16,7 @@ export type PackageFormState = { status: "idle" } | { status: "created" } | { st
 const field = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 
 export async function createPackageAction(_prev: PackageFormState, form: FormData): Promise<PackageFormState> {
-  const user = await requireUser();
+  const user = await requireHost();
   if (!authEnabled()) return { status: "error", errors: { form: "Packages need payments, which this demo copy doesn't have." } };
   const v = validatePackageForm({ eventTypeId: field(form, "eventTypeId"), name: field(form, "name"), sessions: field(form, "sessions"), price: field(form, "price"), validDays: field(form, "validDays") });
   if (!v.ok) return { status: "error", errors: v.errors };
@@ -31,7 +31,7 @@ export async function createPackageAction(_prev: PackageFormState, form: FormDat
 }
 
 export async function togglePackage(form: FormData): Promise<void> {
-  const user = await requireUser();
+  const user = await requireHost();
   let target = "/dashboard/packages";
   try {
     await setPackageActive(getPool(process.env.DATABASE_URL as string), user.id, field(form, "packageId"), field(form, "active") === "on");

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { saveClientNoteAction } from "../actions";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { requireUser } from "@/lib/auth/session";
+import { requireHost } from "@/lib/auth/session";
 import { clientKey, summarizeClients } from "@/lib/clients";
 import { store } from "@/lib/data";
 import { formatDate, formatTime } from "@/lib/format";
@@ -12,7 +12,7 @@ import { focusRing } from "@/components/ui/focus";
 export const dynamic = "force-dynamic";
 
 export default async function ClientPage({ params, searchParams }: { params: Promise<{ key: string }>; searchParams: Promise<{ saved?: string; error?: string }> }) {
-  const user = await requireUser();
+  const user = await requireHost();
   const { key } = await params;
   const { saved, error } = await searchParams;
   const all = await store.listBookings(user.id);
