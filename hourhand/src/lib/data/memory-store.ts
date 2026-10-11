@@ -3,6 +3,7 @@ import { datesInRange } from "../availability";
 import { overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
 import { hashLinkToken, newLinkToken } from "../links";
+import { checkOneOff, oneOffSlug } from "./one-off";
 import {
   EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type BookingLink, type BookingWithInvitee,
   type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval,
@@ -18,6 +19,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   type LinkRow = { id: string; userId: string; eventTypeId: string; tokenHash: string; label: string | null; expiresAt: Date | null; revokedAt: Date | null; createdAt: Date };
   const links: LinkRow[] = []; // newest last
   const linkOfBooking = new Map<string, string>(); // booking id -> booking link id (bookings.booking_link_id)
+  const oneOffTimes = new Map<string, Date[]>(); // one_off event type id -> offered start times, earliest first
 
   /** Same derived rule as Postgres: used when a booking made through it exists that the system didn't cancel. */
   function toLink(row: LinkRow, now: Date): BookingLink {
@@ -101,14 +103,15 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       return db.users.find((u) => u.slug === slug && !deleted.has(u.id)) ?? null;
     },
     async listEventTypes(userId) {
-      return db.eventTypes.filter((e) => e.userId === userId).sort((a, b) => a.position - b.position);
+      // One-off meetings live on the Links page, not in the event types list.
+      return db.eventTypes.filter((e) => e.userId === userId && e.kind !== "one_off").sort((a, b) => a.position - b.position);
     },
     async getEventType(userId, id) {
       return db.eventTypes.find((e) => e.userId === userId && e.id === id) ?? null;
     },
     async getPublicEventType(hostSlug, eventSlug) {
       const user = db.users.find((u) => u.slug === hostSlug && !deleted.has(u.id));
-      const eventType = user && db.eventTypes.find((e) => e.userId === user.id && e.slug === eventSlug && e.active);
+      const eventType = user && db.eventTypes.find((e) => e.userId === user.id && e.slug === eventSlug && e.active && e.kind !== "one_off");
       return user && eventType ? { host: user, eventType } : null;
     },
     async listEventLocations(userId, eventTypeId) {
@@ -180,6 +183,23 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       if (!linkHost || !eventType) return { status: "not_found" };
       return { status: "open", link, host: linkHost, eventType };
     },
+    async createOneOffMeeting(hostId, input, now) {
+      const times = checkOneOff(input, now);
+      const eventType: EventType = {
+        id: randomUUID(), userId: hostId, scheduleId: db.schedules.find((s) => s.userId === hostId && s.isDefault)?.id ?? null,
+        name: input.name.trim(), slug: oneOffSlug(), description: input.description ?? null, durationMinutes: input.durationMinutes,
+        minNoticeMinutes: 0, bookingWindowDays: 730, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null,
+        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off",
+      };
+      db.eventTypes.push(eventType);
+      db.locations.push({ id: randomUUID(), eventTypeId: eventType.id, kind: input.location.kind, value: input.location.value ?? null, position: 0 });
+      oneOffTimes.set(eventType.id, times);
+      const { link, token } = await this.createBookingLink(hostId, eventType.id, { expiresAt: times[times.length - 1] }, now);
+      return { eventType, link, token };
+    },
+    async listOneOffTimes(eventTypeId) {
+      return [...(oneOffTimes.get(eventTypeId) ?? [])];
+    },
     async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey, by = "guest") {
       const repeat = db.bookings.find((b) => b.idempotencyKey === idempotencyKey);
       if (repeat) {
@@ -192,6 +212,9 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       // Both steps run synchronously, so no other request can see the half-done state (one transaction in Postgres).
       const booking = build({ eventTypeId: old.eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers: answers.map((a) => ({ ...a })) } }, old.id);
       db.bookings.push(booking);
+      // The move keeps the booking's single-use link, so the link shows the current time.
+      const linkId = linkOfBooking.get(old.id);
+      if (linkId) linkOfBooking.set(booking.id, linkId);
       Object.assign(old, { status: "cancelled", cancelledAt: new Date(), cancelledBy: by, cancelReason: "Rescheduled" });
       return booking;
     },
@@ -234,7 +257,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       const mine = db.eventTypes.filter((e) => e.userId === userId);
       const eventType: EventType = {
         id: randomUUID(), userId, scheduleId: db.schedules.find((s) => s.userId === userId && s.isDefault)?.id ?? null,
-        ...fields(draft), hidden: false, active: true, position: Math.max(-1, ...mine.map((e) => e.position)) + 1,
+        ...fields(draft), hidden: false, active: true, position: Math.max(-1, ...mine.map((e) => e.position)) + 1, kind: "one_on_one",
       };
       db.eventTypes.push(eventType);
       setLocation(eventType.id, draft);

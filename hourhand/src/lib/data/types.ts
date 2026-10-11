@@ -45,6 +45,26 @@ export interface EventType {
   hidden: boolean;
   active: boolean;
   position: number;
+  /** A one_off type is a one-off meeting: offered only at its own times, through its single-use link. */
+  kind: "one_on_one" | "group" | "one_off";
+}
+
+/** What the host enters for a one-off meeting. */
+export interface OneOffInput {
+  name: string;
+  durationMinutes: number;
+  location: { kind: LocationKind; value?: string | null };
+  description?: string | null;
+  times: Date[];
+}
+
+/** A one-off meeting the store refused: `field` names what is wrong. */
+export class InvalidOneOffError extends Error {
+  readonly code = "invalid_one_off";
+  constructor(readonly field: "times" | "durationMinutes" | "name", message: string) {
+    super(message);
+    this.name = "InvalidOneOffError";
+  }
 }
 
 export type LocationKind =
@@ -282,6 +302,13 @@ export interface DataStore {
   revokeBookingLink(hostId: string, linkId: string, now: Date): Promise<BookingLink>;
   /** Public: what `/l/{token}` shows. Only an open link reveals its host and event type. */
   resolveBookingLink(token: string, now: Date): Promise<ResolvedBookingLink>;
+  /**
+   * A hidden one_off event type at the given times, with a single-use link to it that expires at the last time; all in one
+   * write. Throws InvalidOneOffError unless there are 1–20 distinct future times and the duration is 5–720 minutes.
+   */
+  createOneOffMeeting(hostId: string, input: OneOffInput, now: Date): Promise<{ eventType: EventType; link: BookingLink; token: string }>;
+  /** The offered start times of a one_off event type, earliest first. */
+  listOneOffTimes(eventTypeId: string): Promise<Date[]>;
 }
 
 /** The editable fields of an event type, already validated. */

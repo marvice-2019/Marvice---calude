@@ -4,6 +4,7 @@ import { kickJobs } from "../jobs/kick";
 import { closeAccount, purgeClosedAccounts } from "./account-lifecycle";
 import { queueBookingNotifications } from "./notifications";
 import { hashLinkToken, newLinkToken } from "../links";
+import { checkOneOff, oneOffSlug } from "./one-off";
 import {
   EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingLink,
   type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval, type User,
@@ -28,13 +29,14 @@ const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format
 const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"] });
 
 const EVENT = `id, user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
-  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position`;
+  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind`;
 const toEventType = (r: Row): EventType => ({
   id: r.id as string, userId: r.user_id as string, scheduleId: r.schedule_id as string | null, name: r.name as string, slug: r.slug as string,
   description: r.description as string | null, durationMinutes: r.duration_minutes as number, minNoticeMinutes: r.min_notice_minutes as number,
   bookingWindowDays: r.booking_window_days as number, startIncrementMinutes: r.start_increment_minutes as number, bufferBeforeMinutes: r.buffer_before_minutes as number,
   bufferAfterMinutes: r.buffer_after_minutes as number, dailyLimit: r.daily_limit as number | null, cancelCutoffMinutes: r.cancel_cutoff_minutes as number,
   priceMinor: r.price_minor as number | null, currency: r.currency as EventType["currency"], hidden: r.hidden as boolean, active: r.active as boolean, position: r.position as number,
+  kind: r.kind as EventType["kind"],
 });
 
 const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
@@ -222,7 +224,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async listEventTypes(userId) {
       if (!isId(userId)) return [];
-      return (await pool.query(`select ${EVENT} from event_types where user_id = $1 order by position, created_at`, [userId])).rows.map(toEventType);
+      return (await pool.query(`select ${EVENT} from event_types where user_id = $1 and kind <> 'one_off' order by position, created_at`, [userId])).rows.map(toEventType);
     },
     async getEventType(userId, id) {
       if (!isId(userId) || !isId(id)) return null;
@@ -232,7 +234,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
     async getPublicEventType(hostSlug, eventSlug) {
       const host = await this.getUserBySlug(hostSlug);
       if (!host) return null;
-      const { rows } = await pool.query(`select ${EVENT} from event_types where user_id = $1 and slug = $2 and active`, [host.id, eventSlug]);
+      const { rows } = await pool.query(`select ${EVENT} from event_types where user_id = $1 and slug = $2 and active and kind <> 'one_off'`, [host.id, eventSlug]);
       return rows[0] ? { host, eventType: toEventType(rows[0]) } : null;
     },
     async listEventLocations(userId, eventTypeId) {
@@ -306,6 +308,29 @@ export function createPgStore(pool: pg.Pool): DataStore {
         return settle(error, input.idempotencyKey, isSameRequest);
       }
     },
+    async createOneOffMeeting(hostId, input, now) {
+      if (!isId(hostId)) throw new NotFoundError("User");
+      const times = checkOneOff(input, now);
+      const token = newLinkToken();
+      const { eventType, linkId } = await tx(async (client) => {
+        const { rows } = await client.query(
+          `insert into event_types (user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, buffer_before_minutes, buffer_after_minutes, kind, hidden)
+           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2, $3, $4, $5, 0, 730, 0, 0, 'one_off', true)
+           returning ${EVENT}`, [hostId, input.name.trim(), oneOffSlug(), input.description ?? null, input.durationMinutes]);
+        const created = toEventType(rows[0]);
+        await client.query("insert into event_locations (event_type_id, kind, value, position) values ($1,$2,$3,0)", [created.id, input.location.kind, input.location.value ?? null]);
+        await client.query("insert into one_off_times (event_type_id, start_at) select $1, unnest($2::timestamptz[])", [created.id, times]);
+        const link = await client.query("insert into booking_links (user_id, event_type_id, token_hash, expires_at) values ($1,$2,$3,$4) returning id",
+          [hostId, created.id, hashLinkToken(token), times[times.length - 1]]);
+        return { eventType: created, linkId: link.rows[0].id as string };
+      });
+      const [{ link }] = await linkRows(pool, "l.id = $1", [linkId], now);
+      return { eventType, link, token };
+    },
+    async listOneOffTimes(eventTypeId) {
+      if (!isId(eventTypeId)) return [];
+      return (await pool.query("select start_at from one_off_times where event_type_id = $1 order by start_at", [eventTypeId])).rows.map((r) => r.start_at as Date);
+    },
     async rescheduleBooking(hostId, bookingId, startAt, idempotencyKey, by = "guest") {
       if (!isId(hostId) || !isId(bookingId)) throw new NotFoundError("Booking");
       const isSameRequest = (b: BookingWithInvitee) => b.hostId === hostId && b.rescheduledFromId === bookingId;
@@ -320,7 +345,9 @@ export function createPgStore(pool: pg.Pool): DataStore {
           // Both statements commit together or not at all.
           await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = 'Rescheduled' where id = $1", [bookingId, by]);
           const { name, email, timezone, phone, answers } = invitee;
-          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId);
+          // The move keeps the booking's single-use link, so the link shows the current time.
+          const linkId = (await client.query("select booking_link_id from bookings where id = $1", [bookingId])).rows[0].booking_link_id as string | null;
+          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId, linkId);
           // Nothing more goes out about the old time; the new booking gets its own emails and reminders.
           // A calendar write already running for the old booking is left to finish; the move waits for it and then moves its event.
           await client.query(
