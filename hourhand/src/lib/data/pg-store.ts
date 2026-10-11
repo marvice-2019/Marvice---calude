@@ -41,7 +41,7 @@ const toEventType = (r: Row): EventType => ({
 
 const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
   b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.created_at,
-  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at
+  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at, i.running_late_minutes, i.running_late_at
   from bookings b join invitees i on i.booking_id = b.id`;
 const toBooking = (r: Row): BookingWithInvitee => ({
   id: r.id as string, eventTypeId: r.event_type_id as string, hostId: r.host_id as string, startAt: r.start_at as Date, endAt: r.end_at as Date,
@@ -54,6 +54,7 @@ const toBooking = (r: Row): BookingWithInvitee => ({
     id: r.invitee_id as string, bookingId: r.id as string, hostId: r.host_id as string, name: r.invitee_name as string, email: r.invitee_email as string,
     timezone: r.invitee_timezone as string, phone: r.invitee_phone as string | null, answers: r.answers as BookingWithInvitee["invitee"]["answers"], manageToken: r.manage_token as string,
     noShowAt: (r.no_show_at as Date | null) ?? null,
+    runningLateMinutes: (r.running_late_minutes as number | null) ?? null, runningLateAt: (r.running_late_at as Date | null) ?? null,
   },
 });
 
@@ -393,6 +394,21 @@ export function createPgStore(pool: pg.Pool): DataStore {
         [bookingId, hostId, on ? now : null, now]);
       if (!rowCount) throw new NotFoundError("Booking");
       return (await bookingWhere(pool, "b.id = $1 and b.host_id = $2", [bookingId, hostId]))!;
+    },
+    async markRunningLate(manageToken, minutes, now) {
+      return tx(async (client) => {
+        // Only a confirmed booking; the host's email is queued in the same write, keyed so a repeated tap sends once.
+        const { rows } = await client.query(
+          `update invitees i set running_late_minutes = $2, running_late_at = $3 from bookings b
+           where b.id = i.booking_id and i.manage_token = $1 and b.status = 'confirmed' returning b.id, b.host_id`, [manageToken, minutes, now]);
+        if (!rows[0]) throw new NotFoundError("Booking");
+        const { id, host_id: hostId } = rows[0];
+        await client.query(
+          `insert into notifications (booking_id, user_id, channel, kind, recipient, send_at, dedupe_key)
+           select $1, $2, 'email', 'late_host', u.email, $3, $4 from users u where u.id = $2 on conflict (dedupe_key) do nothing`,
+          [id, hostId, now, `booking:${id}:late:${minutes}`]);
+        return (await bookingWhere(client, "b.id = $1", [id]))!;
+      });
     },
     async saveWeeklyHours(userId, scheduleId, byWeekday) {
       await tx(async (client) => {

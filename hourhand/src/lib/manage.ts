@@ -79,3 +79,28 @@ async function moveBooking(store: DataStore, booking: BookingWithInvitee, input:
     throw err;
   }
 }
+
+/** How late a guest can say they'll be, in minutes. */
+export const RUNNING_LATE_CHOICES = [5, 10, 15, 20, 30] as const;
+/** The guest can say they're late from this long before the start until this long after it. */
+export const RUNNING_LATE_WINDOW = { beforeMinutes: 120, afterMinutes: 30 } as const;
+
+/** True while the "Running late?" buttons make sense for a booking starting at `startAt`. */
+export function canSayRunningLate(startAt: Date, now: Date): boolean {
+  const t = now.getTime(), start = startAt.getTime();
+  return t >= start - RUNNING_LATE_WINDOW.beforeMinutes * MIN && t <= start + RUNNING_LATE_WINDOW.afterMinutes * MIN;
+}
+
+/** POST /api/b/[token]/late with { minutes }. Tells the host the guest is running late. */
+export async function handleRunningLate(store: DataStore, token: string, input: unknown, now: Date): Promise<HandlerResult> {
+  const minutes = (input as { minutes?: unknown } | null)?.minutes;
+  if (typeof minutes !== "number" || !(RUNNING_LATE_CHOICES as readonly number[]).includes(minutes)) {
+    return { status: 400, body: { error: "invalid_request", fields: { minutes: `Pick ${RUNNING_LATE_CHOICES.join(", ")} minutes.` } } };
+  }
+  const booking = await store.getBookingByManageToken(token);
+  if (!booking) return notFound;
+  if (booking.status !== "confirmed") return { status: 409, body: { error: "not_confirmed" } };
+  if (!canSayRunningLate(booking.startAt, now)) return { status: 409, body: { error: "not_now" } };
+  await store.markRunningLate(token, minutes, now);
+  return { status: 200, body: { status: "told", minutes } };
+}

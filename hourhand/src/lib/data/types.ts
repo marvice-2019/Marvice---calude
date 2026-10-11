@@ -127,6 +127,9 @@ export interface Invitee {
   manageToken: string;
   /** When the host marked the guest as not having turned up. */
   noShowAt: Date | null;
+  /** The guest said they're running this many minutes late, and when they said it. */
+  runningLateMinutes: number | null;
+  runningLateAt: Date | null;
 }
 
 /** One entry of invitees.answers (jsonb). The label is copied so later edits to the question don't rewrite history. */
@@ -312,6 +315,8 @@ export interface DataStore {
   /** Public: what `/l/{token}` shows. Only an open link reveals its host and event type. */
   /** `idempotencyKey`: a retried submit whose own booking is what uses the link gets it back as open. */
   resolveBookingLink(token: string, now: Date, opts?: { idempotencyKey?: string }): Promise<ResolvedBookingLink>;
+  /** Records that the guest is running `minutes` late on a confirmed booking and emails the host. NotFoundError otherwise. */
+  markRunningLate(manageToken: string, minutes: number, now: Date): Promise<BookingWithInvitee>;
   /**
    * A hidden one_off event type at the given times, with a single-use link to it that expires at the last time; all in one
    * write. Throws InvalidOneOffError unless there are 1–20 distinct future times and the duration is 5–720 minutes.

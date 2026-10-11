@@ -6,7 +6,7 @@ import type pg from "pg";
 /** Emails about one booking. */
 export type BookingEmailKind =
   | "booked_guest" | "booked_host" | "reminder_guest"
-  | "cancelled_guest" | "cancelled_host" | "rescheduled_guest" | "rescheduled_host";
+  | "cancelled_guest" | "cancelled_host" | "rescheduled_guest" | "rescheduled_host" | "late_host";
 /** Writes to the host's calendar (channel 'calendar'). */
 export type CalendarJobKind = "calendar_create" | "calendar_move" | "calendar_delete";
 export type NotificationKind = BookingEmailKind | CalendarJobKind | "calendar_alert_host" | "renewal_reminder_host";

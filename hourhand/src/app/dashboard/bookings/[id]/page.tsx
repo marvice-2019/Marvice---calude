@@ -75,6 +75,11 @@ export default async function BookingDetailPage({ params, searchParams }: { para
             {booking.status === "cancelled" && <span className="ml-2 rounded-md bg-danger-bg px-2 py-0.5 text-sm text-danger">Cancelled</span>}
             {booking.status === "pending_payment" && <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">Awaiting payment</span>}
             {booking.invitee.noShowAt && <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">No-show</span>}
+            {confirmed && booking.invitee.runningLateMinutes && (
+              <span className="ml-2 rounded-md bg-warning-bg px-2 py-0.5 text-sm text-warning">
+                Running {booking.invitee.runningLateMinutes} min late{booking.invitee.runningLateAt && ` (said at ${formatTime(booking.invitee.runningLateAt, tz)})`}
+              </span>
+            )}
           </dd>
         </div>
         <div><dt className="text-sm text-text-muted">Email</dt><dd className="text-text">{booking.invitee.email}</dd></div>

@@ -37,6 +37,8 @@ export interface BookingMailContext {
   manageUrl: string;
   /** The host's view of the booking in the dashboard. */
   dashboardUrl: string;
+  /** For late_host: how many minutes late the guest said they'll be. */
+  runningLateMinutes?: number | null;
 }
 
 export interface RenderedMail { subject: string; text: string; html: string; attachments?: Attachment[]; replyTo?: string }
@@ -144,7 +146,7 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
     case "reminder_guest":
       return render(`Reminder: ${c.eventName} with ${host}, ${formatTime(c.startAt, c.guestTimezone, "12h")} ${zoneName(c.guestTimezone)}`, {
         heading: "Coming up soon", intro: `Hi ${c.guestName}, a reminder of your time with ${host}.`,
-        rows: guestRows(c), link: manageLink(c), note: "Can't make it? Use the link above so they know.", footer: guestFooter(c),
+        rows: guestRows(c), link: manageLink(c), note: "Can't make it, or running late on the day? Use the link above so they know.", footer: guestFooter(c),
       }, { replyTo: c.hostEmail });
     case "cancelled_guest":
       return render(`Cancelled: ${c.eventName} with ${host}`, {
@@ -164,6 +166,12 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
         rows: [...guestRows(c), ...(c.previousStartAt ? [["Was", when(c.previousStartAt, c.guestTimezone, "12h")] as Row] : [])],
         link: manageLink(c), note: "The attached file adds the new time to your calendar. Remove the old one if you saved it.", footer: guestFooter(c),
       }, { attachments: [calendarFile(c)], replyTo: c.hostEmail });
+    case "late_host":
+      return render(`Running late: ${c.guestName}, ${c.runningLateMinutes ?? "a few"} min, ${c.eventName}`, {
+        heading: `${c.guestName} is running late`,
+        intro: `${c.guestName} says they'll be about ${c.runningLateMinutes ?? "a few"} minutes late for ${c.eventName} at ${formatTime(c.startAt, c.hostTimezone, c.hostTimeFormat)}.`,
+        rows: hostRows(c), link: dashboardLink(c), footer: hostFooter,
+      }, { replyTo: c.guestEmail });
     case "rescheduled_host":
       return render(`Moved: ${c.guestName}, ${c.eventName}, now ${formatDate(c.startAt, c.hostTimezone)}`, {
         heading: "A booking has a new time", intro: c.movedBy === "host" ? `You moved ${c.eventName} with ${c.guestName}.` : `${c.guestName} moved ${c.eventName}.`,

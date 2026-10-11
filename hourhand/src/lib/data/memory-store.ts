@@ -71,7 +71,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed", holdExpiresAt: null,
       locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null, joinUrl: null,
       idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, createdAt: new Date(),
-      invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", ""), noShowAt: null },
+      invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", ""), noShowAt: null, runningLateMinutes: null, runningLateAt: null },
     };
   }
 
@@ -238,6 +238,13 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       const booking = db.bookings.find((b) => b.hostId === hostId && b.id === bookingId && b.status === "confirmed" && b.startAt.getTime() <= now.getTime());
       if (!booking) throw new NotFoundError("Booking");
       booking.invitee.noShowAt = on ? now : null;
+      return booking;
+    },
+    async markRunningLate(manageToken, minutes, now) {
+      const booking = db.bookings.find((b) => b.invitee.manageToken === manageToken && b.status === "confirmed");
+      if (!booking) throw new NotFoundError("Booking");
+      booking.invitee.runningLateMinutes = minutes;
+      booking.invitee.runningLateAt = now;
       return booking;
     },
     async saveWeeklyHours(userId, scheduleId, byWeekday) {

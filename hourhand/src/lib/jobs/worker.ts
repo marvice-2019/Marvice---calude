@@ -53,7 +53,7 @@ const CONTEXT = `
     b.location_kind as booking_location_kind, b.join_url, b.external_event_id, b.external_calendar_id,
     prev.start_at as previous_start_at, prev.external_event_id as previous_event_id, prev.external_calendar_id as previous_calendar_id,
     prev.join_url as previous_join_url, prev.cancelled_by as previous_cancelled_by,
-    i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.answers, i.manage_token, i.reminders_opt_out,
+    i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.answers, i.manage_token, i.reminders_opt_out, i.running_late_minutes,
     e.name as event_name,
     (select p.amount_minor from payments p where p.booking_id = b.id and p.status in ('paid', 'refund_pending', 'refunded')
       order by p.created_at desc limit 1) as paid_minor,
@@ -96,6 +96,7 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
     movedBy: (r.previous_cancelled_by as BookingMailContext["movedBy"]) ?? null,
     issuedAt: new Date(r.queued_at as Date),
     manageUrl: `${baseUrl}/b/${r.manage_token as string}`, dashboardUrl: `${baseUrl}/dashboard/bookings/${r.id as string}`,
+    runningLateMinutes: (r.running_late_minutes as number | null) ?? null,
   };
 }
 

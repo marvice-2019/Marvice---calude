@@ -286,6 +286,25 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
     });
   });
 
+  describe("running late", () => {
+    it("records the minutes and queues one host email per answer, however often the guest taps", async () => {
+      const booking = await store.createBooking({
+        eventTypeId: coaching.id, startAt: at("2034-02-06T04:00:00Z"), idempotencyKey: "pg-late-1", invitee: { ...guest, name: "Late Guest" },
+      });
+      const token = booking.invitee.manageToken;
+      const when = at("2034-02-06T03:45:00Z");
+      await store.markRunningLate(token, 10, when);
+      await store.markRunningLate(token, 10, when);
+      await store.markRunningLate(token, 20, when);
+      expect((await store.getBookingByManageToken(token))!.invitee).toMatchObject({ runningLateMinutes: 20, runningLateAt: when });
+      const { rows } = await pool.query("select kind, recipient, dedupe_key from notifications where booking_id = $1 and kind = 'late_host' order by dedupe_key", [booking.id]);
+      expect(rows.map((r) => r.dedupe_key)).toEqual([`booking:${booking.id}:late:10`, `booking:${booking.id}:late:20`]);
+      expect(rows[0].recipient).toBe(priya.email);
+      await store.cancelBooking(priya.id, booking.id, "guest");
+      await expect(store.markRunningLate(token, 5, when)).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
   describe("single-use booking links", () => {
     const now = () => new Date();
     let n = 0;

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/LocalTime";
 import { ManageBooking } from "@/components/ManageBooking";
+import { RunningLate } from "@/components/RunningLate";
+import { canSayRunningLate } from "@/lib/manage";
 import { buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { isUnpaidRelease } from "@/lib/booking-reasons";
@@ -54,7 +56,10 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
           If you&apos;ve paid, it confirms here within a minute.
         </p>
       ) : (
+        <>
+        {canSayRunningLate(booking.startAt, new Date()) && <RunningLate token={token} hostName={host.name} told={booking.invitee.runningLateMinutes} />}
         <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} />
+        </>
       )}
     </main>
   );
