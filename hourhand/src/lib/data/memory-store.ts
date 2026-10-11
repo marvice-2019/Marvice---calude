@@ -21,19 +21,28 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   const linkOfBooking = new Map<string, string>(); // booking id -> booking link id (bookings.booking_link_id)
   const oneOffTimes = new Map<string, Date[]>(); // one_off event type id -> offered start times, earliest first
 
-  /** Same derived rule as Postgres: used when a booking made through it exists that the system didn't cancel. */
-  function toLink(row: LinkRow, now: Date): BookingLink {
-    const used = db.bookings.filter((b) => linkOfBooking.get(b.id) === row.id && !(b.status === "cancelled" && b.cancelledBy === "system")).at(-1);
+  /** Same derived rule as Postgres. `ignoreKey`: a retried request whose own booking shouldn't count as another use. */
+  function toLink(row: LinkRow, now: Date, ignoreKey?: string): BookingLink {
+    const used = db.bookings.filter((b) => linkOfBooking.get(b.id) === row.id && b.idempotencyKey !== ignoreKey
+      && !(b.status === "cancelled" && b.cancelledBy === "system")
+      && !(b.status === "pending_payment" && b.holdExpiresAt !== null && b.holdExpiresAt <= now)).at(-1);
     const usedBy = used ? { bookingId: used.id, guestName: used.invitee.name, startAt: used.startAt } : null;
     const state = usedBy ? "used" : row.revokedAt ? "revoked" : row.expiresAt && row.expiresAt.getTime() <= now.getTime() ? "expired" : "open";
     return { id: row.id, eventTypeId: row.eventTypeId, label: row.label, expiresAt: row.expiresAt, revokedAt: row.revokedAt, createdAt: row.createdAt, state, usedBy };
   }
 
+  function insertLink(hostId: string, eventTypeId: string, opts: { label?: string; expiresAt?: Date | null }, now: Date) {
+    const token = newLinkToken();
+    const row: LinkRow = { id: randomUUID(), userId: hostId, eventTypeId, tokenHash: hashLinkToken(token), label: opts.label ?? null, expiresAt: opts.expiresAt ?? null, revokedAt: null, createdAt: new Date() };
+    links.push(row);
+    return { link: toLink(row, now), token };
+  }
+
   /** Checks the link is open and for this event type. Synchronous with the insert that follows, so no race. */
-  function openLink(token: string, eventTypeId: string): LinkRow {
+  function openLink(token: string, eventTypeId: string, idempotencyKey: string): LinkRow {
     const row = links.find((l) => l.tokenHash === hashLinkToken(token));
     if (!row || row.eventTypeId !== eventTypeId) throw new LinkUnavailableError("not_found");
-    const { state } = toLink(row, new Date());
+    const { state } = toLink(row, new Date(), idempotencyKey);
     if (state === "used") throw new LinkUsedError();
     if (state !== "open") throw new LinkUnavailableError(state);
     return row;
@@ -151,18 +160,17 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
         if (repeat.eventTypeId === input.eventTypeId && repeat.rescheduledFromId === null) return repeat;
         throw new RequestKeyConflictError();
       }
-      const link = input.bookingLinkToken === undefined ? null : openLink(input.bookingLinkToken, input.eventTypeId);
+      const link = input.bookingLinkToken === undefined ? null : openLink(input.bookingLinkToken, input.eventTypeId, input.idempotencyKey);
       const booking = build(input, null);
       db.bookings.push(booking);
       if (link) linkOfBooking.set(booking.id, link.id);
       return booking;
     },
     async createBookingLink(hostId, eventTypeId, opts, now) {
-      if (!owned(hostId, eventTypeId).active) throw new NotFoundError("Event type");
-      const token = newLinkToken();
-      const row: LinkRow = { id: randomUUID(), userId: hostId, eventTypeId, tokenHash: hashLinkToken(token), label: opts.label ?? null, expiresAt: opts.expiresAt ?? null, revokedAt: null, createdAt: new Date() };
-      links.push(row);
-      return { link: toLink(row, now), token };
+      const et = owned(hostId, eventTypeId);
+      // A one-off meeting has exactly one link, made with it; a second would let it be booked twice.
+      if (!et.active || et.kind === "one_off") throw new NotFoundError("Event type");
+      return insertLink(hostId, eventTypeId, opts, now);
     },
     async listBookingLinks(hostId, now) {
       return links.filter((l) => l.userId === hostId).reverse().map((l) => toLink(l, now));
@@ -173,10 +181,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       row.revokedAt = now;
       return toLink(row, now);
     },
-    async resolveBookingLink(token, now) {
+    async resolveBookingLink(token, now, opts) {
       const row = links.find((l) => l.tokenHash === hashLinkToken(token));
       if (!row) return { status: "not_found" };
-      const link = toLink(row, now);
+      const link = toLink(row, now, opts?.idempotencyKey);
       if (link.state !== "open") return { status: link.state };
       const linkHost = deleted.has(row.userId) ? undefined : db.users.find((u) => u.id === row.userId);
       const eventType = db.eventTypes.find((e) => e.id === row.eventTypeId && e.active);
@@ -194,7 +202,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       db.eventTypes.push(eventType);
       db.locations.push({ id: randomUUID(), eventTypeId: eventType.id, kind: input.location.kind, value: input.location.value ?? null, position: 0 });
       oneOffTimes.set(eventType.id, times);
-      const { link, token } = await this.createBookingLink(hostId, eventType.id, { expiresAt: times[times.length - 1] }, now);
+      const { link, token } = insertLink(hostId, eventType.id, { expiresAt: times[times.length - 1] }, now);
       return { eventType, link, token };
     },
     async listOneOffTimes(eventTypeId) {

@@ -142,6 +142,15 @@ Hosts on Solo or Duo can charge guests for an event type, in rupees through Razo
 - **Free hosts:** a priced event of a host whose plan lapsed can't be booked; guests are told to contact the host.
 - **Not built:** Stripe for non-INR (Stripe is invite-only for Indian businesses), partial refunds or cancellation fees, deposits, payment links for existing bookings, and the host's own webhook (not needed: Hourhand checks Razorpay itself).
 
+## Links: single-use and one-off
+
+Dashboard → Links.
+
+- **Single-use link**: books one of your event types once, at `/l/<token>`. The link is shown once when you make it (copy it then); only its SHA-256 is stored. The Links page shows each link as open, used (with who booked), expired or revoked, and you can revoke an open one.
+- **One-off meeting**: up to 20 times you pick, in your own time zone, for one person. They see only the times you're still free for and book one; the link expires after the last time. One-off meetings don't appear under Event types.
+- **Hidden event type**: "Only people with the link can book" in the editor takes it off your booking page; its own address still books.
+- A link is used by a booking made through it, unless the system cancelled that booking or it's a payment hold whose time has run out, so an abandoned payment frees the link. Two guests on one link at once: exactly one books. A refused link (used, expired, revoked, unknown) shows only its state, never whose it was.
+
 ## Host actions on a booking
 
 From Dashboard → Bookings → a booking, the host can:

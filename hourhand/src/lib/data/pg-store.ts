@@ -58,7 +58,9 @@ const toBooking = (r: Row): BookingWithInvitee => ({
 });
 
 /** The derived "used" rule, over bookings aliased b: any booking made through the link except one the system cancelled. */
-const USES_LINK = "not (b.status = 'cancelled' and b.cancelled_by = 'system')";
+// A booking uses its link unless the system cancelled it, or it is a payment hold whose time has run out (the payment check
+// cancels those within a minute; until then the guest must not be told the link is used).
+const USES_LINK = "not ((b.status = 'cancelled' and b.cancelled_by = 'system') or (b.status = 'pending_payment' and b.hold_expires_at <= now()))";
 const LINK = `select l.id, l.user_id, l.event_type_id, l.label, l.expires_at, l.revoked_at, l.created_at,
   u.id as used_booking_id, u.name as used_guest_name, u.start_at as used_start_at
   from booking_links l
@@ -147,7 +149,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
     const { rows } = await client.query("select id, event_type_id, expires_at, revoked_at from booking_links where token_hash = $1 for update", [hashLinkToken(token)]);
     const link = rows[0];
     if (!link || link.event_type_id !== input.eventTypeId) throw new LinkUnavailableError("not_found");
-    const used = await client.query(`select 1 from bookings b where b.booking_link_id = $1 and ${USES_LINK}`, [link.id]);
+    // The same request again (same key) isn't a second use: the insert below returns that booking instead.
+    const used = await client.query(`select 1 from bookings b where b.booking_link_id = $1 and ${USES_LINK} and b.idempotency_key <> $2`, [link.id, input.idempotencyKey]);
     if (used.rowCount) throw new LinkUsedError();
     if (link.revoked_at) throw new LinkUnavailableError("revoked");
     if (link.expires_at && (link.expires_at as Date).getTime() <= Date.now()) throw new LinkUnavailableError("expired");
@@ -492,7 +495,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
     },
     async createBookingLink(hostId, eventTypeId, opts, now) {
       const eventType = await owned(pool, hostId, eventTypeId);
-      if (!eventType.active) throw new NotFoundError("Event type");
+      // A one-off meeting has exactly one link, made with it; a second would let it be booked twice.
+      if (!eventType.active || eventType.kind === "one_off") throw new NotFoundError("Event type");
       const token = newLinkToken();
       const { rows } = await pool.query("insert into booking_links (user_id, event_type_id, token_hash, label, expires_at) values ($1,$2,$3,$4,$5) returning id",
         [hostId, eventTypeId, hashLinkToken(token), opts.label ?? null, opts.expiresAt ?? null]);
@@ -515,10 +519,13 @@ export function createPgStore(pool: pg.Pool): DataStore {
         return { ...link, revokedAt: now, state: "revoked" as const };
       });
     },
-    async resolveBookingLink(token, now) {
+    async resolveBookingLink(token, now, opts) {
       const [found] = await linkRows(pool, "l.token_hash = $1", [hashLinkToken(token)], now);
       if (!found) return { status: "not_found" };
-      if (found.link.state !== "open") return { status: found.link.state };
+      // A retried submit (same key) whose booking is what uses the link still reaches it, so it gets its booking back.
+      const usedOnlyByThisRequest = found.link.state === "used" && opts?.idempotencyKey !== undefined && !(await pool.query(
+        `select 1 from bookings b where b.booking_link_id = $1 and ${USES_LINK} and b.idempotency_key <> $2`, [found.link.id, opts.idempotencyKey])).rowCount;
+      if (found.link.state !== "open" && !usedOnlyByThisRequest) return { status: found.link.state };
       // A closed account or a link turned off reads as unknown: nothing about the host leaks.
       const host = await this.getUser(found.userId);
       const eventType = host && await this.getEventType(host.id, found.link.eventTypeId);

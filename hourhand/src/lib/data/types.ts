@@ -310,7 +310,8 @@ export interface DataStore {
   /** Throws NotFoundError unless it is `hostId`'s link and open at `now`. */
   revokeBookingLink(hostId: string, linkId: string, now: Date): Promise<BookingLink>;
   /** Public: what `/l/{token}` shows. Only an open link reveals its host and event type. */
-  resolveBookingLink(token: string, now: Date): Promise<ResolvedBookingLink>;
+  /** `idempotencyKey`: a retried submit whose own booking is what uses the link gets it back as open. */
+  resolveBookingLink(token: string, now: Date, opts?: { idempotencyKey?: string }): Promise<ResolvedBookingLink>;
   /**
    * A hidden one_off event type at the given times, with a single-use link to it that expires at the last time; all in one
    * write. Throws InvalidOneOffError unless there are 1–20 distinct future times and the duration is 5–720 minutes.

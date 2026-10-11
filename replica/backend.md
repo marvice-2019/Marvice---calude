@@ -196,6 +196,21 @@ Status as of 2026-10-11. The backend is built in rounds. Each round lands with t
 - **Fixed (low):** Teams requested only on calendars that allow it; "working elsewhere" counts as busy; calendars shared with edit rights aren't treated as owned; every unreadable calendar is named in the sync error.
 - **Needs a real Microsoft account to confirm:** what a repeated create with the same `transactionId` returns; whether a reused refresh token is rejected; how all-day events come back; whether a personal account refuses a Teams request. The code is safe either way, and the first live Outlook booking settles them.
 
+## B8 evidence (2026-10-11, Postgres 16, production build)
+
+- **What shipped:** hidden event types, single-use links (`/l/<token>`, 32 random bytes, only the SHA-256 stored, shown once, revocable), one-off meetings (kind `one_off`, up to 20 offered times, link-only). Migration 0009.
+- **Tests:** 406 pass (379 before B8). Negative tests (fix set aside, test fails): link row lock (two racing bookings both went through), system-cancelled booking frees the link, lapsed hold frees the link before any sweep, one-off times blocked by busy calendar time, one-off unreachable by slug, retry with the same key gets its booking back, rescheduling a one-off from the manage link lists its times.
+- **End to end (production build): 25 of 25.** Link made from the form and shown once; raw token not in the database; booking through it; second booking 409; used page names nobody; two guests at once give exactly one booking; revoke; one-off times read in the host's zone; one-off not reachable by slug and off the Event types list; confirmation email; hidden type off the profile but bookable at its own address; another host sees none of the links. All earlier suites pass again (B4 23, B3 10, B2b 12, sign-in 15, B5a 26, B5b 28, B7 16, B6 31).
+- **Found by the end-to-end run, fixed:** a production build bundles a route and the data store separately, so `instanceof` on store errors failed across them and the losing guest in a link race got a 500. Every route and action now matches store errors by name (`isNamedError`).
+
+## B8 review (fresh-context reviewer)
+
+- **Fixed (high):** a payment hold whose time had run out still counted as using its link until the payment check swept it (up to a minute), so a guest reopening the link was told it was used. Expired holds no longer count.
+- **Fixed (medium):** a guest rescheduling a one-off booking from their manage link got no times (one-off types have no public slug pair). The times now come from the booking's own event type when its manage token is sent.
+- **Fixed (medium):** a retried submit through a link (same request key) was told the link was used by its own booking; it now gets that booking back. The store also lets two identical submits racing on the lock settle on one booking.
+- **Fixed (low):** no second link to a one-off meeting; a typed time inside a clock-change gap is refused instead of moved.
+- **Accepted (low):** one-off times are blocked by other bookings' buffers as well as their times; `takeLink` checks expiry against the server clock (harmless in production).
+
 ## Production addresses for hourhand.cloud
 
 Set `BETTER_AUTH_URL=https://hourhand.cloud` in Coolify. Register exactly these:

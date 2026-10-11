@@ -353,6 +353,18 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       await expect(store.revokeBookingLink(priya.id, link.id, now())).rejects.toBeInstanceOf(NotFoundError);
     });
 
+    it("the same request again (same key) returns its booking instead of LinkUsedError", async () => {
+      const { token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
+      n += 1;
+      const input = {
+        eventTypeId: coaching.id, startAt: new Date(at("2033-01-03T04:00:00Z").getTime() + n * 24 * 60 * MIN), idempotencyKey: `pg-link-retry-${n}`,
+        bookingLinkToken: token, invitee: { ...guest, name: "Retry Guest" },
+      };
+      const first = await store.createBooking(input);
+      expect((await store.createBooking(input)).id).toBe(first.id);
+      await expect(book(coaching.id, token)).rejects.toBeInstanceOf(LinkUsedError);
+    });
+
     it("a payment hold uses the link; once the hold lapses, booking through the link works again", async () => {
       const { link, token } = await store.createBookingLink(priya.id, coaching.id, {}, now());
       n += 1;
@@ -365,6 +377,8 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       await expect(book(coaching.id, token)).rejects.toBeInstanceOf(LinkUsedError);
       // The guest never pays: the hold runs out, and the next booking through the link expires it and goes ahead.
       await pool.query("update bookings set hold_expires_at = now() - interval '1 minute' where id = $1", [held.id]);
+      // Before anything sweeps the lapsed hold, the guest reopening the link must see it open, not "already used".
+      expect(await store.resolveBookingLink(token, now())).toMatchObject({ status: "open" });
       const after = await book(coaching.id, token, "Second Guest");
       expect(after.status).toBe("confirmed");
       expect(await stateOf(link.id)).toMatchObject({ state: "used", usedBy: { bookingId: after.id } });

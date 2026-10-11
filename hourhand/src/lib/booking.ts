@@ -65,9 +65,9 @@ type Target = { host: User; eventType: EventType; linkToken: string | null };
  * meeting has no public slug pair (getPublicEventType leaves it out), so it is reachable only by its link. A link that
  * isn't open answers with its state and nothing about the host.
  */
-async function resolveTarget(store: DataStore, slug: string, event: string, linkToken: string | null, now: Date): Promise<Target | HandlerResult> {
+async function resolveTarget(store: DataStore, slug: string, event: string, linkToken: string | null, now: Date, idempotencyKey?: string): Promise<Target | HandlerResult> {
   if (linkToken) {
-    const r = await store.resolveBookingLink(linkToken, now);
+    const r = await store.resolveBookingLink(linkToken, now, { idempotencyKey });
     if (r.status !== "open") return linkRefusal(r.status);
     return { host: r.host, eventType: r.eventType, linkToken };
   }
@@ -76,6 +76,12 @@ async function resolveTarget(store: DataStore, slug: string, event: string, link
 }
 
 const isResult = (t: Target | HandlerResult): t is HandlerResult => "status" in t;
+
+/** A booking's own host and event type, when they match the slug pair asked for. */
+async function bookingTarget(store: DataStore, booking: Booking, slug: string, event: string): Promise<Target | null> {
+  const [host, eventType] = await Promise.all([store.getUser(booking.hostId), store.getEventType(booking.hostId, booking.eventTypeId)]);
+  return host && eventType && host.slug === slug && eventType.slug === event ? { host, eventType, linkToken: null } : null;
+}
 
 /** used → 409 (someone booked it), unknown → 404, expired or revoked → 410 (it existed and is gone). */
 function linkRefusal(status: "used" | "expired" | "revoked" | "not_found"): HandlerResult {
@@ -105,10 +111,13 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
   if (tz !== null && !isIanaTimeZone(tz)) errors.tz = "Must be an IANA time zone.";
   if (Object.keys(errors).length > 0 || !from || !to) return { status: 400, body: { error: "invalid_request", fields: errors } };
 
-  const found = await resolveTarget(store, slug, event, link, now);
-  if (isResult(found)) return found;
   const token = params.get("token");
   const moving = token ? await store.getBookingByManageToken(token) : null;
+  // Rescheduling from the manage link: the booking's own event type, so a one-off meeting (no public slug pair) still
+  // lists its remaining times. Only when the request names that same host and event, as the manage page does.
+  const own = !link && moving && moving.status === "confirmed" ? await bookingTarget(store, moving, slug, event) : null;
+  const found = own ?? await resolveTarget(store, slug, event, link, now);
+  if (isResult(found)) return found;
   const movingId = moving && moving.status === "confirmed" && moving.hostId === found.host.id && moving.eventTypeId === found.eventType.id ? moving.id : null;
   const slots = await freeSlots(store, found.host, found.eventType, from, to, now, movingId);
   return { status: 200, body: { timezone: tz ?? found.host.timezone, slots: slots.map((s) => s.toISOString()) } };
@@ -205,7 +214,7 @@ export async function handleCreateBooking(
   if (!v.ok) return { status: 400, body: { error: "invalid_request", fields: v.fields } };
   const req = v.value;
 
-  const found = await resolveTarget(store, req.slug, req.event, req.linkToken, now);
+  const found = await resolveTarget(store, req.slug, req.event, req.linkToken, now, req.idempotencyKey);
   if (isResult(found)) return found;
   const { host, eventType } = found;
 

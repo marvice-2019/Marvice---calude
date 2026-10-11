@@ -86,6 +86,39 @@ describe("single-use links through the public handlers", () => {
   });
 });
 
+describe("review fixes", () => {
+  it("a retried submit through a link gets its own booking back; another request is still refused", async () => {
+    const store = fresh();
+    const { token } = await store.createBookingLink("usr_priya", "evt_coaching", {}, now);
+    const [slot] = slotList(await slotsVia(store, { link: token }));
+    const first = await bookVia(store, slot, { linkToken: token }, "retry-key-0001");
+    expect(first.status).toBe(201);
+    const retry = await bookVia(store, slot, { linkToken: token }, "retry-key-0001");
+    expect(retry).toMatchObject({ status: 200, body: { bookingId: (first.body as { bookingId: string }).bookingId } });
+    expect(await bookVia(store, slot, { linkToken: token }, "retry-key-other")).toMatchObject({ status: 409, body: { error: "link_used" } });
+  });
+
+  it("a guest rescheduling a one-off booking from their manage link sees its remaining times", async () => {
+    const store = fresh();
+    const times = [new Date("2026-10-20T03:00:00Z"), new Date("2026-10-21T03:30:00Z")];
+    const { eventType, token } = await store.createOneOffMeeting("usr_priya", { name: "Review", durationMinutes: 30, location: { kind: "google_meet" }, times }, now);
+    const booked = await bookVia(store, times[0].toISOString(), { linkToken: token }, "oneoff-resched-1");
+    const { manageToken } = booked.body as { manageToken: string };
+    const res = await slotsVia(store, { slug: "priya", event: eventType.slug, token: manageToken });
+    expect(res.status).toBe(200);
+    expect(slotList(res)).toEqual(times.map((t) => t.toISOString()));
+    // Without the guest's own manage token, the one-off still isn't reachable by its slug.
+    expect(await slotsVia(store, { slug: "priya", event: eventType.slug })).toMatchObject({ status: 404 });
+  });
+
+  it("won't make a second link to a one-off meeting", async () => {
+    const store = fresh();
+    const { eventType } = await store.createOneOffMeeting("usr_priya",
+      { name: "Review", durationMinutes: 30, location: { kind: "google_meet" }, times: [new Date("2026-10-20T03:00:00Z")] }, now);
+    await expect(store.createBookingLink("usr_priya", eventType.id, {}, now)).rejects.toMatchObject({ name: "NotFoundError" });
+  });
+});
+
 describe("store errors from another bundle", () => {
   it("are recognised by name, so a race on a link answers 409 even when instanceof can't match", async () => {
     const { isNamedError } = await import("./data/types");
