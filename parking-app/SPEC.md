@@ -218,7 +218,7 @@ Base path `/v1`. JSON throughout, with zod validation. Money is in paise. Every 
   - `gst` = round((base − discount + fee) × 18%).
   - `total` = base − discount + fee + gst.
   - The fee is ₹15, never discounted.
-  - The same function runs in the prototype, API, web and app, and is tested with these cases: 3 h at ₹40 → ₹159; 3 h with FIRST50 → ₹89; 10 h with FIRST50 → ₹277; 3 h with WEEKEND20 on a Saturday → ₹131.
+  - The same function runs in the prototype, API, web and app, and is tested with these cases (GST exact to the paise): 3 h at ₹40 → ₹159.30; 3 h with FIRST50 → ₹88.50; 10 h with FIRST50 → ₹277.30; 3 h with WEEKEND20 on a Saturday → ₹130.98. The clickable prototype rounds GST to the rupee for display only.
 - **GST.** Parking is SAC 9967 at 18%. CGST + SGST within Karnataka, IGST otherwise. Each payment gets an invoice in the series `BL/2026-27/000001`. Confirm with a CA.
 - **Capacity.** Online capacity = floor(capacity × online_share). `book_bay()` locks the lot row; an unpaid hold expires after 10 minutes.
 - **Cancellation.** A full refund (parking, fee and GST) up to the arrival time; no refund after it. Park now passes can't be cancelled once paid.
