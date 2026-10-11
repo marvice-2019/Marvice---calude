@@ -1,13 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type pg from "pg";
-import { BillingApiError } from "../billing/providers";
+import { BillingApiError, type Fetch } from "../billing/providers";
 import { seal, unseal } from "../crypto/seal";
 
 // The host's own Razorpay account. Guests pay the host directly: Hourhand creates orders with the host's key pair,
 // so the money never passes through Marvice. The pair is sealed with TOKEN_ENCRYPTION_KEY and bound to its owner.
 
 type Db = Pick<pg.Pool, "query">;
-type Fetch = typeof fetch;
 type Env = Record<string, string | undefined>;
 
 /** How Hourhand authenticates to a host's Razorpay. A key pair today; an OAuth token can implement the same shape later. */
