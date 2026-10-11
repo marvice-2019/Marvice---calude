@@ -1,5 +1,6 @@
 import { BookingFooter } from "@/components/BookingFooter";
 import Link from "next/link";
+import { EmbedResize } from "@/components/EmbedResize";
 import { notFound } from "next/navigation";
 import { BookingFlow } from "@/components/BookingFlow";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -12,9 +13,11 @@ import { packagesForEventType } from "@/lib/packages/packages";
 import { hostPlan } from "@/lib/billing/account";
 import { razorpayStatus } from "@/lib/payments/host-razorpay";
 
-export default async function PublicEventPage({ params, searchParams }: { params: Promise<{ slug: string; event: string }>; searchParams: Promise<{ at?: string; lang?: string }> }) {
+export default async function PublicEventPage({ params, searchParams }: { params: Promise<{ slug: string; event: string }>; searchParams: Promise<{ at?: string; lang?: string; name?: string; email?: string }> }) {
   const { slug, event } = await params;
-  const { at, lang } = await searchParams;
+  const { at, lang, name: prefillName, email: prefillEmail } = await searchParams;
+  // ?name= and ?email= fill the form in, e.g. from a host's own site or CRM; the guest can still change them.
+  const prefill = { name: typeof prefillName === "string" ? prefillName.slice(0, 100) : "", email: typeof prefillEmail === "string" ? prefillEmail.slice(0, 254) : "" };
   const found = await store.getPublicEventType(slug, event);
   if (!found) notFound();
   const { host, eventType } = found;
@@ -29,6 +32,7 @@ export default async function PublicEventPage({ params, searchParams }: { params
   const packages = pool && canSell ? await packagesForEventType(pool, host.id, eventType.id) : [];
   return (
     <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
       <LanguageSwitcher locale={locale} path={`/${host.slug}/${eventType.slug}`} params={{ at: typeof at === "string" ? at : undefined }} />
       <Link href={`/${host.slug}${langQuery}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-accent underline">{host.name}</Link>
       <h1 className="font-display text-xl text-text">{eventType.name}</h1>
@@ -38,6 +42,12 @@ export default async function PublicEventPage({ params, searchParams }: { params
         <p className="mt-2 max-w-xl rounded-md bg-surface p-3 text-sm text-text">
           {t(locale, "depositNote", { amount: formatMoney(eventType.depositMinor, "INR"), host: host.name })}
         </p>
+      )}
+      {eventType.cancelPolicy && (
+        <div className="mt-3 max-w-xl text-sm">
+          <p className="font-semibold text-text">{t(locale, "cancelPolicy")}</p>
+          <p className="whitespace-pre-line text-text-muted">{eventType.cancelPolicy}</p>
+        </div>
       )}
       {packages.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-x-6">
@@ -51,7 +61,7 @@ export default async function PublicEventPage({ params, searchParams }: { params
         </ul>
       )}
       <BookingFlow
-        slug={host.slug} event={eventType.slug} host={{ name: host.name, timezone: host.timezone }} maxWeeks={eventType.priceMinor === null ? eventType.maxRepeats : 1} initialAt={typeof at === "string" ? at : undefined} bookingWindowDays={eventType.bookingWindowDays} questions={questions} waitlist={pool !== null} locale={locale} langQuery={langQuery}
+        slug={host.slug} event={eventType.slug} host={{ name: host.name, timezone: host.timezone }} maxWeeks={eventType.priceMinor === null ? eventType.maxRepeats : 1} initialAt={typeof at === "string" ? at : undefined} bookingWindowDays={eventType.bookingWindowDays} questions={questions} waitlist={pool !== null} locale={locale} langQuery={langQuery} prefill={prefill}
         paid={eventType.priceMinor !== null ? { price: formatMoney(eventType.priceMinor, "INR"), hostName: host.name, eventName: eventType.name }
           : eventType.depositMinor !== null ? { price: formatMoney(eventType.depositMinor, "INR"), hostName: host.name, eventName: eventType.name, deposit: true } : null}
       />

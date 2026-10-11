@@ -2,6 +2,7 @@ import type pg from "pg";
 import type { PackageUnavailableError } from "./packages/packages";
 import { computeOneOffSlots, computeSlots, isSyncStale } from "./slots";
 import { isNamedError, type Booking, type DataStore, type EventType, type LinkUnavailableError, type User } from "./data/types";
+import { isLocale } from "./i18n/guest";
 import { BOOKING_LIMITS, type createRateLimiter } from "./rate-limit";
 import type { Plan } from "./billing/plans";
 import { startPaidBooking } from "./payments/booking-payments";
@@ -124,6 +125,9 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
   return { status: 200, body: { timezone: tz ?? found.host.timezone, slots: slots.map((s) => s.toISOString()) } };
 }
 
+/** Extra guests a booker can add (invitees.guests holds at most this many). */
+export const MAX_GUESTS = 5;
+
 export interface BookingRequest {
   slug: string;
   event: string;
@@ -140,6 +144,10 @@ export interface BookingRequest {
   weeks: number;
   /** Paid for with a session package: its buyer's token. */
   packageToken: string | null;
+  /** Extra guests' emails, deduplicated, without the booker's own. */
+  guests: string[];
+  /** The language of the page they booked on; anything unknown is English. */
+  locale: string;
 }
 
 export type Validation = { ok: true; value: BookingRequest } | { ok: false; fields: Record<string, string> };
@@ -173,6 +181,21 @@ export function validateBookingRequest(input: unknown): Validation {
   if (!idempotencyKey) fields.idempotencyKey = "Missing request key.";
   else if (idempotencyKey.length < 8 || idempotencyKey.length > 100) fields.idempotencyKey = "Request key must be 8–100 characters.";
 
+  // Extra guests: up to 5 distinct addresses, each one checked; the booker's own address is simply dropped.
+  const guests: string[] = [];
+  if (body.guests !== undefined) {
+    const list = Array.isArray(body.guests) ? body.guests : null;
+    if (!list || list.some((g) => typeof g !== "string")) fields.guests = "List each guest's email address.";
+    else {
+      for (const g of (list as string[]).map((x) => x.trim()).filter(Boolean)) {
+        if (!EMAIL.test(g) || g.length > 254) { fields.guests = `${g.slice(0, 60)} isn't a valid email address.`; break; }
+        if (g.toLowerCase() !== email.toLowerCase() && !guests.some((x) => x.toLowerCase() === g.toLowerCase())) guests.push(g);
+        if (guests.length > MAX_GUESTS) break;
+      }
+      if (!fields.guests && guests.length > MAX_GUESTS) fields.guests = `Add up to ${MAX_GUESTS} guests.`;
+    }
+  }
+
   const answers: Record<string, string> = {};
   if (body.answers !== undefined) {
     if (typeof body.answers !== "object" || body.answers === null || Array.isArray(body.answers)) {
@@ -188,7 +211,7 @@ export function validateBookingRequest(input: unknown): Validation {
   if (Object.keys(fields).length > 0 || !start) return { ok: false, fields };
   return {
     ok: true,
-    value: { slug: str("slug"), event: str("event"), linkToken: linkToken || null, start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey, weeks: weeks as number, packageToken: packageToken || null },
+    value: { slug: str("slug"), event: str("event"), linkToken: linkToken || null, start, name, email, timezone: body.timezone as string, phone: phone || null, answers, idempotencyKey, weeks: weeks as number, packageToken: packageToken || null, guests, locale: isLocale(body.locale) ? body.locale : "en" },
   };
 }
 
@@ -266,7 +289,7 @@ export async function handleCreateBooking(
     ...(found.linkToken ? { bookingLinkToken: found.linkToken } : {}),
     ...(req.packageToken ? { packageToken: req.packageToken } : {}),
     invitee: {
-      name: req.name, email: req.email, timezone: req.timezone, phone: req.phone,
+      name: req.name, email: req.email, timezone: req.timezone, phone: req.phone, guests: req.guests, locale: req.locale,
       answers: questions.filter((q) => req.answers[q.id]).map((q) => ({ questionId: q.id, label: q.label, answer: req.answers[q.id] })),
     },
   };

@@ -79,6 +79,25 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect(rejected).toHaveLength(1);
       expect(rejected[0].reason).toBeInstanceOf(SlotTakenError);
     });
+
+    it("keeps the daily and weekly limits when two guests book different times at once", async () => {
+      await pool.query("update event_types set daily_limit = 1 where id = $1", [intro.id]);
+      try {
+        const sameDay = await Promise.allSettled([
+          store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-15T04:00:00Z"), idempotencyKey: "pg-limit-a", invitee: guest }),
+          store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-15T09:00:00Z"), idempotencyKey: "pg-limit-b", invitee: guest }),
+        ]);
+        expect(sameDay.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        expect(sameDay.find((r): r is PromiseRejectedResult => r.status === "rejected")?.reason).toBeInstanceOf(SlotTakenError);
+        await pool.query("update event_types set daily_limit = null, weekly_limit = 2 where id = $1", [intro.id]);
+        // Wednesday and Thursday of the same week: one more fits, the next doesn't.
+        await store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-16T04:00:00Z"), idempotencyKey: "pg-limit-c", invitee: guest });
+        await expect(store.createBooking({ eventTypeId: intro.id, startAt: at("2030-01-17T04:00:00Z"), idempotencyKey: "pg-limit-d", invitee: guest }))
+          .rejects.toBeInstanceOf(SlotTakenError);
+      } finally {
+        await pool.query("update event_types set daily_limit = null, weekly_limit = null where id = $1", [intro.id]);
+      }
+    });
   });
 
   describe("rescheduleBooking", () => {
@@ -191,6 +210,26 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect([reread.priceMinor, reread.currency]).toEqual([49950, "INR"]);
       const free = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), priceMinor: null, currency: null });
       expect([free.priceMinor, free.currency]).toEqual([null, null]);
+    });
+
+    it("stores and clears the page guests go to after booking", async () => {
+      const set = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), redirectUrl: "https://priya.coach/thanks" });
+      expect((await store.getEventType(priya.id, intro.id))!.redirectUrl).toBe("https://priya.coach/thanks");
+      expect((await store.updateEventType(priya.id, intro.id, { ...draftOf(set), redirectUrl: null })).redirectUrl).toBeNull();
+    });
+
+    it("stores the weekly limit and cancellation policy, and clears them", async () => {
+      const set = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), weeklyLimit: 4, cancelPolicy: "24 hours' notice, please." });
+      expect([set.weeklyLimit, set.cancelPolicy]).toEqual([4, "24 hours' notice, please."]);
+      const cleared = await store.updateEventType(priya.id, intro.id, { ...draftOf(set), weeklyLimit: null, cancelPolicy: null });
+      expect([cleared.weeklyLimit, cleared.cancelPolicy]).toEqual([null, null]);
+    });
+
+    it("keeps only https redirect links and policies of up to 1,000 characters in the database itself", async () => {
+      for (const bad of ["javascript:alert(1)", "http://priya.coach", `https://x.in/${"a".repeat(500)}`]) {
+        await expect(pool.query("update event_types set redirect_url = $1 where id = $2", [bad, intro.id])).rejects.toThrow(/event_types_redirect_url_https/);
+      }
+      await expect(pool.query("update event_types set cancellation_policy = $1 where id = $2", ["x".repeat(1001), intro.id])).rejects.toThrow(/cancellation_policy_length/);
     });
 
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
@@ -494,6 +533,6 @@ function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
     startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit, hidden: e.hidden,
-    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, depositMinor: e.depositMinor, location: null,
+    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, depositMinor: e.depositMinor, redirectUrl: e.redirectUrl, weeklyLimit: e.weeklyLimit, cancelPolicy: e.cancelPolicy, location: null,
   };
 }

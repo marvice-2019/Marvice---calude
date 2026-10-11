@@ -7,6 +7,7 @@ import { PackageUnavailableError, takeCredits } from "../packages/packages";
 import { hashLinkToken, newLinkToken } from "../links";
 import { checkOneOff, oneOffSlug } from "./one-off";
 import { queueWaitlistFor } from "../waitlist";
+import { localDay, weekOf } from "../slots";
 import {
   EventTypeInUseError, LinkUnavailableError, LinkUsedError, NotFoundError, RequestKeyConflictError, SlotTakenError, SlugTakenError, type AvailabilityRule, type BookingLink,
   type BookingWithInvitee, type CreateBookingInput, type DataStore, type EventType, type EventTypeDraft, type Interval, type User,
@@ -32,19 +33,19 @@ const USER = "id, email, coalesce(name, '') as name, slug, timezone, time_format
 const toUser = (r: Row): User => ({ id: r.id as string, email: r.email as string, name: r.name as string, slug: r.slug as string, timezone: r.timezone as string, timeFormat: r.time_format as User["timeFormat"], locale: r.locale as string });
 
 const EVENT = `id, user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
-  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind, max_repeats, deposit_minor`;
+  buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, active, position, kind, max_repeats, deposit_minor, redirect_url, weekly_limit, cancellation_policy`;
 const toEventType = (r: Row): EventType => ({
   id: r.id as string, userId: r.user_id as string, scheduleId: r.schedule_id as string | null, name: r.name as string, slug: r.slug as string,
   description: r.description as string | null, durationMinutes: r.duration_minutes as number, minNoticeMinutes: r.min_notice_minutes as number,
   bookingWindowDays: r.booking_window_days as number, startIncrementMinutes: r.start_increment_minutes as number, bufferBeforeMinutes: r.buffer_before_minutes as number,
   bufferAfterMinutes: r.buffer_after_minutes as number, dailyLimit: r.daily_limit as number | null, cancelCutoffMinutes: r.cancel_cutoff_minutes as number,
   priceMinor: r.price_minor as number | null, currency: r.currency as EventType["currency"], hidden: r.hidden as boolean, active: r.active as boolean, position: r.position as number,
-  kind: r.kind as EventType["kind"], maxRepeats: r.max_repeats as number, depositMinor: (r.deposit_minor as number | null) ?? null,
+  kind: r.kind as EventType["kind"], maxRepeats: r.max_repeats as number, depositMinor: (r.deposit_minor as number | null) ?? null, redirectUrl: (r.redirect_url as string | null) ?? null, weeklyLimit: (r.weekly_limit as number | null) ?? null, cancelPolicy: (r.cancellation_policy as string | null) ?? null,
 });
 
 const BOOKING = `select b.id, b.event_type_id, b.host_id, b.start_at, b.end_at, b.buffered_start, b.buffered_end, b.status, b.hold_expires_at, b.location_kind, b.join_url, b.idempotency_key,
   b.cancelled_at, b.cancelled_by, b.cancel_reason, b.rescheduled_from_id, b.series_id, b.series_index, b.created_at,
-  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at, i.running_late_minutes, i.running_late_at
+  i.id as invitee_id, i.name as invitee_name, i.email as invitee_email, i.timezone as invitee_timezone, i.phone as invitee_phone, i.answers, i.manage_token, i.no_show_at, i.running_late_minutes, i.running_late_at, i.guests::text[] as guests, i.locale as invitee_locale
   from bookings b join invitees i on i.booking_id = b.id`;
 const toBooking = (r: Row): BookingWithInvitee => ({
   id: r.id as string, eventTypeId: r.event_type_id as string, hostId: r.host_id as string, startAt: r.start_at as Date, endAt: r.end_at as Date,
@@ -58,7 +59,7 @@ const toBooking = (r: Row): BookingWithInvitee => ({
     id: r.invitee_id as string, bookingId: r.id as string, hostId: r.host_id as string, name: r.invitee_name as string, email: r.invitee_email as string,
     timezone: r.invitee_timezone as string, phone: r.invitee_phone as string | null, answers: r.answers as BookingWithInvitee["invitee"]["answers"], manageToken: r.manage_token as string,
     noShowAt: (r.no_show_at as Date | null) ?? null,
-    runningLateMinutes: (r.running_late_minutes as number | null) ?? null, runningLateAt: (r.running_late_at as Date | null) ?? null,
+    runningLateMinutes: (r.running_late_minutes as number | null) ?? null, runningLateAt: (r.running_late_at as Date | null) ?? null, guests: (r.guests as string[] | null) ?? [], locale: (r.invitee_locale as string | null) ?? "en",
   },
 });
 
@@ -127,8 +128,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
         et.location_kind, input.idempotencyKey, movingId, input.holdUntil ? "pending_payment" : "confirmed", input.holdUntil ?? null, linkId]);
     const id = inserted.rows[0].id as string;
     const i = input.invitee;
-    await client.query("insert into invitees (booking_id, host_id, name, email, timezone, phone, answers) values ($1,$2,$3,$4,$5,$6,$7)",
-      [id, et.user_id, i.name, i.email, i.timezone, i.phone, JSON.stringify(i.answers)]);
+    await client.query("insert into invitees (booking_id, host_id, name, email, timezone, phone, answers, guests, locale) values ($1,$2,$3,$4,$5,$6,$7,$8::citext[],$9)",
+      [id, et.user_id, i.name, i.email, i.timezone, i.phone, JSON.stringify(i.answers), i.guests ?? [], i.locale ?? "en"]);
     return id;
   }
 
@@ -173,6 +174,36 @@ export function createPgStore(pool: pg.Pool): DataStore {
     throw new RequestKeyConflictError();
   }
 
+  /**
+   * The daily and weekly limits again, inside the booking's transaction and under a lock on the event type, so two
+   * guests booking different times at once can't both take the last place. Counts the way the slot engine does.
+   */
+  async function checkLimits(client: pg.PoolClient, eventTypeId: string, starts: Date[]): Promise<void> {
+    const { rows: [et] } = await client.query(
+      `select e.daily_limit, e.weekly_limit, s.timezone from event_types e
+         join availability_schedules s on s.user_id = e.user_id and s.is_default
+        where e.id = $1 for update of e`, [eventTypeId]);
+    if (!et || (et.daily_limit === null && et.weekly_limit === null)) return;
+    const { rows } = await client.query(
+      `select start_at from bookings where event_type_id = $1 and start_at >= $2 and start_at < $3
+         and (status = 'confirmed' or (status = 'pending_payment' and hold_expires_at > now()))`,
+      [eventTypeId, new Date(starts[0].getTime() - 2 * WEEK), new Date(starts[starts.length - 1].getTime() + 2 * WEEK)]);
+    const perDay = new Map<number, number>();
+    const perWeek = new Map<number, number>();
+    const add = (start: Date) => {
+      const day = localDay(start, et.timezone);
+      perDay.set(day, (perDay.get(day) ?? 0) + 1);
+      perWeek.set(weekOf(day), (perWeek.get(weekOf(day)) ?? 0) + 1);
+    };
+    for (const r of rows) add(r.start_at);
+    for (const start of starts) {
+      const day = localDay(start, et.timezone);
+      if (et.daily_limit !== null && (perDay.get(day) ?? 0) >= et.daily_limit) throw new SlotTakenError();
+      if (et.weekly_limit !== null && (perWeek.get(weekOf(day)) ?? 0) >= et.weekly_limit) throw new SlotTakenError();
+      add(start);
+    }
+  }
+
   /** A lost race on the idempotency key returns the winner's booking (if it is the same request); a lost race on the slot is SlotTakenError. */
   async function settle(error: unknown, idempotencyKey: string, isSameRequest: (b: BookingWithInvitee) => boolean): Promise<BookingWithInvitee> {
     if (code(error) === "23505" || code(error) === "23P01") {
@@ -201,7 +232,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
   }
 
   const draftValues = (d: EventTypeDraft) => [d.name, d.slug, d.description, d.durationMinutes, d.minNoticeMinutes, d.bookingWindowDays, d.startIncrementMinutes,
-    d.bufferBeforeMinutes, d.bufferAfterMinutes, d.dailyLimit, d.cancelCutoffMinutes, d.priceMinor, d.priceMinor === null ? null : d.currency, d.hidden, d.maxRepeats, d.priceMinor === null ? d.depositMinor : null];
+    d.bufferBeforeMinutes, d.bufferAfterMinutes, d.dailyLimit, d.cancelCutoffMinutes, d.priceMinor, d.priceMinor === null ? null : d.currency, d.hidden, d.maxRepeats, d.priceMinor === null ? d.depositMinor : null, d.redirectUrl, d.weeklyLimit, d.cancelPolicy];
 
   async function slugSafe<T>(work: () => Promise<T>): Promise<T> {
     try {
@@ -309,6 +340,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
         const id = await tx(async (client) => {
           const linkId = input.bookingLinkToken === undefined ? null : await takeLink(client, input, input.bookingLinkToken);
           const weekStarts = Array.from({ length: input.weeks ?? 1 }, (_, i) => new Date(input.startAt.getTime() + i * WEEK));
+          await checkLimits(client, input.eventTypeId, weekStarts);
           const purchaseId = input.packageToken === undefined ? null : await takeCredits(client, input.packageToken, input.eventTypeId, weekStarts);
           const newId = await insertBooking(client, input, null, linkId);
           // A held booking says nothing yet: its emails and calendar write go out once the payment is confirmed.
@@ -369,10 +401,10 @@ export function createPgStore(pool: pg.Pool): DataStore {
           // Cancel first: the exclusion constraint only covers confirmed rows, so the new slot may overlap the old one.
           // Both statements commit together or not at all.
           await client.query("update bookings set status = 'cancelled', cancelled_at = now(), cancelled_by = $2, cancel_reason = 'Rescheduled' where id = $1", [bookingId, by]);
-          const { name, email, timezone, phone, answers } = invitee;
+          const { name, email, timezone, phone, answers, guests, locale } = invitee;
           // The move keeps the booking's single-use link, so the link shows the current time.
           const linkId = (await client.query("select booking_link_id from bookings where id = $1", [bookingId])).rows[0].booking_link_id as string | null;
-          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers } }, bookingId, linkId);
+          const newId = await insertBooking(client, { eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers, guests, locale } }, bookingId, linkId);
           // A moved week stays its series' week: same series, same place in it. A package session stays paid for by its
           // package (or its credit would come back while still booked), and can't move past the package's end date.
           await client.query(
@@ -500,8 +532,8 @@ export function createPgStore(pool: pg.Pool): DataStore {
       return slugSafe(() => tx(async (client) => {
         const { rows } = await client.query(
           `insert into event_types (user_id, schedule_id, name, slug, description, duration_minutes, min_notice_minutes, booking_window_days, start_increment_minutes,
-             buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, max_repeats, deposit_minor, position)
-           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+             buffer_before_minutes, buffer_after_minutes, daily_limit, cancel_cutoff_minutes, price_minor, currency, hidden, max_repeats, deposit_minor, redirect_url, weekly_limit, cancellation_policy, position)
+           values ($1, (select id from availability_schedules where user_id = $1 and is_default), $2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
              (select coalesce(max(position), -1) + 1 from event_types where user_id = $1))
            returning ${EVENT}`, [userId, ...draftValues(draft)]);
         const eventType = toEventType(rows[0]);
@@ -515,7 +547,7 @@ export function createPgStore(pool: pg.Pool): DataStore {
         const { rows } = await client.query(
           `update event_types set name = $3, slug = $4, description = $5, duration_minutes = $6, min_notice_minutes = $7, booking_window_days = $8,
              start_increment_minutes = $9, buffer_before_minutes = $10, buffer_after_minutes = $11, daily_limit = $12, cancel_cutoff_minutes = $13,
-             price_minor = $14, currency = $15, hidden = $16, max_repeats = $17, deposit_minor = $18
+             price_minor = $14, currency = $15, hidden = $16, max_repeats = $17, deposit_minor = $18, redirect_url = $19, weekly_limit = $20, cancellation_policy = $21
            where user_id = $1 and id = $2 returning ${EVENT}`, [userId, id, ...draftValues(draft)]);
         await setLocation(client, id, draft);
         return toEventType(rows[0]);

@@ -1,4 +1,6 @@
 import { formatDate, formatTime, zoneName } from "./format";
+import { isLocale } from "./i18n/guest";
+import { mt } from "./i18n/mail";
 
 /**
  * A guest's phone as WhatsApp's wa.me wants it: country code and number, digits only. Without a +, only a number that
@@ -28,21 +30,17 @@ export interface WhatsAppContext {
   /** Where to meet: a video link, an address, or a phone arrangement, already worded. */
   where: string | null;
   manageUrl: string;
+  /** The language the guest booked in; English when unset. */
+  locale?: string;
 }
 
 /** The message the host sends from their own WhatsApp. Plain words, first name, the time in the guest's zone. */
 export function whatsappMessage(kind: WhatsAppKind, c: WhatsAppContext): string {
+  const l = isLocale(c.locale) ? c.locale : "en";
   const first = c.guestName.trim().split(/\s+/)[0] || c.guestName;
-  const when = `${formatDate(c.startAt, c.guestTimezone)}, ${formatTime(c.startAt, c.guestTimezone)} ${zoneName(c.guestTimezone)}`;
-  const where = c.where ? `\n${c.where}` : "";
-  switch (kind) {
-    case "confirmation":
-      return `Hi ${first}, this is ${c.hostName}. Your ${c.eventName} is booked for ${when}.${where}\n\nNeed to change it? ${c.manageUrl}`;
-    case "reminder":
-      return `Hi ${first}, a reminder from ${c.hostName}: ${c.eventName} on ${when}.${where}\n\nCan't make it? Move or cancel here: ${c.manageUrl}`;
-    case "manage":
-      return `Hi ${first}, you can move or cancel your ${c.eventName} on ${when} here: ${c.manageUrl}`;
-  }
+  const when = `${formatDate(c.startAt, c.guestTimezone, l)}, ${formatTime(c.startAt, c.guestTimezone, "12h", l)} ${zoneName(c.guestTimezone)}`;
+  const v = { first, host: c.hostName, event: c.eventName, when, where: c.where ? `\n${c.where}` : "", url: c.manageUrl };
+  return mt(l, kind === "confirmation" ? "waConfirmation" : kind === "reminder" ? "waReminder" : "waManage", v);
 }
 
 /** A link that opens WhatsApp with the message ready to send to the guest. */

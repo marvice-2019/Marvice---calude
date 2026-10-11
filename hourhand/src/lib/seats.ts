@@ -9,7 +9,12 @@ type Db = Pick<pg.Pool, "query">;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export type SeatError = "not_duo" | "invalid_email" | "own_email" | "taken";
+export type SeatError = "not_duo" | "invalid_email" | "own_email" | "taken" | "too_many";
+
+/** Invitation emails an owner can send in 24 hours, across all addresses: the email carries their name. */
+export const SEAT_INVITES_PER_DAY = 3;
+/** An invitation nobody accepted stops holding the address after this long. */
+const STALE_INVITE_DAYS = 7;
 export class SeatActionError extends Error {
   constructor(readonly code: SeatError) { super(`seat: ${code}`); this.name = "SeatActionError"; }
 }
@@ -34,6 +39,14 @@ export async function inviteSeat(db: Db, owner: { id: string; email: string }, r
   if (!EMAIL.test(email) || email.length > 254) throw new SeatActionError("invalid_email");
   if (email.toLowerCase() === owner.email.toLowerCase()) throw new SeatActionError("own_email");
   if ((await ownPlan(db, owner.id)) !== "duo") throw new SeatActionError("not_duo");
+  const { rows: [sent] } = await db.query(
+    "select count(*)::int as n from notifications where user_id = $1 and kind = 'seat_invite' and send_at > $2::timestamptz - interval '1 day'",
+    [owner.id, now]);
+  if (sent.n >= SEAT_INVITES_PER_DAY) throw new SeatActionError("too_many");
+  // Someone else's invitation that was never accepted only holds the address for a week.
+  await db.query(
+    `delete from seats where member_email = $1 and owner_id <> $2 and accepted_at is null
+       and invited_at < $3::timestamptz - make_interval(days => ${STALE_INVITE_DAYS})`, [email, owner.id, now]);
   const { rows: [other] } = await db.query("select 1 from seats where member_email = $1 and owner_id <> $2", [email, owner.id]);
   if (other) throw new SeatActionError("taken");
   // A different email starts over; the same email again re-sends the invitation, at most once a day. The row and its

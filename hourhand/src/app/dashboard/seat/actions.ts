@@ -20,6 +20,7 @@ const MESSAGES: Record<string, string> = {
   invalid_email: "Enter a valid email address.",
   own_email: "That's your own email. Enter the other person's.",
   taken: "That person is already the second person on another Duo plan.",
+  too_many: "You've sent 3 invitations today. Try again tomorrow.",
 };
 const db = () => getPool(process.env.DATABASE_URL as string);
 

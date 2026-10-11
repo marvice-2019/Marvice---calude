@@ -57,7 +57,7 @@ const CONTEXT = `
     b.location_kind as booking_location_kind, b.join_url, b.external_event_id, b.external_calendar_id,
     prev.start_at as previous_start_at, prev.external_event_id as previous_event_id, prev.external_calendar_id as previous_calendar_id,
     prev.join_url as previous_join_url, prev.cancelled_by as previous_cancelled_by,
-    i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.answers, i.manage_token, i.reminders_opt_out, i.running_late_minutes,
+    i.name as guest_name, i.email as guest_email, i.timezone as guest_timezone, i.locale as guest_locale, i.answers, i.manage_token, i.reminders_opt_out, i.running_late_minutes,
     e.name as event_name, e.slug as event_slug, e.kind as event_kind, e.active as event_active, b.event_type_id, u.slug as host_slug,
     (select p.amount_minor from payments p where p.booking_id = b.id and p.status in ('paid', 'refund_pending', 'refunded')
       order by p.created_at desc limit 1) as paid_minor,
@@ -91,7 +91,7 @@ function toContext(r: ContextRow, baseUrl: string): BookingMailContext {
   return {
     bookingId: r.id as string, eventName: r.event_name as string,
     hostName: r.host_name as string, hostEmail: r.host_email as string, hostTimezone: r.host_timezone as string, hostTimeFormat: r.host_time_format as HourCycle,
-    guestName: r.guest_name as string, guestEmail: r.guest_email as string, guestTimezone: r.guest_timezone as string,
+    guestName: r.guest_name as string, guestEmail: r.guest_email as string, guestTimezone: r.guest_timezone as string, locale: (r.guest_locale as string | null) ?? "en",
     startAt: new Date(r.start_at as Date), endAt: new Date(r.end_at as Date),
     location: r.location_kind ? { kind: r.location_kind as LocationKind, value: (r.location_value as string | null) ?? null } : null,
     joinUrl: (r.join_url as string | null) ?? null,
@@ -441,6 +441,7 @@ export async function processDueNotifications(
           : c.kind === "seat_invite" ? await renderSeatInvite(pool, c, opts.baseUrl)
           : renderBookingMail(c.kind as BookingEmailKind, {
             ...toContext(r, opts.baseUrl),
+            extraGuest: c.recipient.toLowerCase() !== String(r.guest_email).toLowerCase() && c.kind.endsWith("_guest"),
             ...(c.kind === "cancelled_guest" ? { rebook: await rebookSuggestions(pool, r, opts.baseUrl) } : {}),
             ...((c.kind === "booked_guest" || c.kind === "booked_host") && r.series_id === r.id ? { series: await seriesWeeks(pool, r.id as string, opts.baseUrl) } : {}),
             ...((c.kind === "cancelled_guest" || c.kind === "cancelled_host") && r.series_id ? { alsoCancelled: await cancelledWith(pool, r.id as string) } : {}),

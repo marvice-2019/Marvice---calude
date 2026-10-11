@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/billing/plans";
 import { formatDate, formatTime, zoneName } from "@/lib/format";
 import { getPool } from "@/lib/data/pg-store";
 import { bookingPayment, DEPOSIT_HOLD_MS, type BookingPaymentSummary } from "@/lib/payments/booking-payments";
+import { LOCATION_KEYS, isLocale, t } from "@/lib/i18n/guest";
 import { GUEST_LOCATION_LABELS } from "@/lib/location-labels";
 import { waLink, waNumber, whatsappMessage, type WhatsAppKind } from "@/lib/whatsapp";
 import { cancelAsHost, rescheduleAsHost, setNoShow } from "./actions";
@@ -95,6 +96,7 @@ export default async function BookingDetailPage({ params, searchParams }: { para
           {series.length > 1 && <dd className="text-sm text-text-muted">Week {booking.seriesIndex} of {new Set(series.map((b) => b.seriesIndex)).size}, every week at this time</dd>}
         </div>
         <div><dt className="text-sm text-text-muted">Email</dt><dd className="text-text">{booking.invitee.email}</dd></div>
+        {booking.invitee.guests.length > 0 && <div><dt className="text-sm text-text-muted">Also invited</dt><dd className="text-text">{booking.invitee.guests.join(", ")}</dd></div>}
         {payment && (
           <div>
             <dt className="text-sm text-text-muted">Payment</dt>
@@ -219,10 +221,12 @@ async function whatsappLinks(
   const origin = process.env.BETTER_AUTH_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
   const kind = booking.locationKind;
   const value = locations.find((l) => l.kind === kind)?.value ?? null;
-  const where = kind ? `${GUEST_LOCATION_LABELS[kind]}${booking.joinUrl ? `: ${booking.joinUrl}` : value ? `: ${value}` : ""}` : null;
+  const locale = isLocale(booking.invitee.locale) ? booking.invitee.locale : "en";
+  const label = kind ? (locale === "en" ? GUEST_LOCATION_LABELS[kind] : t(locale, LOCATION_KEYS[kind])) : null;
+  const where = label ? `${label}${booking.joinUrl ? `: ${booking.joinUrl}` : value ? `: ${value}` : ""}` : null;
   const ctx = {
     guestName: booking.invitee.name, hostName: user.name, eventName: eventType?.name ?? "booking", startAt: booking.startAt,
-    guestTimezone: booking.invitee.timezone, where, manageUrl: `${origin.replace(/\/+$/, "")}/b/${booking.invitee.manageToken}`,
+    guestTimezone: booking.invitee.timezone, where, locale, manageUrl: `${origin.replace(/\/+$/, "")}/b/${booking.invitee.manageToken}`,
   };
   return (Object.keys(WHATSAPP_LABELS) as WhatsAppKind[]).map((k) => ({ kind: k, label: WHATSAPP_LABELS[k], href: waLink(number, whatsappMessage(k, ctx)) }));
 }

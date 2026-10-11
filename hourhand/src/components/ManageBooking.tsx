@@ -21,6 +21,8 @@ interface Props {
   locale?: Locale;
   /** "?lang=xx" when the guest chose a language, carried to the next page. */
   langQuery?: string;
+  /** The host's cancellation policy, shown next to Cancel. */
+  cancelPolicy?: string | null;
 }
 
 function When({ slot, tz, locale }: { slot: string; tz: string; locale: Locale }) {
@@ -28,16 +30,16 @@ function When({ slot, tz, locale }: { slot: string; tz: string; locale: Locale }
 }
 
 /** The two things a guest can do with a booking: move it, or cancel it. */
-export function ManageBooking({ token, slug, event, bookingWindowDays, hostName, laterWeeks = 0, locale = "en", langQuery = "" }: Props) {
+export function ManageBooking({ token, slug, event, bookingWindowDays, hostName, laterWeeks = 0, locale = "en", langQuery = "", cancelPolicy = null }: Props) {
   return (
     <>
       <Reschedule token={token} slug={slug} event={event} bookingWindowDays={bookingWindowDays} locale={locale} langQuery={langQuery} />
-      <Cancel token={token} hostName={hostName} laterWeeks={laterWeeks} locale={locale} />
+      <Cancel token={token} hostName={hostName} laterWeeks={laterWeeks} locale={locale} policy={cancelPolicy} />
     </>
   );
 }
 
-function Reschedule({ token, slug, event, bookingWindowDays, locale = "en", langQuery = "" }: Omit<Props, "hostName" | "laterWeeks">) {
+function Reschedule({ token, slug, event, bookingWindowDays, locale = "en", langQuery = "" }: Omit<Props, "hostName" | "laterWeeks" | "cancelPolicy">) {
   const router = useRouter();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
@@ -104,7 +106,7 @@ function Reschedule({ token, slug, event, bookingWindowDays, locale = "en", lang
   );
 }
 
-function Cancel({ token, hostName, laterWeeks, locale }: { token: string; hostName: string; laterWeeks: number; locale: Locale }) {
+function Cancel({ token, hostName, laterWeeks, locale, policy }: { token: string; hostName: string; laterWeeks: number; locale: Locale; policy: string | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +138,7 @@ function Cancel({ token, hostName, laterWeeks, locale }: { token: string; hostNa
   return (
     <section aria-labelledby="cancel-heading" className="mt-10 max-w-md">
       <h2 id="cancel-heading" className="font-semibold text-text">{t(locale, "cancel")}</h2>
+      {policy && <p className="mt-1 whitespace-pre-line text-sm text-text-muted"><span className="font-semibold text-text">{t(locale, "cancelPolicy")}: </span>{policy}</p>}
       <form onSubmit={submit} className="mt-2 grid gap-3">
         <div>
           <Label htmlFor="reason">{t(locale, "reasonOptional")}</Label>

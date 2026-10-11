@@ -5,6 +5,8 @@ import { formatDate, formatTime, zoneName, type HourCycle } from "../format";
 import { GUEST_LOCATION_LABELS } from "../location-labels";
 import { formatMoney } from "../billing/plans";
 import { buildIcs } from "./ics";
+import { LOCATION_KEYS, isLocale, t, type Locale } from "../i18n/guest";
+import { mt, type MailKey } from "../i18n/mail";
 import type { Attachment } from "./mailer";
 
 export interface BookingMailContext {
@@ -47,6 +49,10 @@ export interface BookingMailContext {
   series?: { bookingId: string; startAt: Date; endAt: Date; manageUrl: string }[];
   /** For cancellations: later weeks of the same series cancelled in the same step. */
   alsoCancelled?: Date[];
+  /** The recipient is an extra guest the booker added: told about the booking, never given the link that changes it. */
+  extraGuest?: boolean;
+  /** The language the guest booked in; guest emails use it, host emails stay English. */
+  locale?: string;
 }
 
 export interface RenderedMail { subject: string; text: string; html: string; attachments?: Attachment[]; replyTo?: string }
@@ -58,13 +64,16 @@ export function escapeHtml(s: string): string {
 /** Strips line breaks from anything that goes into a subject line. */
 const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
 
-const when = (d: Date, tz: string, cycle: HourCycle) => `${formatDate(d, tz)}, ${formatTime(d, tz, cycle)} ${zoneName(tz)}`;
+const when = (d: Date, tz: string, cycle: HourCycle, locale: Locale = "en") => `${formatDate(d, tz, locale)}, ${formatTime(d, tz, cycle, locale)} ${zoneName(tz)}`;
+/** The guest's language for this email, and its lines. */
+const lang = (c: BookingMailContext): Locale => (isLocale(c.locale) ? c.locale : "en");
+const g = (c: BookingMailContext, key: MailKey, vars: Record<string, string | number> = {}) => mt(lang(c), key, vars);
 const minutes = (c: BookingMailContext) => Math.round((c.endAt.getTime() - c.startAt.getTime()) / 60_000);
 const hostLabel = (c: BookingMailContext) => c.hostName || c.hostEmail;
 
-function where(c: BookingMailContext): string | null {
+function where(c: BookingMailContext, locale: Locale = "en"): string | null {
   if (!c.location) return null;
-  const label = GUEST_LOCATION_LABELS[c.location.kind];
+  const label = locale === "en" ? GUEST_LOCATION_LABELS[c.location.kind] : t(locale, LOCATION_KEYS[c.location.kind]);
   if (c.joinUrl) return `${label}: ${c.joinUrl}`;
   return c.location.value ? `${label}: ${c.location.value}` : label;
 }
@@ -105,16 +114,18 @@ const render = (subject: string, b: Block, extra: Partial<RenderedMail> = {}): R
   ({ subject: oneLine(subject), text: toText(b), html: toHtml(b), ...extra });
 
 /** "Every week": the series' dates, one line each, when this is a series confirmation. */
-const seriesRow = (c: BookingMailContext, tz: string, cycle: HourCycle): Row[] => [
-  ...(c.series && c.series.length > 1 ? [[`Every week (${c.series.length})`, c.series.map((s) => when(s.startAt, tz, cycle)).join("\n")] as Row] : []),
-  ...(c.alsoCancelled?.length ? [[`Also cancelled (${c.alsoCancelled.length})`, c.alsoCancelled.map((d) => when(d, tz, cycle)).join("\n")] as Row] : []),
+const seriesRow = (c: BookingMailContext, tz: string, cycle: HourCycle, locale: Locale = "en"): Row[] => [
+  ...(c.series && c.series.length > 1 ? [[mt(locale, "rEveryWeek", { n: c.series.length }), c.series.map((s) => when(s.startAt, tz, cycle, locale)).join("\n")] as Row] : []),
+  ...(c.alsoCancelled?.length ? [[mt(locale, "rAlsoCancelled", { n: c.alsoCancelled.length }), c.alsoCancelled.map((d) => when(d, tz, cycle, locale)).join("\n")] as Row] : []),
 ];
 
 function guestRows(c: BookingMailContext): Row[] {
-  const rows: Row[] = [["What", `${c.eventName} (${minutes(c)} min)`], ["When", when(c.startAt, c.guestTimezone, "12h")], ...seriesRow(c, c.guestTimezone, "12h"), ["With", hostLabel(c)]];
-  const w = where(c);
-  if (w) rows.push(["Where", w]);
-  if (c.paidMinor) rows.push(c.paidIsDeposit ? ["Deposit", `${formatMoney(c.paidMinor, "INR")}, refunded a day after your session. Kept only if you don't turn up.`] : ["Paid", formatMoney(c.paidMinor, "INR")]);
+  const l = lang(c);
+  const rows: Row[] = [[g(c, "rWhat"), `${c.eventName} (${g(c, "minutes", { n: minutes(c) })})`], [g(c, "rWhen"), when(c.startAt, c.guestTimezone, "12h", l)],
+    ...seriesRow(c, c.guestTimezone, "12h", l), [g(c, "rWith"), hostLabel(c)]];
+  const w = where(c, l);
+  if (w) rows.push([g(c, "rWhere"), w]);
+  if (c.paidMinor) rows.push(c.paidIsDeposit ? [g(c, "rDeposit"), g(c, "rDepositValue", { amount: formatMoney(c.paidMinor, "INR") })] : [g(c, "rPaid"), formatMoney(c.paidMinor, "INR")]);
   return rows;
 }
 
@@ -134,52 +145,90 @@ function calendarFile(c: BookingMailContext): Attachment {
   const weeks = c.series && c.series.length > 1 ? c.series : [{ bookingId: c.bookingId, startAt: c.startAt, endAt: c.endAt, manageUrl: c.manageUrl }];
   const ics = buildIcs(weeks.map((w) => ({
     uid: `${w.bookingId}@hourhand`, start: w.startAt, end: w.endAt, stamp: c.issuedAt,
-    summary: `${c.eventName} with ${hostLabel(c)}`, description: `Change or cancel: ${w.manageUrl}`, location: where(c), url: w.manageUrl,
+    summary: g(c, "calWith", { event: c.eventName, host: hostLabel(c) }), description: g(c, "calChange", { url: w.manageUrl }), location: where(c, lang(c)), url: w.manageUrl,
   })));
   return { filename: "booking.ics", content: Buffer.from(ics, "utf8").toString("base64"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" };
 }
 
-const guestFooter = (c: BookingMailContext) => `Sent by Hourhand for ${hostLabel(c)}. Reply to this email to reach them.`;
+const guestFooter = (c: BookingMailContext) => g(c, "fGuest", { host: hostLabel(c) });
 const hostFooter = "Sent by Hourhand about your booking page.";
-const manageLink = (c: BookingMailContext) => ({ label: "Reschedule or cancel", url: c.manageUrl });
+const manageLink = (c: BookingMailContext) => ({ label: g(c, "lManage"), url: c.manageUrl });
 const dashboardLink = (c: BookingMailContext) => ({ label: "Open in Hourhand", url: c.dashboardUrl });
 
 function cancelNote(c: BookingMailContext, to: "guest" | "host"): string | undefined {
+  if (to === "guest") {
+    const refund = !c.paidMinor ? "" : g(c, c.paidIsDeposit ? "refundDeposit" : "refundPayment", { amount: formatMoney(c.paidMinor, "INR") });
+    return [refund, c.cancelReason ? g(c, "reason", { reason: c.cancelReason }) : ""].filter(Boolean).join(" ") || undefined;
+  }
+  // A paid booking is refunded in full on cancellation; say so, since that's what each side wants to know first.
   const reason = c.cancelReason ? `Reason given: ${c.cancelReason}` : "";
-  // A paid booking is refunded in full on cancellation; say so, since that's what the guest wants to know first.
-  const refund = !c.paidMinor ? "" : to === "guest"
-    ? `Your ${c.paidIsDeposit ? "deposit" : "payment"} of ${formatMoney(c.paidMinor, "INR")} is being refunded to the way you paid. Banks usually take 5 to 7 working days.`
-    : `The guest's ${formatMoney(c.paidMinor, "INR")} is being refunded from your Razorpay account.`;
+  const refund = !c.paidMinor ? "" : `The guest's ${formatMoney(c.paidMinor, "INR")} is being refunded from your Razorpay account.`;
   return [refund, reason].filter(Boolean).join(" ") || undefined;
 }
 
-export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext): RenderedMail {
+/** What an extra guest hears: the same news, framed as an invitation, with no manage link, payment or refund details. */
+function renderForExtraGuest(kind: "booked_guest" | "reminder_guest" | "cancelled_guest" | "rescheduled_guest", c: BookingMailContext): RenderedMail {
   const host = hostLabel(c);
+  const l = lang(c);
+  const v = { guest: c.guestName, event: c.eventName, host };
+  const rows = guestRows({ ...c, paidMinor: null });
+  const footer = g(c, "fExtra", v);
+  const file = () => {
+    const weeks = c.series && c.series.length > 1 ? c.series : [{ bookingId: c.bookingId, startAt: c.startAt, endAt: c.endAt }];
+    const ics = buildIcs(weeks.map((w) => ({
+      uid: `${w.bookingId}@hourhand`, start: w.startAt, end: w.endAt, stamp: c.issuedAt,
+      summary: g(c, "calWith", v), description: g(c, "calBookedBy", v), location: where(c, l),
+    })));
+    return { filename: "booking.ics", content: Buffer.from(ics, "utf8").toString("base64"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" };
+  };
   switch (kind) {
     case "booked_guest":
-      return render(`Booked: ${c.eventName} with ${host}, ${formatDate(c.startAt, c.guestTimezone)}`, {
-        heading: "You're booked", intro: `Hi ${c.guestName}, your time with ${host} is confirmed.`,
+      return render(g(c, "subjInvitation", { ...v, date: formatDate(c.startAt, c.guestTimezone, l) }), {
+        heading: g(c, "hInvited"), intro: g(c, "iInvited", v), rows, footer, note: g(c, "nInvited"),
+      }, { attachments: [file()], replyTo: c.guestEmail });
+    case "reminder_guest":
+      return render(g(c, "subjReminder", { ...v, time: `${formatTime(c.startAt, c.guestTimezone, "12h", l)} ${zoneName(c.guestTimezone)}` }), {
+        heading: g(c, "hSoon"), intro: g(c, "iReminderExtra", v), rows, footer,
+      }, { replyTo: c.guestEmail });
+    case "cancelled_guest":
+      return render(g(c, "subjCancelled", v), {
+        heading: g(c, "hCancelledExtra"), intro: g(c, "iCancelledExtra", v), rows, footer,
+      }, { replyTo: c.guestEmail });
+    case "rescheduled_guest":
+      return render(g(c, "subjMoved", { ...v, date: formatDate(c.startAt, c.guestTimezone, l) }), {
+        heading: g(c, "hMovedExtra"), intro: g(c, "iMovedExtra", v),
+        rows: [...rows, ...(c.previousStartAt ? [[g(c, "rWas"), when(c.previousStartAt, c.guestTimezone, "12h", l)] as Row] : [])], footer, note: g(c, "nMoved"),
+      }, { attachments: [file()], replyTo: c.guestEmail });
+  }
+}
+
+export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext): RenderedMail {
+  if (c.extraGuest && (kind === "booked_guest" || kind === "reminder_guest" || kind === "cancelled_guest" || kind === "rescheduled_guest")) return renderForExtraGuest(kind, c);
+  const host = hostLabel(c);
+  const l = lang(c);
+  switch (kind) {
+    case "booked_guest":
+      return render(g(c, "subjBooked", { event: c.eventName, host, date: formatDate(c.startAt, c.guestTimezone, l) }), {
+        heading: g(c, "hBooked"), intro: g(c, "iBooked", { guest: c.guestName, host }),
         rows: guestRows(c), link: manageLink(c), footer: guestFooter(c),
-        note: c.series && c.series.length > 1
-          ? "The attached file adds every week to your calendar. Each week's reminder has its own link to move or cancel that week."
-          : "The attached file adds this to your calendar.",
+        note: g(c, c.series && c.series.length > 1 ? "nBookedSeries" : "nBooked"),
       }, { attachments: [calendarFile(c)], replyTo: c.hostEmail });
     case "booked_host":
       return render(`New booking: ${c.guestName}, ${c.eventName}, ${formatDate(c.startAt, c.hostTimezone)}`, {
         heading: "New booking", intro: `${c.guestName} booked ${c.eventName}.`, rows: hostRows(c), link: dashboardLink(c), footer: hostFooter,
       }, { replyTo: c.guestEmail });
     case "reminder_guest":
-      return render(`Reminder: ${c.eventName} with ${host}, ${formatTime(c.startAt, c.guestTimezone, "12h")} ${zoneName(c.guestTimezone)}`, {
-        heading: "Coming up soon", intro: `Hi ${c.guestName}, a reminder of your time with ${host}.`,
-        rows: guestRows(c), link: manageLink(c), note: "Can't make it, or running late on the day? Use the link above so they know.", footer: guestFooter(c),
+      return render(g(c, "subjReminder", { event: c.eventName, host, time: `${formatTime(c.startAt, c.guestTimezone, "12h", l)} ${zoneName(c.guestTimezone)}` }), {
+        heading: g(c, "hSoon"), intro: g(c, "iReminder", { guest: c.guestName, host }),
+        rows: guestRows(c), link: manageLink(c), note: g(c, "nReminder"), footer: guestFooter(c),
       }, { replyTo: c.hostEmail });
     case "cancelled_guest":
-      return render(`Cancelled: ${c.eventName} with ${host}`, {
-        heading: "Your booking is cancelled",
-        intro: c.cancelledBy === "guest" ? `Hi ${c.guestName}, you cancelled your time with ${host}.` : `Hi ${c.guestName}, ${host} cancelled your booking.`,
+      return render(g(c, "subjCancelled", { event: c.eventName, host }), {
+        heading: g(c, "hCancelled"),
+        intro: g(c, c.cancelledBy === "guest" ? "iCancelledByGuest" : "iCancelledByHost", { guest: c.guestName, host }),
         rows: guestRows(c), note: cancelNote(c, "guest"), footer: guestFooter(c),
         ...(c.cancelledBy === "host" && c.rebook?.length ? {
-          choices: { heading: `Book another time with ${host}`, items: c.rebook.map((s) => ({ label: when(s.at, c.guestTimezone, "12h"), url: s.url })) },
+          choices: { heading: g(c, "rebook", { host }), items: c.rebook.map((s) => ({ label: when(s.at, c.guestTimezone, "12h", l), url: s.url })) },
         } : {}),
       }, { replyTo: c.hostEmail });
     case "cancelled_host":
@@ -189,10 +238,10 @@ export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext)
         rows: hostRows(c), note: cancelNote(c, "host"), footer: hostFooter,
       }, { replyTo: c.guestEmail });
     case "rescheduled_guest":
-      return render(`Moved: ${c.eventName} with ${host}, now ${formatDate(c.startAt, c.guestTimezone)}`, {
-        heading: "Your booking has a new time", intro: c.movedBy === "host" ? `Hi ${c.guestName}, ${host} moved your booking to a new time.` : `Hi ${c.guestName}, your time with ${host} has moved.`,
-        rows: [...guestRows(c), ...(c.previousStartAt ? [["Was", when(c.previousStartAt, c.guestTimezone, "12h")] as Row] : [])],
-        link: manageLink(c), note: "The attached file adds the new time to your calendar. Remove the old one if you saved it.", footer: guestFooter(c),
+      return render(g(c, "subjMoved", { event: c.eventName, host, date: formatDate(c.startAt, c.guestTimezone, l) }), {
+        heading: g(c, "hMoved"), intro: g(c, c.movedBy === "host" ? "iMovedByHost" : "iMoved", { guest: c.guestName, host }),
+        rows: [...guestRows(c), ...(c.previousStartAt ? [[g(c, "rWas"), when(c.previousStartAt, c.guestTimezone, "12h", l)] as Row] : [])],
+        link: manageLink(c), note: g(c, "nMoved"), footer: guestFooter(c),
       }, { attachments: [calendarFile(c)], replyTo: c.hostEmail });
     case "late_host":
       return render(`Running late: ${c.guestName}, ${c.runningLateMinutes ?? "a few"} min, ${c.eventName}`, {

@@ -73,7 +73,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed", holdExpiresAt: null,
       locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null, joinUrl: null,
       idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, seriesId: null, seriesIndex: null, createdAt: new Date(),
-      invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, manageToken: randomUUID().replaceAll("-", ""), noShowAt: null, runningLateMinutes: null, runningLateAt: null },
+      invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, guests: input.invitee.guests ?? [], locale: input.invitee.locale ?? "en", manageToken: randomUUID().replaceAll("-", ""), noShowAt: null, runningLateMinutes: null, runningLateAt: null },
     };
   }
 
@@ -89,10 +89,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   function fields(draft: EventTypeDraft): Omit<EventTypeDraft, "location"> {
-    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden, maxRepeats, depositMinor } = draft;
+    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden, maxRepeats, depositMinor, redirectUrl, weeklyLimit, cancelPolicy } = draft;
     return {
       name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
-      priceMinor, currency: priceMinor === null ? null : currency, hidden, maxRepeats, depositMinor: priceMinor === null ? depositMinor : null,
+      priceMinor, currency: priceMinor === null ? null : currency, hidden, maxRepeats, depositMinor: priceMinor === null ? depositMinor : null, redirectUrl, weeklyLimit, cancelPolicy,
     };
   }
 
@@ -209,7 +209,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
         id: randomUUID(), userId: hostId, scheduleId: db.schedules.find((s) => s.userId === hostId && s.isDefault)?.id ?? null,
         name: input.name.trim(), slug: oneOffSlug(), description: input.description ?? null, durationMinutes: input.durationMinutes,
         minNoticeMinutes: 0, bookingWindowDays: 730, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null,
-        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off", maxRepeats: 1, depositMinor: null,
+        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off", maxRepeats: 1, depositMinor: null, redirectUrl: null, weeklyLimit: null, cancelPolicy: null,
       };
       db.eventTypes.push(eventType);
       db.locations.push({ id: randomUUID(), eventTypeId: eventType.id, kind: input.location.kind, value: input.location.value ?? null, position: 0 });
@@ -228,9 +228,9 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       }
       const old = db.bookings.find((b) => b.hostId === hostId && b.id === bookingId);
       if (!old) throw new NotFoundError("Booking");
-      const { name, email, timezone, phone, answers } = old.invitee;
+      const { name, email, timezone, phone, answers, guests, locale } = old.invitee;
       // Both steps run synchronously, so no other request can see the half-done state (one transaction in Postgres).
-      const booking = build({ eventTypeId: old.eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers: answers.map((a) => ({ ...a })) } }, old.id);
+      const booking = build({ eventTypeId: old.eventTypeId, startAt, idempotencyKey, invitee: { name, email, timezone, phone, answers: answers.map((a) => ({ ...a })), guests: [...guests], locale } }, old.id);
       // A moved week stays its series' week.
       Object.assign(booking, { seriesId: old.seriesId, seriesIndex: old.seriesIndex });
       db.bookings.push(booking);

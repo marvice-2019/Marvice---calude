@@ -5,6 +5,7 @@ import { authEnabled } from "@/lib/auth/auth";
 import { requireHost } from "@/lib/auth/session";
 import { getPool } from "@/lib/data/pg-store";
 import { getProfile } from "@/lib/profile";
+import { resolveBaseUrl } from "@/lib/auth/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,28 @@ export default async function ProfileSettingsPage() {
           <Card className="mt-6 max-w-xl"><ProfileForm profile={profile} /></Card>
         </>
       )}
+      <EmbedCard base={(resolveBaseUrl() ?? "").replace(/\/+$/, "")} slug={user.slug} />
     </div>
+  );
+}
+
+/** Copy-and-paste code for the host's own website: the page inline, or a button that opens it. */
+function EmbedCard({ base, slug }: { base: string; slug: string }) {
+  const page = `${base}/${slug}`;
+  const inline = `<div data-hourhand-inline="${page}"></div>\n<script src="${base}/embed.js" async></script>`;
+  const popup = `<button data-hourhand-popup="${page}">Book a session</button>\n<script src="${base}/embed.js" async></script>`;
+  const code = "mt-2 block overflow-x-auto whitespace-pre rounded-md bg-surface p-3 font-mono text-sm text-text";
+  return (
+    <Card className="mt-6 max-w-xl">
+      <h2 className="font-semibold text-text">Put it on your website</h2>
+      <p className="mt-1 text-text-muted">
+        Paste one of these where you want it on your site. For one service only, use that event type&apos;s link instead of {page}.
+        Add <code>?name=</code> and <code>?email=</code> to a link to fill those in for the guest.
+      </p>
+      <h3 className="mt-4 text-sm font-semibold text-text">On the page</h3>
+      <code className={code}>{inline}</code>
+      <h3 className="mt-4 text-sm font-semibold text-text">As a button that opens it</h3>
+      <code className={code}>{popup}</code>
+    </Card>
   );
 }

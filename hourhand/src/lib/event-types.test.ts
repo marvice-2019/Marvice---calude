@@ -52,8 +52,26 @@ describe("validateEventType", () => {
         name: "30-min strategy call", slug: "strategy", description: "Plan the next quarter.", durationMinutes: 30, minNoticeMinutes: 240,
         bookingWindowDays: 60, startIncrementMinutes: 15, bufferBeforeMinutes: 0, bufferAfterMinutes: 10, dailyLimit: null,
         cancelCutoffMinutes: 120, maxRepeats: 1, depositMinor: null, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
+        redirectUrl: null, weeklyLimit: null, cancelPolicy: null,
       },
     });
+  });
+
+  it("takes a weekly limit no lower than the daily one, and a policy of up to 1,000 characters", () => {
+    expect(validateEventType({ ...valid, weeklyLimit: "5", cancelPolicy: " Cancel 24 hours ahead for a refund. " }, []))
+      .toMatchObject({ ok: true, value: { weeklyLimit: 5, cancelPolicy: "Cancel 24 hours ahead for a refund." } });
+    expect(validateEventType({ ...valid, dailyLimit: "3", weeklyLimit: "2" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
+    // Past what the database column holds: a field error, not a failed save.
+    expect(validateEventType({ ...valid, weeklyLimit: "3000000000" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
+    expect(validateEventType({ ...valid, minNoticeMinutes: "3000000000", cancelCutoffMinutes: "3000000000", dailyLimit: "3000000000" }, []))
+      .toMatchObject({ ok: false, errors: { minNoticeMinutes: expect.any(String), cancelCutoffMinutes: expect.any(String), dailyLimit: expect.any(String) } });
+    expect(validateEventType({ ...valid, weeklyLimit: "0" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
+    expect(validateEventType({ ...valid, cancelPolicy: "x".repeat(1001) }, [])).toMatchObject({ ok: false, errors: { cancelPolicy: expect.any(String) } });
+  });
+
+  it("takes an https page to send guests to after booking, and nothing else", () => {
+    expect(validateEventType({ ...valid, redirectUrl: "https://priya.coach/thanks" }, [])).toMatchObject({ ok: true, value: { redirectUrl: "https://priya.coach/thanks" } });
+    expect(validateEventType({ ...valid, redirectUrl: "javascript:alert(1)" }, [])).toMatchObject({ ok: false, errors: { redirectUrl: expect.any(String) } });
   });
 
   it("carries the 'only people with the link' choice, and refuses anything but true or false", () => {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmbedResize } from "@/components/EmbedResize";
 import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/LocalTime";
 import { ManageBooking } from "@/components/ManageBooking";
@@ -11,6 +12,8 @@ import { store } from "@/lib/data";
 import { formatDate, zoneName } from "@/lib/format";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { LOCATION_KEYS, resolveLocale, t, tNodes } from "@/lib/i18n/guest";
+import { AddToCalendar } from "@/components/AddToCalendar";
+import { resolveBaseUrl } from "@/lib/auth/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +40,7 @@ export default async function ManageBookingPage({ params, searchParams }: { para
 
   return (
     <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
       <LanguageSwitcher locale={locale} path={`/b/${token}`} />
       <h1 className="font-display text-xl text-text">{t(locale, "yourBooking")}</h1>
       <Card className="mt-4 max-w-md">
@@ -67,8 +71,13 @@ export default async function ManageBookingPage({ params, searchParams }: { para
         </p>
       ) : (
         <>
+        <AddToCalendar
+          token={token} title={`${eventType.name} with ${host.name}`} start={booking.startAt} end={booking.endAt} locale={locale}
+          location={booking.joinUrl ?? (booking.locationKind ? t(locale, LOCATION_KEYS[booking.locationKind]) : null)}
+          manageUrl={`${(resolveBaseUrl() ?? "").replace(/\/+$/, "")}/b/${token}`}
+        />
         {canSayRunningLate(booking.startAt, new Date()) && <RunningLate token={token} hostName={host.name} told={booking.invitee.runningLateMinutes} locale={locale} />}
-        <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} laterWeeks={laterWeeks} locale={locale} langQuery={q} />
+        <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} laterWeeks={laterWeeks} locale={locale} langQuery={q} cancelPolicy={eventType.cancelPolicy} />
         </>
       )}
     </main>

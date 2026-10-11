@@ -6,6 +6,11 @@ describe("ics", () => {
     expect(icsText("a,b;c\\d\ne")).toBe("a\\,b\\;c\\\\d\\ne");
   });
 
+  it("escapes a bare carriage return too, so a guest name can't start a new property", () => {
+    expect(icsText("Ravi\rATTENDEE:mailto:x@evil.test")).toBe("Ravi\\nATTENDEE:mailto:x@evil.test");
+    expect(icsText("a\r\nb")).toBe("a\\nb");
+  });
+
   it("folds long lines at 75 octets without splitting a character", () => {
     const line = `SUMMARY:${"मीरा ".repeat(30)}`;
     const folded = foldLine(line).split("\r\n");

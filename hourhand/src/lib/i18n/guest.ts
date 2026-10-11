@@ -165,6 +165,15 @@ const en = {
   locInPerson: "In person",
   locCustom: "Details from the host",
   locAskGuest: "Your chosen location",
+  addToCalendar: "Add to calendar",
+  calOther: "Apple / other (.ics)",
+  continueTo: "Continue to {site}",
+  redirecting: "Taking you there in a few seconds…",
+  addGuests: "Add guests",
+  guestsLabel: "Guest emails",
+  guestsHint: "Up to 5, separated by commas. They get the details and reminders; only you can change the booking.",
+  errGuests: "Check the guest emails: up to 5 valid addresses.",
+  cancelPolicy: "Cancellation policy",
 };
 
 export type GuestKey = keyof typeof en;
@@ -315,6 +324,15 @@ const hi: Catalog = {
   locInPerson: "आमने-सामने",
   locCustom: "होस्ट से मिली जानकारी",
   locAskGuest: "आपकी चुनी हुई जगह",
+  addToCalendar: "कैलेंडर में जोड़ें",
+  calOther: "Apple / अन्य (.ics)",
+  continueTo: "{site} पर आगे बढ़ें",
+  redirecting: "कुछ ही सेकंड में आपको वहाँ ले जा रहे हैं…",
+  addGuests: "मेहमान जोड़ें",
+  guestsLabel: "मेहमानों के ईमेल",
+  guestsHint: "ज़्यादा से ज़्यादा 5, कॉमा से अलग करें। उन्हें जानकारी और रिमाइंडर मिलेंगे; बुकिंग सिर्फ़ आप बदल सकते हैं।",
+  errGuests: "मेहमानों के ईमेल जाँचें: ज़्यादा से ज़्यादा 5 सही पते।",
+  cancelPolicy: "रद्द करने की नीति",
 };
 
 const ta: Catalog = {
@@ -462,6 +480,15 @@ const ta: Catalog = {
   locInPerson: "நேரில்",
   locCustom: "ஹோஸ்ட் தந்த விவரங்கள்",
   locAskGuest: "நீங்கள் தேர்ந்தெடுத்த இடம்",
+  addToCalendar: "காலெண்டரில் சேர்க்கவும்",
+  calOther: "Apple / மற்றவை (.ics)",
+  continueTo: "{site} க்குத் தொடரவும்",
+  redirecting: "சில வினாடிகளில் அங்கு அழைத்துச் செல்கிறோம்…",
+  addGuests: "விருந்தினர்களைச் சேர்க்கவும்",
+  guestsLabel: "விருந்தினர் மின்னஞ்சல்கள்",
+  guestsHint: "அதிகபட்சம் 5, காற்புள்ளியால் பிரிக்கவும். அவர்களுக்கு விவரங்களும் நினைவூட்டல்களும் வரும்; முன்பதிவை நீங்கள் மட்டுமே மாற்ற முடியும்.",
+  errGuests: "விருந்தினர் மின்னஞ்சல்களைச் சரிபார்க்கவும்: அதிகபட்சம் 5 சரியான முகவரிகள்.",
+  cancelPolicy: "ரத்து செய்யும் கொள்கை",
 };
 
 const te: Catalog = {
@@ -609,6 +636,15 @@ const te: Catalog = {
   locInPerson: "నేరుగా కలిసి",
   locCustom: "హోస్ట్ ఇచ్చిన వివరాలు",
   locAskGuest: "మీరు ఎంచుకున్న చోటు",
+  addToCalendar: "క్యాలెండర్‌లో జోడించండి",
+  calOther: "Apple / ఇతరాలు (.ics)",
+  continueTo: "{site} కి కొనసాగండి",
+  redirecting: "కొన్ని సెకన్లలో మిమ్మల్ని అక్కడికి తీసుకెళ్తున్నాం…",
+  addGuests: "అతిథులను జోడించండి",
+  guestsLabel: "అతిథుల ఈమెయిల్స్",
+  guestsHint: "గరిష్ఠంగా 5, కామాలతో వేరు చేయండి. వారికి వివరాలు, రిమైండర్లు వస్తాయి; బుకింగ్‌ను మీరు మాత్రమే మార్చగలరు.",
+  errGuests: "అతిథుల ఈమెయిల్స్ చూడండి: గరిష్ఠంగా 5 సరైన చిరునామాలు.",
+  cancelPolicy: "రద్దు విధానం",
 };
 
 const kn: Catalog = {
@@ -756,6 +792,15 @@ const kn: Catalog = {
   locInPerson: "ನೇರವಾಗಿ ಭೇಟಿ",
   locCustom: "ಹೋಸ್ಟ್ ಕೊಟ್ಟ ವಿವರಗಳು",
   locAskGuest: "ನೀವು ಆರಿಸಿದ ಸ್ಥಳ",
+  addToCalendar: "ಕ್ಯಾಲೆಂಡರ್‌ಗೆ ಸೇರಿಸಿ",
+  calOther: "Apple / ಇತರೆ (.ics)",
+  continueTo: "{site} ಗೆ ಮುಂದುವರಿಯಿರಿ",
+  redirecting: "ಕೆಲವೇ ಸೆಕೆಂಡುಗಳಲ್ಲಿ ನಿಮ್ಮನ್ನು ಅಲ್ಲಿಗೆ ಕರೆದೊಯ್ಯುತ್ತೇವೆ…",
+  addGuests: "ಅತಿಥಿಗಳನ್ನು ಸೇರಿಸಿ",
+  guestsLabel: "ಅತಿಥಿಗಳ ಇಮೇಲ್‌ಗಳು",
+  guestsHint: "ಗರಿಷ್ಠ 5, ಅಲ್ಪವಿರಾಮದಿಂದ ಬೇರ್ಪಡಿಸಿ. ಅವರಿಗೆ ವಿವರಗಳು ಮತ್ತು ಜ್ಞಾಪನೆಗಳು ಬರುತ್ತವೆ; ಬುಕಿಂಗ್ ಅನ್ನು ನೀವು ಮಾತ್ರ ಬದಲಾಯಿಸಬಹುದು.",
+  errGuests: "ಅತಿಥಿಗಳ ಇಮೇಲ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ: ಗರಿಷ್ಠ 5 ಸರಿಯಾದ ವಿಳಾಸಗಳು.",
+  cancelPolicy: "ರದ್ದತಿ ನೀತಿ",
 };
 
 export const CATALOGS: Record<Locale, Catalog> = { en, hi, ta, te, kn };

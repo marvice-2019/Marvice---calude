@@ -32,7 +32,7 @@ const MIN = 60_000;
  */
 export async function queueBookingNotifications(db: Db, bookingId: string, event: Event, now: Date, { notifyHost = true, confirm = true } = {}): Promise<void> {
   const { rows } = await db.query(
-    `select b.host_id, b.start_at, i.email as guest_email, u.email as host_email,
+    `select b.host_id, b.start_at, i.email as guest_email, i.guests::text[] as extra_guests, u.email as host_email,
        (select c.id from calendars c join calendar_connections cc on cc.id = c.connection_id
         where c.user_id = b.host_id and c.is_add_to and cc.status <> 'disconnected' and octet_length(cc.credentials_encrypted) > 0) as add_to_calendar,
        exists (select 1 from calendar_connections cc where cc.user_id = b.host_id) as has_calendar
@@ -42,13 +42,19 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
   const start = new Date(b.start_at);
   const queued: { kind: NotificationKind; channel: "email" | "calendar"; to: string; sendAt: Date; key: string }[] = [];
   const now_ = (kind: BookingEmailKind, to: string) => queued.push({ kind, channel: "email", to, sendAt: now, key: `booking:${bookingId}:${kind}` });
+  // Extra guests get each guest email too, under their own keys (the worker leaves out the manage link for them).
+  const extras: string[] = b.extra_guests ?? [];
+  const toGuests = (kind: BookingEmailKind, sendAt: Date, key: string) => {
+    queued.push({ kind, channel: "email", to: b.guest_email, sendAt, key });
+    for (const g of extras) queued.push({ kind, channel: "email", to: g, sendAt, key: `${key}:to:${g.toLowerCase()}` });
+  };
   // Calendar jobs name the target calendar; a delete finds the event's own calendar from the booking when it runs.
   const calendarJob = (kind: CalendarJobKind, calendarId: string) =>
     queued.push({ kind, channel: "calendar", to: calendarId, sendAt: now, key: `booking:${bookingId}:${kind}` });
 
   if (event === "cancelled") {
     // `confirm: false`: a later week cancelled along with an earlier one, whose email lists it.
-    if (confirm) now_("cancelled_guest", b.guest_email);
+    if (confirm) toGuests("cancelled_guest", now, `booking:${bookingId}:cancelled_guest`);
     if (confirm && notifyHost) now_("cancelled_host", b.host_email);
     await db.query(
       `update notifications set status = 'skipped', last_error = 'booking cancelled', updated_at = $2
@@ -57,14 +63,14 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
     if (b.has_calendar) calendarJob("calendar_delete", "event");
   } else {
     // `confirm: false` is a later week of a series: the first week's confirmation already lists it.
-    if (confirm) now_(event === "booked" ? "booked_guest" : "rescheduled_guest", b.guest_email);
+    if (confirm) { const k = event === "booked" ? "booked_guest" : "rescheduled_guest"; toGuests(k, now, `booking:${bookingId}:${k}`); }
     if (confirm && notifyHost) now_(event === "booked" ? "booked_host" : "rescheduled_host", b.host_email);
     if (event === "booked" && b.add_to_calendar) calendarJob("calendar_create", b.add_to_calendar);
     // A move updates the old booking's event wherever it is; with no old event it creates one in the add-to calendar.
     if (event === "rescheduled" && (b.add_to_calendar || b.has_calendar)) calendarJob("calendar_move", b.add_to_calendar ?? "event");
     for (const offset of REMINDER_OFFSETS_MINUTES) {
       const sendAt = new Date(start.getTime() - offset * MIN);
-      if (sendAt > now) queued.push({ kind: "reminder_guest", channel: "email", to: b.guest_email, sendAt, key: `booking:${bookingId}:reminder_guest:${offset}` });
+      if (sendAt > now) toGuests("reminder_guest", sendAt, `booking:${bookingId}:reminder_guest:${offset}`);
     }
   }
 

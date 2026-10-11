@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmbedResize } from "@/components/EmbedResize";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { LocalTime } from "@/components/LocalTime";
@@ -8,6 +9,10 @@ import { isUnpaidRelease } from "@/lib/booking-reasons";
 import { store } from "@/lib/data";
 import { formatDate, zoneName } from "@/lib/format";
 import { LOCATION_KEYS, resolveLocale, t, tNodes } from "@/lib/i18n/guest";
+import { AddToCalendar } from "@/components/AddToCalendar";
+import { AutoRedirect } from "@/components/AutoRedirect";
+import { cleanRedirectUrl } from "@/lib/calendar-links";
+import { resolveBaseUrl } from "@/lib/auth/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +24,8 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
   const booking = host && (await store.getBooking(host.id, bookingId));
   if (!host || !booking) notFound();
   const eventType = await store.getEventType(host.id, booking.eventTypeId);
+  // Checked again here: a stored value from before the https rule must never become a link or a redirect.
+  const redirectUrl = eventType?.redirectUrl ? cleanRedirectUrl(eventType.redirectUrl) : null;
   const tz = booking.invitee.timezone;
   const locale = resolveLocale(lang, host.locale);
   const q = typeof lang === "string" && lang === locale ? `?lang=${locale}` : "";
@@ -26,6 +33,7 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
   if (booking.status === "pending_payment") {
     return (
       <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
         <h1 className="font-display text-xl text-text">{t(locale, "confirmingPayment")}</h1>
         <p className="mt-2 max-w-md text-text-muted" role="status">
           {t(locale, "paymentSeconds")} {booking.holdExpiresAt ? tNodes(locale, "heldUntil", { time: time(booking.holdExpiresAt) }) : t(locale, "heldGeneric")}{" "}
@@ -39,6 +47,7 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
     const unpaid = isUnpaidRelease(booking.cancelReason);
     return (
       <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
         <h1 className="font-display text-xl text-text">{t(locale, unpaid ? "unpaidTitle" : "cancelledTitle")}</h1>
         <p className="mt-2 max-w-md text-text-muted">{t(locale, unpaid ? "unpaidBody" : "nothingMore")}</p>
         <Link href={`/${host.slug}/${eventType?.slug ?? ""}${q}`} className={`mt-4 ${buttonClasses({ variant: "primary" })}`}>{t(locale, "bookATime")}</Link>
@@ -47,6 +56,7 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
   }
   return (
     <main lang={locale} className="mx-auto max-w-(--hh-booking-max) px-4 py-10">
+      <EmbedResize />
       <h1 className="font-display text-xl text-text">{t(locale, "booked")}</h1>
       <Card className="mt-4 max-w-md">
         <dl className="grid gap-3">
@@ -59,8 +69,18 @@ export default async function BookedPage({ params, searchParams }: { params: Pro
           <div><dt className="text-sm text-text-muted">{t(locale, "bookedFor")}</dt><dd className="text-text">{booking.invitee.name}, {booking.invitee.email}</dd></div>
         </dl>
       </Card>
+      {booking.status === "confirmed" && (
+        <AddToCalendar
+          token={booking.invitee.manageToken} title={`${eventType?.name ?? ""} with ${host.name}`} start={booking.startAt} end={booking.endAt} locale={locale}
+          location={booking.joinUrl ?? (booking.locationKind ? t(locale, LOCATION_KEYS[booking.locationKind]) : null)}
+          manageUrl={`${(resolveBaseUrl() ?? "").replace(/\/+$/, "")}/b/${booking.invitee.manageToken}`}
+        />
+      )}
       <p className="mt-4 text-text-muted">{t(locale, "keepLink")}</p>
       <Link href={`/b/${booking.invitee.manageToken}${q}`} className={`mt-2 ${buttonClasses({ variant: "secondary" })}`}>{t(locale, "manageBooking")}</Link>
+      {redirectUrl && (
+        <AutoRedirect url={redirectUrl} waiting={t(locale, "redirecting")} label={t(locale, "continueTo", { site: new URL(redirectUrl).hostname })} />
+      )}
     </main>
   );
 }
