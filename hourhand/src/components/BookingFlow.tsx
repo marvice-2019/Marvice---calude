@@ -127,17 +127,19 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
   const [weeks, setWeeks] = useState(1);
   const [weeksTaken, setWeeksTaken] = useState<string[] | null>(null);
   const [packageRefused, setPackageRefused] = useState<string | null>(null);
+  const [showGuests, setShowGuests] = useState(false);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (zone.confirm && !zoneConfirmed) { setZoneError(true); document.getElementById("zone-confirm")?.focus(); return; }
     const data = new FormData(e.currentTarget);
     const answers = Object.fromEntries(questions.map((q) => [q.id, String(data.get(`q_${q.id}`) ?? "")]));
+    const guests = String(data.get("guests") ?? "").split(/[\s,;]+/).filter(Boolean);
     setBusy(true); setFailed(false); setLimited(false); setExpired(false); setWeeksTaken(null);
     try {
       const res = await fetch("/api/bookings", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...(linkToken ? { linkToken } : { slug, event }), start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey, ...(weeks > 1 ? { weeks } : {}), ...(packageToken ? { packageToken } : {}) }),
+        body: JSON.stringify({ ...(linkToken ? { linkToken } : { slug, event }), start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey, ...(weeks > 1 ? { weeks } : {}), ...(packageToken ? { packageToken } : {}), ...(guests.length ? { guests } : {}) }),
       });
       const body = await res.json();
       if ((res.status === 201 || res.status === 200) && body.payment) {
@@ -158,7 +160,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
       else if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
       else if (res.status === 400) {
         // Server messages are English; show ours for the fields it names.
-        const own: Record<string, GuestKey> = { name: "errName", email: "errEmail", phone: "errPhone", timezone: "errTimezone" };
+        const own: Record<string, GuestKey> = { name: "errName", email: "errEmail", phone: "errPhone", timezone: "errTimezone", guests: "errGuests" };
         const fields = (body.fields ?? {}) as Record<string, string>;
         setErrors(Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, own[k] ? t(locale, own[k]) : k.startsWith("answers.") ? t(locale, "errAnswer") : v])));
       }
@@ -231,6 +233,15 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
       <div><Label htmlFor="name">{t(locale, "yourName")}</Label><Input id="name" name="name" autoComplete="name" required maxLength={100} error={errors.name} /></div>
       <div><Label htmlFor="email">{t(locale, "email")}</Label><Input id="email" name="email" type="email" autoComplete="email" required error={errors.email} /></div>
       <div><Label htmlFor="phone">{t(locale, "phoneOptional")}</Label><Input id="phone" name="phone" type="tel" autoComplete="tel" error={errors.phone} /></div>
+      {showGuests || errors.guests ? (
+        <div>
+          <Label htmlFor="guests">{t(locale, "guestsLabel")}</Label>
+          <Input id="guests" name="guests" type="text" inputMode="email" autoComplete="off" error={errors.guests} aria-describedby="guests-hint" />
+          <p id="guests-hint" className="mt-1 text-sm text-text-muted">{t(locale, "guestsHint")}</p>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setShowGuests(true)} className={`min-h-11 justify-self-start text-sm font-semibold text-accent underline ${focusRing}`}>{t(locale, "addGuests")}</button>
+      )}
       {questions.map((q) => {
         const id = `q_${q.id}`;
         const err = errors[`answers.${q.id}`];

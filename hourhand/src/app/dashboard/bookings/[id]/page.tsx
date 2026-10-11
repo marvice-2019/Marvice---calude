@@ -95,6 +95,7 @@ export default async function BookingDetailPage({ params, searchParams }: { para
           {series.length > 1 && <dd className="text-sm text-text-muted">Week {booking.seriesIndex} of {new Set(series.map((b) => b.seriesIndex)).size}, every week at this time</dd>}
         </div>
         <div><dt className="text-sm text-text-muted">Email</dt><dd className="text-text">{booking.invitee.email}</dd></div>
+        {booking.invitee.guests.length > 0 && <div><dt className="text-sm text-text-muted">Also invited</dt><dd className="text-text">{booking.invitee.guests.join(", ")}</dd></div>}
         {payment && (
           <div>
             <dt className="text-sm text-text-muted">Payment</dt>

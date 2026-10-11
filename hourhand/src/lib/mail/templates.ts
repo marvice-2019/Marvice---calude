@@ -47,6 +47,8 @@ export interface BookingMailContext {
   series?: { bookingId: string; startAt: Date; endAt: Date; manageUrl: string }[];
   /** For cancellations: later weeks of the same series cancelled in the same step. */
   alsoCancelled?: Date[];
+  /** The recipient is an extra guest the booker added: told about the booking, never given the link that changes it. */
+  extraGuest?: boolean;
 }
 
 export interface RenderedMail { subject: string; text: string; html: string; attachments?: Attachment[]; replyTo?: string }
@@ -153,7 +155,44 @@ function cancelNote(c: BookingMailContext, to: "guest" | "host"): string | undef
   return [refund, reason].filter(Boolean).join(" ") || undefined;
 }
 
+/** What an extra guest hears: the same news, framed as an invitation, with no manage link, payment or refund details. */
+function renderForExtraGuest(kind: "booked_guest" | "reminder_guest" | "cancelled_guest" | "rescheduled_guest", c: BookingMailContext): RenderedMail {
+  const host = hostLabel(c);
+  const rows = guestRows({ ...c, paidMinor: null });
+  const footer = `Sent by Hourhand for ${host}. Only ${c.guestName} can change or cancel this booking.`;
+  const file = () => {
+    const weeks = c.series && c.series.length > 1 ? c.series : [{ bookingId: c.bookingId, startAt: c.startAt, endAt: c.endAt }];
+    const ics = buildIcs(weeks.map((w) => ({
+      uid: `${w.bookingId}@hourhand`, start: w.startAt, end: w.endAt, stamp: c.issuedAt,
+      summary: `${c.eventName} with ${host}`, description: `Booked by ${c.guestName}`, location: where(c),
+    })));
+    return { filename: "booking.ics", content: Buffer.from(ics, "utf8").toString("base64"), contentType: "text/calendar; charset=utf-8; method=PUBLISH" };
+  };
+  switch (kind) {
+    case "booked_guest":
+      return render(`Invitation: ${c.eventName} with ${host}, ${formatDate(c.startAt, c.guestTimezone)}`, {
+        heading: "You're invited", intro: `${c.guestName} added you to their ${c.eventName} with ${host}.`, rows, footer,
+        note: "The attached file adds it to your calendar.",
+      }, { attachments: [file()], replyTo: c.guestEmail });
+    case "reminder_guest":
+      return render(`Reminder: ${c.eventName} with ${host}, ${formatTime(c.startAt, c.guestTimezone, "12h")} ${zoneName(c.guestTimezone)}`, {
+        heading: "Coming up soon", intro: `A reminder of ${c.guestName}'s ${c.eventName} with ${host}, which you're invited to.`, rows, footer,
+      }, { replyTo: c.guestEmail });
+    case "cancelled_guest":
+      return render(`Cancelled: ${c.eventName} with ${host}`, {
+        heading: "This booking is cancelled", intro: `${c.guestName}'s ${c.eventName} with ${host}, which you were invited to, is cancelled.`, rows, footer,
+      }, { replyTo: c.guestEmail });
+    case "rescheduled_guest":
+      return render(`Moved: ${c.eventName} with ${host}, now ${formatDate(c.startAt, c.guestTimezone)}`, {
+        heading: "New time", intro: `${c.guestName}'s ${c.eventName} with ${host}, which you're invited to, has a new time.`,
+        rows: [...rows, ...(c.previousStartAt ? [["Was", when(c.previousStartAt, c.guestTimezone, "12h")] as Row] : [])], footer,
+        note: "The attached file adds the new time to your calendar. Remove the old one if you saved it.",
+      }, { attachments: [file()], replyTo: c.guestEmail });
+  }
+}
+
 export function renderBookingMail(kind: BookingEmailKind, c: BookingMailContext): RenderedMail {
+  if (c.extraGuest && (kind === "booked_guest" || kind === "reminder_guest" || kind === "cancelled_guest" || kind === "rescheduled_guest")) return renderForExtraGuest(kind, c);
   const host = hostLabel(c);
   switch (kind) {
     case "booked_guest":

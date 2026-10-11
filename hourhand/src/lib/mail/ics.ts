@@ -8,7 +8,8 @@ export interface IcsEvent {
   summary: string;
   description: string;
   location: string | null;
-  url: string;
+  /** Left out for an extra guest, who mustn't get the link that changes the booking. */
+  url?: string;
   stamp: Date;
 }
 
@@ -49,7 +50,7 @@ export function buildIcs(events: IcsEvent | IcsEvent[]): string {
       `UID:${e.uid}`, `DTSTAMP:${utc(e.stamp)}`, `DTSTART:${utc(e.start)}`, `DTEND:${utc(e.end)}`,
       `SUMMARY:${icsText(e.summary)}`, `DESCRIPTION:${icsText(e.description)}`,
       ...(e.location ? [`LOCATION:${icsText(e.location)}`] : []),
-      `URL:${e.url}`,
+      ...(e.url ? [`URL:${e.url}`] : []),
       "END:VEVENT",
     ]),
     "END:VCALENDAR",
