@@ -46,6 +46,10 @@ export interface EventTypeForm {
   hidden: boolean;
   /** Where guests go after booking; blank means they stay on the confirmation page. */
   redirectUrl?: string;
+  /** Blank means no weekly limit. */
+  weeklyLimit?: string;
+  /** The host's cancellation policy; blank means none. */
+  cancelPolicy?: string;
 }
 
 /** The most weeks a guest can book in one go (event_types.max_repeats). */
@@ -110,9 +114,9 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
     if (key === "hidden") {
       // A checkbox: true or false (an older client may leave it out, which means shown).
       if (form.hidden !== undefined && typeof form.hidden !== "boolean") errors.hidden = "Choose whether it shows on your booking page.";
-    } else if (key === "redirectUrl") {
-      // Optional, so an older client may leave it out.
-      if (form.redirectUrl !== undefined && typeof form.redirectUrl !== "string") errors.redirectUrl = "Enter text for this field.";
+    } else if (key === "redirectUrl" || key === "weeklyLimit" || key === "cancelPolicy") {
+      // Optional, so an older client may leave them out.
+      if (form[key] !== undefined && typeof form[key] !== "string") errors[key] = "Enter text for this field.";
     } else if (typeof form[key] !== "string") errors[key] = "Enter text for this field.";
   }
   if (Object.keys(errors).length > 0) return { ok: false, errors };
@@ -131,8 +135,8 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
     errors.slug = SLUG_TAKEN;
   }
 
-  const number = (key: Exclude<keyof EventTypeForm, "hidden" | "redirectUrl">, min: number, max: number, message: string): number => {
-    const n = whole(form[key]);
+  const number = (key: Exclude<keyof EventTypeForm, "hidden" | "redirectUrl" | "cancelPolicy">, min: number, max: number, message: string): number => {
+    const n = whole(form[key] ?? "");
     if (n === null || n < min || n > max) errors[key] = message;
     return n ?? 0;
   };
@@ -164,6 +168,10 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
   const locationValue = form.locationValue.trim();
   if (valueLabel && !locationValue) errors.locationValue = `Add the ${valueLabel.toLowerCase()} so guests know where to go.`;
 
+  const weeklyLimit = (form.weeklyLimit ?? "").trim() ? number("weeklyLimit", 1, Number.MAX_SAFE_INTEGER, "Enter 1 or more, or leave it blank for no limit.") : null;
+  if (!errors.weeklyLimit && !errors.dailyLimit && weeklyLimit !== null && dailyLimit !== null && weeklyLimit < dailyLimit) errors.weeklyLimit = "Make the weekly limit at least the daily one.";
+  const cancelPolicy = (form.cancelPolicy ?? "").trim().replace(/\r\n/g, "\n");
+  if (cancelPolicy.length > 1000) errors.cancelPolicy = "Keep the policy to 1,000 characters.";
   const redirectUrl = cleanRedirectUrl(form.redirectUrl ?? "");
   if (redirectUrl === undefined) errors.redirectUrl = "Enter a full https:// address, or leave it blank.";
 
@@ -173,7 +181,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
     value: {
       name, slug, description: form.description.trim() || null, durationMinutes, minNoticeMinutes, bookingWindowDays,
       startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, maxRepeats, depositMinor,
-      priceMinor, currency: priceMinor === null ? null : "INR", hidden: form.hidden === true, redirectUrl: redirectUrl ?? null,
+      priceMinor, currency: priceMinor === null ? null : "INR", hidden: form.hidden === true, redirectUrl: redirectUrl ?? null, weeklyLimit, cancelPolicy: cancelPolicy || null,
       location: form.locationKind ? { kind: form.locationKind, value: valueLabel ? locationValue : null } : null,
     },
   };
@@ -183,7 +191,7 @@ export function validateEventType(form: EventTypeForm, takenSlugs: readonly stri
 export const NEW_EVENT_TYPE_FORM: EventTypeForm = {
   name: "", slug: "", durationMinutes: "30", description: "", locationKind: "google_meet", locationValue: "", minNoticeMinutes: "240",
   bookingWindowDays: "60", startIncrementMinutes: "30", bufferBeforeMinutes: "0", bufferAfterMinutes: "0", dailyLimit: "", cancelCutoffMinutes: "0", maxRepeats: "1", deposit: "",
-  price: "", hidden: false, redirectUrl: "",
+  price: "", hidden: false, redirectUrl: "", weeklyLimit: "", cancelPolicy: "",
 };
 
 /** The editor's values for a saved event type and its first location. */
@@ -195,6 +203,7 @@ export function toForm(et: EventType, location: EventLocation | undefined): Even
     bufferBeforeMinutes: String(et.bufferBeforeMinutes), bufferAfterMinutes: String(et.bufferAfterMinutes),
     dailyLimit: et.dailyLimit === null ? "" : String(et.dailyLimit), cancelCutoffMinutes: String(et.cancelCutoffMinutes), maxRepeats: String(et.maxRepeats), deposit: priceInput(et.depositMinor),
     price: priceInput(et.priceMinor), hidden: et.hidden, redirectUrl: et.redirectUrl ?? "",
+    weeklyLimit: et.weeklyLimit === null ? "" : String(et.weeklyLimit), cancelPolicy: et.cancelPolicy ?? "",
   };
 }
 

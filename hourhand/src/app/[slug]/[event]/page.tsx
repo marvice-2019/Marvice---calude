@@ -43,6 +43,12 @@ export default async function PublicEventPage({ params, searchParams }: { params
           {t(locale, "depositNote", { amount: formatMoney(eventType.depositMinor, "INR"), host: host.name })}
         </p>
       )}
+      {eventType.cancelPolicy && (
+        <div className="mt-3 max-w-xl text-sm">
+          <p className="font-semibold text-text">{t(locale, "cancelPolicy")}</p>
+          <p className="whitespace-pre-line text-text-muted">{eventType.cancelPolicy}</p>
+        </div>
+      )}
       {packages.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-x-6">
           {packages.map((p) => (

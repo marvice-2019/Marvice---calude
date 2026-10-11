@@ -12,7 +12,7 @@ export interface SlotInput {
   eventType: Pick<
     EventType,
     | "id" | "durationMinutes" | "startIncrementMinutes" | "bufferBeforeMinutes" | "bufferAfterMinutes"
-    | "minNoticeMinutes" | "bookingWindowDays" | "dailyLimit"
+    | "minNoticeMinutes" | "bookingWindowDays" | "dailyLimit" | "weeklyLimit"
   >;
   schedule: { timezone: string };
   rules: AvailabilityRule[];
@@ -58,6 +58,9 @@ function wallTime(dayMs: number, minutes: number, tz: string): number {
   return new TZDate(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Math.floor(minutes / 60), minutes % 60, tz).getTime();
 }
 
+/** The Monday that starts a local day's week (Monday to Sunday, as the week reads in India). */
+const weekOf = (dayMs: number) => dayMs - ((new Date(dayMs).getUTCDay() + 6) % 7) * DAY;
+
 function intervalsFor(dayMs: number, rules: AvailabilityRule[]): Interval[] {
   const date = isoDate(dayMs);
   const override = rules.find((r) => r.kind === "date" && r.onDate === date);
@@ -91,16 +94,19 @@ export function computeSlots(input: SlotInput): Date[] {
     ...busyBlocks.map((b): [number, number] => [b.start.getTime(), b.end.getTime()]),
   ];
   const bookedPerDay = new Map<number, number>();
+  const bookedPerWeek = new Map<number, number>();
   for (const b of confirmed) {
     if (b.eventTypeId !== et.id) continue;
     const day = localDay(b.startAt, tz);
     bookedPerDay.set(day, (bookedPerDay.get(day) ?? 0) + 1);
+    bookedPerWeek.set(weekOf(day), (bookedPerWeek.get(weekOf(day)) ?? 0) + 1);
   }
 
   const slots: Date[] = [];
   const lastDay = localDay(new Date(latest), tz);
   for (let day = localDay(new Date(earliest), tz); day <= lastDay; day += DAY) {
     if (et.dailyLimit != null && (bookedPerDay.get(day) ?? 0) >= et.dailyLimit) continue;
+    if (et.weeklyLimit != null && (bookedPerWeek.get(weekOf(day)) ?? 0) >= et.weeklyLimit) continue;
     for (const { from, to } of intervalsFor(day, rules)) {
       const open = wallTime(day, minutesOf(from), tz);
       const close = wallTime(day, minutesOf(to), tz);

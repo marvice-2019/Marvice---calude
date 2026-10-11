@@ -55,6 +55,10 @@ export interface EventType {
   depositMinor: number | null;
   /** Where guests go after booking (https), instead of staying on the confirmation page; null = stay. */
   redirectUrl: string | null;
+  /** Most bookings of this type per week (Monday to Sunday, host's zone); null = no limit. */
+  weeklyLimit: number | null;
+  /** The host's own words on cancelling, shown before booking and next to Cancel; null = none. */
+  cancelPolicy: string | null;
 }
 
 /** What the host enters for a one-off meeting. */
@@ -357,7 +361,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor" | "redirectUrl"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor" | "redirectUrl" | "weeklyLimit" | "cancelPolicy"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

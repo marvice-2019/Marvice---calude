@@ -199,6 +199,13 @@ describe.skipIf(!URL_)("pg store (TEST_DATABASE_URL)", () => {
       expect((await store.updateEventType(priya.id, intro.id, { ...draftOf(set), redirectUrl: null })).redirectUrl).toBeNull();
     });
 
+    it("stores the weekly limit and cancellation policy, and clears them", async () => {
+      const set = await store.updateEventType(priya.id, intro.id, { ...draftOf(intro), weeklyLimit: 4, cancelPolicy: "24 hours' notice, please." });
+      expect([set.weeklyLimit, set.cancelPolicy]).toEqual([4, "24 hours' notice, please."]);
+      const cleared = await store.updateEventType(priya.id, intro.id, { ...draftOf(set), weeklyLimit: null, cancelPolicy: null });
+      expect([cleared.weeklyLimit, cleared.cancelPolicy]).toEqual([null, null]);
+    });
+
     it("round-trips questions in order with required flags, replacing an id from another event type", async () => {
       const [coachingQuestion] = await store.listCustomQuestions(priya.id, coaching.id);
       const saved = await store.saveQuestions(priya.id, intro.id, [
@@ -500,6 +507,6 @@ function draftOf(e: EventType): EventTypeDraft {
   return {
     name: e.name, slug: e.slug, description: e.description, durationMinutes: e.durationMinutes, minNoticeMinutes: e.minNoticeMinutes, bookingWindowDays: e.bookingWindowDays,
     startIncrementMinutes: e.startIncrementMinutes, bufferBeforeMinutes: e.bufferBeforeMinutes, bufferAfterMinutes: e.bufferAfterMinutes, dailyLimit: e.dailyLimit, hidden: e.hidden,
-    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, depositMinor: e.depositMinor, redirectUrl: e.redirectUrl, location: null,
+    cancelCutoffMinutes: e.cancelCutoffMinutes, priceMinor: e.priceMinor, currency: e.currency, maxRepeats: e.maxRepeats, depositMinor: e.depositMinor, redirectUrl: e.redirectUrl, weeklyLimit: e.weeklyLimit, cancelPolicy: e.cancelPolicy, location: null,
   };
 }

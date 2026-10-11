@@ -11,7 +11,7 @@ const hours = [{ from: "10:00", to: "13:00" }, { from: "15:00", to: "19:00" }];
 function input(over: Partial<Omit<SlotInput, "eventType">> & { eventType?: Partial<SlotInput["eventType"]> } = {}): SlotInput {
   const { eventType, ...rest } = over;
   return {
-    eventType: { id: "et", durationMinutes: 30, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, minNoticeMinutes: 0, bookingWindowDays: 60, dailyLimit: null, ...eventType },
+    eventType: { id: "et", durationMinutes: 30, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, minNoticeMinutes: 0, bookingWindowDays: 60, dailyLimit: null, weeklyLimit: null, ...eventType },
     schedule: { timezone: "Asia/Kolkata" },
     rules: [1, 2, 3, 4, 5].map((d) => weekly(d, hours)),
     busyBlocks: [],
@@ -104,6 +104,21 @@ describe("computeSlots", () => {
     }));
     expect(slots.some((s) => s < ist("2026-10-13", "00:00"))).toBe(false);
     expect(slots).toHaveLength(14); // Tuesday is untouched
+  });
+
+  it("closes the rest of the week once its weekly limit is reached, Monday to Sunday in the host's zone", () => {
+    // Mon 12 and Thu 15 Oct 2026 are booked; another event type's booking on Tue doesn't count.
+    const slots = computeSlots(input({
+      eventType: { weeklyLimit: 2 },
+      rangeEnd: ist("2026-10-21", "00:00"),
+      bookings: [booking(ist("2026-10-12", "10:00"), ist("2026-10-12", "10:30"), "et"), booking(ist("2026-10-15", "10:00"), ist("2026-10-15", "10:30"), "et"),
+        booking(ist("2026-10-13", "11:00"), ist("2026-10-13", "11:30"))],
+    }));
+    expect(slots.some((s) => s < ist("2026-10-19", "00:00"))).toBe(false);
+    expect(slots.some((s) => s >= ist("2026-10-19", "00:00"))).toBe(true); // next Monday opens again
+    const one = computeSlots(input({ eventType: { weeklyLimit: 2 }, rangeEnd: ist("2026-10-17", "00:00"),
+      bookings: [booking(ist("2026-10-12", "10:00"), ist("2026-10-12", "10:30"), "et")] }));
+    expect(one.some((s) => s >= ist("2026-10-16", "00:00"))).toBe(true); // one booked of two: still open
   });
 
   it("offers nothing while calendar sync is stale", () => {

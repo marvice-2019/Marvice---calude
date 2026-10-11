@@ -52,9 +52,17 @@ describe("validateEventType", () => {
         name: "30-min strategy call", slug: "strategy", description: "Plan the next quarter.", durationMinutes: 30, minNoticeMinutes: 240,
         bookingWindowDays: 60, startIncrementMinutes: 15, bufferBeforeMinutes: 0, bufferAfterMinutes: 10, dailyLimit: null,
         cancelCutoffMinutes: 120, maxRepeats: 1, depositMinor: null, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
-        redirectUrl: null,
+        redirectUrl: null, weeklyLimit: null, cancelPolicy: null,
       },
     });
+  });
+
+  it("takes a weekly limit no lower than the daily one, and a policy of up to 1,000 characters", () => {
+    expect(validateEventType({ ...valid, weeklyLimit: "5", cancelPolicy: " Cancel 24 hours ahead for a refund. " }, []))
+      .toMatchObject({ ok: true, value: { weeklyLimit: 5, cancelPolicy: "Cancel 24 hours ahead for a refund." } });
+    expect(validateEventType({ ...valid, dailyLimit: "3", weeklyLimit: "2" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
+    expect(validateEventType({ ...valid, weeklyLimit: "0" }, [])).toMatchObject({ ok: false, errors: { weeklyLimit: expect.any(String) } });
+    expect(validateEventType({ ...valid, cancelPolicy: "x".repeat(1001) }, [])).toMatchObject({ ok: false, errors: { cancelPolicy: expect.any(String) } });
   });
 
   it("takes an https page to send guests to after booking, and nothing else", () => {

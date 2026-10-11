@@ -145,12 +145,12 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
     });
   }
 
-  const numberField = (key: Exclude<keyof EventTypeForm, "hidden" | "redirectUrl">, label: string, unit: string, hint?: string) => (
+  const numberField = (key: Exclude<keyof EventTypeForm, "hidden" | "redirectUrl" | "cancelPolicy">, label: string, unit: string, hint?: string) => (
     <div>
       <Label htmlFor={`f-${key}`}>{label}</Label>
       <div className="flex items-center gap-2">
         <Input
-          id={`f-${key}`} inputMode="numeric" value={form[key]} onChange={(e) => set(key)(e.target.value)} error={errors[key]}
+          id={`f-${key}`} inputMode="numeric" value={form[key] ?? ""} onChange={(e) => set(key)(e.target.value)} error={errors[key]}
           aria-describedby={hint ? `f-${key}-hint` : undefined} className="max-w-32"
         />
         <span className="mt-1 text-sm text-text-muted">{unit}</span>
@@ -290,7 +290,17 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
         {numberField("bufferBeforeMinutes", "Free time before", "minutes", "Kept clear before each meeting, up to 240 minutes.")}
         {numberField("bufferAfterMinutes", "Free time after", "minutes", "Kept clear after each meeting, up to 240 minutes.")}
         {numberField("dailyLimit", "Most bookings per day", "bookings", "Leave blank for no limit.")}
+        {numberField("weeklyLimit", "Most bookings per week", "bookings", "Monday to Sunday. Leave blank for no limit.")}
         {numberField("cancelCutoffMinutes", "Online cancelling closes", "minutes before", "Guests can't cancel or reschedule online after this. 0 means any time before the start.")}
+        <div>
+          <Label htmlFor="f-cancelPolicy">Cancellation policy</Label>
+          <textarea
+            id="f-cancelPolicy" rows={3} maxLength={1000} value={form.cancelPolicy ?? ""} onChange={(e) => set("cancelPolicy")(e.target.value)}
+            aria-describedby="f-cancelPolicy-hint" aria-invalid={errors.cancelPolicy ? true : undefined} className={`py-2 ${fieldClasses(Boolean(errors.cancelPolicy))}`}
+            placeholder="Free to cancel up to 24 hours before. Later cancellations aren't refunded."
+          />
+          <p id="f-cancelPolicy-hint" className="mt-1 text-sm text-text-muted">{errors.cancelPolicy ?? "Optional. Guests see it before they book and next to Cancel."}</p>
+        </div>
         {numberField("maxRepeats", "Weekly repeats", "weeks at most", "Let guests book the same time every week, up to this many weeks in one go. 1 means no repeats. Free event types only.")}
       </Panel>
 

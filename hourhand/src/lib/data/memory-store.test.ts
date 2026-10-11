@@ -62,7 +62,7 @@ describe("memory store createBooking", () => {
     const { store, host } = await setup();
     const draft = {
       name: "Intro", slug: "intro", description: null, durationMinutes: 15, minNoticeMinutes: 240, bookingWindowDays: 60, startIncrementMinutes: 15,
-      bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null, cancelCutoffMinutes: 0, maxRepeats: 1, depositMinor: null, redirectUrl: null, location: null, hidden: false,
+      bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null, cancelCutoffMinutes: 0, maxRepeats: 1, depositMinor: null, redirectUrl: null, weeklyLimit: null, cancelPolicy: null, location: null, hidden: false,
     };
     const priced = await store.updateEventType(host.id, "evt_intro", { ...draft, priceMinor: 49900, currency: "INR" });
     expect([priced.priceMinor, priced.currency]).toEqual([49900, "INR"]);

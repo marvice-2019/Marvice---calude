@@ -89,10 +89,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   function fields(draft: EventTypeDraft): Omit<EventTypeDraft, "location"> {
-    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden, maxRepeats, depositMinor, redirectUrl } = draft;
+    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden, maxRepeats, depositMinor, redirectUrl, weeklyLimit, cancelPolicy } = draft;
     return {
       name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
-      priceMinor, currency: priceMinor === null ? null : currency, hidden, maxRepeats, depositMinor: priceMinor === null ? depositMinor : null, redirectUrl,
+      priceMinor, currency: priceMinor === null ? null : currency, hidden, maxRepeats, depositMinor: priceMinor === null ? depositMinor : null, redirectUrl, weeklyLimit, cancelPolicy,
     };
   }
 
@@ -209,7 +209,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
         id: randomUUID(), userId: hostId, scheduleId: db.schedules.find((s) => s.userId === hostId && s.isDefault)?.id ?? null,
         name: input.name.trim(), slug: oneOffSlug(), description: input.description ?? null, durationMinutes: input.durationMinutes,
         minNoticeMinutes: 0, bookingWindowDays: 730, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null,
-        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off", maxRepeats: 1, depositMinor: null, redirectUrl: null,
+        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off", maxRepeats: 1, depositMinor: null, redirectUrl: null, weeklyLimit: null, cancelPolicy: null,
       };
       db.eventTypes.push(eventType);
       db.locations.push({ id: randomUUID(), eventTypeId: eventType.id, kind: input.location.kind, value: input.location.value ?? null, position: 0 });
