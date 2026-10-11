@@ -7,6 +7,7 @@ import { Input, Label } from "@/components/ui/Input";
 import { focusRing } from "@/components/ui/focus";
 import { formatDate, zoneName } from "@/lib/format";
 import { LocalTime } from "./LocalTime";
+import { payWithRazorpay, type CheckoutPayment } from "./razorpay-checkout";
 import { SlotPicker } from "./SlotPicker";
 
 export interface FlowQuestion { id: string; label: string; kind: string; required: boolean }
@@ -16,10 +17,12 @@ interface Props {
   event: string;
   bookingWindowDays: number;
   questions: FlowQuestion[];
+  /** For a priced event: the price as shown ("₹499") and the names Checkout shows the guest. */
+  paid?: { price: string; hostName: string; eventName: string } | null;
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
@@ -28,7 +31,7 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions }: Props
       </div>
       {picked && (
         <DetailsForm
-          slug={slug} event={event} tz={picked.tz} slot={picked.slot} questions={questions}
+          slug={slug} event={event} tz={picked.tz} slot={picked.slot} questions={questions} paid={paid}
           onPick={(slot) => setPicked({ slot, tz: picked.tz })} onBack={() => setPicked(null)}
         />
       )}
@@ -37,11 +40,11 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions }: Props
 }
 
 interface FormProps {
-  slug: string; event: string; tz: string; slot: string; questions: FlowQuestion[];
+  slug: string; event: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"];
   onPick: (slot: string) => void; onBack: () => void;
 }
 
-function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormProps) {
+function DetailsForm({ slug, event, tz, slot, questions, paid, onPick, onBack }: FormProps) {
   const router = useRouter();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
@@ -49,6 +52,34 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
   const [taken, setTaken] = useState<string[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [limited, setLimited] = useState(false);
+  // Paid events: the order the server made, kept so a guest who closes Checkout can reopen it while the hold lasts.
+  const [held, setHeld] = useState<{ bookingId: string; manageToken: string; payment: CheckoutPayment; prefill: { name: string; email: string; contact?: string } } | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [checkoutFailed, setCheckoutFailed] = useState(false);
+
+  /** Opens Checkout; after a payment the server checks it with Razorpay. The booked page shows the result either way. */
+  async function pay(h: NonNullable<typeof held>) {
+    setCheckoutFailed(false);
+    let result;
+    try {
+      result = await payWithRazorpay(h.payment, { name: paid?.hostName ?? "", description: paid?.eventName ?? "", prefill: h.prefill });
+    } catch {
+      setHeld(h);
+      setCheckoutFailed(true);
+      return;
+    }
+    if (!result) { setHeld(h); return; }
+    setBusy(true);
+    try {
+      await fetch("/api/bookings/pay", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ manageToken: h.manageToken, paymentId: result.razorpay_payment_id, signature: result.razorpay_signature }),
+      });
+    } catch {
+      // The reconciler confirms a real payment within a minute even if this call never arrives.
+    }
+    router.push(`/${slug}/${event}/booked/${h.bookingId}`);
+  }
   const start = new Date(slot);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -62,11 +93,18 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
         body: JSON.stringify({ slug, event, start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey }),
       });
       const body = await res.json();
+      if ((res.status === 201 || res.status === 200) && body.payment) {
+        setBusy(false);
+        const prefill = { name: String(data.get("name") ?? ""), email: String(data.get("email") ?? ""), ...(data.get("phone") ? { contact: String(data.get("phone")) } : {}) };
+        await pay({ bookingId: body.bookingId, manageToken: body.manageToken, payment: body.payment, prefill });
+        return;
+      }
       if (res.status === 201 || res.status === 200) {
         router.push(`/${slug}/${event}/booked/${body.bookingId}`);
         return;
       }
-      if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
+      if (res.status === 409 && body.error === "payments_unavailable") setUnavailable(true);
+      else if (res.status === 409) { setTaken(body.nextSlots ?? []); setErrors({}); }
       else if (res.status === 400) setErrors(body.fields ?? {});
       else if (res.status === 429) setLimited(true);
       else setFailed(true);
@@ -121,7 +159,18 @@ function DetailsForm({ slug, event, tz, slot, questions, onPick, onBack }: FormP
       })}
       {limited && <p className="text-danger" role="alert">Too many bookings from here in the last hour. Try again later.</p>}
       {failed && <p className="text-danger" role="alert">Something went wrong. Your time isn&apos;t booked yet. Try again.</p>}
-      <Button type="submit" loading={busy}>{busy ? "Booking…" : "Book this time"}</Button>
+      {unavailable && <p className="text-danger" role="alert">{paid?.hostName ?? "This host"} isn&apos;t taking payments online right now, so this event can&apos;t be booked here. Contact them directly.</p>}
+      {held ? (
+        <div className="grid gap-2 rounded-md bg-warning-bg p-4" role="status">
+          <p className="text-text">
+            {checkoutFailed ? "Razorpay didn't open. Check your connection and try again." : "You haven't paid yet."} Your time is held until{" "}
+            <LocalTime date={held.payment.holdExpiresAt} tz={tz} />.
+          </p>
+          <Button type="button" loading={busy} onClick={() => { const h = held; setHeld(null); void pay(h); }}>Pay {paid?.price}</Button>
+        </div>
+      ) : (
+        <Button type="submit" loading={busy}>{busy ? "Booking…" : paid ? `Continue to pay ${paid.price}` : "Book this time"}</Button>
+      )}
     </form>
   );
 }
