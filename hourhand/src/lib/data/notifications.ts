@@ -1,4 +1,6 @@
 import type pg from "pg";
+import { waNumber } from "../whatsapp";
+import { whatsappConfig } from "../whatsapp-cloud";
 
 // Queueing booking emails. These run inside the same transaction as the booking change, so a booking and its emails
 // commit together or not at all (the outbox pattern). The job runner (src/lib/jobs) sends the due rows.
@@ -19,6 +21,8 @@ export type NotificationKind = BookingEmailKind | CalendarJobKind | PackageEmail
 
 /** Guest reminders, in minutes before the start. A reminder whose time has already passed at booking is not queued. */
 export const REMINDER_OFFSETS_MINUTES = [1440, 60] as const;
+/** The one WhatsApp reminder: a day ahead. Each message is paid for, and the email reminders still go. */
+export const WHATSAPP_REMINDER_MINUTES = 1440;
 
 type Db = Pick<pg.PoolClient, "query">;
 type Event = "booked" | "rescheduled" | "cancelled";
@@ -28,11 +32,17 @@ const MIN = 60_000;
 /**
  * Queues the emails for one booking change. `notifyHost: false` is for a host closing their own account: their guests
  * hear about it, the host does not get one email per booking. `confirm: false` queues a booking's reminders and
- * calendar write but not its confirmations. Each row has a dedupe key, so queueing twice sends once.
+ * calendar write but not its confirmations. Each row has a dedupe key, so queueing twice sends once. The guest's
+ * confirmation, day-ahead reminder and change notices also go on WhatsApp when they ticked it for their phone, haven't
+ * replied STOP, and WhatsApp is set up here (`whatsapp`); whether the host's plan covers it is checked when it sends.
  */
-export async function queueBookingNotifications(db: Db, bookingId: string, event: Event, now: Date, { notifyHost = true, confirm = true } = {}): Promise<void> {
+export async function queueBookingNotifications(
+  db: Db, bookingId: string, event: Event, now: Date,
+  { notifyHost = true, confirm = true, whatsapp = whatsappConfig() !== null } = {},
+): Promise<void> {
   const { rows } = await db.query(
     `select b.host_id, b.start_at, i.email as guest_email, i.guests::text[] as extra_guests, u.email as host_email,
+       i.phone as guest_phone, i.whatsapp_opt_in_at is not null as whatsapp_opt_in,
        (select c.id from calendars c join calendar_connections cc on cc.id = c.connection_id
         where c.user_id = b.host_id and c.is_add_to and cc.status <> 'disconnected' and octet_length(cc.credentials_encrypted) > 0) as add_to_calendar,
        exists (select 1 from calendar_connections cc where cc.user_id = b.host_id) as has_calendar
@@ -40,7 +50,12 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
   const b = rows[0];
   if (!b) return;
   const start = new Date(b.start_at);
-  const queued: { kind: NotificationKind; channel: "email" | "calendar"; to: string; sendAt: Date; key: string }[] = [];
+  const queued: { kind: NotificationKind; channel: "email" | "calendar" | "whatsapp"; to: string; sendAt: Date; key: string }[] = [];
+  const phone = whatsapp && b.whatsapp_opt_in ? waNumber(b.guest_phone) : null;
+  const optedOut = phone !== null && (await db.query("select 1 from whatsapp_opt_outs where phone = $1", [phone])).rowCount! > 0;
+  const toWhatsApp = (kind: BookingEmailKind, sendAt: Date, suffix = "") => {
+    if (phone && !optedOut) queued.push({ kind, channel: "whatsapp", to: phone, sendAt, key: `booking:${bookingId}:wa:${kind}${suffix}` });
+  };
   const now_ = (kind: BookingEmailKind, to: string) => queued.push({ kind, channel: "email", to, sendAt: now, key: `booking:${bookingId}:${kind}` });
   // Extra guests get each guest email too, under their own keys (the worker leaves out the manage link for them).
   const extras: string[] = b.extra_guests ?? [];
@@ -55,6 +70,7 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
   if (event === "cancelled") {
     // `confirm: false`: a later week cancelled along with an earlier one, whose email lists it.
     if (confirm) toGuests("cancelled_guest", now, `booking:${bookingId}:cancelled_guest`);
+    if (confirm) toWhatsApp("cancelled_guest", now);
     if (confirm && notifyHost) now_("cancelled_host", b.host_email);
     await db.query(
       `update notifications set status = 'skipped', last_error = 'booking cancelled', updated_at = $2
@@ -63,7 +79,7 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
     if (b.has_calendar) calendarJob("calendar_delete", "event");
   } else {
     // `confirm: false` is a later week of a series: the first week's confirmation already lists it.
-    if (confirm) { const k = event === "booked" ? "booked_guest" : "rescheduled_guest"; toGuests(k, now, `booking:${bookingId}:${k}`); }
+    if (confirm) { const k = event === "booked" ? "booked_guest" : "rescheduled_guest"; toGuests(k, now, `booking:${bookingId}:${k}`); toWhatsApp(k, now); }
     if (confirm && notifyHost) now_(event === "booked" ? "booked_host" : "rescheduled_host", b.host_email);
     if (event === "booked" && b.add_to_calendar) calendarJob("calendar_create", b.add_to_calendar);
     // A move updates the old booking's event wherever it is; with no old event it creates one in the add-to calendar.
@@ -72,6 +88,8 @@ export async function queueBookingNotifications(db: Db, bookingId: string, event
       const sendAt = new Date(start.getTime() - offset * MIN);
       if (sendAt > now) toGuests("reminder_guest", sendAt, `booking:${bookingId}:reminder_guest:${offset}`);
     }
+    const waReminderAt = new Date(start.getTime() - WHATSAPP_REMINDER_MINUTES * MIN);
+    if (waReminderAt > now) toWhatsApp("reminder_guest", waReminderAt, `:${WHATSAPP_REMINDER_MINUTES}`);
   }
 
   for (const q of queued) {

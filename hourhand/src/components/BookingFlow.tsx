@@ -40,10 +40,12 @@ interface Props {
   prefill?: { name: string; email: string };
   /** Offer the waitlist (needs Postgres; not for single-use links or packages). */
   waitlist?: boolean;
+  /** Offer automatic WhatsApp updates to the phone the guest gives. */
+  whatsapp?: boolean;
 }
 
 /** Public booking: pick a time, then fill in details. The picker stays mounted so "Pick another time" keeps the month and day. */
-export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host, maxWeeks = 1, packageToken, waitlist = false, locale = "en", langQuery = "", prefill }: Props) {
+export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = null, linkToken, initialAt, host, maxWeeks = 1, packageToken, waitlist = false, locale = "en", langQuery = "", prefill, whatsapp = false }: Props) {
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
   return (
     <>
@@ -53,7 +55,7 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
       </div>
       {picked && (
         <DetailsForm
-          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={packageToken ? null : paid} host={host} maxWeeks={maxWeeks} packageToken={packageToken} locale={locale} langQuery={langQuery} prefill={prefill}
+          slug={slug} event={event} linkToken={linkToken} tz={picked.tz} slot={picked.slot} questions={questions} paid={packageToken ? null : paid} host={host} maxWeeks={maxWeeks} packageToken={packageToken} locale={locale} langQuery={langQuery} prefill={prefill} whatsapp={whatsapp}
           onPick={(slot) => setPicked({ slot, tz: picked.tz })} onBack={() => setPicked(null)}
         />
       )}
@@ -62,11 +64,11 @@ export function BookingFlow({ slug, event, bookingWindowDays, questions, paid = 
 }
 
 interface FormProps {
-  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"]; host: Props["host"]; maxWeeks: number; packageToken?: string; locale: Locale; langQuery: string; prefill?: { name: string; email: string };
+  slug: string; event: string; linkToken?: string; tz: string; slot: string; questions: FlowQuestion[]; paid: Props["paid"]; host: Props["host"]; maxWeeks: number; packageToken?: string; locale: Locale; langQuery: string; prefill?: { name: string; email: string }; whatsapp: boolean;
   onPick: (slot: string) => void; onBack: () => void;
 }
 
-function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, maxWeeks, packageToken, locale, langQuery, prefill, onPick, onBack }: FormProps) {
+function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, maxWeeks, packageToken, locale, langQuery, prefill, whatsapp, onPick, onBack }: FormProps) {
   const router = useRouter();
   // A new key starts a fresh attempt; it changes only after an attempt is over (payment couldn't start, or the hold ran out).
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
@@ -141,7 +143,7 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
     try {
       const res = await fetch("/api/bookings", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...(linkToken ? { linkToken } : { slug, event }), start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey, ...(weeks > 1 ? { weeks } : {}), ...(packageToken ? { packageToken } : {}), ...(guests.length ? { guests } : {}), locale }),
+        body: JSON.stringify({ ...(linkToken ? { linkToken } : { slug, event }), start: slot, name: data.get("name"), email: data.get("email"), phone: data.get("phone") || undefined, timezone: tz, answers, idempotencyKey, ...(weeks > 1 ? { weeks } : {}), ...(packageToken ? { packageToken } : {}), ...(guests.length ? { guests } : {}), ...(data.get("whatsappOptIn") ? { whatsappOptIn: true } : {}), locale }),
       });
       const body = await res.json();
       if ((res.status === 201 || res.status === 200) && body.payment) {
@@ -235,6 +237,12 @@ function DetailsForm({ slug, event, linkToken, tz, slot, questions, paid, host, 
       <div><Label htmlFor="name">{t(locale, "yourName")}</Label><Input id="name" name="name" autoComplete="name" required maxLength={100} defaultValue={prefill?.name} error={errors.name} /></div>
       <div><Label htmlFor="email">{t(locale, "email")}</Label><Input id="email" name="email" type="email" autoComplete="email" required defaultValue={prefill?.email} error={errors.email} /></div>
       <div><Label htmlFor="phone">{t(locale, "phoneOptional")}</Label><Input id="phone" name="phone" type="tel" autoComplete="tel" error={errors.phone} /></div>
+      {whatsapp && (
+        <label className="flex items-start gap-2 text-text">
+          <input type="checkbox" name="whatsappOptIn" value="1" className="mt-1 size-5 accent-accent" />
+          <span>{t(locale, "whatsappOptIn")}</span>
+        </label>
+      )}
       {showGuests || errors.guests ? (
         <div>
           <Label htmlFor="guests">{t(locale, "guestsLabel")}</Label>

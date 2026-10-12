@@ -10,6 +10,7 @@ import { queueMonthlyReports } from "../earnings";
 import { pruneWaitlist } from "../waitlist";
 import { setJobKick } from "./kick";
 import { BATCH_SIZE, processDueNotifications, type CalendarDeps } from "./worker";
+import { whatsappConfig } from "../whatsapp-cloud";
 
 // The job loop: every few seconds (or at once when kicked) it syncs due calendars (Google, Microsoft), settles pending booking payments, then runs due queue rows
 // (email and calendar writes); once an hour it queues plan renewal reminders and purges closed accounts. All of it is safe on several servers at once.
@@ -63,7 +64,7 @@ export function startJobRunner(opts: { pool: pg.Pool; mailer: Mailer; baseUrl: s
         }
         // A full batch means more may be due: keep going until a batch comes back short.
         for (;;) {
-          const r = await processDueNotifications(opts.pool, opts.mailer, { baseUrl: opts.baseUrl, calendar: opts.calendar });
+          const r = await processDueNotifications(opts.pool, opts.mailer, { baseUrl: opts.baseUrl, calendar: opts.calendar, whatsapp: whatsappConfig() });
           if (r.claimed < BATCH_SIZE && r.released === 0) break;
         }
         // Watch channels are a nice-to-have on top of polling: run after the emails, and a failure stops nothing.

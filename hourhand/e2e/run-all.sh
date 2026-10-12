@@ -227,5 +227,15 @@ up 3205
 node e2e/e2e-d5.mjs 3205 $OUT/srv-d5.log $DB > $OUT/out-d5.txt 2>&1
 kill $SRV
 summary D5-policy $OUT/out-d5.txt
+sleep 2
+
+fresh
+node e2e/fake-meta.mjs 3797 > $OUT/fakemeta.log 2>&1 & FM=$!
+: > $OUT/srv-d7.log
+node e2e/start-e2e-d7.mjs 3207 $DB 3797 > $OUT/srv-d7.log 2>&1 & SRV=$!
+up 3207
+node e2e/e2e-d7.mjs 3207 $OUT/srv-d7.log $DB 3797 > $OUT/out-d7.txt 2>&1
+kill $SRV $FM
+summary D7-whatsapp $OUT/out-d7.txt
 
 exit $FAILED

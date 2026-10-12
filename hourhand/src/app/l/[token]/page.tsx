@@ -3,6 +3,7 @@ import { BookingFlow } from "@/components/BookingFlow";
 import { BookingFooter } from "@/components/BookingFooter";
 import { formatMoney } from "@/lib/billing/plans";
 import { store } from "@/lib/data";
+import { whatsappOffered } from "@/lib/whatsapp-offer";
 
 export const dynamic = "force-dynamic";
 // A link is for one person: keep it out of search results and away from referrer headers.
@@ -42,7 +43,7 @@ export default async function LinkPage({ params }: { params: Promise<{ token: st
       </p>
       {eventType.description && <p className="mt-2 text-text">{eventType.description}</p>}
       <BookingFlow
-        slug={host.slug} event={eventType.slug} host={{ name: host.name, timezone: host.timezone }} linkToken={token} bookingWindowDays={eventType.bookingWindowDays} questions={questions}
+        slug={host.slug} event={eventType.slug} host={{ name: host.name, timezone: host.timezone }} linkToken={token} bookingWindowDays={eventType.bookingWindowDays} questions={questions} whatsapp={await whatsappOffered(host.id)}
         paid={eventType.priceMinor !== null ? { price: formatMoney(eventType.priceMinor, "INR"), hostName: host.name, eventName: eventType.name }
           : eventType.depositMinor !== null ? { price: formatMoney(eventType.depositMinor, "INR"), hostName: host.name, eventName: eventType.name, deposit: true } : null}
       />

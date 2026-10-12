@@ -29,7 +29,7 @@ One-off meeting and single-use links,sharing,should,yes,yes,"B8: single-use link
 "Meetings list: upcoming, past, cancelled",host,must,yes,yes,"S11 lists bookings upcoming first, cancelled marked"
 "Meeting detail with cancel, reschedule, mark no-show",host,must,yes,yes,"B7: host cancel with reason, move to a free time, no-show and undo"
 Confirmation email + calendar invite to host and guest,notifications,must,yes,yes,B3: emails with .ics to both; B4: event in the host's calendar with Meet link
-"Reminders before the meeting (email, text)",notifications,must,yes,partial,B3: email reminders; WhatsApp in B9; no SMS
+"Reminders before the meeting (email, text)",notifications,must,yes,yes,"B3: email reminders; D7: WhatsApp confirmation, day-ahead reminder and change notices from Hourhand's number (opt-in, STOP, plan limits); no SMS"
 "Video link auto-created (Google Meet, Zoom)",integrations,should,yes,partial,Google Meet (B4) and Microsoft Teams on work/school Outlook (B6); no Zoom
 Collect payment at booking (Stripe / PayPal),payments,should,yes,partial,"B5b: Razorpay through the host's own account, refunds on cancel; no Stripe or PayPal"
 Meeting polls,event types,could,yes,no,help meeting polls

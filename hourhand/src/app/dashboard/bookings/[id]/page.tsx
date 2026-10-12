@@ -64,6 +64,12 @@ export default async function BookingDetailPage({ params, searchParams }: { para
   const error = query.error && Object.hasOwn(ERRORS, query.error) ? ERRORS[query.error] : null;
   const payment = authEnabled() ? await bookingPayment(getPool(process.env.DATABASE_URL as string), user.id, booking.id) : null;
   const whatsapp = upcoming ? await whatsappLinks(user, booking) : null;
+  // Messages Hourhand's own WhatsApp number sent (or will send) to this guest, when they ticked it.
+  const automatic = authEnabled()
+    ? (await getPool(process.env.DATABASE_URL as string).query(
+        "select kind, status, last_error from notifications where booking_id = $1 and user_id = $2 and channel = 'whatsapp' order by send_at, kind",
+        [booking.id, user.id])).rows as { kind: string; status: string; last_error: string | null }[]
+    : [];
   const allBookings = await store.listBookings(user.id);
   const series = booking.seriesId ? allBookings.filter((b) => b.seriesId === booking.seriesId) : [];
   const nth = sessionNumber(allBookings, booking);
@@ -119,6 +125,15 @@ export default async function BookingDetailPage({ params, searchParams }: { para
       {upcoming && (
         <section aria-labelledby="whatsapp" className="mt-6 grid max-w-xl gap-2">
           <h2 id="whatsapp" className="font-display text-lg text-text">Message on WhatsApp</h2>
+          {automatic.length > 0 && (
+            <ul className="grid gap-1 text-sm text-text">
+              {automatic.map((a) => (
+                <li key={a.kind}>
+                  {AUTOMATIC_LABELS[a.kind] ?? a.kind}: {a.status === "sent" ? "sent automatically" : a.status === "queued" ? "will be sent automatically" : a.status === "failed" ? `not delivered${a.last_error ? ` (${a.last_error})` : ""}` : `not sent${a.last_error ? ` (${a.last_error})` : ""}`}
+                </li>
+              ))}
+            </ul>
+          )}
           {whatsapp ? (
             <>
               <p className="text-sm text-text-muted">Opens WhatsApp on your phone or computer with the message written. You send it from your own number.</p>
@@ -206,6 +221,9 @@ export default async function BookingDetailPage({ params, searchParams }: { para
   );
 }
 
+const AUTOMATIC_LABELS: Record<string, string> = {
+  booked_guest: "Confirmation", reminder_guest: "Reminder a day before", cancelled_guest: "Cancellation notice", rescheduled_guest: "New time",
+};
 const WHATSAPP_LABELS: Record<WhatsAppKind, string> = { confirmation: "Send confirmation", reminder: "Send reminder", manage: "Send change-or-cancel link" };
 
 /** One wa.me link per message, or null when the guest left no usable number. */
