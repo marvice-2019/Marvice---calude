@@ -45,7 +45,12 @@ export async function queueBookingNotifications(
        i.phone as guest_phone, i.whatsapp_opt_in_at is not null as whatsapp_opt_in,
        (select c.id from calendars c join calendar_connections cc on cc.id = c.connection_id
         where c.user_id = b.host_id and c.is_add_to and cc.status <> 'disconnected' and octet_length(cc.credentials_encrypted) > 0) as add_to_calendar,
-       exists (select 1 from calendar_connections cc where cc.user_id = b.host_id) as has_calendar
+       exists (select 1 from calendar_connections cc where cc.user_id = b.host_id) as has_calendar,
+       b.external_event_id,
+       -- Another live seat of the same group class: the class keeps one calendar event between all its seats.
+       (select o.id from bookings o where b.class_key is not null and o.class_key = b.class_key and o.id <> b.id
+          and (o.status = 'confirmed' or (o.status = 'pending_payment' and o.hold_expires_at > now()))
+        order by (o.external_event_id is not null) desc, o.created_at limit 1) as class_mate
      from bookings b join invitees i on i.booking_id = b.id join users u on u.id = b.host_id where b.id = $1`, [bookingId]);
   const b = rows[0];
   if (!b) return;
@@ -76,12 +81,25 @@ export async function queueBookingNotifications(
       `update notifications set status = 'skipped', last_error = 'booking cancelled', updated_at = $2
        where booking_id = $1 and status = 'queued' and kind not in ('cancelled_guest', 'cancelled_host')
          and not (channel = 'calendar' and locked_until > $2)`, [bookingId, now]); // a running calendar write finishes; the delete waits for it
-    if (b.has_calendar) calendarJob("calendar_delete", "event");
+    if (b.class_mate) {
+      // The class goes on: its calendar event stays, now on a remaining seat (or is written for it, if this seat's
+      // event was never written).
+      if (b.external_event_id) {
+        await db.query(
+          `update bookings m set external_event_id = s.external_event_id, external_calendar_id = s.external_calendar_id, join_url = coalesce(m.join_url, s.join_url), updated_at = $3
+           from bookings s where m.id = $1 and s.id = $2 and m.external_event_id is null`, [b.class_mate, bookingId, now]);
+      } else if (b.add_to_calendar) {
+        await db.query(
+          `insert into notifications (booking_id, user_id, channel, kind, recipient, send_at, dedupe_key)
+           values ($1, $2, 'calendar', 'calendar_create', $3, $4, $5) on conflict (dedupe_key) do nothing`,
+          [b.class_mate, b.host_id, b.add_to_calendar, now, `booking:${b.class_mate}:calendar_create`]);
+      }
+    } else if (b.has_calendar) calendarJob("calendar_delete", "event");
   } else {
     // `confirm: false` is a later week of a series: the first week's confirmation already lists it.
     if (confirm) { const k = event === "booked" ? "booked_guest" : "rescheduled_guest"; toGuests(k, now, `booking:${bookingId}:${k}`); toWhatsApp(k, now); }
     if (confirm && notifyHost) now_(event === "booked" ? "booked_host" : "rescheduled_host", b.host_email);
-    if (event === "booked" && b.add_to_calendar) calendarJob("calendar_create", b.add_to_calendar);
+    if (event === "booked" && b.add_to_calendar && !b.class_mate) calendarJob("calendar_create", b.add_to_calendar);
     // A move updates the old booking's event wherever it is; with no old event it creates one in the add-to calendar.
     if (event === "rescheduled" && (b.add_to_calendar || b.has_calendar)) calendarJob("calendar_move", b.add_to_calendar ?? "event");
     for (const offset of REMINDER_OFFSETS_MINUTES) {

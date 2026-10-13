@@ -13,7 +13,7 @@ function b(email: string, startH: number, o: Partial<BookingWithInvitee> & { nam
   return {
     id: `b${n}`, eventTypeId: "e", hostId: "h", startAt: start, endAt: new Date(start.getTime() + H), bufferedStart: start, bufferedEnd: start, status: "confirmed",
     holdExpiresAt: null, locationKind: null, joinUrl: null, idempotencyKey: `k${n}`, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: null,
-    seriesId: null, seriesIndex: null, createdAt: new Date(now.getTime() + n), ...o,
+    seriesId: null, seriesIndex: null, classKey: null, createdAt: new Date(now.getTime() + n), ...o,
     invitee: { id: `i${n}`, bookingId: `b${n}`, hostId: "h", name: o.name ?? "Meera", email, timezone: "Asia/Kolkata", phone: o.phone ?? null, answers: [], manageToken: `t${n}`,
       noShowAt: o.noShow ? now : null, runningLateMinutes: null, runningLateAt: null, guests: [], locale: "en", whatsappOptIn: false },
   };

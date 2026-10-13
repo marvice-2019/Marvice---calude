@@ -302,6 +302,7 @@ export function EventTypeEditor({ id, userSlug, initial, initialQuestions, justS
           <p id="f-cancelPolicy-hint" className="mt-1 text-sm text-text-muted">{errors.cancelPolicy ?? "Optional. Guests see it before they book and next to Cancel."}</p>
         </div>
         {numberField("maxRepeats", "Weekly repeats", "weeks at most", "Let guests book the same time every week, up to this many weeks in one go. 1 means no repeats. Free event types only.")}
+        {numberField("seats", "Guests per session", "guests", "For a group class (yoga, dance, batch tuition): 2 to 500 guests share each time. Leave blank for one-on-one. Free, single-week sessions for now.")}
       </Panel>
 
       <Panel id="form" active={tab}>

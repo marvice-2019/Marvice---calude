@@ -34,6 +34,7 @@ const ERRORS: Record<string, string> = {
   not_cancellable: "Only upcoming confirmed bookings can be cancelled.",
   slot_taken: "That time was just taken. Pick another.",
   not_movable: "This booking can't be moved. Only upcoming confirmed bookings can.",
+  group_seat: "A seat in a group class can't be moved on its own. Cancel it, and the guest can book another class.",
   bad_time: "That time didn't come through. Pick one from the list.",
   not_started: "You can mark a no-show once the booking has started.",
 };
@@ -74,6 +75,9 @@ export default async function BookingDetailPage({ params, searchParams }: { para
   const series = booking.seriesId ? allBookings.filter((b) => b.seriesId === booking.seriesId) : [];
   const nth = sessionNumber(allBookings, booking);
   const clientNote = await store.getClientNote(user.id, booking.invitee.email);
+  // Everyone holding a live seat in the same group class, this guest included.
+  const classmates = booking.classKey ? allBookings.filter((b) => b.classKey === booking.classKey && (b.status === "confirmed" || b.status === "pending_payment")) : [];
+  const seatLimit = booking.classKey ? (await store.getEventType(user.id, booking.eventTypeId))?.seatLimit ?? null : null;
   const laterWeeks = series.filter((b) => (b.seriesIndex ?? 0) > (booking.seriesIndex ?? 0) && b.status === "confirmed" && b.startAt > now).length;
   return (
     <div>
@@ -101,6 +105,18 @@ export default async function BookingDetailPage({ params, searchParams }: { para
           </dd>
           {series.length > 1 && <dd className="text-sm text-text-muted">Week {booking.seriesIndex} of {new Set(series.map((b) => b.seriesIndex)).size}, every week at this time</dd>}
         </div>
+        {booking.classKey && (
+          <div>
+            <dt className="text-sm text-text-muted">Group class · {classmates.length}{seatLimit ? ` of ${seatLimit}` : ""} seats taken</dt>
+            <dd className="text-text">
+              <ul className="space-y-1">
+                {classmates.map((b) => (
+                  <li key={b.id}>{b.id === booking.id ? b.invitee.name : <Link href={`/dashboard/bookings/${b.id}`} className="text-accent underline">{b.invitee.name}</Link>}</li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
         <div><dt className="text-sm text-text-muted">Email</dt><dd className="text-text">{booking.invitee.email}</dd></div>
         {booking.invitee.guests.length > 0 && <div><dt className="text-sm text-text-muted">Also invited</dt><dd className="text-text">{booking.invitee.guests.join(", ")}</dd></div>}
         {payment && (
@@ -177,10 +193,10 @@ export default async function BookingDetailPage({ params, searchParams }: { para
           ) : (
             <div className="flex flex-wrap gap-4">
               <Link href={`/dashboard/bookings/${booking.id}?confirm=cancel`} className="inline-flex min-h-11 items-center font-semibold text-danger underline">Cancel booking</Link>
-              <Link href={`/dashboard/bookings/${booking.id}?reschedule=1`} className="inline-flex min-h-11 items-center font-semibold text-accent underline">Move to another time</Link>
+              {!booking.classKey && <Link href={`/dashboard/bookings/${booking.id}?reschedule=1`} className="inline-flex min-h-11 items-center font-semibold text-accent underline">Move to another time</Link>}
             </div>
           )}
-          {query.reschedule && (
+          {query.reschedule && !booking.classKey && (
             <div>
               <h3 className="font-semibold text-text">Pick a new time ({zoneName(tz)})</h3>
               {byDay.size === 0 ? (

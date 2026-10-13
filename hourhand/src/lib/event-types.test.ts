@@ -52,7 +52,7 @@ describe("validateEventType", () => {
         name: "30-min strategy call", slug: "strategy", description: "Plan the next quarter.", durationMinutes: 30, minNoticeMinutes: 240,
         bookingWindowDays: 60, startIncrementMinutes: 15, bufferBeforeMinutes: 0, bufferAfterMinutes: 10, dailyLimit: null,
         cancelCutoffMinutes: 120, maxRepeats: 1, depositMinor: null, priceMinor: null, currency: null, location: { kind: "zoom", value: null }, hidden: false,
-        redirectUrl: null, weeklyLimit: null, cancelPolicy: null,
+        redirectUrl: null, weeklyLimit: null, cancelPolicy: null, seatLimit: null,
       },
     });
   });
@@ -70,6 +70,11 @@ describe("validateEventType", () => {
   });
 
   it("takes an https page to send guests to after booking, and nothing else", () => {
+    // Guests per session: blank or 1 is one-on-one, 2 to 500 makes it a group class, which can't take payment or repeat.
+    expect(validateEventType({ ...valid, seats: "1" }, [])).toMatchObject({ ok: true, value: { seatLimit: null } });
+    expect(validateEventType({ ...valid, seats: "12" }, [])).toMatchObject({ ok: true, value: { seatLimit: 12 } });
+    expect(validateEventType({ ...valid, seats: "501" }, [])).toMatchObject({ ok: false, errors: { seats: expect.any(String) } });
+    expect(validateEventType({ ...valid, seats: "12", price: "500" }, [])).toMatchObject({ ok: false });
     expect(validateEventType({ ...valid, redirectUrl: "https://priya.coach/thanks" }, [])).toMatchObject({ ok: true, value: { redirectUrl: "https://priya.coach/thanks" } });
     expect(validateEventType({ ...valid, redirectUrl: "javascript:alert(1)" }, [])).toMatchObject({ ok: false, errors: { redirectUrl: expect.any(String) } });
   });

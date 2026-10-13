@@ -1,6 +1,6 @@
 import type pg from "pg";
 import type { PackageUnavailableError } from "./packages/packages";
-import { computeOneOffSlots, computeSlots, isSyncStale } from "./slots";
+import { computeOneOffSlots, computeSlotSeats, isSyncStale } from "./slots";
 import { isNamedError, type Booking, type DataStore, type EventType, type LinkUnavailableError, type User } from "./data/types";
 import { isLocale } from "./i18n/guest";
 import { waNumber } from "./whatsapp";
@@ -37,6 +37,11 @@ function parseInstant(value: unknown): Date | null {
  * `movingId` is a booking being rescheduled: its own time doesn't block the slots it could move to.
  */
 export async function freeSlots(store: DataStore, host: User, eventType: EventType, from: Date, to: Date, now: Date, movingId: string | null = null): Promise<Date[]> {
+  return (await freeSlotSeats(store, host, eventType, from, to, now, movingId)).map((s) => s.start);
+}
+
+/** freeSlots with each start's seats left (null unless it is a group class). */
+export async function freeSlotSeats(store: DataStore, host: User, eventType: EventType, from: Date, to: Date, now: Date, movingId: string | null = null): Promise<{ start: Date; seatsLeft: number | null }[]> {
   if (eventType.kind === "one_off") {
     const [times, connections, busyBlocks, bookings] = await Promise.all([
       store.listOneOffTimes(eventType.id),
@@ -47,7 +52,7 @@ export async function freeSlots(store: DataStore, host: User, eventType: EventTy
     return computeOneOffSlots({
       times, durationMinutes: eventType.durationMinutes, busyBlocks, bookings: bookings.filter((b) => b.id !== movingId),
       now, rangeStart: from, rangeEnd: to, syncStale: isSyncStale(connections, now),
-    });
+    }).map((start) => ({ start, seatsLeft: null }));
   }
   const [{ schedule, rules }, connections, busyBlocks, bookings] = await Promise.all([
     store.getDefaultSchedule(host.id),
@@ -55,7 +60,7 @@ export async function freeSlots(store: DataStore, host: User, eventType: EventTy
     store.listBusyBlocks(host.id, new Date(from.getTime() - DAY), new Date(to.getTime() + DAY)),
     store.listBookings(host.id),
   ]);
-  return computeSlots({
+  return computeSlotSeats({
     eventType, schedule, rules, busyBlocks, bookings: bookings.filter((b) => b.id !== movingId), now, rangeStart: from, rangeEnd: to,
     syncStale: isSyncStale(connections, now),
   });
@@ -122,8 +127,10 @@ export async function handleGetSlots(store: DataStore, params: URLSearchParams, 
   const found = own ?? await resolveTarget(store, slug, event, link, now);
   if (isResult(found)) return found;
   const movingId = moving && moving.status === "confirmed" && moving.hostId === found.host.id && moving.eventTypeId === found.eventType.id ? moving.id : null;
-  const slots = await freeSlots(store, found.host, found.eventType, from, to, now, movingId);
-  return { status: 200, body: { timezone: tz ?? found.host.timezone, slots: slots.map((s) => s.toISOString()) } };
+  const slots = await freeSlotSeats(store, found.host, found.eventType, from, to, now, movingId);
+  // A group class also says how many seats each time has left.
+  const seatsLeft = found.eventType.kind === "group" ? Object.fromEntries(slots.map((s) => [s.start.toISOString(), s.seatsLeft])) : undefined;
+  return { status: 200, body: { timezone: tz ?? found.host.timezone, slots: slots.map((s) => s.start.toISOString()), ...(seatsLeft ? { seatsLeft } : {}) } };
 }
 
 /** Extra guests a booker can add (invitees.guests holds at most this many). */
