@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { MobileMenu, NavLinks } from "@/components/DashboardNav";
+import { PwaInstall } from "@/components/PwaInstall";
 import { SyncLight } from "@/components/SyncLight";
 import { focusRing } from "@/components/ui/focus";
 import { store } from "@/lib/data";
@@ -60,6 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             )}
           </div>
         </header>
+        <PwaInstall />
         {acting && (
           <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2 text-sm text-text lg:px-8">
             <span>You&apos;re managing <span className="font-semibold">{user.name}</span>&apos;s account as their second person.</span>

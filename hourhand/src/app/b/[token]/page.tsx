@@ -77,7 +77,7 @@ export default async function ManageBookingPage({ params, searchParams }: { para
           manageUrl={`${(resolveBaseUrl() ?? "").replace(/\/+$/, "")}/b/${token}`}
         />
         {canSayRunningLate(booking.startAt, new Date()) && <RunningLate token={token} hostName={host.name} told={booking.invitee.runningLateMinutes} locale={locale} />}
-        <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} laterWeeks={laterWeeks} locale={locale} langQuery={q} cancelPolicy={eventType.cancelPolicy} />
+        <ManageBooking token={token} slug={host.slug} event={eventType.slug} bookingWindowDays={eventType.bookingWindowDays} hostName={host.name} laterWeeks={laterWeeks} locale={locale} langQuery={q} cancelPolicy={eventType.cancelPolicy} groupSeat={booking.classKey !== null} />
         </>
       )}
     </main>

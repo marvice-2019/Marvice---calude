@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { PackageUnavailableError } from "../packages/packages";
 import { datesInRange } from "../availability";
-import { overlaps } from "../slots";
+import { classKeyOf, overlaps } from "../slots";
 import { buildSeed, type Seed } from "./seed";
 import { hashLinkToken, newLinkToken } from "../links";
 import { checkOneOff, oneOffSlug } from "./one-off";
@@ -61,18 +61,21 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
     const endAt = new Date(startAt.getTime() + et.durationMinutes * MIN);
     const bufferedStart = new Date(startAt.getTime() - et.bufferBeforeMinutes * MIN);
     const bufferedEnd = new Date(endAt.getTime() + et.bufferAfterMinutes * MIN);
-    // Same rule as the exclusion constraint: no two confirmed bookings of one host overlap, buffers included.
+    // Same rules as the exclusion constraint and the seat count: no two confirmed bookings of one host overlap, buffers
+    // included, except seats of the same group class, which fill up to its seat limit.
+    const classKey = et.kind === "group" ? classKeyOf(et.id, startAt) : null;
     const clash = db.bookings.some(
-      (b) => b.hostId === et.userId && b.status === "confirmed" && b.id !== movingId &&
+      (b) => b.hostId === et.userId && b.status === "confirmed" && b.id !== movingId && (classKey === null || b.classKey !== classKey) &&
         overlaps(bufferedStart.getTime(), bufferedEnd.getTime(), b.bufferedStart.getTime(), b.bufferedEnd.getTime()),
     );
-    if (clash) throw new SlotTakenError();
+    const seats = classKey ? db.bookings.filter((b) => b.classKey === classKey && b.status === "confirmed").length : 0;
+    if (clash || (classKey && seats >= (et.seatLimit ?? 0))) throw new SlotTakenError();
 
     const id = randomUUID();
     return {
       id, eventTypeId: et.id, hostId: et.userId, startAt, endAt, bufferedStart, bufferedEnd, status: "confirmed", holdExpiresAt: null,
       locationKind: db.locations.find((l) => l.eventTypeId === et.id)?.kind ?? null, joinUrl: null,
-      idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, seriesId: null, seriesIndex: null, createdAt: new Date(),
+      idempotencyKey: input.idempotencyKey, cancelledAt: null, cancelledBy: null, cancelReason: null, rescheduledFromId: movingId, seriesId: null, seriesIndex: null, classKey, createdAt: new Date(),
       invitee: { id: randomUUID(), bookingId: id, hostId: et.userId, ...input.invitee, guests: input.invitee.guests ?? [], locale: input.invitee.locale ?? "en", whatsappOptIn: input.invitee.whatsappOptIn === true && input.invitee.phone !== null, manageToken: randomUUID().replaceAll("-", ""), noShowAt: null, runningLateMinutes: null, runningLateAt: null },
     };
   }
@@ -89,10 +92,10 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
   }
 
   function fields(draft: EventTypeDraft): Omit<EventTypeDraft, "location"> {
-    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden, maxRepeats, depositMinor, redirectUrl, weeklyLimit, cancelPolicy } = draft;
+    const { name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes, priceMinor, currency, hidden, maxRepeats, depositMinor, redirectUrl, weeklyLimit, cancelPolicy, seatLimit } = draft;
     return {
       name, slug, description, durationMinutes, minNoticeMinutes, bookingWindowDays, startIncrementMinutes, bufferBeforeMinutes, bufferAfterMinutes, dailyLimit, cancelCutoffMinutes,
-      priceMinor, currency: priceMinor === null ? null : currency, hidden, maxRepeats, depositMinor: priceMinor === null ? depositMinor : null, redirectUrl, weeklyLimit, cancelPolicy,
+      priceMinor, currency: priceMinor === null ? null : currency, hidden, maxRepeats, depositMinor: priceMinor === null ? depositMinor : null, redirectUrl, weeklyLimit, cancelPolicy, seatLimit,
     };
   }
 
@@ -209,7 +212,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
         id: randomUUID(), userId: hostId, scheduleId: db.schedules.find((s) => s.userId === hostId && s.isDefault)?.id ?? null,
         name: input.name.trim(), slug: oneOffSlug(), description: input.description ?? null, durationMinutes: input.durationMinutes,
         minNoticeMinutes: 0, bookingWindowDays: 730, startIncrementMinutes: 30, bufferBeforeMinutes: 0, bufferAfterMinutes: 0, dailyLimit: null,
-        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off", maxRepeats: 1, depositMinor: null, redirectUrl: null, weeklyLimit: null, cancelPolicy: null,
+        cancelCutoffMinutes: 0, priceMinor: null, currency: null, hidden: true, active: true, position: 0, kind: "one_off", seatLimit: null, maxRepeats: 1, depositMinor: null, redirectUrl: null, weeklyLimit: null, cancelPolicy: null,
       };
       db.eventTypes.push(eventType);
       db.locations.push({ id: randomUUID(), eventTypeId: eventType.id, kind: input.location.kind, value: input.location.value ?? null, position: 0 });
@@ -298,7 +301,7 @@ export function createMemoryStore(seed: Seed = buildSeed(new Date())): DataStore
       const mine = db.eventTypes.filter((e) => e.userId === userId);
       const eventType: EventType = {
         id: randomUUID(), userId, scheduleId: db.schedules.find((s) => s.userId === userId && s.isDefault)?.id ?? null,
-        ...fields(draft), active: true, position: Math.max(-1, ...mine.map((e) => e.position)) + 1, kind: "one_on_one",
+        ...fields(draft), active: true, position: Math.max(-1, ...mine.map((e) => e.position)) + 1, kind: draft.seatLimit === null ? "one_on_one" : "group",
       };
       db.eventTypes.push(eventType);
       setLocation(eventType.id, draft);

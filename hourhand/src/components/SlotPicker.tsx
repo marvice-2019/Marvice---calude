@@ -32,7 +32,7 @@ const detectZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 export const useDeviceZone = () => useSyncExternalStore(noSubscribe, detectZone, () => null);
 
 type Month = { y: number; m: number }; // m is 0-11
-type Loaded = { key: string; slots: string[] | null }; // null slots = failed
+type Loaded = { key: string; slots: string[] | null; seatsLeft?: Record<string, number> }; // null slots = failed; seatsLeft for a group class
 
 function monthOf(date: Date, tz: string): Month {
   const [y, m] = dayKey(date, tz).split("-").map(Number);
@@ -78,7 +78,7 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkTo
     let live = true;
     fetch(`/api/slots?${params}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((body: { slots: string[] }) => live && setLoaded({ key, slots: body.slots }))
+      .then((body: { slots: string[]; seatsLeft?: Record<string, number> }) => live && setLoaded({ key, slots: body.slots, seatsLeft: body.seatsLeft }))
       .catch(() => live && setLoaded({ key, slots: null }));
     return () => { live = false; };
   }, [sy, sm, attempt, slug, event, manageToken, linkToken, now]);
@@ -171,8 +171,9 @@ export function SlotPicker({ slug, event, bookingWindowDays, manageToken, linkTo
             <ul className="mt-2 grid gap-2">
               {byDay.get(day)!.map((s) => (
                 <li key={s}>
-                  <Button variant="secondary" className="w-full" onClick={() => onPick(s, tz)} aria-label={`${formatDate(new Date(s), tz, locale)}, ${formatTime(new Date(s), tz, cycle, locale)} ${zoneName(tz)}`}>
+                  <Button variant="secondary" className="w-full" onClick={() => onPick(s, tz)} aria-label={`${formatDate(new Date(s), tz, locale)}, ${formatTime(new Date(s), tz, cycle, locale)} ${zoneName(tz)}${loaded?.seatsLeft?.[s] !== undefined ? `, ${t(locale, "seatsLeft", { n: loaded.seatsLeft[s] })}` : ""}`}>
                     {formatTime(new Date(s), tz, cycle, locale)}
+                    {loaded?.seatsLeft?.[s] !== undefined && <span className="ml-2 text-sm font-normal text-text-muted">{t(locale, "seatsLeft", { n: loaded.seatsLeft[s] })}</span>}
                   </Button>
                 </li>
               ))}

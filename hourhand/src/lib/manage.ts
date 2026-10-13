@@ -58,6 +58,8 @@ async function moveBooking(store: DataStore, booking: BookingWithInvitee, input:
   const repeat = all.find((b) => b.idempotencyKey === idempotencyKey && b.rescheduledFromId === booking.id);
   if (repeat) return { status: 200, body: { bookingId: repeat.id, manageToken: repeat.invitee.manageToken } };
   if (booking.status === "cancelled") return { status: 409, body: { error: "cancelled" } };
+  // A group class seat isn't moved: the class's calendar event goes with its seats. The guest cancels and books again.
+  if (booking.classKey) return { status: 409, body: { error: "group_seat" } };
   // The host moves upcoming bookings only (the page hides the form, but a post can still arrive): moving one that
   // already happened would cancel it as the host's and email the guest. Checked after the repeat lookup, so a double
   // submit still gets its booking back.

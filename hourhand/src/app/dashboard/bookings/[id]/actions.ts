@@ -49,7 +49,7 @@ export async function rescheduleAsHost(form: FormData): Promise<void> {
     const body = result.body as { bookingId?: string; error?: string };
     if (result.status === 404) throw new NotFoundError("Booking");
     if (result.status < 300 && body.bookingId) return `${page(body.bookingId)}?done=rescheduled`;
-    const error = body.error === "slot_taken" ? "slot_taken" : result.status === 400 ? "bad_time" : "not_movable";
+    const error = body.error === "slot_taken" || body.error === "group_seat" ? body.error : result.status === 400 ? "bad_time" : "not_movable";
     return `${page(id)}?reschedule=1&error=${error}`;
   });
 }

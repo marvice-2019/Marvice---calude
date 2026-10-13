@@ -13,17 +13,20 @@ export interface SlotInput {
     EventType,
     | "id" | "durationMinutes" | "startIncrementMinutes" | "bufferBeforeMinutes" | "bufferAfterMinutes"
     | "minNoticeMinutes" | "bookingWindowDays" | "dailyLimit" | "weeklyLimit"
-  >;
+  > & Partial<Pick<EventType, "seatLimit">>;
   schedule: { timezone: string };
   rules: AvailabilityRule[];
   busyBlocks: Range[];
-  bookings: { eventTypeId: string; status: "confirmed" | "cancelled" | "pending_payment"; holdExpiresAt: Date | null; startAt: Date; bufferedStart: Date; bufferedEnd: Date }[];
+  bookings: { eventTypeId: string; status: "confirmed" | "cancelled" | "pending_payment"; holdExpiresAt: Date | null; startAt: Date; bufferedStart: Date; bufferedEnd: Date; classKey?: string | null }[];
   now: Date;
   rangeStart: Date;
   rangeEnd: Date;
   /** True when any conflict-checked calendar is out of date. Hourhand then offers no times at all. */
   syncStale: boolean;
 }
+
+/** Every seat of one group class shares this: the event type and the class's start. */
+export const classKeyOf = (eventTypeId: string, startAt: Date) => `${eventTypeId}@${startAt.toISOString()}`;
 
 /** Half-open [start, end) overlap: ranges that only touch do not overlap. */
 export function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
@@ -75,6 +78,14 @@ function intervalsFor(dayMs: number, rules: AvailabilityRule[]): Interval[] {
  * move the UTC times and never the host's wall-clock hours.
  */
 export function computeSlots(input: SlotInput): Date[] {
+  return computeSlotSeats(input).map((s) => s.start);
+}
+
+/**
+ * computeSlots with each start's seats left: null for a one-on-one type. A group class time stays open while it has a
+ * free seat: its own seats, and the host's calendar event for it (exactly the class's time), don't block it.
+ */
+export function computeSlotSeats(input: SlotInput): { start: Date; seatsLeft: number | null }[] {
   const { eventType: et, schedule, rules, busyBlocks, bookings, now, rangeStart, rangeEnd, syncStale } = input;
   if (syncStale) return [];
 
@@ -89,24 +100,35 @@ export function computeSlots(input: SlotInput): Date[] {
 
   // A hold the guest is still paying for blocks like a confirmed booking; a lapsed one is about to be expired and doesn't.
   const confirmed = bookings.filter((b) => b.status === "confirmed" || (b.status === "pending_payment" && b.holdExpiresAt !== null && b.holdExpiresAt > now));
+  const ownSeat = new Set(confirmed.filter((b) => b.eventTypeId === et.id && b.classKey).map((b) => `${b.bufferedStart.getTime()}:${b.bufferedEnd.getTime()}`));
   const blocked: [number, number][] = [
     ...confirmed.map((b): [number, number] => [b.bufferedStart.getTime(), b.bufferedEnd.getTime()]),
     ...busyBlocks.map((b): [number, number] => [b.start.getTime(), b.end.getTime()]),
   ];
+  const seatLimit = et.seatLimit ?? null;
+  const seatsTaken = new Map<number, number>(); // class start -> seats taken, for this group type
+  const counted = new Set<string>();
   const bookedPerDay = new Map<number, number>();
   const bookedPerWeek = new Map<number, number>();
   for (const b of confirmed) {
     if (b.eventTypeId !== et.id) continue;
+    if (b.classKey) {
+      seatsTaken.set(b.startAt.getTime(), (seatsTaken.get(b.startAt.getTime()) ?? 0) + 1);
+      if (counted.has(b.classKey)) continue; // a class counts once towards the limits
+      counted.add(b.classKey);
+    }
     const day = localDay(b.startAt, tz);
     bookedPerDay.set(day, (bookedPerDay.get(day) ?? 0) + 1);
     bookedPerWeek.set(weekOf(day), (bookedPerWeek.get(weekOf(day)) ?? 0) + 1);
   }
 
-  const slots: Date[] = [];
+  const slots: { start: Date; seatsLeft: number | null }[] = [];
   const lastDay = localDay(new Date(latest), tz);
   for (let day = localDay(new Date(earliest), tz); day <= lastDay; day += DAY) {
-    if (et.dailyLimit != null && (bookedPerDay.get(day) ?? 0) >= et.dailyLimit) continue;
-    if (et.weeklyLimit != null && (bookedPerWeek.get(weekOf(day)) ?? 0) >= et.weeklyLimit) continue;
+    // A full day or week takes no new session; a group class already on it still takes guests.
+    const full = (et.dailyLimit != null && (bookedPerDay.get(day) ?? 0) >= et.dailyLimit)
+      || (et.weeklyLimit != null && (bookedPerWeek.get(weekOf(day)) ?? 0) >= et.weeklyLimit);
+    if (full && seatLimit === null) continue;
     for (const { from, to } of intervalsFor(day, rules)) {
       const open = wallTime(day, minutesOf(from), tz);
       const close = wallTime(day, minutesOf(to), tz);
@@ -114,12 +136,16 @@ export function computeSlots(input: SlotInput): Date[] {
         if (start < earliest || start >= latest) continue;
         const bufStart = start - before;
         const bufEnd = start + duration + after;
-        if (blocked.some(([s, e]) => overlaps(bufStart, bufEnd, s, e))) continue;
-        slots.push(new Date(start));
+        const taken = seatLimit === null ? 0 : seatsTaken.get(start) ?? 0;
+        if ((seatLimit !== null && taken >= seatLimit) || (full && taken === 0)) continue;
+        // A class already running at this start: its seats and its calendar event are this class, not a clash.
+        const own = (s: number, e: number) => taken > 0 && ((s === start && e === start + duration) || ownSeat.has(`${s}:${e}`));
+        if (blocked.some(([s, e]) => !own(s, e) && overlaps(bufStart, bufEnd, s, e))) continue;
+        slots.push({ start: new Date(start), seatsLeft: seatLimit === null ? null : seatLimit - taken });
       }
     }
   }
-  return slots.sort((a, b) => a.getTime() - b.getTime());
+  return slots.sort((a, b) => a.start.getTime() - b.start.getTime());
 }
 
 export interface OneOffSlotInput {

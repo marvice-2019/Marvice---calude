@@ -49,6 +49,8 @@ export interface EventType {
   position: number;
   /** A one_off type is a one-off meeting: offered only at its own times, through its single-use link. */
   kind: "one_on_one" | "group" | "one_off";
+  /** A group class: how many guests one session takes (2 to 500). null for one-on-one and one-off types. */
+  seatLimit: number | null;
   /** Guests may book the same time weekly for up to this many weeks in one go; 1 = no repeats. Free event types only. */
   maxRepeats: number;
   /** A refundable no-show deposit in paise, on a free event type; null = none. Refunded after the session unless marked a no-show. */
@@ -127,6 +129,8 @@ export interface Booking {
   /** A weekly series: the first week's booking id, and this week's place in it (1 = first). Both null otherwise. */
   seriesId: string | null;
   seriesIndex: number | null;
+  /** A seat in a group class: shared by every seat of the same class (event type + start). null for other bookings. */
+  classKey: string | null;
   createdAt: Date;
 }
 
@@ -363,7 +367,7 @@ export interface DataStore {
 /** The editable fields of an event type, already validated. */
 export type EventTypeDraft = Pick<EventType,
   "name" | "slug" | "description" | "durationMinutes" | "minNoticeMinutes" | "bookingWindowDays" | "startIncrementMinutes" |
-  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor" | "redirectUrl" | "weeklyLimit" | "cancelPolicy"> & {
+  "bufferBeforeMinutes" | "bufferAfterMinutes" | "dailyLimit" | "cancelCutoffMinutes" | "priceMinor" | "currency" | "hidden" | "maxRepeats" | "depositMinor" | "redirectUrl" | "weeklyLimit" | "cancelPolicy" | "seatLimit"> & {
   location: { kind: LocationKind; value: string | null } | null;
 };
 

@@ -90,6 +90,8 @@ iCloud calendars need no server keys: each host connects with their own Apple ID
 
 **Security fixes (2026-10-11):** if you put Cloudflare (or any other proxy) in front of Coolify, add its address ranges to `TRUSTED_PROXIES`, or every visitor shares one rate-limit bucket. Keep the app's own port closed to the internet so all traffic comes through Coolify's proxy.
 
+**Group classes and installable app (2026-10-13):** migrations run to `0025` (adds the seat column to bookings; existing bookings are untouched). No new variables. Hosts can install Hourhand to their phone's home screen from the dashboard.
+
 ## 5b. WhatsApp (D7: automatic confirmations and reminders)
 
 Off until all four variables below are set. With them unset nothing is queued, the booking form doesn't offer WhatsApp, and the wa.me buttons on each booking work as before. Migration `0024` adds the opt-in and opt-out tables either way.

@@ -23,6 +23,8 @@ interface Props {
   langQuery?: string;
   /** The host's cancellation policy, shown next to Cancel. */
   cancelPolicy?: string | null;
+  /** A seat in a group class: it can be cancelled but not moved. */
+  groupSeat?: boolean;
 }
 
 function When({ slot, tz, locale }: { slot: string; tz: string; locale: Locale }) {
@@ -30,16 +32,18 @@ function When({ slot, tz, locale }: { slot: string; tz: string; locale: Locale }
 }
 
 /** The two things a guest can do with a booking: move it, or cancel it. */
-export function ManageBooking({ token, slug, event, bookingWindowDays, hostName, laterWeeks = 0, locale = "en", langQuery = "", cancelPolicy = null }: Props) {
+export function ManageBooking({ token, slug, event, bookingWindowDays, hostName, laterWeeks = 0, locale = "en", langQuery = "", cancelPolicy = null, groupSeat = false }: Props) {
   return (
     <>
-      <Reschedule token={token} slug={slug} event={event} bookingWindowDays={bookingWindowDays} locale={locale} langQuery={langQuery} />
+      {groupSeat
+        ? <p className="mt-8 max-w-md text-text">{t(locale, "groupNoMove")}</p>
+        : <Reschedule token={token} slug={slug} event={event} bookingWindowDays={bookingWindowDays} locale={locale} langQuery={langQuery} />}
       <Cancel token={token} hostName={hostName} laterWeeks={laterWeeks} locale={locale} policy={cancelPolicy} />
     </>
   );
 }
 
-function Reschedule({ token, slug, event, bookingWindowDays, locale = "en", langQuery = "" }: Omit<Props, "hostName" | "laterWeeks" | "cancelPolicy">) {
+function Reschedule({ token, slug, event, bookingWindowDays, locale = "en", langQuery = "" }: Omit<Props, "hostName" | "laterWeeks" | "cancelPolicy" | "groupSeat">) {
   const router = useRouter();
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [picked, setPicked] = useState<{ slot: string; tz: string } | null>(null);
