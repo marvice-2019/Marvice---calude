@@ -52,6 +52,13 @@ Parked + typo domains: ₹10,874/yr. Client brands should move to client billing
 - Reach 100 (email marketing): trial, auto-renews ₹1,548 on 7 Sep 2027.
 - Website Builder site `billie-builder-hjtgzfgd5hieqlbd.hostingersite.com` returned 502.
 
+## Actions taken 13 Oct 2026
+
+- 14:51 UTC — VPS restarted (action 119837671, success; state running).
+- urbanightmedia.online auto-renew disabled (subscription AzyyJIVEa3anu38bW now `non_renewing`, expires 22 Mar 2027).
+- SSH key cleanup NOT done via API: the remove-key operation does not let you choose which key, so it could strip Coolify's key. Do it on the server instead.
+- SSH-to-my-IP NOT done: waiting for the office IP(s).
+
 ## Pending / next session
 
 1. DKIM fix — needs the full key from BillionMail.
