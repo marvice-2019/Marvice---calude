@@ -67,6 +67,11 @@ export default function TermsPage() {
           We work hard to keep Hourhand running, but we do not promise it will always be available or free of errors. Calendar providers such as Google can fail or change. When we can&apos;t check a calendar, we show it on the sync light and pause bookings for that host, so guests are not offered times we can&apos;t confirm. You should still keep an eye on your own calendar.
         </p>
 
+        <h2 className={h2}>Sync guarantee</h2>
+        <p className={p}>
+          On a paid plan, if Hourhand books two guests into overlapping times because it failed to read a connected calendar, your next month on that plan is free. To claim it, email us within 7 days of the booking with the two bookings. It applies once per billing period, and not when the overlap comes from a calendar that was disconnected and shown as such on the sync light, or from times you added or changed yourself. This credit is the whole of our responsibility for such an overlap.
+        </p>
+
         <h2 className={h2}>Limitation of liability</h2>
         <p className={p}>
           As far as the law allows, we are not liable for indirect or consequential losses, such as lost income or missed bookings. Our total liability for any claim relating to Hourhand is limited to the fees you paid us in the 12 months before the claim. Nothing in these terms limits liability that cannot be limited under Indian law.
