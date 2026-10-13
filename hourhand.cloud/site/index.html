@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hourhand: time tracking and billable hours for agencies</title>
+<meta name="description" content="Hourhand tracks every hour your team works, turns billable time into GST-ready invoices, and shows which clients actually make you money. Built for agencies and service teams.">
+<link rel="canonical" href="https://hourhand.cloud/">
+<meta name="theme-color" content="#14161c">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hourhand.cloud/">
+<meta property="og:title" content="Hourhand: every billable hour, accounted for">
+<meta property="og:description" content="Time tracking, timesheets and billable-hours reporting for agencies and service teams.">
+<meta property="og:image" content="https://hourhand.cloud/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://hourhand.cloud/#org",
+      "name": "Hourhand",
+      "url": "https://hourhand.cloud/",
+      "logo": "https://hourhand.cloud/favicon.svg",
+      "parentOrganization": {"@type": "Organization", "name": "Marvice Media Private Limited"},
+      "contactPoint": {"@type": "ContactPoint", "telephone": "+91-78456-67204", "email": "Yuvarajgs@marvice.in", "contactType": "sales", "areaServed": ["IN", "GB"], "availableLanguage": ["en", "ta", "hi"]}
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Hourhand",
+      "url": "https://hourhand.cloud/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, Android, iOS",
+      "description": "Time tracking, timesheets, billable-hours reporting and GST-ready invoicing for agencies and service teams.",
+      "publisher": {"@id": "https://hourhand.cloud/#org"}
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {"@type": "Question", "name": "Who is Hourhand for?", "acceptedAnswer": {"@type": "Answer", "text": "Agencies, studios, consultancies and IT service teams of 5 to 200 people who bill clients by the hour or on retainers and need to know where time goes."}},
+        {"@type": "Question", "name": "Does Hourhand handle GST invoicing?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Approved billable hours turn into invoices in INR with 18% GST shown separately, or in GBP and other currencies for clients outside India."}},
+        {"@type": "Question", "name": "Can my team log time from WhatsApp?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Hourhand sends a daily WhatsApp nudge to anyone with a missing timesheet, and they can reply to log hours without opening the app."}},
+        {"@type": "Question", "name": "How do I get access?", "acceptedAnswer": {"@type": "Answer", "text": "Hourhand is in early access. Message us on WhatsApp or email and we will set up your workspace and import your clients and projects."}}
+      ]
+    }
+  ]
+}
+</script>
+<style>
+:root{
+  --ink:#14161c; --ink-2:#2a2e38; --muted:#5d6270; --paper:#f4efe6; --paper-2:#ebe4d6; --card:#fbf8f2;
+  --line:#d9d0bf; --accent:#ff5a1f; --accent-ink:#ffffff; --good:#1f7a4d;
+  --serif:"Instrument Serif",Georgia,serif; --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,monospace;
+  --wrap:1160px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#f1ece2; --ink-2:#d6d0c4; --muted:#9a9688; --paper:#111318; --paper-2:#181b22; --card:#1a1d24; --line:#2c3039; --accent:#ff6a33;
+  }
+}
+:root[data-theme="dark"]{ --ink:#f1ece2; --ink-2:#d6d0c4; --muted:#9a9688; --paper:#111318; --paper-2:#181b22; --card:#1a1d24; --line:#2c3039; --accent:#ff6a33; }
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 16px}
+@media(min-width:720px){.wrap{padding:0 32px}}
+.mono{font-family:var(--mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+/* nav */
+header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:600;font-size:19px;letter-spacing:-.01em}
+.nav-links{display:none;gap:28px;font-size:15px;color:var(--ink-2)}
+.nav-links a{text-decoration:none}
+.nav-links a:hover{color:var(--accent)}
+@media(min-width:820px){.nav-links{display:flex}}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:999px;font-weight:500;font-size:15px;text-decoration:none;border:1px solid var(--ink);transition:transform .15s ease,background .15s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-ghost{background:transparent}
+.btn-sm{padding:9px 16px;font-size:14px}
+
+/* hero */
+.hero{padding:56px 0 72px;border-bottom:1px solid var(--line)}
+.hero-grid{display:grid;gap:48px;align-items:center}
+@media(min-width:900px){.hero-grid{grid-template-columns:1.15fr .85fr}.hero{padding:96px 0 104px}}
+h1{font-family:var(--serif);font-weight:400;font-size:clamp(46px,8vw,92px);line-height:.98;letter-spacing:-.02em;margin:18px 0 22px}
+h1 em{color:var(--accent)}
+.lede{font-size:19px;color:var(--ink-2);max-width:34em}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+.trust{margin-top:28px;display:flex;flex-wrap:wrap;gap:8px 20px}
+.trust span::before{content:"●";color:var(--accent);margin-right:8px;font-size:9px;vertical-align:2px}
+
+/* clock */
+.clock-card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:28px;padding:28px;box-shadow:0 30px 60px -40px rgba(20,22,28,.35)}
+.clock{width:100%;max-width:360px;display:block;margin:0 auto}
+.clock .hand-h{transform-origin:150px 150px;animation:sweep 12s linear infinite}
+.clock .hand-m{transform-origin:150px 150px;animation:sweep 3s linear infinite}
+@keyframes sweep{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.clock .hand-h,.clock .hand-m{animation:none}}
+.ticker{display:grid;grid-template-columns:1fr auto;gap:10px 16px;margin-top:22px;padding-top:20px;border-top:1px dashed var(--line);font-size:15px}
+.ticker b{font-family:var(--mono);font-weight:500}
+.ticker .total{font-weight:600}
+.ticker b.total{color:var(--accent)}
+
+/* sections */
+section{padding:80px 0}
+@media(min-width:900px){section{padding:112px 0}}
+h2{font-family:var(--serif);font-weight:400;font-size:clamp(36px,5.4vw,60px);line-height:1.02;letter-spacing:-.015em;margin:14px 0 18px;max-width:16em}
+.sub{color:var(--ink-2);max-width:38em;font-size:18px}
+
+.leak{background:var(--ink);color:var(--paper)}
+.leak .mono{color:color-mix(in srgb,var(--paper) 60%,transparent)}
+.leak .sub{color:color-mix(in srgb,var(--paper) 78%,transparent)}
+.stats{display:grid;gap:1px;background:color-mix(in srgb,var(--paper) 18%,transparent);margin-top:48px;border-radius:20px;overflow:hidden}
+@media(min-width:760px){.stats{grid-template-columns:repeat(3,1fr)}}
+.stat{background:var(--ink);padding:30px}
+.stat .n{font-family:var(--serif);font-size:64px;line-height:1;color:var(--accent)}
+.stat p{margin-top:12px;color:color-mix(in srgb,var(--paper) 80%,transparent);font-size:16px}
+
+.features{display:grid;gap:16px;margin-top:52px}
+@media(min-width:760px){.features{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1040px){.features{grid-template-columns:repeat(3,1fr)}}
+.feature{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:10px}
+.feature .ico{width:44px;height:44px;border-radius:12px;background:var(--paper-2);display:grid;place-items:center;margin-bottom:8px}
+.feature h3{font-size:20px;font-weight:600;letter-spacing:-.01em}
+.feature p{color:var(--muted);font-size:16px}
+
+.steps{display:grid;gap:0;margin-top:52px;border-top:1px solid var(--line)}
+.step{display:grid;grid-template-columns:64px 1fr;gap:16px;padding:28px 0;border-bottom:1px solid var(--line)}
+@media(min-width:900px){.step{grid-template-columns:120px 1fr 1.2fr;align-items:baseline}}
+.step .k{font-family:var(--serif);font-size:44px;line-height:1;color:var(--accent)}
+.step h3{font-size:22px;font-weight:600}
+.step p{color:var(--muted);grid-column:2}
+@media(min-width:900px){.step p{grid-column:auto}}
+
+.for{background:var(--paper-2)}
+.tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:36px}
+.tag{border:1px solid var(--ink);border-radius:999px;padding:10px 18px;font-size:15px}
+
+.faq{margin-top:44px;border-top:1px solid var(--line)}
+details{border-bottom:1px solid var(--line);padding:22px 0}
+summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:20px;font-size:19px;font-weight:500}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--mono);color:var(--accent);font-size:22px;line-height:1}
+details[open] summary::after{content:"–"}
+details p{margin-top:12px;color:var(--muted);max-width:44em}
+
+.final{text-align:center;border-top:1px solid var(--line)}
+.final h2{margin-left:auto;margin-right:auto}
+.final .sub{margin:0 auto}
+.final .cta-row{justify-content:center}
+
+footer{border-top:1px solid var(--line);padding:36px 0 48px;font-size:14px;color:var(--muted)}
+.foot{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center}
+.foot a{text-decoration:none}
+.foot a:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="/" aria-label="Hourhand home">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M16 16V8.5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M16 16l6 3.5" stroke="#ff5a1f" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="16" r="2" fill="#ff5a1f"/></svg>
+      Hourhand
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="btn btn-primary btn-sm" href="#access">Get early access</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <div class="mono">Time tracking for agencies · Early access</div>
+        <h1>Every hour your team works, <em>billed.</em></h1>
+        <p class="lede">Hourhand tracks time across clients and projects, turns approved hours into GST-ready invoices, and shows you which accounts make money and which quietly eat your margin.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://wa.me/917845667204?text=Hi%2C%20I%27d%20like%20early%20access%20to%20Hourhand" target="_blank" rel="noopener">Request access on WhatsApp</a>
+          <a class="btn btn-ghost" href="#how">See how it works</a>
+        </div>
+        <div class="trust mono">
+          <span>INR + 18% GST</span><span>WhatsApp reminders</span><span>India &amp; UK teams</span>
+        </div>
+      </div>
+      <div class="clock-card" aria-hidden="true">
+        <svg class="clock" viewBox="0 0 300 300">
+          <circle cx="150" cy="150" r="138" fill="none" stroke="var(--line)" stroke-width="2"/>
+          <g stroke="var(--ink)" stroke-width="3" stroke-linecap="round">
+            <path d="M150 22v16"/><path d="M278 150h-16"/><path d="M150 278v-16"/><path d="M22 150h16"/>
+          </g>
+          <g stroke="var(--muted)" stroke-width="2" stroke-linecap="round">
+            <path d="M214 39l-5 9"/><path d="M261 86l-9 5"/><path d="M261 214l-9-5"/><path d="M214 261l-5-9"/><path d="M86 261l5-9"/><path d="M39 214l9-5"/><path d="M39 86l9 5"/><path d="M86 39l5 9"/>
+          </g>
+          <path d="M150 150 L150 12 A138 138 0 0 1 269.5 81 Z" fill="var(--accent)" opacity=".12"/>
+          <line class="hand-m" x1="150" y1="150" x2="150" y2="44" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>
+          <line class="hand-h" x1="150" y1="150" x2="150" y2="78" stroke="var(--accent)" stroke-width="8" stroke-linecap="round"/>
+          <circle cx="150" cy="150" r="9" fill="var(--accent)"/>
+        </svg>
+        <div class="ticker">
+          <span>Brand refresh · Client A</span><b>06:30</b>
+          <span>Meta Ads · Client B</span><b>03:15</b>
+          <span>Internal / non-billable</span><b>01:45</b>
+          <span class="total">Billable this week</span><b class="total">₹74,250</b>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="leak">
+    <div class="wrap">
+      <div class="mono">The leak</div>
+      <h2>Unlogged time is revenue you already earned and never invoiced.</h2>
+      <p class="sub">Most service teams reconstruct timesheets from memory on Friday evening. Hours go missing, retainers overrun without anyone noticing, and pricing is set on gut feel.</p>
+      <div class="stats">
+        <div class="stat"><div class="n">Same day</div><p>Timesheets filled while the work is fresh, not rebuilt from memory at the end of the week.</p></div>
+        <div class="stat"><div class="n">0</div><p>Friday-evening timesheet chases. Hourhand nudges people daily on WhatsApp instead.</p></div>
+        <div class="stat"><div class="n">1 view</div><p>Hours, cost and invoice value per client, side by side, so margin is a number, not a guess.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="mono">What it does</div>
+      <h2>From the first minute to the paid invoice.</h2>
+      <div class="features">
+        <article class="feature">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg></div>
+          <h3>One-tap timer</h3>
+          <p>Start, switch and stop timers by client and project from desktop or phone. Forgot to start one? Add the block afterwards in seconds.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12z"/></svg></div>
+          <h3>WhatsApp nudges</h3>
+          <p>Anyone with a missing day gets a reminder at 6 pm and can reply with their hours. Managers see who is behind without chasing.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
+          <h3>GST-ready invoices</h3>
+          <p>Approved billable hours become invoices in INR with 18% GST shown separately, or in GBP for UK clients. Export to your accountant in one click.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+          <h3>Client profitability</h3>
+          <p>Hours spent against what each retainer pays, with team cost per hour applied. See which accounts to reprice before renewal.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 3v9h9"/></svg></div>
+          <h3>Retainer burn alerts</h3>
+          <p>Set the hours a retainer covers. Hourhand warns the account lead at 80% and 100%, before the overrun becomes free work.</p>
+        </article>
+        <article class="feature">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></svg></div>
+          <h3>Utilisation by person</h3>
+          <p>Billable versus non-billable time for each team member and department, week by week, with approvals built in.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" style="padding-top:0">
+    <div class="wrap">
+      <div class="mono">How it works</div>
+      <h2>Live in a day, not a quarter.</h2>
+      <div class="steps">
+        <div class="step"><div class="k">01</div><h3>We set up your workspace</h3><p>Send us your client and project list. We import it, set billing rates and retainers, and invite your team.</p></div>
+        <div class="step"><div class="k">02</div><h3>Your team logs time</h3><p>Timers on web and mobile, plus a daily WhatsApp nudge for anyone who forgets. Managers approve weekly.</p></div>
+        <div class="step"><div class="k">03</div><h3>You invoice and reprice</h3><p>Approved hours turn into invoices, and the profitability view tells you which clients to keep, grow or reprice.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="for">
+    <div class="wrap">
+      <div class="mono">Built for</div>
+      <h2>Teams that sell their time.</h2>
+      <p class="sub">If your revenue depends on hours worked, retainers delivered or projects scoped, Hourhand is built for you.</p>
+      <div class="tags">
+        <span class="tag">Digital &amp; creative agencies</span><span class="tag">Performance marketing teams</span><span class="tag">Software &amp; IT services</span><span class="tag">Consultancies</span><span class="tag">Architecture &amp; design studios</span><span class="tag">PR &amp; events firms</span><span class="tag">Freelance collectives</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <div class="mono">Questions</div>
+      <h2>Good to know.</h2>
+      <div class="faq">
+        <details><summary>Who is Hourhand for?</summary><p>Agencies, studios, consultancies and IT service teams of 5 to 200 people who bill clients by the hour or on retainers and need to know where time goes.</p></details>
+        <details><summary>Does Hourhand handle GST invoicing?</summary><p>Yes. Approved billable hours turn into invoices in INR with 18% GST shown separately, or in GBP and other currencies for clients outside India.</p></details>
+        <details><summary>Can my team log time from WhatsApp?</summary><p>Yes. Hourhand sends a daily WhatsApp nudge to anyone with a missing timesheet, and they can reply to log hours without opening the app.</p></details>
+        <details><summary>How do I get access?</summary><p>Hourhand is in early access. Message us on WhatsApp or email and we will set up your workspace and import your clients and projects.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section id="access" class="final">
+    <div class="wrap">
+      <div class="mono">Early access</div>
+      <h2>Stop guessing where the hours went.</h2>
+      <p class="sub">We are onboarding a small group of agencies and service teams. Tell us your team size and we will set you up.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://wa.me/917845667204?text=Hi%2C%20I%27d%20like%20early%20access%20to%20Hourhand.%20Team%20size%3A%20" target="_blank" rel="noopener">WhatsApp +91 78456 67204</a>
+        <a class="btn btn-ghost" href="mailto:Yuvarajgs@marvice.in?subject=Hourhand%20early%20access">Email Yuvarajgs@marvice.in</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>© 2026 Hourhand · A product of Marvice Media Private Limited, Bengaluru</span>
+    <span><a href="mailto:Yuvarajgs@marvice.in">Yuvarajgs@marvice.in</a> · <a href="tel:+917845667204">+91 78456 67204</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
