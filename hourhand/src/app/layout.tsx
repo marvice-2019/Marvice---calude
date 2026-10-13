@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -12,7 +12,10 @@ export const metadata: Metadata = {
   title: "Hourhand",
   description: "Share one link and let people book a time that suits you both.",
   openGraph: { siteName: "Hourhand", type: "website" },
+  icons: { apple: "/icons/180" },
 };
+
+export const viewport: Viewport = { themeColor: "#b4410e" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
