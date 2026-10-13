@@ -1,8 +1,0 @@
-node_modules/
-.next/
-next-env.d.ts
-*.tsbuildinfo
-.env*
-!.env.example
-.scratch/
-e2e/.out/

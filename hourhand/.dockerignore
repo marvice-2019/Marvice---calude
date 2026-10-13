@@ -1,7 +1,0 @@
-node_modules
-.next
-.scratch
-.env*
-*.tsbuildinfo
-next-env.d.ts
-npm-debug.log*
