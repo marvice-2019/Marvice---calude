@@ -354,6 +354,8 @@ Check after go-live: book on your own page with your phone and the WhatsApp tick
 
 ## 6. Microsoft Entra (for B6: Outlook, Teams links, Sign in with Microsoft)
 
+Done 2026-10-13: the Entra app is registered and `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` are set in Coolify for production. The client secret expires in 24 months; renew it a month before.
+
 1. [entra.microsoft.com](https://entra.microsoft.com) → App registrations → New registration. Name `Hourhand`. Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**.
 2. Redirect URI, platform **Web**: `https://hourhand.cloud/api/auth/callback/microsoft`. Then Authentication → add `https://hourhand.cloud/api/calendars/microsoft/callback`, plus `http://localhost:3000/...` versions of both for development.
 3. API permissions → Microsoft Graph → Delegated: `openid`, `email`, `offline_access`, `User.Read`, `Calendars.ReadWrite`. No admin consent needed for these.
