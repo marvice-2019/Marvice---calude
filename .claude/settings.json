@@ -56,5 +56,8 @@
   },
   "env": {
     "TOKEN_QUOTA_DAILY": "5000000"
-  }
+  },
+  "enabledMcpjsonServers": [
+    "coolify"
+  ]
 }
