@@ -1,0 +1,16 @@
+/* Marvice brand: ink #2D3837, copper #BD8B53. Overrides Studio's green accent. */
+:root, :root[data-theme] {
+  --color-accent: light-dark(#a8743c, #d4a46e);
+  --color-accent-hover: light-dark(#8f612f, #e0b583);
+  --color-accent-ink: light-dark(#8a5c2c, #dcae7a);
+  --color-on-accent: light-dark(#ffffff, #2d3837);
+  --color-brand-gradient-from: #bd8b53;
+  --color-brand-gradient-to: #d9b07c;
+}
+/* Swap the HeyGen HyperFrames wordmark for the Marvice logo + "Editor Studio". */
+/* ...and drop the project-name label next to it ("| studio"). */
+svg[aria-label="Hyperframes"], svg[aria-label="Hyperframes"] ~ span { display: none; }
+.marvice-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.marvice-brand i { display: block; width: 94px; height: 28px; background: var(--marvice-logo) left center / contain no-repeat; }
+.marvice-brand span { font: 600 11px/1 system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #bd8b53; border-left: 1px solid var(--color-border-strong); padding-left: 10px; white-space: nowrap; }
+:root:not([data-theme="paper"]) .marvice-brand i { filter: invert(1) hue-rotate(180deg) brightness(1.15); }

@@ -2,9 +2,16 @@
 	basic_auth {
 		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
 	}
+	# Home page: Marvice Studio (prompt to video).
+	handle / {
+		rewrite * /create
+		reverse_proxy creator:4000
+	}
 	handle /create* {
 		reverse_proxy creator:4000
 	}
+	# Everything else is the HyperFrames editor (opened at /editor; its app,
+	# assets and API use absolute paths, so any other path serves it).
 	handle {
 		reverse_proxy studio:3002
 	}

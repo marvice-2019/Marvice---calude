@@ -52,17 +52,31 @@
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
   .actions a, .actions button { background: transparent; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 14px; text-decoration: none; cursor: pointer; }
   .actions a:hover, .actions button:hover { border-color: var(--accent); }
-  @media (max-width: 760px) { .sizes { grid-template-columns: repeat(2, 1fr); } .job { grid-template-columns: 1fr; } }
+  .brag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 28px; }
+  .brag div { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 12px; padding: 14px 16px; }
+  .brag b { display: block; font-size: 26px; line-height: 1.2; }
+  .brag span { display: block; font-weight: 600; margin-bottom: 4px; }
+  .brag-now { margin: 0 0 10px; font-weight: 600; color: var(--ok); }
+  .brag-now::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 50%; background: var(--ok); animation: pulse 1.4s ease-in-out infinite; }
+  .brag.live div { border-top-color: var(--ok); }
+  .brag.live b { font-size: 19px; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .brag-now::before { animation: none; } }
+  .brag small { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+  @media (max-width: 760px) { .brag, .sizes { grid-template-columns: repeat(2, 1fr); } .job { grid-template-columns: 1fr; } }
   @media (max-width: 480px) { header { padding: 12px 16px; } .brand img { height: 32px; } .brand { gap: 10px; } .brand span { padding-left: 10px; font-size: 13px; } .wide { display: none; } .narrow { display: inline; } }
 </style>
 </head>
 <body>
-<header><div class="brand"><img src="/create/assets/marvice-logo.svg" alt="Marvice"><span>Studio</span></div><a href="/"><span class="wide">Open video editor →</span><span class="narrow">Editor →</span></a></header>
+<header><div class="brand"><img src="/create/assets/marvice-logo.svg" alt="Marvice"><span>Studio</span></div><a href="/editor#project/studio"><span class="wide">Open video editor →</span><span class="narrow">Editor →</span></a></header>
 <main>
   <h1>Type it. Get a video.</h1>
   <p class="sub">Describe the video. AI writes it, optionally films AI footage for it, and renders an MP4 you can download or keep editing in the video editor.</p>
 
-  <div id="setup" class="note" hidden>No AI is connected yet. Add an API key in Coolify (hyperframes-studio → Environment Variables: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GEMINI_API_KEY</code> or <code>OPENROUTER_API_KEY</code> + <code>OPENROUTER_MODEL</code>), then redeploy.</div>
+  <p class="brag-now" id="brag-now" role="status" hidden></p>
+  <section class="brag" id="brag" aria-label="What Marvice Studio can do"></section>
+
+  <div id="setup" class="note" hidden>No AI writer is connected yet. In Coolify (hyperframes-studio → Environment Variables) add at least one key — <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GEMINI_API_KEY</code>, <code>XAI_API_KEY</code>, <code>DEEPSEEK_API_KEY</code>, <code>MISTRAL_API_KEY</code> or <code>OPENROUTER_API_KEY</code> + <code>OPENROUTER_MODEL</code> — then redeploy. Greyed-out choices below show which key each one needs.</div>
 
   <form id="form">
     <label class="label" for="prompt">What should the video show?</label>
@@ -102,17 +116,25 @@ function pressGroup(container, value, attr) {
 }
 
 async function init() {
-  const opts = await api("options");
+  opts = await api("options");
   sizes = opts.sizes;
+  const names = (list) => list.map((p) => p.label).join(" · ");
+  const models = (list) => list.reduce((n, p) => n + (p.models?.length || 1), 0);
+  bragDefault = [
+    [models(opts.providers.text), "AI writers", names(opts.providers.text)],
+    [models(opts.providers.footage), "AI video models", names(opts.providers.footage)],
+    [Object.keys(sizes).length, "Sizes", Object.values(sizes).map((s) => s.label).join(" · ")],
+    [`${Math.min(...opts.durations)}–${Math.max(...opts.durations)}`, "Seconds long", "MP4 to download, or open it in the video editor and keep editing"],
+  ];
+  showcase(null);
   $("sizes").innerHTML = Object.entries(sizes).map(([id, s]) => {
     const k = 40 / Math.max(s.width, s.height);
     return `<button type="button" class="size" data-size="${id}"><span class="shape"><i style="width:${s.width * k}px;height:${s.height * k}px"></i></span><span>${s.label}<small>${s.width}×${s.height}</small></span></button>`;
   }).join("");
   $("durations").innerHTML = opts.durations.map((d) => `<button type="button" class="chip" data-duration="${d}">${d}s</button>`).join("");
-  $("text").innerHTML = opts.providers.text.map((p) => `<option value="${p.id}">${p.label} · ${p.model}</option>`).join("");
-  $("footage").innerHTML = `<option value="">None (motion graphics only)</option>` +
-    opts.providers.footage.map((p) => `<option value="${p.id}">${p.label}</option>`).join("");
-  if (!opts.providers.text.length) { $("setup").hidden = false; $("go").disabled = true; }
+  $("text").innerHTML = modelOptions(opts.providers.text);
+  $("footage").innerHTML = `<option value="">None (motion graphics only)</option>` + modelOptions(opts.providers.footage, true);
+  if (!opts.providers.text.some((p) => p.enabled)) { $("setup").hidden = false; $("go").disabled = true; }
   pressGroup($("sizes"), state.size, "size");
   pressGroup($("durations"), state.duration, "duration");
   $("sizes").onclick = (e) => { const b = e.target.closest("[data-size]"); if (b) { state.size = b.dataset.size; pressGroup($("sizes"), state.size, "size"); } };
@@ -120,12 +142,25 @@ async function init() {
   refresh();
 }
 
+// One <optgroup> per provider; providers without a key are listed but disabled.
+function modelOptions(providers, showLength) {
+  const ready = providers.filter((p) => p.enabled), locked = providers.filter((p) => !p.enabled);
+  return [...ready, ...locked].map((p) => {
+    const label = p.enabled ? p.label : `${p.label} — add ${p.needs}`;
+    const models = p.models.length ? p.models : [{ id: "", label: "set the model name" }];
+    return `<optgroup label="${esc(label)}">` + models.map((m) =>
+      `<option value="${esc(p.id)}::${esc(m.id)}"${p.enabled ? "" : " disabled"}>${esc(m.label)}${showLength && m.clipSeconds ? ` · ${m.clipSeconds}s clips` : ""}</option>`).join("") + `</optgroup>`;
+  }).join("");
+}
+const pick = (id) => { const [provider = "", model = ""] = $(id).value.split("::"); return { provider, model }; };
+
 $("form").onsubmit = async (e) => {
   e.preventDefault();
   $("err").textContent = "";
   $("go").disabled = true;
   try {
-    await api("jobs", { method: "POST", body: JSON.stringify({ prompt: $("prompt").value, size: state.size, duration: state.duration, text: $("text").value, footage: $("footage").value }) });
+    const text = pick("text"), footage = pick("footage");
+    await api("jobs", { method: "POST", body: JSON.stringify({ prompt: $("prompt").value, size: state.size, duration: state.duration, text: text.provider, model: text.model, footage: footage.provider, footageModel: footage.model }) });
     $("prompt").value = "";
     refresh();
   } catch (err) { $("err").textContent = err.message; }
@@ -134,13 +169,42 @@ $("form").onsubmit = async (e) => {
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// The showcase lists what the studio offers; while a video is being made it shows that job's choices instead.
+let opts, bragDefault;
+const modelLabel = (providers, providerId, modelId) => {
+  const p = providers.find((x) => x.id === providerId);
+  return [p?.models?.find((m) => m.id === modelId)?.label || modelId, p?.label || providerId];
+};
+function showcase(job) {
+  let cards = bragDefault;
+  if (job) {
+    const s = sizes[job.size] || { label: job.size };
+    const [writer, writerBy] = modelLabel(opts.providers.text, job.text, job.model);
+    const clips = job.clipSeconds ? Math.min(3, Math.ceil(job.duration / job.clipSeconds)) : 0;
+    const [film, filmBy] = job.footage ? modelLabel(opts.providers.footage, job.footage, job.footageModel) : ["None", ""];
+    cards = [
+      [writer, "AI writer", writerBy],
+      [film, "AI footage", job.footage ? `${filmBy} · ${clips} clip${clips === 1 ? "" : "s"} of ${job.clipSeconds}s` : "Motion graphics only"],
+      [s.label, "Size", s.width ? `${s.width}×${s.height}` : ""],
+      [`${job.duration}s`, "Length", `Step: ${STEPS[job.status] || job.status}`],
+    ];
+  }
+  $("brag").innerHTML = cards.map(([big, label, detail]) => `<div><b>${esc(big)}</b><span>${esc(label)}</span><small>${esc(detail)}</small></div>`).join("");
+  $("brag").classList.toggle("live", !!job);
+  $("brag").setAttribute("aria-label", job ? "The video being made now" : "What Marvice Studio can do");
+  $("brag-now").hidden = !job;
+  if (job) $("brag-now").textContent = `Making now: ${STEPS[job.status] || job.status} — "${job.prompt.slice(0, 80)}${job.prompt.length > 80 ? "…" : ""}"`;
+}
+
 let timer;
 async function refresh() {
   clearTimeout(timer);
   const jobs = await api("jobs").catch(() => null);
   if (!jobs) return;
   if (jobs.length) $("jobs").innerHTML = jobs.map(render).join("");
-  if (jobs.some((j) => j.status !== "done" && j.status !== "failed")) timer = setTimeout(refresh, 4000);
+  const active = jobs.filter((j) => j.status !== "done" && j.status !== "failed");
+  showcase(active.find((j) => j.status !== "queued") || active[0] || null);
+  if (active.length) timer = setTimeout(refresh, 4000);
 }
 
 function render(j) {
@@ -155,7 +219,7 @@ function render(j) {
       <button type="button" data-studio="${j.id}">Open in editor</button></div>` : "";
   return `<article class="job">${media}<div>
     <span class="status ${j.status}">${STEPS[j.status] || j.status}</span>
-    <span class="meta"> · ${esc(s.label)} · ${j.duration}s · ${esc(j.model)}${j.footage ? " · AI footage" : ""}</span>
+    <span class="meta"> · ${esc(s.label)} · ${j.duration}s · ${esc(j.model)}${j.footage ? ` · ${esc(j.footageModel || j.footage)}` : ""}</span>
     <p class="prompt">${esc(j.prompt)}</p>
     <div class="log">${esc(j.error || last)}</div>${actions}</div></article>`;
 }
@@ -164,7 +228,7 @@ $("jobs").onclick = async (e) => {
   const id = e.target.dataset.studio;
   if (!id) return;
   if (!confirm("Replace the project currently open in the video editor with this video? A backup of the current project is kept.")) return;
-  try { await api(`jobs/${id}/studio`, { method: "POST" }); location.href = "/"; }
+  try { await api(`jobs/${id}/studio`, { method: "POST" }); location.href = "/editor#project/studio"; }
   catch (err) { alert(err.message); }
 };
 

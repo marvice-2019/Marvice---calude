@@ -1,0 +1,2 @@
+Type it. Get a video.
+Marvice Studio turns one sentence into a finished MP4: pick a size (reel, landscape, square, portrait), a length (8 to 60 seconds), let Claude, OpenAI or Gemini write it and Veo or Sora film it. This 20-second clip was rendered by the same engine. video.marvice.tech/create

@@ -54,12 +54,12 @@ export function compositionRequest({ prompt, size, duration, clips }) {
 }
 
 export const FOOTAGE_SYSTEM = `You plan b-roll for short videos. Given a video request, write cinematic text-to-video prompts, one per shot.
-Each prompt describes one continuous 8-second shot: subject, action, setting, camera movement, lighting and style. No on-screen text, captions, logos or real people's names.
+Each prompt describes one continuous shot of the length given in the request: subject, action, setting, camera movement, lighting and style. No on-screen text, captions, logos or real people's names.
 Return ONLY JSON: {"shots": ["prompt 1", "prompt 2"]}`;
 
-export function footageRequest({ prompt, size, shots }) {
+export function footageRequest({ prompt, size, shots, clipSeconds }) {
   const s = SIZES[size];
-  return `Video request: ${prompt}\nFormat: ${s.label}.\nWrite exactly ${shots} shot prompt(s).`;
+  return `Video request: ${prompt}\nFormat: ${s.label}.\nShot length: ${clipSeconds} seconds.\nWrite exactly ${shots} shot prompt(s).`;
 }
 
 export function repairRequest(html, findings) {

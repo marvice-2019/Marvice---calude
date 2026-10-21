@@ -1,0 +1,38 @@
+# Coolify "Docker Compose" resource for https://aivideo.marvice.tech
+# In Coolify: give ONLY the `auth` service a domain (https://aivideo.marvice.tech:8080)
+# and set BASIC_AUTH_USER / BASIC_AUTH_PASSWORD in Environment Variables (see README).
+services:
+  openmontage:
+    build:
+      context: .
+      args:
+        OPENMONTAGE_REF: ${OPENMONTAGE_REF:-9327439db69021ab4b0e2776729bf3b58fdb5a87}
+    restart: unless-stopped
+    # Provider keys are optional; each one unlocks its tools (see README).
+    environment:
+      FAL_KEY: ${FAL_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      PIXABAY_API_KEY: ${PIXABAY_API_KEY:-}
+    volumes:
+      - openmontage-projects:/data/projects
+      - openmontage-home:/home/openmontage
+    shm_size: "1gb"
+
+  # Backlot has no login of its own, so it is only reachable through this gate.
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    restart: unless-stopped
+    environment:
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:-admin}
+      BASIC_AUTH_PASSWORD: ${BASIC_AUTH_PASSWORD:?set BASIC_AUTH_PASSWORD}
+    depends_on:
+      - openmontage
+
+volumes:
+  openmontage-projects:
+  openmontage-home:
