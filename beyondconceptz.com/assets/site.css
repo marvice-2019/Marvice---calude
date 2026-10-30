@@ -485,3 +485,14 @@ html,body{overflow-x:clip}
 .pop-x{z-index:3}
 @media (max-width:640px){.stamp.in-pop{right:auto;left:-8px;top:-52px;width:92px;height:92px}.pop{margin-top:max(64px,10vh)}}
 .pop h2:focus{outline:none}
+
+/* WhatsApp doorway: the logo's arch, traced in gold like the photographs */
+.wa-float{right:28px;bottom:28px;width:58px;height:72px;min-height:0;padding:0;justify-content:center;align-items:center;border-radius:999px 999px 2px 2px;background:var(--olive);outline:1px solid var(--zari);outline-offset:4px;box-shadow:0 14px 34px rgba(31,36,32,.22);transition:background .3s var(--ease),transform .3s var(--ease)}
+.wa-float::before{content:none}
+.wa-float:hover{background:var(--olive-deep);transform:translateY(-2px)}
+.wa-float:focus-visible{outline:2px solid var(--oxide);outline-offset:4px}
+.wa-ico{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round;flex:none}
+.wa-float .wa-ico{width:27px;height:27px;margin-top:6px}
+.wa-tip{position:absolute;right:calc(100% + 16px);top:50%;transform:translate(8px,-50%);white-space:nowrap;background:var(--ground);color:var(--ink);font:500 .9rem var(--f-body);padding:.6rem .95rem;border:1px solid var(--stone);opacity:0;pointer-events:none;transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.wa-float:hover .wa-tip,.wa-float:focus-visible .wa-tip{opacity:1;transform:translate(0,-50%)}
+.callbar .c2 .wa-ico{width:20px;height:20px;margin-right:.55rem}

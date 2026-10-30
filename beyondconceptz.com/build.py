@@ -93,10 +93,10 @@ POPUP = """<dialog class="pop" id="pop" aria-labelledby="pop-h">
     <p class="q-err" id="p-err" aria-live="polite"></p>
   </form>
 </dialog>
-<a class="wa-float" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp us</a>
+<a class="wa-float" href="https://wa.me/919600029991" target="_blank" rel="noopener" aria-label="Chat on WhatsApp"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M8.6 7.6c.3-.3.8-.3 1 0l1.2 1.6c.2.3.2.7-.1 1l-.7.7c.6 1.3 1.6 2.3 2.9 2.9l.7-.7c.3-.3.7-.3 1-.1l1.6 1.2c.3.2.3.7 0 1l-.8.8c-.6.6-1.6.8-2.4.4-2.2-1-4-2.8-5-5-.4-.8-.2-1.8.4-2.4z"/></svg><span class="wa-tip">Chat on WhatsApp</span></a>
 """
 
-CALLBAR = """<nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></nav>
+CALLBAR = """<nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M8.6 7.6c.3-.3.8-.3 1 0l1.2 1.6c.2.3.2.7-.1 1l-.7.7c.6 1.3 1.6 2.3 2.9 2.9l.7-.7c.3-.3.7-.3 1-.1l1.6 1.2c.3.2.3.7 0 1l-.8.8c-.6.6-1.6.8-2.4.4-2.2-1-4-2.8-5-5-.4-.8-.2-1.8.4-2.4z"/></svg>WhatsApp</a></nav>
 """
 
 
