@@ -16,9 +16,9 @@
 
 ## Pages
 - [Home](https://beyondconceptz.com/): Architects and turnkey home builders in Chennai. Plans, approvals, construction and interiors from one team, in Tamil Nadu, Bengaluru and Andhra Pradesh.
-- [About](https://beyondconceptz.com/about.html): Why Beyond Conceptz keeps design and construction in one team, and how we work with home owners across Tamil Nadu, Bengaluru and Andhra Pradesh.
-- [Services](https://beyondconceptz.com/services.html): Architecture and planning, approval drawings, turnkey house construction, interiors, renovation, and office and restaurant interiors, from a Chennai studio.
-- [Collections](https://beyondconceptz.com/collections.html): House construction cost in Chennai: ₹2,100 to ₹3,800 per sq.ft built-up across three written specifications, with a budget planner and stage-wise payments.
-- [Process](https://beyondconceptz.com/process.html): How we build your home in six steps, from a free site visit to handover, with payments tied to stages and photo and video updates from site.
-- [Projects](https://beyondconceptz.com/projects.html): Independent homes Beyond Conceptz is designing and building, including the Sampath Residence in Kanchipuram. Ask us for a site walkthrough.
-- [Contact](https://beyondconceptz.com/contact.html): Book a free site visit with Beyond Conceptz. Call or WhatsApp +91 96000 29991, or visit our studio at 224, Pathari Road, Thousand Lights, Chennai.
+- [About](https://beyondconceptz.com/about): Why Beyond Conceptz keeps design and construction in one team, and how we work with home owners across Tamil Nadu, Bengaluru and Andhra Pradesh.
+- [Services](https://beyondconceptz.com/services): Architecture and planning, approval drawings, turnkey house construction, interiors, renovation, and office and restaurant interiors, from a Chennai studio.
+- [Collections](https://beyondconceptz.com/collections): House construction cost in Chennai: ₹2,100 to ₹3,800 per sq.ft built-up across three written specifications, with a budget planner and stage-wise payments.
+- [Process](https://beyondconceptz.com/process): How we build your home in six steps, from a free site visit to handover, with payments tied to stages and photo and video updates from site.
+- [Projects](https://beyondconceptz.com/projects): Independent homes Beyond Conceptz is designing and building, including the Sampath Residence in Kanchipuram. Ask us for a site walkthrough.
+- [Contact](https://beyondconceptz.com/contact): Book a free site visit with Beyond Conceptz. Call or WhatsApp +91 96000 29991, or visit our studio at 224, Pathari Road, Thousand Lights, Chennai.

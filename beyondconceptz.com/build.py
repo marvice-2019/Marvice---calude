@@ -366,7 +366,13 @@ SERVICES = [
 
 
 def url(fname):
-    return SITE if fname == "index.html" else SITE + fname
+    return SITE if fname == "index.html" else SITE + fname[:-5]
+
+
+def clean_links(html):
+    """Live site uses extensionless URLs (/about); nginx serves about.html and 301s the old .html form."""
+    html = re.sub(r'href="index\.html(#[^"]*)?"', lambda m: f'href="/{m.group(1) or ""}"', html)
+    return re.sub(r'href="([a-z-]+)\.html(#[^"]*)?"', lambda m: f'href="/{m.group(1)}{m.group(2) or ""}"', html)
 
 
 BUSINESS = {
@@ -558,7 +564,8 @@ def build():
         for fname, _, title in PAGES:
             full = full_index or fname != "index.html"
             with open(os.path.join(d, fname), "w") as fh:
-                fh.write(fingerprint(page(fname, title, full)))
+                html = fingerprint(page(fname, title, full))
+                fh.write(clean_links(html) if out == "dist" else html)
     print("built", [p[0] for p in PAGES])
 
 
