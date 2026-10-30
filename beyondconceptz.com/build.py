@@ -27,12 +27,12 @@ PAGES = [  # file, nav label, <title>
     ("contact.html", "Contact", "Contact | Beyond Conceptz"),
 ]
 DESC = {
-    "index.html": "Beyond Conceptz designs and builds independent homes in Chennai and Kanchipuram: plans, approvals, construction and interiors from one team.",
-    "about.html": "Why Beyond Conceptz keeps design and construction in one team, and how we work with home owners in Chennai and Kanchipuram.",
+    "index.html": "Beyond Conceptz designs and builds independent homes across Tamil Nadu, Bengaluru and Andhra Pradesh: plans, approvals, construction and interiors from one team.",
+    "about.html": "Why Beyond Conceptz keeps design and construction in one team, and how we work with home owners across Tamil Nadu, Bengaluru and Andhra Pradesh.",
     "services.html": "Architecture and planning, approval drawings, turnkey construction, interiors, renovation and design-only services.",
     "collections.html": "Essential, Signature and Bespoke collections with their specifications, and a budget planner for your home.",
     "process.html": "Six steps from site visit to handover, stage-wise payments and video updates from site.",
-    "projects.html": "Homes Beyond Conceptz is designing and building in Chennai and Kanchipuram.",
+    "projects.html": "Homes Beyond Conceptz is designing and building across Tamil Nadu, Bengaluru and Andhra Pradesh.",
     "contact.html": "Book a free site visit with Beyond Conceptz. Tell us about your plot and we will call within one working day.",
 }
 
@@ -69,7 +69,7 @@ def header(current):
 
 FOOTER = """<footer>
   <div class="wrap f-top">
-    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, interiors and turnkey construction. Independent homes across Chennai and Kanchipuram, and office and restaurant interiors in Chennai.</p></div>
+    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, interiors and turnkey construction. Homes and commercial interiors across Tamil Nadu, Bengaluru and Andhra Pradesh, from our studio in Chennai.</p></div>
     <div><h2>Explore</h2><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li></ul></div>
     <div><h2>Contact</h2><ul><li><a href="tel:+919600029991">+91 96000 29991</a></li><li><a href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="mailto:beyondconceptz@gmail.com">beyondconceptz@gmail.com</a></li><li>224, Pathari Road, Thousand Lights, Chennai 600006</li><li><a href="https://www.instagram.com/beyond_conceptz/" target="_blank" rel="noopener">Instagram</a></li></ul></div>
   </div>
@@ -83,10 +83,10 @@ CALLBAR = """<nav class="callbar" aria-label="Quick contact"><a class="c1" href=
 
 SCHEMA = """<script type="application/ld+json">
 {"@context":"https://schema.org","@type":"GeneralContractor","name":"Beyond Conceptz",
-"description":"Architecture, interiors and turnkey construction for independent homes in Chennai and Kanchipuram, and office and restaurant interiors in Chennai.",
+"description":"Architecture, interiors and turnkey construction for independent homes and office and restaurant interiors across Tamil Nadu, Bengaluru and Andhra Pradesh, from a studio in Chennai.",
 "url":"https://beyondconceptz.com/","telephone":"+91-96000-29991","taxID":"33DUYPR3142B1ZI","founder":{"@type":"Person","name":"Md Khaleel"},"email":"beyondconceptz@gmail.com",
 "address":{"@type":"PostalAddress","streetAddress":"224, Pathari Road, Thousand Lights East","addressLocality":"Chennai","addressRegion":"Tamil Nadu","postalCode":"600006","addressCountry":"IN"},
-"areaServed":["Chennai","Kanchipuram","Chengalpattu"],
+"areaServed":[{"@type":"State","name":"Tamil Nadu"},{"@type":"City","name":"Bengaluru"},{"@type":"State","name":"Andhra Pradesh"}],
 "sameAs":["https://www.instagram.com/beyond_conceptz/","https://www.indiamart.com/beyond-conceptz-company/"]}
 </script>
 """
@@ -161,9 +161,9 @@ about_region = """<section class="sec" aria-labelledby="reg-h">
   <div class="wrap split">
     <figure class="rv"><div class="arch"><img src="img/hero.jpg" alt="A finished contemporary family home with a brick feature wall" width="1000" height="1239" loading="lazy"></div></figure>
     <div class="copy">
-      <h2 id="reg-h" class="rv">Built for Chennai's climate</h2>
-      <p class="rv">Deep overhangs against the afternoon sun, cross-ventilation through every room, waterproofing that holds through the north-east monsoon, and materials chosen for salt air near the coast.</p>
-      <p class="rv">We work across Chennai, Kanchipuram and the towns around them, so we know the soil, the local approval process and the trades who do the work well.</p>
+      <h2 id="reg-h" class="rv">Built for the climate it stands in</h2>
+      <p class="rv">Deep overhangs against the afternoon sun, cross-ventilation through every room, waterproofing that holds through the north-east monsoon, and materials chosen for salt air along the coast, from Chennai to Visakhapatnam, or for Bengaluru's long wet season.</p>
+      <p class="rv">We build across Tamil Nadu, Bengaluru and Andhra Pradesh, and we learn each site's soil, its local approval process and the trades who do the work well before the design is frozen.</p>
     </div>
   </div>
 </section>
@@ -241,7 +241,7 @@ def services_detail():
     <div class="values three">
       <div class="rv"><h3>Renovation and extensions</h3><p>Add a floor or rework an older home. We check the existing structure first and tell you plainly what it can carry.</p></div>
       <div class="rv"><h3>Design only</h3><p>Already have a contractor? We prepare your plans, elevation and approval drawings, and visit site at key stages.</p></div>
-      <div class="rv"><h3>Office and restaurant interiors</h3><p>Workspaces, cafés and restaurants in Chennai: layout, joinery, lighting and fit-out, delivered to a fixed schedule so you can open on time.</p></div>
+      <div class="rv"><h3>Office and restaurant interiors</h3><p>Workspaces, cafés and restaurants across Tamil Nadu, Bengaluru and Andhra Pradesh: layout, joinery, lighting and fit-out, delivered to a fixed schedule so you can open on time.</p></div>
     </div>
   </div>
 </section>
