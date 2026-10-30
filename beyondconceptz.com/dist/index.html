@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Marcellus&family=Montserrat:wght@400;700&display=swap">
-<link rel="stylesheet" href="assets/site.css?v=53148478bf">
+<link rel="stylesheet" href="assets/site.css?v=f6727885fe">
 <link rel="icon" href="assets/favicon.svg?v=cffe877d0d" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png?v=8d4efa4ea2" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=0b3c798bda">
@@ -62,10 +62,13 @@
         <div class="hero-copy">
           <h1 id="h1">Homes built exactly as drawn</h1>
           <p class="lede">Architects and builders of independent homes across Tamil Nadu, Bengaluru and Andhra Pradesh. One team carries your house from the first sketch to the day you receive the keys.</p>
-          <div class="actions">
-            <a class="btn" href="contact.html">Book a free site visit</a>
-            <a class="tlink" href="collections.html#planner">Estimate my budget</a>
-          </div>
+          <form class="quick" id="quick" novalidate aria-label="Book a free site visit">
+            <div class="q-field"><label for="q-name">Your name</label><input id="q-name" name="name" autocomplete="name" required></div>
+            <div class="q-field"><label for="q-phone">Mobile</label><input id="q-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required></div>
+            <button class="btn" type="submit">Book a free site visit</button>
+            <p class="q-err" id="q-err" aria-live="polite"></p>
+          </form>
+          <p class="q-alt">Opens WhatsApp with your details. Or <a class="tlink" href="collections.html#planner">estimate your budget</a> first.</p>
         </div>
         <div class="hero-pic">
           <div class="arch"><img src="img/hero.jpg?v=8699f28fc6" alt="A contemporary two-storey family home with a red brick wall, timber screen and coconut palm, in evening light" width="1000" height="1239" fetchpriority="high"></div>
@@ -89,7 +92,22 @@
         <p class="rv">We take on a limited number of homes at a time, so each one has an engineer's attention at every stage, and you always know who to call.</p>
       </div>
     </div>
-  </section><section class="sec" id="services" aria-labelledby="svc-h">
+  </section><section class="sec" aria-labelledby="cmp-h">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="cmp-h" class="rv">Your whole house, one contract</h2>
+        <p class="rv">Most interior companies start once a house is already built. We design and build the house itself, then finish it inside, so one team answers for all of it.</p>
+      </div>
+      <div class="cmp rv" role="table" aria-label="Interior-only firm compared with Beyond Conceptz">
+        <div class="cmp-row cmp-head" role="row"><span role="columnheader"></span><span role="columnheader">Interior-only firm</span><span role="columnheader">Beyond Conceptz</span></div>
+        <div class="cmp-row" role="row"><span role="rowheader">What is covered</span><span role="cell">Kitchen, wardrobes and furniture inside a finished shell</span><span role="cell">Plans, approvals, structure, construction and interiors</span></div>
+        <div class="cmp-row" role="row"><span role="rowheader">Who you deal with</span><span role="cell">An architect, a contractor and an interior firm, separately</span><span role="cell">One team, from the first sketch to the keys</span></div>
+        <div class="cmp-row" role="row"><span role="rowheader">How it is priced</span><span role="cell">Module by module, added up as you go</span><span role="cell">Per sq.ft, with every brand and grade in one agreement</span></div>
+        <div class="cmp-row" role="row"><span role="rowheader">When it is right</span><span role="cell">Your house or flat is already built</span><span role="cell">You have a plot, or a house to rebuild or extend</span></div>
+      </div>
+    </div>
+  </section>
+<section class="sec" id="services" aria-labelledby="svc-h">
     <div class="wrap">
       <div class="head">
         <h2 id="svc-h" class="rv">What we do for you</h2>
@@ -175,7 +193,7 @@
   <div class="f-base"><div class="wrap f-base-in"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>GSTIN 33DUYPR3142B1ZI</span><span>Website by Marvice Media</span></div></div>
 </footer>
 <nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></nav>
-<script src="assets/site.js?v=becc4e06d4"></script>
+<script src="assets/site.js?v=4c116e1a5b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="assets/model.js?v=d118c5a394"></script>

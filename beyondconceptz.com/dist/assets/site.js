@@ -96,6 +96,20 @@
   var em=$('email'),ce=$('copyEmail');
   if(em&&ce)ce.onclick=function(){copy(em.textContent,this,em)};
 
+  /* Hero quick enquiry: name and mobile, sent on WhatsApp */
+  var q=$('quick');
+  if(q){
+    q.addEventListener('submit',function(e){
+      e.preventDefault();
+      var n=q.elements['name'],ph=q.elements['phone'],name=n.value.trim(),phone=ph.value.replace(/[\s-]/g,'');
+      var ok=/^(\+?91)?[6-9]\d{9}$/.test(phone)||/^\+\d{8,15}$/.test(phone);
+      n.setAttribute('aria-invalid',name?'false':'true');ph.setAttribute('aria-invalid',ok?'false':'true');
+      $('q-err').textContent=!name?'Please enter your name.':!ok?'Enter a 10-digit mobile number, or an international number starting with +.':'';
+      if(!name){n.focus();return;}if(!ok){ph.focus();return;}
+      window.open('https://wa.me/919600029991?text='+encodeURIComponent('Site visit request\nName: '+name+'\nPhone: '+phone),'_blank','noopener');
+    });
+  }
+
   /* Enquiry form */
   var f=$('lead');
   if(f){

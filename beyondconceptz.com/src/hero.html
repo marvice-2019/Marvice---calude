@@ -4,10 +4,13 @@
         <div class="hero-copy">
           <h1 id="h1">Homes built exactly as drawn</h1>
           <p class="lede">Architects and builders of independent homes across Tamil Nadu, Bengaluru and Andhra Pradesh. One team carries your house from the first sketch to the day you receive the keys.</p>
-          <div class="actions">
-            <a class="btn" href="#contact">Book a free site visit</a>
-            <a class="tlink" href="#planner">Estimate my budget</a>
-          </div>
+          <form class="quick" id="quick" novalidate aria-label="Book a free site visit">
+            <div class="q-field"><label for="q-name">Your name</label><input id="q-name" name="name" autocomplete="name" required></div>
+            <div class="q-field"><label for="q-phone">Mobile</label><input id="q-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required></div>
+            <button class="btn" type="submit">Book a free site visit</button>
+            <p class="q-err" id="q-err" aria-live="polite"></p>
+          </form>
+          <p class="q-alt">Opens WhatsApp with your details. Or <a class="tlink" href="#planner">estimate your budget</a> first.</p>
         </div>
         <div class="hero-pic">
           <div class="arch"><img src="img/hero.jpg" alt="A contemporary two-storey family home with a red brick wall, timber screen and coconut palm, in evening light" width="1000" height="1239" fetchpriority="high"></div>

@@ -273,6 +273,7 @@ home_services = fix_links(part("services")).replace(
 BODY = {
     "index.html": fix_links(part("hero"))
     + fix_links(part("about"))
+    + part("compare")
     + home_services
     + part("model")
     + home_collections
