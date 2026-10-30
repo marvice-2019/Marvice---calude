@@ -445,3 +445,43 @@ html,body{overflow-x:clip}
   .cmp-head > span:first-child{display:none}
   .cmp-head > span{font-size:1.15rem;line-height:1.3}
 }
+
+/* Offer stamp: a seal on the hero arch, real included offers only */
+.hero-pic{position:relative}
+.stamp{position:absolute;z-index:2;left:-26px;bottom:42px;width:136px;height:136px;border-radius:50%;background:var(--oxide);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:18px;transform:rotate(-8deg);box-shadow:0 0 0 4px var(--ground),0 0 0 5px var(--zari);animation:stamp .7s var(--ease) 1.3s both}
+.stamp b{font-family:var(--f-head);font-weight:400;font-size:1.9rem;line-height:1}
+.stamp span{font-size:.74rem;line-height:1.25;margin-top:.35rem}
+@keyframes stamp{from{opacity:0;transform:rotate(-8deg) scale(.6)}to{opacity:1;transform:rotate(-8deg) scale(1)}}
+@media (max-width:860px){.stamp{left:auto;right:-6px;bottom:24px;width:112px;height:112px;padding:14px}.stamp b{font-size:1.55rem}.stamp span{font-size:.66rem}}
+
+/* Stats row: large figures on gold hairlines */
+.stats{list-style:none;margin:clamp(3.5rem,7vw,5.5rem) 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.8rem clamp(1.5rem,3.5vw,3rem)}
+.stats li{border-top:1px solid var(--zari);padding-top:1.1rem;display:grid;gap:.45rem;align-content:start}
+.stats b{font-family:var(--f-head);font-weight:400;font-size:clamp(1.9rem,2.9vw,2.6rem);line-height:1;color:var(--olive)}
+.stats span{font-size:.98rem;color:var(--ink-2);max-width:24ch}
+@media (max-width:860px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Pop-up enquiry */
+.pop{border:0;padding:clamp(1.8rem,4vw,2.8rem);max-width:min(520px,calc(100vw - 32px));width:100%;background:var(--ground);color:var(--ink);box-shadow:0 30px 80px rgba(31,36,32,.35);overflow:visible}
+.pop::backdrop{background:rgba(31,36,32,.55)}
+.pop[open]{animation:popin .45s var(--ease)}
+@keyframes popin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.pop h2{font-size:clamp(1.8rem,4vw,2.4rem);margin-top:.2rem;max-width:12ch}
+.pop > p{margin-top:.9rem;color:var(--ink-2)}
+.pop .quick{grid-template-columns:minmax(0,1fr);margin-top:1.4rem}
+.pop .quick .btn{width:100%}
+.pop-x{position:absolute;top:10px;right:10px}
+.pop-x button{min-height:44px;min-width:44px;background:none;border:0;font:500 .9rem var(--f-body);color:var(--ink-2);text-decoration:underline;text-decoration-color:var(--zari);text-underline-offset:.3em;cursor:pointer}
+.stamp.in-pop{position:absolute;left:auto;right:-30px;top:-46px;bottom:auto;width:104px;height:104px;padding:12px;animation:none}
+.stamp.in-pop b{font-size:1.4rem}.stamp.in-pop span{font-size:.6rem}
+
+/* Floating WhatsApp on desktop; phones use the call bar */
+.wa-float{position:fixed;right:24px;bottom:24px;z-index:54;display:inline-flex;align-items:center;min-height:50px;padding:0 1.3rem;background:var(--olive);color:var(--on-dark);font:500 .98rem var(--f-body);text-decoration:none;box-shadow:0 10px 30px rgba(31,36,32,.28);transition:background .3s var(--ease)}
+.wa-float:hover{background:var(--olive-deep)}
+.wa-float::before{content:"";width:10px;height:10px;border-radius:50%;background:#7FD18A;margin-right:.65rem;box-shadow:0 0 0 3px rgba(127,209,138,.25)}
+@media (max-width:760px){.wa-float{display:none}}
+/* The seal never takes a tap; Close always sits on top, and on phones the seal moves to the other corner */
+.stamp{pointer-events:none}
+.pop-x{z-index:3}
+@media (max-width:640px){.stamp.in-pop{right:auto;left:-8px;top:-52px;width:92px;height:92px}.pop{margin-top:max(64px,10vh)}}
+.pop h2:focus{outline:none}

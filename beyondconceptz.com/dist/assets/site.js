@@ -96,18 +96,37 @@
   var em=$('email'),ce=$('copyEmail');
   if(em&&ce)ce.onclick=function(){copy(em.textContent,this,em)};
 
-  /* Hero quick enquiry: name and mobile, sent on WhatsApp */
-  var q=$('quick');
-  if(q){
-    q.addEventListener('submit',function(e){
+  /* Short enquiry forms (hero and pop-up): name and mobile, sent on WhatsApp */
+  var store={get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},set:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+  function quickForm(form,errId){
+    if(!form)return;
+    form.addEventListener('submit',function(e){
       e.preventDefault();
-      var n=q.elements['name'],ph=q.elements['phone'],name=n.value.trim(),phone=ph.value.replace(/[\s-]/g,'');
+      var n=form.elements['name'],ph=form.elements['phone'],name=n.value.trim(),phone=ph.value.replace(/[\s-]/g,'');
       var ok=/^(\+?91)?[6-9]\d{9}$/.test(phone)||/^\+\d{8,15}$/.test(phone);
       n.setAttribute('aria-invalid',name?'false':'true');ph.setAttribute('aria-invalid',ok?'false':'true');
-      $('q-err').textContent=!name?'Please enter your name.':!ok?'Enter a 10-digit mobile number, or an international number starting with +.':'';
+      $(errId).textContent=!name?'Please enter your name.':!ok?'Enter a 10-digit mobile number, or an international number starting with +.':'';
       if(!name){n.focus();return;}if(!ok){ph.focus();return;}
+      store.set('bc-enquired','1');
       window.open('https://wa.me/919600029991?text='+encodeURIComponent('Site visit request\nName: '+name+'\nPhone: '+phone),'_blank','noopener');
+      var d=form.closest('dialog');if(d&&d.open)d.close();
     });
+  }
+  quickForm($('quick'),'q-err');
+  quickForm($('popForm'),'p-err');
+  var lead=$('lead');if(lead)lead.addEventListener('submit',function(){store.set('bc-enquired','1')});
+
+  /* Pop-up: once a week at most, never on the contact page, never after an enquiry */
+  var pop=$('pop');
+  if(pop&&pop.showModal&&!$('lead')){
+    var WEEK=7*864e5,last=+store.get('bc-pop')||0,shown=false;
+    var show=function(){
+      if(shown||store.get('bc-enquired')||Date.now()-last<WEEK||document.querySelector('dialog[open]'))return;
+      shown=true;store.set('bc-pop',String(Date.now()));pop.showModal();
+    };
+    setTimeout(show,25000);
+    if(matchMedia('(pointer:fine)').matches)document.addEventListener('mouseout',function(e){if(!e.relatedTarget&&e.clientY<=0)show();});
+    pop.addEventListener('click',function(e){if(e.target===pop)pop.close();});
   }
 
   /* Enquiry form */

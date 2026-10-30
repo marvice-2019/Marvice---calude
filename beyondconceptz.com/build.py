@@ -82,6 +82,20 @@ FOOTER = """<footer>
 </footer>
 """
 
+POPUP = """<dialog class="pop" id="pop" aria-labelledby="pop-h">
+  <form method="dialog" class="pop-x"><button aria-label="Close">Close</button></form>
+  <h2 id="pop-h" tabindex="-1" autofocus>Book a free site visit</h2>
+  <p>Tell us where your plot is and we will call within one working day. The visit and the first consultation cost nothing.</p>
+  <form class="quick" id="popForm" novalidate>
+    <div class="q-field"><label for="p-name">Your name</label><input id="p-name" name="name" autocomplete="name" required></div>
+    <div class="q-field"><label for="p-phone">Mobile</label><input id="p-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required></div>
+    <button class="btn" type="submit">Send on WhatsApp</button>
+    <p class="q-err" id="p-err" aria-live="polite"></p>
+  </form>
+</dialog>
+<a class="wa-float" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp us</a>
+"""
+
 CALLBAR = """<nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></nav>
 """
 
@@ -500,6 +514,7 @@ def page(fname, title, full):
         + "</main>\n"
         + FOOTER
         + CALLBAR
+        + POPUP
         + scripts
     )
     if full:

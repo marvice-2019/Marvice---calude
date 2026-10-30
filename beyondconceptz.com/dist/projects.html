@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Marcellus&family=Montserrat:wght@400;700&display=swap">
-<link rel="stylesheet" href="assets/site.css?v=f6727885fe">
+<link rel="stylesheet" href="assets/site.css?v=103c0982ab">
 <link rel="icon" href="assets/favicon.svg?v=cffe877d0d" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png?v=8d4efa4ea2" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=0b3c798bda">
@@ -104,6 +104,18 @@
   <div class="f-base"><div class="wrap f-base-in"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>GSTIN 33DUYPR3142B1ZI</span><span>Website by Marvice Media</span></div></div>
 </footer>
 <nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></nav>
-<script src="assets/site.js?v=4c116e1a5b"></script>
+<dialog class="pop" id="pop" aria-labelledby="pop-h">
+  <form method="dialog" class="pop-x"><button aria-label="Close">Close</button></form>
+  <h2 id="pop-h" tabindex="-1" autofocus>Book a free site visit</h2>
+  <p>Tell us where your plot is and we will call within one working day. The visit and the first consultation cost nothing.</p>
+  <form class="quick" id="popForm" novalidate>
+    <div class="q-field"><label for="p-name">Your name</label><input id="p-name" name="name" autocomplete="name" required></div>
+    <div class="q-field"><label for="p-phone">Mobile</label><input id="p-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required></div>
+    <button class="btn" type="submit">Send on WhatsApp</button>
+    <p class="q-err" id="p-err" aria-live="polite"></p>
+  </form>
+</dialog>
+<a class="wa-float" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp us</a>
+<script src="assets/site.js?v=3c372fda04"></script>
 </body>
 </html>
