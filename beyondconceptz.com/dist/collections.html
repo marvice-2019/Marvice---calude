@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Collections and pricing | Beyond Conceptz</title>
+<meta name="description" content="Essential, Signature and Bespoke collections with their specifications, and a budget planner for your home.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="mark" viewBox="0 0 256 370">
+      <g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="butt" stroke-linejoin="miter">
+        <path d="M60 296H8V122A120 120 0 0 1 248 122V364H214"/>
+        <path d="M72 186V92H118A47 47 0 0 1 118 186H72"/>
+        <path d="M72 186V364H186"/>
+        <path d="M96 186H120A55 55 0 0 1 120 296H96"/>
+      </g>
+    </symbol>
+    <symbol id="plus" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="check" viewBox="0 0 22 22"><path d="M4 11.5l4.5 4.5L18 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></symbol>
+  </defs>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="logo" href="index.html" aria-label="Beyond Conceptz, home">
+      <svg viewBox="0 0 256 370" aria-hidden="true"><use href="#mark"/></svg>
+      <span class="wm"><b>BEYOND</b><span>CONCEPTZ</span></span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav id="nav" aria-label="Main"><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html" aria-current="page">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li><li class="nav-contact"><a href="contact.html">Contact</a></li></ul></nav>
+    <a class="btn cta" href="contact.html">Book a site visit</a>
+  </div>
+</header>
+<main id="main">
+<section class="phero" aria-labelledby="ph-h">
+  <div class="wrap phero-grid">
+    <div><h1 id="ph-h">Collections and pricing</h1><p class="lede">Three written specifications and a planner that shows what your home will cost and how payments split across the build.</p></div>
+    
+  </div>
+</section>
+<section class="sec" id="collections" aria-labelledby="col-h">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="col-h" class="rv">Three collections, in writing</h2>
+        <p class="rv">Choose a collection to see what goes into the house. Your own estimate lists every brand, grade and quantity, and it becomes part of the agreement.</p>
+      </div>
+      <div class="tabs rv" role="tablist" aria-label="Collections" id="tabs">
+        <button role="tab" id="tab-0" aria-controls="tierPanel" data-t="0" aria-selected="false" tabindex="-1">Essential</button>
+        <button role="tab" id="tab-1" aria-controls="tierPanel" data-t="1" aria-selected="true">Signature</button>
+        <button role="tab" id="tab-2" aria-controls="tierPanel" data-t="2" aria-selected="false" tabindex="-1">Bespoke</button>
+      </div>
+      <div class="coll" id="tierPanel" role="tabpanel" aria-labelledby="tab-1">
+        <div>
+          <h3 class="tier-name" id="tName">Signature</h3>
+          <p class="tier-rate num" id="tRate">₹2,500 – 2,900 <span>per sq.ft built-up</span></p>
+          <p class="tier-desc" id="tDesc">Our most chosen home, with teak joinery, larger tiles and a fuller kitchen.</p>
+        </div>
+        <div>
+          <ul class="spec" id="specList"></ul>
+          <p class="note">Indicative rates and specification. Approval fees and government charges are listed separately in your estimate.</p>
+        </div>
+      </div>
+    </div>
+    <div class="planner" id="planner">
+      <div class="wrap planner-grid">
+        <div class="l">
+          <h2>What will it cost?</h2>
+          <p>Set the size and floors to see a realistic range, and how the payments split across the build.</p>
+          <div class="ctrl">
+            <div><div class="lab"><label for="area">Built-up area</label><output id="areaOut" for="area" class="num">2,000 sq.ft</output></div><input class="r" type="range" id="area" min="600" max="6000" step="50" value="2000"></div>
+            <div><div class="lab"><span id="flL">Floors</span></div>
+              <div class="opts" role="group" aria-labelledby="flL" id="floors"><button type="button" data-f="G" aria-pressed="false">Ground</button><button type="button" data-f="G+1" aria-pressed="true">G+1</button><button type="button" data-f="G+2" aria-pressed="false">G+2</button><button type="button" data-f="G+3" aria-pressed="false">G+3</button></div></div>
+            <div><div class="lab"><span id="coL">Collection</span></div>
+              <div class="opts" role="group" aria-labelledby="coL" id="tierPills"><button type="button" data-t="0" aria-pressed="false">Essential</button><button type="button" data-t="1" aria-pressed="true">Signature</button><button type="button" data-t="2" aria-pressed="false">Bespoke</button></div></div>
+          </div>
+        </div>
+        <div class="r" aria-live="polite">
+          <p class="est-k">Construction cost</p>
+          <p class="est-v num" id="range">₹50 – 58 lakh</p>
+          <p class="est-s" id="rangeSub">Signature, G+1, 2,000 sq.ft</p>
+          <ul class="sched num" id="sched" aria-label="Payment by stage"></ul>
+          <a class="btn light" href="contact.html">Get my itemised estimate</a>
+        </div>
+      </div>
+    </div>
+  </section><section class="cta-band" aria-labelledby="cta-h">
+  <div class="wrap cta-in">
+    <h2 id="cta-h">Tell us about your plot</h2>
+    <p>The first site visit and consultation are free. We call within one working day.</p>
+    <a class="btn light" href="contact.html">Book a free site visit <span class="arr" aria-hidden="true">→</span></a>
+  </div>
+</section>
+</main>
+<footer>
+  <div class="wrap f-top">
+    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, construction and interiors for independent homes in Chennai and Kanchipuram.</p></div>
+    <div><h2>Explore</h2><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li></ul></div>
+    <div><h2>Contact</h2><ul><li>beyondconceptz@gmail.com</li><li>Monday to Saturday</li><li><a href="contact.html">Book a site visit</a></li></ul></div>
+  </div>
+  <div class="wrap f-name" aria-hidden="true"><svg viewBox="0 0 256 370"><use href="#mark"/></svg><b>BEYOND CONCEPTZ</b></div>
+  <div class="f-base"><div class="wrap f-base-in"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>Website by Marvice Media</span></div></div>
+</footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

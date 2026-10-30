@@ -1,0 +1,46 @@
+<section class="sec" id="collections" aria-labelledby="col-h">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="col-h" class="rv">Three collections, in writing</h2>
+        <p class="rv">Choose a collection to see what goes into the house. Your own estimate lists every brand, grade and quantity, and it becomes part of the agreement.</p>
+      </div>
+      <div class="tabs rv" role="tablist" aria-label="Collections" id="tabs">
+        <button role="tab" id="tab-0" aria-controls="tierPanel" data-t="0" aria-selected="false" tabindex="-1">Essential</button>
+        <button role="tab" id="tab-1" aria-controls="tierPanel" data-t="1" aria-selected="true">Signature</button>
+        <button role="tab" id="tab-2" aria-controls="tierPanel" data-t="2" aria-selected="false" tabindex="-1">Bespoke</button>
+      </div>
+      <div class="coll" id="tierPanel" role="tabpanel" aria-labelledby="tab-1">
+        <div>
+          <h3 class="tier-name" id="tName">Signature</h3>
+          <p class="tier-rate num" id="tRate">₹2,500 – 2,900 <span>per sq.ft built-up</span></p>
+          <p class="tier-desc" id="tDesc">Our most chosen home, with teak joinery, larger tiles and a fuller kitchen.</p>
+        </div>
+        <div>
+          <ul class="spec" id="specList"></ul>
+          <p class="note">Indicative rates and specification. Approval fees and government charges are listed separately in your estimate.</p>
+        </div>
+      </div>
+    </div>
+    <div class="planner" id="planner">
+      <div class="wrap planner-grid">
+        <div class="l">
+          <h2>What will it cost?</h2>
+          <p>Set the size and floors to see a realistic range, and how the payments split across the build.</p>
+          <div class="ctrl">
+            <div><div class="lab"><label for="area">Built-up area</label><output id="areaOut" for="area" class="num">2,000 sq.ft</output></div><input class="r" type="range" id="area" min="600" max="6000" step="50" value="2000"></div>
+            <div><div class="lab"><span id="flL">Floors</span></div>
+              <div class="opts" role="group" aria-labelledby="flL" id="floors"><button type="button" data-f="G" aria-pressed="false">Ground</button><button type="button" data-f="G+1" aria-pressed="true">G+1</button><button type="button" data-f="G+2" aria-pressed="false">G+2</button><button type="button" data-f="G+3" aria-pressed="false">G+3</button></div></div>
+            <div><div class="lab"><span id="coL">Collection</span></div>
+              <div class="opts" role="group" aria-labelledby="coL" id="tierPills"><button type="button" data-t="0" aria-pressed="false">Essential</button><button type="button" data-t="1" aria-pressed="true">Signature</button><button type="button" data-t="2" aria-pressed="false">Bespoke</button></div></div>
+          </div>
+        </div>
+        <div class="r" aria-live="polite">
+          <p class="est-k">Construction cost</p>
+          <p class="est-v num" id="range">₹50 – 58 lakh</p>
+          <p class="est-s" id="rangeSub">Signature, G+1, 2,000 sq.ft</p>
+          <ul class="sched num" id="sched" aria-label="Payment by stage"></ul>
+          <a class="btn light" href="#contact">Get my itemised estimate</a>
+        </div>
+      </div>
+    </div>
+  </section>

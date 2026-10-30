@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Contact | Beyond Conceptz</title>
+<meta name="description" content="Book a free site visit with Beyond Conceptz. Tell us about your plot and we will call within one working day.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600&display=swap">
+<link rel="stylesheet" href="assets/site.css">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="mark" viewBox="0 0 256 370">
+      <g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="butt" stroke-linejoin="miter">
+        <path d="M60 296H8V122A120 120 0 0 1 248 122V364H214"/>
+        <path d="M72 186V92H118A47 47 0 0 1 118 186H72"/>
+        <path d="M72 186V364H186"/>
+        <path d="M96 186H120A55 55 0 0 1 120 296H96"/>
+      </g>
+    </symbol>
+    <symbol id="plus" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="check" viewBox="0 0 22 22"><path d="M4 11.5l4.5 4.5L18 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></symbol>
+  </defs>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="logo" href="index.html" aria-label="Beyond Conceptz, home">
+      <svg viewBox="0 0 256 370" aria-hidden="true"><use href="#mark"/></svg>
+      <span class="wm"><b>BEYOND</b><span>CONCEPTZ</span></span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav id="nav" aria-label="Main"><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li><li class="nav-contact"><a href="contact.html" aria-current="page">Contact</a></li></ul></nav>
+    <a class="btn cta" href="contact.html">Book a site visit</a>
+  </div>
+</header>
+<main id="main">
+<section class="contact first" id="contact" aria-labelledby="ct-h">
+    <div class="wrap c-grid">
+      <div class="side">
+        <h1 id="ct-h">Tell us about your plot</h1>
+        <p>Share a few details and we will call within one working day to fix a site visit. The first visit and consultation are free.</p>
+        <div class="reach">
+          <div><small>Email</small><b id="email">beyondconceptz@gmail.com</b><button type="button" class="copy-btn" id="copyEmail">Copy address</button></div>
+          <div><small>We build in</small><b>Chennai and Kanchipuram</b></div>
+          <div><small>Site visits</small><b>Monday to Saturday</b></div>
+        </div>
+      </div>
+      <div class="formcard">
+        <form id="lead" novalidate>
+          <div class="field"><label for="f-name">Your name</label><input id="f-name" name="name" autocomplete="name" required aria-describedby="e-name"><span class="err" id="e-name"></span></div>
+          <div class="field"><label for="f-phone">Mobile or WhatsApp</label><input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required aria-describedby="e-phone"><span class="err" id="e-phone"></span></div>
+          <div class="field full"><span class="lab" id="needL">I am planning</span>
+            <div class="chips" role="radiogroup" aria-labelledby="needL">
+              <label><input type="radio" name="need" id="n1" value="A new home" checked><span>A new home</span></label>
+              <label><input type="radio" name="need" id="n2" value="Design only"><span>Design only</span></label>
+              <label><input type="radio" name="need" id="n3" value="Interiors"><span>Interiors</span></label>
+              <label><input type="radio" name="need" id="n4" value="Renovation"><span>Renovation</span></label>
+            </div>
+          </div>
+          <div class="field"><label for="f-loc">Plot location</label><input id="f-loc" name="loc" placeholder="Oragadam"></div>
+          <div class="field"><label for="f-size">Plot size</label><input id="f-size" name="size" placeholder="30 × 40 ft"></div>
+          <div class="field"><label for="f-bud">Budget</label><select id="f-bud" name="budget"><option value="">Choose a range</option><option>Under ₹50 lakh</option><option>₹50 lakh – ₹1 crore</option><option>₹1 – 2 crore</option><option>Above ₹2 crore</option><option>Not sure yet</option></select></div>
+          <div class="field"><label for="f-when">Planning to start</label><select id="f-when" name="when"><option value="">Choose</option><option>Within 3 months</option><option>3 – 6 months</option><option>6 – 12 months</option><option>Just exploring</option></select></div>
+          <div class="field full"><label for="f-msg">Anything else</label><textarea id="f-msg" name="msg" placeholder="Bedrooms, parking, a rental floor"></textarea></div>
+          <button class="btn" type="submit">Request a site visit <span class="arr" aria-hidden="true">→</span></button>
+          <div class="result" id="result" hidden aria-live="polite">
+            <b>Your request is ready. Copy it, or open it in your email.</b>
+            <pre id="summary"></pre>
+            <div class="row"><button type="button" class="btn quiet" id="copySum">Copy details</button><a class="btn" id="mailSum" href="#">Open in email</a></div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section><section class="sec" id="faq" aria-labelledby="faq-h">
+    <div class="wrap faq-grid">
+      <div class="side">
+        <h2 id="faq-h" class="rv">Before you call</h2>
+        <p class="rv">Not here? Write to us and we will reply within a working day.</p>
+      </div>
+      <div class="faq rv">
+        <details><summary>Which areas do you build in?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Chennai, Kanchipuram and nearby towns in Kanchipuram and Chengalpattu districts. If your plot is further out, send us the location and we will tell you honestly whether we can supervise it well.</p></details>
+        <details><summary>Is the rate per sq.ft my final price?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>The collection rates are a guide. After the site visit and design you receive an itemised estimate with every material, brand and quantity. Once signed, that estimate is your price.</p></details>
+        <details><summary>Do you take care of plan approval?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Yes. We prepare the submission and structural drawings and follow them through with the authority. Government fees are paid by the owner and shown separately.</p></details>
+        <details><summary>How do payments work?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>An advance to start the design, then payments tied to construction stages. You pay for each stage after it is complete and you have seen it, on site or on video.</p></details>
+        <details><summary>I live outside India. Can I build with you?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Yes. Design reviews happen on video calls, and you get photos, video and the engineer's checklist at every stage. Most owners visit only for the foundation and the handover.</p></details>
+        <details><summary>Can I hire you only for design or interiors?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Yes. Each service can be taken on its own. Tell us what you need below and we will quote only for that.</p></details>
+      </div>
+    </div>
+  </section></main>
+<footer>
+  <div class="wrap f-top">
+    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, construction and interiors for independent homes in Chennai and Kanchipuram.</p></div>
+    <div><h2>Explore</h2><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li></ul></div>
+    <div><h2>Contact</h2><ul><li>beyondconceptz@gmail.com</li><li>Monday to Saturday</li><li><a href="contact.html">Book a site visit</a></li></ul></div>
+  </div>
+  <div class="wrap f-name" aria-hidden="true"><svg viewBox="0 0 256 370"><use href="#mark"/></svg><b>BEYOND CONCEPTZ</b></div>
+  <div class="f-base"><div class="wrap f-base-in"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>Website by Marvice Media</span></div></div>
+</footer>
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<section class="contact" id="contact" aria-labelledby="ct-h">
+    <div class="wrap c-grid">
+      <div class="side">
+        <h2 id="ct-h">Tell us about your plot</h2>
+        <p>Share a few details and we will call within one working day to fix a site visit. The first visit and consultation are free.</p>
+        <div class="reach">
+          <div><small>Email</small><b id="email">beyondconceptz@gmail.com</b><button type="button" class="copy-btn" id="copyEmail">Copy address</button></div>
+          <div><small>We build in</small><b>Chennai and Kanchipuram</b></div>
+          <div><small>Site visits</small><b>Monday to Saturday</b></div>
+        </div>
+      </div>
+      <div class="formcard">
+        <form id="lead" novalidate>
+          <div class="field"><label for="f-name">Your name</label><input id="f-name" name="name" autocomplete="name" required aria-describedby="e-name"><span class="err" id="e-name"></span></div>
+          <div class="field"><label for="f-phone">Mobile or WhatsApp</label><input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required aria-describedby="e-phone"><span class="err" id="e-phone"></span></div>
+          <div class="field full"><span class="lab" id="needL">I am planning</span>
+            <div class="chips" role="radiogroup" aria-labelledby="needL">
+              <label><input type="radio" name="need" id="n1" value="A new home" checked><span>A new home</span></label>
+              <label><input type="radio" name="need" id="n2" value="Design only"><span>Design only</span></label>
+              <label><input type="radio" name="need" id="n3" value="Interiors"><span>Interiors</span></label>
+              <label><input type="radio" name="need" id="n4" value="Renovation"><span>Renovation</span></label>
+            </div>
+          </div>
+          <div class="field"><label for="f-loc">Plot location</label><input id="f-loc" name="loc" placeholder="Oragadam"></div>
+          <div class="field"><label for="f-size">Plot size</label><input id="f-size" name="size" placeholder="30 × 40 ft"></div>
+          <div class="field"><label for="f-bud">Budget</label><select id="f-bud" name="budget"><option value="">Choose a range</option><option>Under ₹50 lakh</option><option>₹50 lakh – ₹1 crore</option><option>₹1 – 2 crore</option><option>Above ₹2 crore</option><option>Not sure yet</option></select></div>
+          <div class="field"><label for="f-when">Planning to start</label><select id="f-when" name="when"><option value="">Choose</option><option>Within 3 months</option><option>3 – 6 months</option><option>6 – 12 months</option><option>Just exploring</option></select></div>
+          <div class="field full"><label for="f-msg">Anything else</label><textarea id="f-msg" name="msg" placeholder="Bedrooms, parking, a rental floor"></textarea></div>
+          <button class="btn" type="submit">Request a site visit <span class="arr" aria-hidden="true">→</span></button>
+          <div class="result" id="result" hidden aria-live="polite">
+            <b>Your request is ready. Copy it, or open it in your email.</b>
+            <pre id="summary"></pre>
+            <div class="row"><button type="button" class="btn quiet" id="copySum">Copy details</button><a class="btn" id="mailSum" href="#">Open in email</a></div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>

@@ -1,0 +1,811 @@
+<title>Beyond Conceptz</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Beyond Conceptz designs and builds independent homes in Chennai and Kanchipuram: plans, approvals, construction and interiors from one team.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600&display=swap">
+<style>
+/* Idea: the arch from the Beyond Conceptz mark is the frame for every photograph and the page's only curve.
+   Everything else is square. Brand palette kept from the logo files; red oxide is reserved for actions. */
+:root{
+  --ground:#F4EFE8;   /* linen */
+  --tone:#EAE2D8;     /* one step down, separates surfaces */
+  --sand:#CBB4A4;
+  --ink:#22211E;
+  --ink-2:#5C5850;    /* secondary notes only */
+  --oxide:#8D3C27;    /* actions */
+  --oxide-press:#73301F;
+  --olive:#414C2C;
+  --olive-deep:#343D23;
+  --on-dark:#F4EFE8;
+  --on-dark-2:#D5CDBE;
+
+  --f-head:"Montserrat","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Nunito Sans","Segoe UI",system-ui,sans-serif;
+  --t-display:clamp(2.1rem,6.2vw,5.4rem);
+  --t-h2:clamp(2rem,4.2vw,3.4rem);
+  --t-statement:clamp(1.4rem,2.4vw,2.1rem);
+  --t-h3:1.3rem;
+  --t-body:1.0625rem;
+  --t-small:.9rem;
+  --gap-sec:clamp(5rem,11vw,9rem);
+  --maxw:1240px;
+  --ease:cubic-bezier(.16,1,.3,1);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px;scrollbar-color:var(--sand) var(--ground)}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-body);font-size:var(--t-body);line-height:1.6;-webkit-font-smoothing:antialiased;caret-color:var(--oxide);accent-color:var(--olive)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--ground)}
+::selection{background:var(--olive);color:var(--on-dark)}
+a{color:inherit;text-underline-offset:.22em;text-decoration-thickness:1.5px}
+:focus-visible{outline:2px solid var(--oxide);outline-offset:3px}
+h1,h2,h3{font-family:var(--f-head);font-weight:600;margin:0;text-wrap:balance}
+h1{font-size:var(--t-display);line-height:1;letter-spacing:-.035em}
+h2{font-size:var(--t-h2);line-height:1.05;letter-spacing:-.03em}
+h3{font-size:var(--t-h3);line-height:1.25;letter-spacing:-.01em}
+p{margin:0}
+.wrap{max-width:var(--maxw);margin-inline:auto;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+.num{font-variant-numeric:tabular-nums}
+.skip{position:absolute;left:-999px;top:0}
+.skip:focus{left:16px;top:16px;z-index:99;background:var(--ink);color:var(--on-dark);padding:.7rem 1rem}
+
+/* Actions: square, one fill */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:48px;font:600 1rem var(--f-head);padding:.9rem 1.5rem;background:var(--oxide);color:#fff;border:0;text-decoration:none;cursor:pointer;transition:background .2s,transform .2s var(--ease)}
+.btn:hover{background:var(--oxide-press)}
+.btn:active{transform:translateY(1px)}
+.btn .arr{transition:transform .3s var(--ease)}
+.btn:hover .arr{transform:translateX(4px)}
+.btn.quiet{background:var(--ink)}
+.btn.quiet:hover{background:#000}
+.btn.light{background:var(--on-dark);color:var(--ink)}
+.btn.light:hover{background:#fff}
+.tlink{font:600 1rem var(--f-head);text-decoration:underline;text-underline-offset:.35em}
+.tlink:hover{color:var(--oxide)}
+
+/* Header: plain bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--ground);transition:background .2s}
+.top.scrolled{background:var(--tone)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;padding-block:.85rem}
+.logo{display:flex;align-items:center;gap:.7rem;text-decoration:none;color:var(--ink)}
+.logo svg{height:42px;width:auto;flex:none}
+.wm{display:flex;flex-direction:column;line-height:1}
+.wm b{font-family:var(--f-head);font-weight:700;font-size:1.1rem;letter-spacing:.06em}
+.wm span{font-family:var(--f-head);font-weight:500;font-size:.64rem;letter-spacing:.42em;margin-top:5px}
+nav ul{display:flex;gap:2rem;list-style:none;margin:0;padding:0}
+nav a{text-decoration:none;font-family:var(--f-head);font-weight:500;font-size:.98rem}
+nav a:hover{text-decoration:underline}
+.top .btn{min-height:44px;padding:.65rem 1.1rem;font-size:.95rem}
+.menu-btn{display:none;min-height:44px;background:var(--ink);color:var(--on-dark);border:0;padding:.5rem 1rem;font:600 .95rem var(--f-head)}
+@media (max-width:980px){
+  .menu-btn{display:inline-block}
+  nav{position:absolute;left:0;right:0;top:100%;background:var(--tone)}
+  nav ul{flex-direction:column;gap:0;padding:.5rem max(24px,env(safe-area-inset-right,0px)) 1.25rem max(24px,env(safe-area-inset-left,0px))}
+  nav li a{display:block;padding:.85rem 0;font-size:1.1rem}
+  .top .cta{display:none}
+}
+
+/* Arch frame */
+.arch{position:relative;border-radius:999px 999px 0 0;overflow:hidden;background:var(--tone);aspect-ratio:4/5;width:100%}
+.arch img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+
+/* Hero */
+.hero{padding-block:clamp(2rem,5vw,4rem) var(--gap-sec)}
+.hero h1{max-width:16ch}
+.hero-grid{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:clamp(2rem,5vw,5rem);align-items:end;margin-top:clamp(1.5rem,3vw,2.5rem)}
+.hero .lede{font-size:var(--t-statement);line-height:1.3;max-width:22ch;font-family:var(--f-head);font-weight:500;letter-spacing:-.015em}
+.hero .actions{display:flex;flex-wrap:wrap;align-items:center;gap:1.5rem;margin-top:2rem}
+.facts{list-style:none;margin:2.6rem 0 0;padding:0;display:grid;gap:.9rem;max-width:34ch}
+.facts li{display:grid;grid-template-columns:1.6rem minmax(0,1fr);gap:.6rem;align-items:start}
+.facts svg{width:22px;height:22px;margin-top:2px;color:var(--olive)}
+.hero-pic{position:relative}
+.hero-pic .arch{aspect-ratio:5/6;max-height:78vh}
+.hero-pic img{animation:settle 2.4s var(--ease) both}
+@keyframes settle{from{transform:scale(1.06)}to{transform:scale(1)}}
+@media (max-width:860px){.hero-grid{grid-template-columns:minmax(0,1fr)}.hero-pic{order:-1}.hero-pic .arch{aspect-ratio:4/5;max-height:none}}
+
+/* About: olive field */
+.about{background:var(--olive);color:var(--on-dark);padding-block:var(--gap-sec)}
+.about-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(2rem,6vw,6rem)}
+.statement{font-family:var(--f-head);font-weight:500;font-size:var(--t-statement);line-height:1.3;letter-spacing:-.015em;margin-top:1.6rem;max-width:26ch}
+.about .body{display:grid;gap:1.2rem;align-content:end;color:var(--on-dark-2);max-width:48ch}
+.about .body strong{color:var(--on-dark);font-weight:600}
+@media (max-width:820px){.about-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Section heads */
+.sec{padding-block:var(--gap-sec) 0}
+.head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2rem 4rem;align-items:end;margin-bottom:clamp(2.5rem,5vw,4rem)}
+.head p{max-width:46ch}
+@media (max-width:820px){.head{grid-template-columns:minmax(0,1fr)}}
+
+/* Services: one arch that follows the list */
+.svc{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(2rem,6vw,6rem);align-items:start}
+.svc-pic{position:sticky;top:110px}
+.svc-pic .arch img{transition:opacity .45s var(--ease)}
+.svc-pic .arch img.off{opacity:0}
+.svc-cap{font-size:var(--t-small);color:var(--ink-2);margin-top:.8rem}
+.svc-list{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
+.svc-list li{background:transparent;transition:background .25s}
+.svc-list > li{padding:1.4rem 1.4rem}
+.svc-list h3 button{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;justify-content:space-between;gap:1rem;align-items:center;min-height:44px}
+.svc-list button:focus-visible{outline:2px solid var(--oxide);outline-offset:-2px}
+.svc-list li.on,.svc-list li:hover{background:var(--tone)}
+.svc-list h3{font-size:clamp(1.5rem,2.6vw,2.1rem);letter-spacing:-.02em}
+.svc-list h3 svg{width:22px;height:22px;flex:none;color:var(--oxide);transition:transform .3s var(--ease)}
+.svc-list li.on h3 svg{transform:rotate(45deg)}
+.svc-list .more{display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s var(--ease)}
+.svc-list li.on .more{grid-template-rows:1fr}
+.svc-list .more > div{overflow:hidden}
+.svc-list .more p{margin-top:.8rem;max-width:48ch}
+.svc-list .more ul{margin:.8rem 0 0;padding-left:1.1rem;display:grid;gap:.25rem}
+.svc-list .more li{padding:0}
+@media (max-width:860px){.svc{grid-template-columns:minmax(0,1fr)}.svc-pic{position:relative;top:0;max-width:420px}}
+
+/* 3D model: sand field */
+.model{background:var(--tone);padding-block:var(--gap-sec);margin-top:var(--gap-sec)}
+.model-grid{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);gap:clamp(2rem,5vw,5rem);align-items:center}
+.model-grid .copy p{margin-top:1.3rem;max-width:40ch}
+.model-grid .copy ul{margin:1.5rem 0 0;padding-left:1.1rem;display:grid;gap:.35rem}
+.stage{position:relative;background:var(--ground);aspect-ratio:5/4;min-width:0;overflow:hidden}
+.stage canvas{display:block;width:100%!important;height:100%!important;cursor:grab;touch-action:pan-y}
+.stage canvas:active{cursor:grabbing}
+.stage .fallback{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage-bar{position:absolute;left:14px;right:14px;bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:.8rem;flex-wrap:wrap;pointer-events:none}
+.stage-bar > *{pointer-events:auto}
+.stage-hint{font-size:var(--t-small);color:var(--ink-2)}
+.seg2{display:inline-flex;background:var(--tone)}
+.seg2 button{min-height:44px;font:600 .9rem var(--f-head);padding:.6rem 1rem;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.seg2 button[aria-pressed="true"]{background:var(--olive);color:var(--on-dark)}
+@media (max-width:900px){.model-grid{grid-template-columns:minmax(0,1fr)}.stage{aspect-ratio:1/1}}
+
+/* Collections */
+.tabs{display:inline-flex;background:var(--tone);flex-wrap:wrap}
+.tabs button{min-height:48px;font:600 1rem var(--f-head);padding:.75rem 1.4rem;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--on-dark)}
+.coll{display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr);gap:clamp(2rem,5vw,5rem);margin-top:2.2rem;align-items:start}
+.tier-name{font-size:var(--t-h2)}
+.tier-rate{font-family:var(--f-head);font-weight:600;font-size:var(--t-h3);margin-top:1rem}
+.tier-rate span{font-family:var(--f-body);font-weight:400;font-size:var(--t-body);color:var(--ink-2)}
+.tier-desc{margin-top:1rem;max-width:36ch}
+.spec{list-style:none;margin:0;padding:0}
+.spec li{display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr);gap:1.5rem;padding:.95rem 1.1rem}
+.spec li:nth-child(odd){background:var(--tone)}
+.spec li span{font-family:var(--f-head);font-weight:600}
+.note{font-size:var(--t-small);color:var(--ink-2);margin-top:1rem}
+@media (max-width:860px){.coll{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:480px){.spec li{grid-template-columns:minmax(0,1fr);gap:.15rem}}
+
+/* Planner: olive field */
+.planner{background:var(--olive);color:var(--on-dark);margin-top:clamp(3.5rem,7vw,6rem)}
+.planner-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.planner .l{padding:clamp(1.8rem,4vw,3.4rem)}
+.planner .r{padding:clamp(1.8rem,4vw,3.4rem);background:var(--olive-deep)}
+.planner .l > p{color:var(--on-dark-2);margin-top:1rem;max-width:40ch}
+.ctrl{display:grid;gap:1.7rem;margin-top:2.2rem}
+.ctrl .lab{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.6rem;font-family:var(--f-head);font-weight:600;color:var(--on-dark-2)}
+.ctrl output{font-size:var(--t-h3);color:var(--on-dark)}
+input[type=range].r{width:100%;accent-color:var(--sand);height:28px}
+.opts{display:flex;flex-wrap:wrap;gap:.5rem}
+.opts button{min-height:44px;font:600 .95rem var(--f-head);padding:.6rem 1rem;border:0;background:var(--olive-deep);color:var(--on-dark);cursor:pointer}
+.opts button[aria-pressed="true"]{background:var(--on-dark);color:var(--olive)}
+.est-k{font-family:var(--f-head);font-weight:600;color:var(--on-dark-2)}
+.est-v{font-family:var(--f-head);font-weight:600;font-size:var(--t-h2);line-height:1.05;letter-spacing:-.03em;margin-top:.4rem}
+.est-s{color:var(--on-dark-2);margin-top:.4rem}
+.sched{list-style:none;margin:1.8rem 0 0;padding:0;display:grid;gap:.6rem}
+.sched li{display:grid;grid-template-columns:minmax(0,9.5rem) minmax(0,1fr) 4.6rem;gap:.9rem;align-items:center;font-size:var(--t-small)}
+.sched .bar{height:8px;background:var(--olive)}
+.sched .bar i{display:block;height:100%;background:var(--sand);transition:width .5s var(--ease)}
+.sched .amt{text-align:right;font-weight:600}
+.planner .btn{margin-top:2rem}
+@media (max-width:860px){.planner-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:420px){.sched li{grid-template-columns:minmax(0,1fr) 4.4rem}.sched .bar{grid-column:1/-1;grid-row:2}}
+
+/* Process: a thick bar is the idea */
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0 1.6rem;position:relative}
+.steps::before{content:"";position:absolute;left:0;right:0;top:9px;height:6px;background:var(--sand)}
+.steps li{position:relative;padding-top:2.6rem;min-width:0}
+.steps li::before{content:"";position:absolute;left:0;top:0;width:24px;height:24px;background:var(--olive)}
+.steps li:last-child::before{background:var(--oxide)}
+.steps p{margin-top:.5rem;font-size:var(--t-small)}
+@media (max-width:1000px){
+  .steps{grid-template-columns:minmax(0,1fr);gap:1.8rem}
+  .steps::before{left:9px;right:auto;top:0;bottom:0;width:6px;height:auto}
+  .steps li{padding:0 0 0 3rem}
+}
+
+/* Updates */
+.upd{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(2rem,6vw,6rem);align-items:center}
+.upd .copy p{margin-top:1.3rem;max-width:44ch}
+.feed{background:var(--tone);padding:1.4rem;max-width:460px;width:100%;justify-self:end}
+.feed-h{display:flex;align-items:center;gap:.8rem;padding-bottom:1.1rem}
+.feed-h .av{width:40px;height:40px;background:var(--olive);display:grid;place-items:center;color:var(--on-dark)}
+.feed-h b{font-family:var(--f-head);display:block;line-height:1.2}
+.feed-h small{color:var(--ink-2);font-size:var(--t-small)}
+.msg{background:var(--ground);padding:.9rem;display:grid;grid-template-columns:72px minmax(0,1fr);gap:1rem;align-items:center;margin-top:.5rem}
+.msg img{width:72px;height:72px;object-fit:cover;display:block}
+.msg b{font-family:var(--f-head);font-weight:600}
+.msg p{font-size:var(--t-small);line-height:1.45;margin-top:.15rem}
+.st{display:inline-block;font:600 .8rem var(--f-head);padding:.15rem .5rem;margin-left:.4rem;vertical-align:1px}
+.st.ok{background:var(--olive);color:var(--on-dark)}
+.st.now{background:var(--oxide);color:#fff}
+@media (max-width:860px){.upd{grid-template-columns:minmax(0,1fr)}.feed{justify-self:start}}
+
+/* Project */
+.proj{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(2rem,6vw,6rem);align-items:center}
+.proj figure{margin:0}
+.proj figcaption{font-size:var(--t-small);color:var(--ink-2);margin-top:.8rem}
+.proj .copy p{margin-top:1.3rem;max-width:42ch}
+.proj dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.6rem 2rem;margin:2rem 0;background:var(--tone);padding:1.3rem 1.4rem}
+.proj dt{font-family:var(--f-head);font-weight:600}
+.proj dd{margin:0}
+@media (max-width:860px){.proj{grid-template-columns:minmax(0,1fr)}.proj figure{max-width:440px}}
+
+/* FAQ */
+.faq-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(2rem,6vw,6rem);align-items:start}
+.faq-grid .side p{margin-top:1.2rem;max-width:32ch}
+.faq{display:grid;gap:.5rem}
+.faq details{background:var(--tone)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1.2rem 1.4rem;font-family:var(--f-head);font-weight:600;font-size:1.1rem;min-height:56px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary svg{width:20px;height:20px;flex:none;color:var(--oxide);transition:transform .3s var(--ease)}
+.faq details[open] summary svg{transform:rotate(45deg)}
+.faq details p{padding:0 1.4rem 1.4rem;max-width:62ch}
+@media (max-width:860px){.faq-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Contact: oxide field */
+.contact{background:var(--oxide);color:var(--on-dark);padding-block:var(--gap-sec);margin-top:var(--gap-sec)}
+.c-grid{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:clamp(2rem,6vw,6rem);align-items:start}
+.contact .side p{margin-top:1.3rem;max-width:36ch;color:#F2E3DA}
+.reach{margin-top:2.4rem;display:grid;gap:1.1rem}
+.reach div{display:grid;gap:.1rem}
+.reach small{font-family:var(--f-head);font-weight:600;font-size:var(--t-small);color:#EBCFC2}
+.reach b{font-weight:600;font-size:1.1rem;overflow-wrap:anywhere}
+.copy-btn{justify-self:start;min-height:36px;font:600 .9rem var(--f-head);background:none;border:0;color:var(--on-dark);text-decoration:underline;text-underline-offset:.3em;padding:0;cursor:pointer}
+.formcard{background:var(--ground);color:var(--ink);padding:clamp(1.5rem,3.5vw,2.8rem)}
+form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.3rem 1.5rem}
+.field{display:flex;flex-direction:column;gap:.4rem;min-width:0}
+.field.full{grid-column:1/-1}
+.field label,.field .lab{font-family:var(--f-head);font-weight:600;font-size:.95rem}
+.field input,.field select,.field textarea{font:400 1rem var(--f-body);color:var(--ink);background:#fff;border:1.5px solid var(--sand);border-radius:0;padding:.8rem .95rem;width:100%;min-height:48px}
+.field textarea{min-height:100px;resize:vertical}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(65,76,44,.2)}
+.field input[aria-invalid="true"]{border-color:var(--oxide)}
+.err{color:var(--oxide);font-size:var(--t-small);min-height:1.2em}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem}
+.chips label{cursor:pointer}
+.chips input{position:absolute;opacity:0;pointer-events:none}
+.chips span{display:inline-flex;align-items:center;min-height:44px;font:500 .98rem var(--f-body);padding:.5rem 1rem;background:var(--tone);transition:background .2s}
+.chips label:hover span{background:var(--sand)}
+.chips input:checked + span{background:var(--olive);color:var(--on-dark)}
+.chips input:focus-visible + span{outline:2px solid var(--oxide);outline-offset:2px}
+form .btn{grid-column:1/-1;justify-self:start}
+.result{grid-column:1/-1;background:var(--tone);padding:1.2rem 1.3rem;display:grid;gap:.8rem}
+.result b{font-family:var(--f-head)}
+.result pre{margin:0;white-space:pre-wrap;font:400 .95rem/1.6 var(--f-body)}
+.result .row{display:flex;flex-wrap:wrap;gap:.6rem}
+@media (max-width:900px){.c-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:540px){form{grid-template-columns:minmax(0,1fr)}}
+
+/* Footer: the name returns */
+footer{background:var(--olive-deep);color:var(--on-dark-2)}
+.f-top{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(2,minmax(0,1fr));gap:2.5rem;padding-block:4.5rem 3rem}
+footer h2{font-size:var(--t-h3);color:var(--on-dark);letter-spacing:-.01em}
+footer ul{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.5rem}
+footer a{text-decoration:none}
+footer a:hover{color:var(--on-dark);text-decoration:underline}
+footer .lead{max-width:34ch}
+.f-name{color:var(--on-dark);display:flex;align-items:flex-end;gap:clamp(.8rem,2vw,1.6rem);padding-bottom:1.6rem}
+.f-name svg{height:clamp(56px,11vw,150px);width:auto;flex:none}
+.f-name b{font-family:var(--f-head);font-weight:700;font-size:clamp(2.6rem,10.5vw,9.6rem);line-height:.82;letter-spacing:.01em}
+.f-base{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;padding-block:1.2rem calc(1.4rem + env(safe-area-inset-bottom,0px));font-size:var(--t-small);background:#2C331D}
+@media (max-width:760px){.f-top{grid-template-columns:minmax(0,1fr)}}
+
+/* Entrances: content is visible by default; only script hides what is below the fold */
+.rv{transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.rv.pre{opacity:0;transform:translateY(24px)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}html{scroll-behavior:auto}.rv.pre{opacity:1;transform:none}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="mark" viewBox="0 0 256 370">
+      <g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="butt" stroke-linejoin="miter">
+        <path d="M60 296H8V122A120 120 0 0 1 248 122V364H214"/>
+        <path d="M72 186V92H118A47 47 0 0 1 118 186H72"/>
+        <path d="M72 186V364H186"/>
+        <path d="M96 186H120A55 55 0 0 1 120 296H96"/>
+      </g>
+    </symbol>
+    <symbol id="plus" viewBox="0 0 20 20"><path d="M10 3v14M3 10h14" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="check" viewBox="0 0 22 22"><path d="M4 11.5l4.5 4.5L18 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="logo" href="#main" aria-label="Beyond Conceptz, home">
+      <svg viewBox="0 0 256 370" aria-hidden="true"><use href="#mark"/></svg>
+      <span class="wm"><b>BEYOND</b><span>CONCEPTZ</span></span>
+    </a>
+    <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav id="nav" aria-label="Main">
+      <ul>
+        <li><a href="#services">Services</a></li>
+        <li><a href="#model">3D design</a></li>
+        <li><a href="#collections">Collections</a></li>
+        <li><a href="#process">Process</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+    </nav>
+    <a class="btn cta" href="#contact">Book a site visit</a>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="h1">
+    <div class="wrap">
+      <h1 id="h1">Homes, designed and built</h1>
+      <div class="hero-grid">
+        <div>
+          <p class="lede">Architects and builders for independent homes in Chennai and Kanchipuram.</p>
+          <div class="actions">
+            <a class="btn" href="#contact">Book a free site visit <span class="arr" aria-hidden="true">→</span></a>
+            <a class="tlink" href="#planner">Estimate my budget</a>
+          </div>
+          <ul class="facts">
+            <li><svg aria-hidden="true"><use href="#check"/></svg><span>Plans, approval drawings, construction and interiors from one team</span></li>
+            <li><svg aria-hidden="true"><use href="#check"/></svg><span>Every brand and grade written into your agreement</span></li>
+            <li><svg aria-hidden="true"><use href="#check"/></svg><span>You pay for each stage after you have seen it</span></li>
+          </ul>
+        </div>
+        <div class="hero-pic">
+          <div class="arch"><img src="img/hero.jpg" alt="A contemporary two-storey family home with a red brick wall, timber screen and coconut palm, in evening light" width="1000" height="1239" fetchpriority="high"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="about" aria-labelledby="about-h">
+    <div class="wrap about-grid">
+      <div>
+        <h2 id="about-h" class="rv">One team, sketch to keys</h2>
+        <p class="statement rv">Homes lose something between the architect's drawing and the contractor's site. We keep both jobs in one team, so nothing gets lost.</p>
+      </div>
+      <div class="body">
+        <p class="rv"><strong>Beyond Conceptz designs and builds independent houses, villas and interiors.</strong> The person who sets a proportion on paper is the person who checks it on site.</p>
+        <p class="rv">We take on a limited number of homes at a time, so each one has an engineer's attention at every stage, and you always know who to call.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="services" aria-labelledby="svc-h">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="svc-h" class="rv">What we do for you</h2>
+        <p class="rv">Take the complete service, or hire us for the one part you need. Each is scoped and priced before work starts.</p>
+      </div>
+      <div class="svc">
+        <div class="svc-pic rv">
+          <div class="arch" id="svcArch">
+            <img src="img/architecture.jpg" alt="An architect's desk with floor plans, a house model and material swatches" width="800" height="1071" loading="lazy" data-k="0">
+            <img src="img/construction.jpg" alt="A house under construction with a concrete frame and brick walls" width="800" height="1071" loading="lazy" data-k="1" class="off">
+            <img src="img/interiors.jpg" alt="A living room with an arched teak window and a terracotta sofa" width="800" height="1071" loading="lazy" data-k="2" class="off">
+            <img src="img/site.jpg" alt="A house at the brickwork stage on a residential street" width="1000" height="1239" loading="lazy" data-k="3" class="off">
+            <img src="img/hero.jpg" alt="A finished contemporary family home" width="1000" height="1239" loading="lazy" data-k="4" class="off">
+          </div>
+          <p class="svc-cap" id="svcCap">Planning and design</p>
+        </div>
+        <ul class="svc-list" id="svcList">
+          <li class="on"><h3><button type="button" aria-expanded="true" data-k="0" data-cap="Planning and design">Architecture and planning<svg aria-hidden="true"><use href="#plus"/></svg></button></h3><div class="more"><div><p>A layout shaped around your plot, its light and the way your family lives, revised with you until every room is right.</p><ul><li>Floor plans, with Vastu alignment if you want it</li><li>3D elevation and a model you can turn</li><li>Approval and structural drawings</li></ul></div></div></li>
+          <li><h3><button type="button" aria-expanded="false" data-k="1" data-cap="On site, structure stage">Turnkey construction<svg aria-hidden="true"><use href="#plus"/></svg></button></h3><div class="more"><div><p>Foundation to final coat, built by our own team to the specification you signed.</p><ul><li>Engineer checks before every concrete pour</li><li>Electrical, plumbing and waterproofing</li><li>Photos and video at every stage</li></ul></div></div></li>
+          <li><h3><button type="button" aria-expanded="false" data-k="2" data-cap="Interiors">Interiors<svg aria-hidden="true"><use href="#plus"/></svg></button></h3><div class="more"><div><p>Planned with the architecture, so storage, light and furniture sit where the plan meant them to.</p><ul><li>Modular kitchen and wardrobes</li><li>Lighting, ceiling and pooja room</li><li>Furniture and styling</li></ul></div></div></li>
+          <li><h3><button type="button" aria-expanded="false" data-k="3" data-cap="Extension under way">Renovation and extensions<svg aria-hidden="true"><use href="#plus"/></svg></button></h3><div class="more"><div><p>Add a floor or rework an older home. We check the existing structure first and tell you plainly what it can carry.</p></div></div></li>
+          <li><h3><button type="button" aria-expanded="false" data-k="4" data-cap="Designed by us, built by your contractor">Design only<svg aria-hidden="true"><use href="#plus"/></svg></button></h3><div class="more"><div><p>Already have a contractor? We prepare your plans, elevation and approval drawings, and visit site at key stages.</p></div></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="model" id="model" aria-labelledby="model-h">
+    <div class="wrap model-grid">
+      <div class="copy">
+        <h2 id="model-h" class="rv">See it before it is built</h2>
+        <p class="rv">Every home we design comes with a 3D model you can turn on your phone. You check the proportions, the shade from each overhang and how the floors stack while changes still cost nothing.</p>
+        <ul class="rv"><li>Front elevation and massing in 3D</li><li>A floor-by-floor view of the layout</li><li>Revised with you until it feels right</li></ul>
+      </div>
+      <div class="stage rv" id="stage">
+        <img class="fallback" id="stageFallback" src="img/architecture.jpg" alt="An architect's model of a two-storey house on a desk with floor plans" loading="lazy">
+        <div class="stage-bar">
+          <span class="stage-hint" id="stageHint">Drag to turn the house</span>
+          <div class="seg2" role="group" aria-label="Model view">
+            <button type="button" id="vWhole" aria-pressed="true">Whole house</button>
+            <button type="button" id="vFloors" aria-pressed="false">Floor by floor</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="collections" aria-labelledby="col-h">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="col-h" class="rv">Three collections, in writing</h2>
+        <p class="rv">Choose a collection to see what goes into the house. Your own estimate lists every brand, grade and quantity, and it becomes part of the agreement.</p>
+      </div>
+      <div class="tabs rv" role="tablist" aria-label="Collections" id="tabs">
+        <button role="tab" id="tab-0" aria-controls="tierPanel" data-t="0" aria-selected="false" tabindex="-1">Essential</button>
+        <button role="tab" id="tab-1" aria-controls="tierPanel" data-t="1" aria-selected="true">Signature</button>
+        <button role="tab" id="tab-2" aria-controls="tierPanel" data-t="2" aria-selected="false" tabindex="-1">Bespoke</button>
+      </div>
+      <div class="coll" id="tierPanel" role="tabpanel" aria-labelledby="tab-1">
+        <div>
+          <h3 class="tier-name" id="tName">Signature</h3>
+          <p class="tier-rate num" id="tRate">₹2,500 – 2,900 <span>per sq.ft built-up</span></p>
+          <p class="tier-desc" id="tDesc">Our most chosen home, with teak joinery, larger tiles and a fuller kitchen.</p>
+        </div>
+        <div>
+          <ul class="spec" id="specList"></ul>
+          <p class="note">Indicative rates and specification. Approval fees and government charges are listed separately in your estimate.</p>
+        </div>
+      </div>
+    </div>
+    <div class="planner" id="planner">
+      <div class="wrap planner-grid">
+        <div class="l">
+          <h2>What will it cost?</h2>
+          <p>Set the size and floors to see a realistic range, and how the payments split across the build.</p>
+          <div class="ctrl">
+            <div><div class="lab"><label for="area">Built-up area</label><output id="areaOut" for="area" class="num">2,000 sq.ft</output></div><input class="r" type="range" id="area" min="600" max="6000" step="50" value="2000"></div>
+            <div><div class="lab"><span id="flL">Floors</span></div>
+              <div class="opts" role="group" aria-labelledby="flL" id="floors"><button type="button" data-f="G" aria-pressed="false">Ground</button><button type="button" data-f="G+1" aria-pressed="true">G+1</button><button type="button" data-f="G+2" aria-pressed="false">G+2</button><button type="button" data-f="G+3" aria-pressed="false">G+3</button></div></div>
+            <div><div class="lab"><span id="coL">Collection</span></div>
+              <div class="opts" role="group" aria-labelledby="coL" id="tierPills"><button type="button" data-t="0" aria-pressed="false">Essential</button><button type="button" data-t="1" aria-pressed="true">Signature</button><button type="button" data-t="2" aria-pressed="false">Bespoke</button></div></div>
+          </div>
+        </div>
+        <div class="r" aria-live="polite">
+          <p class="est-k">Construction cost</p>
+          <p class="est-v num" id="range">₹50 – 58 lakh</p>
+          <p class="est-s" id="rangeSub">Signature, G+1, 2,000 sq.ft</p>
+          <ul class="sched num" id="sched" aria-label="Payment by stage"></ul>
+          <a class="btn light" href="#contact">Get my itemised estimate</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="process" aria-labelledby="proc-h">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="proc-h" class="rv">From plot to keys</h2>
+        <p class="rv">Each step ends with something you keep: a brief, a plan, a signed specification, an approval set, a stage report and, at the end, your keys.</p>
+      </div>
+      <ol class="steps">
+        <li class="rv"><h3>Site visit</h3><p>We walk the plot with you and note orientation, access, soil and what your family needs.</p></li>
+        <li class="rv"><h3>Design</h3><p>Floor plans, a 3D model and the front elevation, revised with you.</p></li>
+        <li class="rv"><h3>Agreement</h3><p>An itemised estimate and a payment schedule tied to stages.</p></li>
+        <li class="rv"><h3>Approval</h3><p>Submission and structural drawings, followed through with the authority.</p></li>
+        <li class="rv"><h3>Construction</h3><p>Each stage checked by our engineer and shown to you before the next.</p></li>
+        <li class="rv"><h3>Handover</h3><p>Interiors, a walkthrough together, your drawings and warranties, and the keys.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="upd-h">
+    <div class="wrap upd">
+      <div class="copy">
+        <h2 id="upd-h" class="rv">Build from anywhere</h2>
+        <p class="rv">Every stage ends with photos, a short site video and the engineer's checklist, sent to your phone. Owners in Bengaluru, the Gulf and further away follow the whole build and visit when they choose.</p>
+        <p class="rv">You release the next payment after you have seen the finished stage.</p>
+      </div>
+      <div class="feed rv" aria-label="Example of the stage updates an owner receives">
+        <div class="feed-h">
+          <span class="av"><svg viewBox="0 0 256 370" width="18" height="26" aria-hidden="true"><use href="#mark"/></svg></span>
+          <div><b>Your site updates</b><small>An example of what you receive</small></div>
+        </div>
+        <div class="msg"><img src="img/construction.jpg" alt="" loading="lazy" style="object-position:50% 80%"><div><b>Foundation</b><span class="st ok">Approved</span><p>Footings and columns to plinth. Video and checklist attached.</p></div></div>
+        <div class="msg"><img src="img/site.jpg" alt="" loading="lazy" style="object-position:70% 75%"><div><b>Plinth</b><span class="st ok">Approved</span><p>Plinth beam and anti-termite treatment complete.</p></div></div>
+        <div class="msg"><img src="img/construction.jpg" alt="" loading="lazy" style="object-position:15% 75%"><div><b>Ground floor walls</b><span class="st now">To review</span><p>Brickwork and lintels done. Sent today.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="project" aria-labelledby="proj-h">
+    <div class="wrap proj">
+      <figure class="rv">
+        <div class="arch"><img src="img/site.jpg" alt="An independent house at the brickwork stage on a residential street" width="1000" height="1239" loading="lazy"></div>
+        <figcaption>Representative image.</figcaption>
+      </figure>
+      <div class="copy">
+        <h2 id="proj-h" class="rv">On site in Kanchipuram</h2>
+        <p class="rv">The Sampath Residence is an independent family home, designed and now being built by our team. Its owner receives a video at every stage.</p>
+        <dl class="rv"><dt>Home</dt><dd>Sampath Residence</dd><dt>Scope</dt><dd>Design and construction</dd><dt>Status</dt><dd>Under construction</dd></dl>
+        <a class="btn quiet rv" href="#contact">Arrange a site walkthrough</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="faq" aria-labelledby="faq-h">
+    <div class="wrap faq-grid">
+      <div class="side">
+        <h2 id="faq-h" class="rv">Before you call</h2>
+        <p class="rv">Not here? Write to us and we will reply within a working day.</p>
+      </div>
+      <div class="faq rv">
+        <details><summary>Which areas do you build in?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Chennai, Kanchipuram and nearby towns in Kanchipuram and Chengalpattu districts. If your plot is further out, send us the location and we will tell you honestly whether we can supervise it well.</p></details>
+        <details><summary>Is the rate per sq.ft my final price?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>The collection rates are a guide. After the site visit and design you receive an itemised estimate with every material, brand and quantity. Once signed, that estimate is your price.</p></details>
+        <details><summary>Do you take care of plan approval?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Yes. We prepare the submission and structural drawings and follow them through with the authority. Government fees are paid by the owner and shown separately.</p></details>
+        <details><summary>How do payments work?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>An advance to start the design, then payments tied to construction stages. You pay for each stage after it is complete and you have seen it, on site or on video.</p></details>
+        <details><summary>I live outside India. Can I build with you?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Yes. Design reviews happen on video calls, and you get photos, video and the engineer's checklist at every stage. Most owners visit only for the foundation and the handover.</p></details>
+        <details><summary>Can I hire you only for design or interiors?<svg aria-hidden="true"><use href="#plus"/></svg></summary><p>Yes. Each service can be taken on its own. Tell us what you need below and we will quote only for that.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="contact" id="contact" aria-labelledby="ct-h">
+    <div class="wrap c-grid">
+      <div class="side">
+        <h2 id="ct-h">Tell us about your plot</h2>
+        <p>Share a few details and we will call within one working day to fix a site visit. The first visit and consultation are free.</p>
+        <div class="reach">
+          <div><small>Email</small><b id="email">beyondconceptz@gmail.com</b><button type="button" class="copy-btn" id="copyEmail">Copy address</button></div>
+          <div><small>We build in</small><b>Chennai and Kanchipuram</b></div>
+          <div><small>Site visits</small><b>Monday to Saturday</b></div>
+        </div>
+      </div>
+      <div class="formcard">
+        <form id="lead" novalidate>
+          <div class="field"><label for="f-name">Your name</label><input id="f-name" name="name" autocomplete="name" required aria-describedby="e-name"><span class="err" id="e-name"></span></div>
+          <div class="field"><label for="f-phone">Mobile or WhatsApp</label><input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required aria-describedby="e-phone"><span class="err" id="e-phone"></span></div>
+          <div class="field full"><span class="lab" id="needL">I am planning</span>
+            <div class="chips" role="radiogroup" aria-labelledby="needL">
+              <label><input type="radio" name="need" id="n1" value="A new home" checked><span>A new home</span></label>
+              <label><input type="radio" name="need" id="n2" value="Design only"><span>Design only</span></label>
+              <label><input type="radio" name="need" id="n3" value="Interiors"><span>Interiors</span></label>
+              <label><input type="radio" name="need" id="n4" value="Renovation"><span>Renovation</span></label>
+            </div>
+          </div>
+          <div class="field"><label for="f-loc">Plot location</label><input id="f-loc" name="loc" placeholder="Oragadam"></div>
+          <div class="field"><label for="f-size">Plot size</label><input id="f-size" name="size" placeholder="30 × 40 ft"></div>
+          <div class="field"><label for="f-bud">Budget</label><select id="f-bud" name="budget"><option value="">Choose a range</option><option>Under ₹50 lakh</option><option>₹50 lakh – ₹1 crore</option><option>₹1 – 2 crore</option><option>Above ₹2 crore</option><option>Not sure yet</option></select></div>
+          <div class="field"><label for="f-when">Planning to start</label><select id="f-when" name="when"><option value="">Choose</option><option>Within 3 months</option><option>3 – 6 months</option><option>6 – 12 months</option><option>Just exploring</option></select></div>
+          <div class="field full"><label for="f-msg">Anything else</label><textarea id="f-msg" name="msg" placeholder="Bedrooms, parking, a rental floor"></textarea></div>
+          <button class="btn" type="submit">Request a site visit <span class="arr" aria-hidden="true">→</span></button>
+          <div class="result" id="result" hidden aria-live="polite">
+            <b>Your request is ready. Copy it, or open it in your email.</b>
+            <pre id="summary"></pre>
+            <div class="row"><button type="button" class="btn quiet" id="copySum">Copy details</button><a class="btn" id="mailSum" href="#">Open in email</a></div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap f-top">
+    <div><h2>Beyond Conceptz</h2><p class="lead" style="margin-top:1rem">Architecture, construction and interiors for independent homes in Chennai and Kanchipuram.</p></div>
+    <div><h2>Explore</h2><ul><li><a href="#services">Services</a></li><li><a href="#model">3D design</a></li><li><a href="#collections">Collections</a></li><li><a href="#faq">FAQ</a></li></ul></div>
+    <div><h2>Contact</h2><ul><li>beyondconceptz@gmail.com</li><li>Monday to Saturday</li><li><a href="#contact">Book a site visit</a></li></ul></div>
+  </div>
+  <div class="wrap f-name" aria-hidden="true"><svg viewBox="0 0 256 370"><use href="#mark"/></svg><b>BEYOND CONCEPTZ</b></div>
+  <div class="f-base"><div class="wrap" style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;width:100%"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>Website by Marvice Media</span></div></div>
+</footer>
+
+<script>
+(function(){
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Header + mobile menu */
+  var top=document.getElementById('top');
+  addEventListener('scroll',function(){top.classList.toggle('scrolled',scrollY>8)},{passive:true});
+  var mb=document.getElementById('menuBtn'),nav=document.getElementById('nav'),mq=matchMedia('(max-width:980px)');
+  function sync(){nav.hidden=mq.matches&&mb.getAttribute('aria-expanded')!=='true';}
+  mb.onclick=function(){mb.setAttribute('aria-expanded',mb.getAttribute('aria-expanded')!=='true');sync();};
+  nav.addEventListener('click',function(e){if(e.target.tagName==='A'&&mq.matches){mb.setAttribute('aria-expanded','false');sync();}});
+  mq.addEventListener('change',sync);sync();
+
+  /* Entrances: only elements below the first screen are hidden, and only while script runs */
+  if(!reduce&&'IntersectionObserver' in window){
+    var groups={};
+    document.querySelectorAll('.rv').forEach(function(el){
+      if(el.getBoundingClientRect().top<innerHeight*.92)return;
+      var sec=el.closest('section')||document.body,key=sec.id||sec.className;
+      groups[key]=(groups[key]||0)+1;
+      el.style.transitionDelay=Math.min(groups[key]-1,5)*75+'ms';
+      el.classList.add('pre');
+    });
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.remove('pre');io.unobserve(e.target);}});},{rootMargin:'0px 0px -8% 0px'});
+    document.querySelectorAll('.rv.pre').forEach(function(el){io.observe(el)});
+  }
+
+  /* Services: the arch follows the open service */
+  var list=document.getElementById('svcList'),imgs=document.querySelectorAll('#svcArch img'),cap=document.getElementById('svcCap');
+  list.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){
+      list.querySelectorAll('li').forEach(function(li){li.classList.remove('on');li.querySelector('button').setAttribute('aria-expanded','false');});
+      b.closest('li').classList.add('on');b.setAttribute('aria-expanded','true');
+      imgs.forEach(function(im){im.classList.toggle('off',im.dataset.k!==b.dataset.k)});
+      cap.textContent=b.dataset.cap;
+    });
+  });
+
+  /* Collections and planner: indicative rates kept in one place */
+  var TIERS=[
+    {name:'Essential',rate:[2100,2400],desc:'A well-built family home with dependable brands and a clean, simple finish.',
+     spec:['RCC frame, M20 concrete, Fe500D steel','Solid concrete blocks','10\'-0"','Tiles up to ₹60/sq.ft','Hardwood frame and shutter','UPVC','Granite counter, steel sink','ISI-brand sanitaryware and fittings','Interior emulsion, weatherproof exterior']},
+    {name:'Signature',rate:[2500,2900],desc:'Our most chosen home, with teak joinery, larger tiles and a fuller kitchen.',
+     spec:['RCC frame, M25 concrete, Fe550D steel','Wire-cut bricks or AAC blocks','10\'-6"','Tiles up to ₹110/sq.ft','Teak frame and shutter','Teak or premium UPVC','Granite counter, dado to ceiling','Premium-brand fittings, concealed cisterns','Premium emulsion, weatherproof exterior']},
+    {name:'Bespoke',rate:[3100,3800],desc:'Designer finishes, system windows and details chosen with you piece by piece.',
+     spec:['RCC frame, M25 concrete, Fe550D steel, optimised design','Wire-cut bricks, stone or exposed-brick features','11\'-0" and above','Marble, granite or tiles up to ₹200/sq.ft','Designer teak door with hardware','Aluminium system windows','Quartz counter, designer dado','Luxury-brand fittings, glass partitions','Luxury emulsion, textured feature walls']}
+  ];
+  var ROWS=['Structure','Walls','Ceiling height','Flooring','Main door','Windows','Kitchen','Bathrooms','Paint'];
+  var FLOOR_ADJ={'G':1.04,'G+1':1,'G+2':1.02,'G+3':1.05};
+  var STAGES=[['Booking and design',10],['Foundation',15],['Plinth',10],['Walls and columns',15],['Roof slab',15],['Services and plaster',15],['Finishes',15],['Handover',5]];
+  var st={t:1,f:'G+1',a:2000};
+  function inr(n){return n.toLocaleString('en-IN');}
+  function lakh(r){return r>=1e7?(r/1e7).toFixed(2).replace(/0$/,'')+' Cr':(r/1e5).toFixed(r<1e6?1:0)+' L';}
+  function rangeTxt(lo,hi){return hi>=1e7?'₹'+lakh(lo)+' – '+lakh(hi):'₹'+Math.round(lo/1e5)+' – '+Math.round(hi/1e5)+' lakh';}
+  var sched=document.getElementById('sched');
+  sched.innerHTML=STAGES.map(function(s){return '<li><span>'+s[0]+'</span><span class="bar"><i style="width:'+(s[1]/15*100)+'%"></i></span><span class="amt"></span></li>'}).join('');
+  function render(){
+    var T=TIERS[st.t];
+    document.querySelectorAll('#tabs [role=tab]').forEach(function(b){var on=+b.dataset.t===st.t;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;});
+    document.getElementById('tierPanel').setAttribute('aria-labelledby','tab-'+st.t);
+    document.querySelectorAll('#tierPills button').forEach(function(b){b.setAttribute('aria-pressed',+b.dataset.t===st.t)});
+    document.querySelectorAll('#floors button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.f===st.f)});
+    document.getElementById('tName').textContent=T.name;
+    document.getElementById('tRate').innerHTML='₹'+inr(T.rate[0])+' – '+inr(T.rate[1])+' <span>per sq.ft built-up</span>';
+    document.getElementById('tDesc').textContent=T.desc;
+    document.getElementById('specList').innerHTML=ROWS.map(function(r,i){return '<li><span>'+r+'</span><p>'+T.spec[i]+'</p></li>'}).join('');
+    var adj=FLOOR_ADJ[st.f],lo=T.rate[0]*adj*st.a,hi=T.rate[1]*adj*st.a,mid=(lo+hi)/2;
+    document.getElementById('areaOut').textContent=inr(st.a)+' sq.ft';
+    document.getElementById('range').textContent=rangeTxt(lo,hi);
+    document.getElementById('rangeSub').textContent=T.name+', '+st.f+', '+inr(st.a)+' sq.ft';
+    sched.querySelectorAll('.amt').forEach(function(el,i){el.textContent='₹'+lakh(mid*STAGES[i][1]/100)});
+  }
+  var tabs=[].slice.call(document.querySelectorAll('#tabs [role=tab]'));
+  tabs.forEach(function(b){
+    b.addEventListener('click',function(){st.t=+b.dataset.t;render();});
+    b.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();var n=(tabs.indexOf(b)+(e.key==='ArrowRight'?1:2))%3;st.t=n;render();tabs[n].focus();}
+    });
+  });
+  document.querySelectorAll('#tierPills button').forEach(function(b){b.addEventListener('click',function(){st.t=+b.dataset.t;render();})});
+  document.querySelectorAll('#floors button').forEach(function(b){b.addEventListener('click',function(){st.f=b.dataset.f;render();})});
+  var area=document.getElementById('area');
+  area.addEventListener('input',function(){st.a=+area.value;render();});
+  render();
+
+  /* Copy helpers */
+  function copy(text,btn,node){
+    function sel(){var r=document.createRange();r.selectNodeContents(node);var s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Selected, press Ctrl+C';}
+    try{navigator.clipboard.writeText(text).then(function(){var t=btn.textContent;btn.textContent='Copied';setTimeout(function(){btn.textContent=t},1500);},sel);}catch(e){sel();}
+  }
+  var em=document.getElementById('email');
+  document.getElementById('copyEmail').onclick=function(){copy(em.textContent,this,em)};
+
+  /* Enquiry form */
+  var f=document.getElementById('lead'),E=f.elements;
+  function flag(id,input,msg){document.getElementById(id).textContent=msg;input.setAttribute('aria-invalid',msg?'true':'false');}
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    var name=E['name'].value.trim(),phone=E['phone'].value.replace(/[\s-]/g,'');
+    var pOk=/^(\+?91)?[6-9]\d{9}$/.test(phone)||/^\+\d{8,15}$/.test(phone);
+    flag('e-name',E['name'],name?'':'Please enter your name.');
+    flag('e-phone',E['phone'],pOk?'':'Enter a 10-digit mobile number, or an international number starting with +.');
+    if(!name||!pOk){(name?E['phone']:E['name']).focus();return;}
+    var need=(f.querySelector('input[name=need]:checked')||{}).value||'';
+    var txt=['Name: '+name,'Phone: '+phone,'Planning: '+need,'Plot location: '+(E['loc'].value||'–'),'Plot size: '+(E['size'].value||'–'),
+      'Budget: '+(E['budget'].value||'–'),'Start: '+(E['when'].value||'–'),'Planner: '+TIERS[st.t].name+', '+st.f+', '+inr(st.a)+' sq.ft','Notes: '+(E['msg'].value.trim()||'–')].join('\n');
+    document.getElementById('summary').textContent=txt;
+    document.getElementById('mailSum').href='mailto:beyondconceptz@gmail.com?subject='+encodeURIComponent('Site visit request: '+name)+'&body='+encodeURIComponent(txt);
+    var r=document.getElementById('result');r.hidden=false;r.scrollIntoView({block:'nearest'});
+  });
+  document.getElementById('copySum').onclick=function(){var s=document.getElementById('summary');copy(s.textContent,this,s)};
+  document.getElementById('yr').textContent=new Date().getFullYear();
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* Architect's card model of the hero house, built in three.js */
+(function(){
+  var stage=document.getElementById('stage'),fb=document.getElementById('stageFallback');
+  var hint=document.getElementById('stageHint'),bW=document.getElementById('vWhole'),bF=document.getElementById('vFloors');
+  if(!window.THREE||!THREE.OrbitControls){bW.parentNode.hidden=true;hint.hidden=true;return;}
+  var renderer;
+  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch(e){bW.parentNode.hidden=true;hint.hidden=true;return;}
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  stage.insertBefore(renderer.domElement,stage.firstChild);
+  fb.hidden=true;
+
+  var scene=new THREE.Scene();
+  var camera=new THREE.PerspectiveCamera(32,1,0.1,200);
+  camera.position.set(17,11,19);
+  var controls=new THREE.OrbitControls(camera,renderer.domElement);
+  controls.target.set(0,3.2,0);controls.enableDamping=true;controls.enablePan=false;controls.enableZoom=false;
+  controls.minPolarAngle=0.35;controls.maxPolarAngle=1.38;controls.autoRotate=!reduce;controls.autoRotateSpeed=0.6;
+
+  scene.add(new THREE.HemisphereLight(0xfff6ea,0xb9a690,0.75));
+  var sun=new THREE.DirectionalLight(0xffe2c4,0.95);
+  sun.position.set(12,18,8);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+  var sc=sun.shadow.camera;sc.left=-14;sc.right=14;sc.top=14;sc.bottom=-14;sc.near=1;sc.far=60;sun.shadow.bias=-0.0005;
+  scene.add(sun);
+
+  function mat(c,r){return new THREE.MeshStandardMaterial({color:c,roughness:r==null?0.85:r,metalness:0});}
+  var M={card:mat(0xF7F3EC),brick:mat(0x8D3C27),wood:mat(0x8A5A34,0.7),glass:mat(0x55625a,0.25),base:mat(0xCBB4A4,0.95),leaf:mat(0x414C2C),trunk:mat(0x6E5A44)};
+  var edgeMat=new THREE.LineBasicMaterial({color:0x22211E,transparent:true,opacity:0.22});
+  function box(g,w,h,d,x,y,z,m,edges){
+    var mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);
+    if(edges!==false){var l=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),edgeMat);l.position.copy(mesh.position);g.add(l);}
+    return mesh;
+  }
+  var house=new THREE.Group();scene.add(house);
+
+  /* site board */
+  var board=box(scene,22,0.4,20,0,-0.2,0,M.base,false);board.castShadow=false;
+  box(scene,10.4,0.45,12.4,0.2,0.225,0,M.card);
+  /* driveway */
+  var dw=box(scene,3.2,0.02,4.5,3.4,0.01,8,mat(0xE6DACF),false);dw.castShadow=false;
+
+  /* ground floor */
+  var gf=new THREE.Group();house.add(gf);
+  box(gf,6.6,3,10,0.9,1.95,0,M.card);
+  box(gf,2.3,3,9.4,-3.55,1.95,0,M.brick);
+  box(gf,4.4,2.5,0.06,1.4,1.75,5.03,M.glass,false);
+  box(gf,1,2.6,0.06,-1.4,1.8,5.03,M.wood,false);
+  box(gf,11.4,0.32,11,0.5,3.61,0.3,M.card);
+  var col=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,3,16),M.card);col.position.set(5.6,1.95,5.3);col.castShadow=true;gf.add(col);
+
+  /* first floor */
+  var ff=new THREE.Group();house.add(ff);
+  box(ff,5.6,3,9,0.6,5.27,-0.4,M.card);
+  box(ff,2.3,3,9,-3.55,5.27,-0.4,M.brick);
+  /* arched-window stand-in on the brick */
+  box(ff,0.9,1.6,0.06,-3.55,5.1,4.13,M.glass,false);
+  for(var i=0;i<12;i++){box(ff,0.09,2.7,0.14,-1.6+i*0.38,5.22,4.25,M.wood,false);}
+  /* terrace railing over the porch */
+  box(ff,0.05,0.9,6.2,5.9,4.22,0.6,M.card,false);
+  box(ff,2.8,0.9,0.05,4.5,4.22,3.7,M.card,false);
+
+  /* roof */
+  var rf=new THREE.Group();house.add(rf);
+  box(rf,9.4,0.3,10.2,-0.5,6.92,-0.4,M.card);
+  box(rf,2.8,2.2,3.2,1.6,8.17,-2.2,M.card);
+  box(rf,3.2,0.2,3.6,1.6,9.37,-2.2,M.card);
+
+  /* landscape */
+  function palm(x,z,h){
+    var t=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.16,h,8),M.trunk);t.position.set(x,h/2,z);t.rotation.z=0.06;t.castShadow=true;scene.add(t);
+    for(var k=0;k<7;k++){var f=new THREE.Mesh(new THREE.ConeGeometry(0.28,2.4,4),M.leaf);f.position.set(x+Math.cos(k)*0.9,h-0.1,z+Math.sin(k)*0.9);f.rotation.set(Math.sin(k)*1.2,0,-Math.cos(k)*1.2);f.castShadow=true;scene.add(f);}
+  }
+  palm(-6.6,5.2,6.4);
+  [[-7.6,-3.5,0.9],[-6.9,-5.8,0.7],[7.6,-4.2,0.8],[-5.6,7.6,0.6],[6.8,7.2,0.55]].forEach(function(b){
+    var sp=new THREE.Mesh(new THREE.SphereGeometry(b[2],18,14),M.leaf);sp.position.set(b[0],b[2]*0.8,b[1]);sp.castShadow=true;scene.add(sp);
+  });
+
+  /* exploded view */
+  var target=0,cur=0;
+  function setView(f){target=f?1:0;bW.setAttribute('aria-pressed',!f);bF.setAttribute('aria-pressed',!!f);if(reduce)cur=target;}
+  bW.onclick=function(){setView(false)};bF.onclick=function(){setView(true)};
+  controls.addEventListener('start',function(){controls.autoRotate=false;hint.textContent='Drag to turn. Use the buttons to see each floor.';});
+
+  function size(){var w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+  new ResizeObserver(size).observe(stage);size();
+
+  var visible=true;
+  new IntersectionObserver(function(e){visible=e[0].isIntersecting;},{rootMargin:'100px'}).observe(stage);
+  (function loop(){
+    requestAnimationFrame(loop);
+    if(!visible)return;
+    cur+= (target-cur)*0.08;
+    ff.position.y=cur*2.4;rf.position.y=cur*5;
+    controls.update();renderer.render(scene,camera);
+  })();
+})();
+</script>
