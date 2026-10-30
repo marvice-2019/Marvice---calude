@@ -455,7 +455,7 @@ html,body{overflow-x:clip}
 @media (max-width:860px){.stamp{left:auto;right:-6px;bottom:24px;width:112px;height:112px;padding:14px}.stamp b{font-size:1.55rem}.stamp span{font-size:.66rem}}
 
 /* Stats row: large figures on gold hairlines */
-.stats{list-style:none;margin:clamp(3.5rem,7vw,5.5rem) 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.8rem clamp(1.5rem,3.5vw,3rem)}
+.stats{list-style:none;margin:clamp(3.5rem,7vw,5.5rem) 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.8rem clamp(1.5rem,3.5vw,3rem)}
 .stats li{border-top:1px solid var(--zari);padding-top:1.1rem;display:grid;gap:.45rem;align-content:start}
 .stats b{font-family:var(--f-head);font-weight:400;font-size:clamp(1.9rem,2.9vw,2.6rem);line-height:1;color:var(--olive)}
 .stats span{font-size:.98rem;color:var(--ink-2);max-width:24ch}

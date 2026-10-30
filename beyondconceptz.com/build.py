@@ -85,7 +85,7 @@ FOOTER = """<footer>
 POPUP = """<dialog class="pop" id="pop" aria-labelledby="pop-h">
   <form method="dialog" class="pop-x"><button aria-label="Close">Close</button></form>
   <h2 id="pop-h" tabindex="-1" autofocus>Book a free site visit</h2>
-  <p>Tell us where your plot is and we will call within one working day. The visit and the first consultation cost nothing.</p>
+  <p>Book now and claim 25% off. Tell us where your plot is and we will call within one working day. The visit and the first consultation cost nothing.</p>
   <form class="quick" id="popForm" novalidate>
     <div class="q-field"><label for="p-name">Your name</label><input id="p-name" name="name" autocomplete="name" required></div>
     <div class="q-field"><label for="p-phone">Mobile</label><input id="p-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required></div>
