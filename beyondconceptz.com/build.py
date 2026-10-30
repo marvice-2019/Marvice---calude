@@ -82,7 +82,7 @@ CTA = """<section class="cta-band" aria-labelledby="cta-h">
   <div class="wrap cta-in">
     <h2 id="cta-h">Tell us about your plot</h2>
     <p>The first site visit and consultation are free. We call within one working day.</p>
-    <a class="btn light" href="contact.html">Book a free site visit <span class="arr" aria-hidden="true">→</span></a>
+    <a class="btn light" href="contact.html">Book a free site visit</a>
   </div>
 </section>
 """
@@ -315,7 +315,7 @@ BODY = {
 FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600&display=swap">\n'
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Marcellus&display=swap">\n'
 )
 THREE = (
     '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n'

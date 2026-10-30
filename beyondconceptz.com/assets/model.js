@@ -19,15 +19,15 @@
   controls.target.set(0,3.2,0);controls.enableDamping=true;controls.enablePan=false;controls.enableZoom=false;
   controls.minPolarAngle=0.35;controls.maxPolarAngle=1.38;controls.autoRotate=!reduce;controls.autoRotateSpeed=0.6;
 
-  scene.add(new THREE.HemisphereLight(0xfff6ea,0xb9a690,0.75));
+  scene.add(new THREE.HemisphereLight(0xfbf8f1,0xa9a69c,0.75));
   var sun=new THREE.DirectionalLight(0xffe2c4,0.95);
   sun.position.set(12,18,8);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
   var sc=sun.shadow.camera;sc.left=-14;sc.right=14;sc.top=14;sc.bottom=-14;sc.near=1;sc.far=60;sun.shadow.bias=-0.0005;
   scene.add(sun);
 
   function mat(c,r){return new THREE.MeshStandardMaterial({color:c,roughness:r==null?0.85:r,metalness:0});}
-  var M={card:mat(0xF7F3EC),brick:mat(0x8D3C27),wood:mat(0x8A5A34,0.7),glass:mat(0x55625a,0.25),base:mat(0xCBB4A4,0.95),leaf:mat(0x414C2C),trunk:mat(0x6E5A44)};
-  var edgeMat=new THREE.LineBasicMaterial({color:0x22211E,transparent:true,opacity:0.22});
+  var M={card:mat(0xF3F2EE),brick:mat(0x8D3C27),wood:mat(0x8A5A34,0.7),glass:mat(0x55625a,0.25),base:mat(0xC9C6BC,0.95),leaf:mat(0x414C2C),trunk:mat(0x6E5A44)};
+  var edgeMat=new THREE.LineBasicMaterial({color:0x1F2420,transparent:true,opacity:0.22});
   function box(g,w,h,d,x,y,z,m,edges){
     var mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);
     if(edges!==false){var l=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry),edgeMat);l.position.copy(mesh.position);g.add(l);}
@@ -39,7 +39,7 @@
   var board=box(scene,22,0.4,20,0,-0.2,0,M.base,false);board.castShadow=false;
   box(scene,10.4,0.45,12.4,0.2,0.225,0,M.card);
   /* driveway */
-  var dw=box(scene,3.2,0.02,4.5,3.4,0.01,8,mat(0xE6DACF),false);dw.castShadow=false;
+  var dw=box(scene,3.2,0.02,4.5,3.4,0.01,8,mat(0xDCDAD2),false);dw.castShadow=false;
 
   /* ground floor */
   var gf=new THREE.Group();house.add(gf);

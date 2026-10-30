@@ -13,20 +13,6 @@
     mq.addEventListener('change',sync);sync();
   }
 
-  /* Entrances: only what sits below the first screen is hidden, and only while script runs */
-  if(!reduce&&'IntersectionObserver' in window){
-    var groups={};
-    document.querySelectorAll('.rv').forEach(function(el){
-      if(el.getBoundingClientRect().top<innerHeight*.92)return;
-      var sec=el.closest('section')||document.body,key=sec.id||sec.className;
-      groups[key]=(groups[key]||0)+1;
-      el.style.transitionDelay=Math.min(groups[key]-1,5)*75+'ms';
-      el.classList.add('pre');
-    });
-    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.remove('pre');io.unobserve(e.target);}});},{rootMargin:'0px 0px -8% 0px'});
-    document.querySelectorAll('.rv.pre').forEach(function(el){io.observe(el)});
-  }
-
   /* Services list: the arch follows the open service */
   var list=$('svcList');
   if(list){
