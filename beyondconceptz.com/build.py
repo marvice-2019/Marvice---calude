@@ -69,19 +69,32 @@ def header(current):
 
 FOOTER = """<footer>
   <div class="wrap f-top">
-    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, construction and interiors for independent homes in Chennai and Kanchipuram.</p></div>
+    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, interiors and turnkey construction. Independent homes across Chennai and Kanchipuram, and office and restaurant interiors in Chennai.</p></div>
     <div><h2>Explore</h2><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li></ul></div>
-    <div><h2>Contact</h2><ul><li>beyondconceptz@gmail.com</li><li>Monday to Saturday</li><li><a href="contact.html">Book a site visit</a></li></ul></div>
+    <div><h2>Contact</h2><ul><li><a href="tel:+919600029991">+91 96000 29991</a></li><li><a href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="mailto:beyondconceptz@gmail.com">beyondconceptz@gmail.com</a></li><li>224, Pathari Road, Thousand Lights, Chennai 600006</li><li><a href="https://www.instagram.com/beyond_conceptz/" target="_blank" rel="noopener">Instagram</a></li></ul></div>
   </div>
   <div class="wrap f-name" aria-hidden="true"><svg viewBox="0 0 256 370"><use href="#mark"/></svg><b>BEYOND CONCEPTZ</b></div>
   <div class="f-base"><div class="wrap f-base-in"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>Website by Marvice Media</span></div></div>
 </footer>
 """
 
+CALLBAR = """<nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></nav>
+"""
+
+SCHEMA = """<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"GeneralContractor","name":"Beyond Conceptz",
+"description":"Architecture, interiors and turnkey construction for independent homes in Chennai and Kanchipuram, and office and restaurant interiors in Chennai.",
+"url":"https://beyondconceptz.com/","telephone":"+91-96000-29991","email":"beyondconceptz@gmail.com",
+"address":{"@type":"PostalAddress","streetAddress":"224, Pathari Road, Thousand Lights East","addressLocality":"Chennai","addressRegion":"Tamil Nadu","postalCode":"600006","addressCountry":"IN"},
+"areaServed":["Chennai","Kanchipuram","Chengalpattu"],
+"sameAs":["https://www.instagram.com/beyond_conceptz/","https://www.indiamart.com/beyond-conceptz-company/"]}
+</script>
+"""
+
 CTA = """<section class="cta-band" aria-labelledby="cta-h">
   <div class="wrap cta-in">
     <h2 id="cta-h">Tell us about your plot</h2>
-    <p>The first site visit and consultation are free. We call within one working day.</p>
+    <p>The first site visit and consultation are free. Call or WhatsApp <a href="tel:+919600029991" class="tel">+91 96000 29991</a>, or send your details and we call within one working day.</p>
     <a class="btn light" href="contact.html">Book a free site visit</a>
   </div>
 </section>
@@ -224,10 +237,11 @@ def services_detail():
 </section>
 <section class="sec" aria-labelledby="sx-h">
   <div class="wrap">
-    <div class="head"><h2 id="sx-h" class="rv">Smaller jobs we take on</h2><p class="rv">Not building from scratch? These are priced on their own.</p></div>
-    <div class="values">
+    <div class="head"><h2 id="sx-h" class="rv">Also on our desk</h2><p class="rv">Not building a home from scratch? Each of these is scoped and priced on its own.</p></div>
+    <div class="values three">
       <div class="rv"><h3>Renovation and extensions</h3><p>Add a floor or rework an older home. We check the existing structure first and tell you plainly what it can carry.</p></div>
       <div class="rv"><h3>Design only</h3><p>Already have a contractor? We prepare your plans, elevation and approval drawings, and visit site at key stages.</p></div>
+      <div class="rv"><h3>Office and restaurant interiors</h3><p>Workspaces, cafés and restaurants in Chennai: layout, joinery, lighting and fit-out, delivered to a fixed schedule so you can open on time.</p></div>
     </div>
   </div>
 </section>
@@ -333,6 +347,7 @@ def page(fname, title, full):
         f'<title>{title}</title>\n<meta name="description" content="{DESC[fname]}">\n'
         + FONTS
         + '<link rel="stylesheet" href="assets/site.css">\n<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">\n'
+        + SCHEMA
     )
     content = (
         part("defs")
@@ -341,6 +356,7 @@ def page(fname, title, full):
         + body
         + "</main>\n"
         + FOOTER
+        + CALLBAR
         + scripts
     )
     if full:

@@ -1,6 +1,14 @@
 /* Beyond Conceptz: shared behaviour. Each block runs only when its markup is on the page. */
 (function(){
   var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.documentElement.classList.add('js');
+
+  /* Arches below the first screen open once as they come into view */
+  if(!reduce&&'IntersectionObserver' in window){
+    var arches=[].filter.call(document.querySelectorAll('main .arch'),function(a){return !a.closest('.hero-pic,.phero-pic')&&a.getBoundingClientRect().top>innerHeight;});
+    var ao=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.remove('await');e.target.classList.add('open');ao.unobserve(e.target);}});},{rootMargin:'0px 0px -12% 0px'});
+    arches.forEach(function(a){a.classList.add('await');ao.observe(a);});
+  }
   function $(id){return document.getElementById(id);}
 
   /* Header + mobile menu */
@@ -104,6 +112,7 @@
       var txt=['Name: '+name,'Phone: '+phone,'Planning: '+need,'Plot location: '+(E['loc'].value||'–'),'Plot size: '+(E['size'].value||'–'),
         'Budget: '+(E['budget'].value||'–'),'Start: '+(E['when'].value||'–'),'Notes: '+(E['msg'].value.trim()||'–')].join('\n');
       $('summary').textContent=txt;
+      $('waSum').href='https://wa.me/919600029991?text='+encodeURIComponent('Site visit request\n'+txt);
       $('mailSum').href='mailto:beyondconceptz@gmail.com?subject='+encodeURIComponent('Site visit request: '+name)+'&body='+encodeURIComponent(txt);
       var r=$('result');r.hidden=false;r.scrollIntoView({block:'nearest'});
     });

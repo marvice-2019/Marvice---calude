@@ -11,6 +11,14 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Marcellus&display=swap">
 <link rel="stylesheet" href="assets/site.css">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"GeneralContractor","name":"Beyond Conceptz",
+"description":"Architecture, interiors and turnkey construction for independent homes in Chennai and Kanchipuram, and office and restaurant interiors in Chennai.",
+"url":"https://beyondconceptz.com/","telephone":"+91-96000-29991","email":"beyondconceptz@gmail.com",
+"address":{"@type":"PostalAddress","streetAddress":"224, Pathari Road, Thousand Lights East","addressLocality":"Chennai","addressRegion":"Tamil Nadu","postalCode":"600006","addressCountry":"IN"},
+"areaServed":["Chennai","Kanchipuram","Chengalpattu"],
+"sameAs":["https://www.instagram.com/beyond_conceptz/","https://www.indiamart.com/beyond-conceptz-company/"]}
+</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -44,8 +52,10 @@
     <div class="wrap c-grid">
       <div class="side">
         <h1 id="ct-h">Tell us about your plot</h1>
-        <p>Share a few details and we will call within one working day to fix a site visit. The first visit and consultation are free.</p>
+        <p>Share a few details and we will call within one working day to fix a site visit. The first visit and consultation are free. You are also welcome at our studio in Thousand Lights.</p>
         <div class="reach">
+          <div><small>Call or WhatsApp</small><b><a href="tel:+919600029991">+91 96000 29991</a></b><a class="copy-btn" href="https://wa.me/919600029991" target="_blank" rel="noopener">Message on WhatsApp</a></div>
+          <div><small>Studio</small><b>224, Pathari Road, Thousand Lights, Chennai 600006</b><a class="copy-btn" href="https://maps.google.com/?q=Beyond+Conceptz+224+Pathari+Road+Thousand+Lights+Chennai+600006" target="_blank" rel="noopener">Open in Maps</a></div>
           <div><small>Email</small><b id="email">beyondconceptz@gmail.com</b><button type="button" class="copy-btn" id="copyEmail">Copy address</button></div>
           <div><small>We build in</small><b>Chennai and Kanchipuram</b></div>
           <div><small>Site visits</small><b>Monday to Saturday</b></div>
@@ -70,9 +80,9 @@
           <div class="field full"><label for="f-msg">Anything else</label><textarea id="f-msg" name="msg" placeholder="Bedrooms, parking, a rental floor"></textarea></div>
           <button class="btn" type="submit">Request a site visit</button>
           <div class="result" id="result" hidden aria-live="polite">
-            <b>Your request is ready. Copy it, or open it in your email.</b>
+            <b>Your request is ready. Send it to us on WhatsApp, or by email.</b>
             <pre id="summary"></pre>
-            <div class="row"><button type="button" class="btn quiet" id="copySum">Copy details</button><a class="btn" id="mailSum" href="#">Open in email</a></div>
+            <div class="row"><a class="btn" id="waSum" href="#" target="_blank" rel="noopener">Send on WhatsApp</a><a class="btn quiet" id="mailSum" href="#">Send by email</a><button type="button" class="copy-btn dark" id="copySum">Copy details</button></div>
           </div>
         </form>
       </div>
@@ -95,13 +105,14 @@
   </section></main>
 <footer>
   <div class="wrap f-top">
-    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, construction and interiors for independent homes in Chennai and Kanchipuram.</p></div>
+    <div><h2>Beyond Conceptz</h2><p class="lead">Architecture, interiors and turnkey construction. Independent homes across Chennai and Kanchipuram, and office and restaurant interiors in Chennai.</p></div>
     <div><h2>Explore</h2><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li></ul></div>
-    <div><h2>Contact</h2><ul><li>beyondconceptz@gmail.com</li><li>Monday to Saturday</li><li><a href="contact.html">Book a site visit</a></li></ul></div>
+    <div><h2>Contact</h2><ul><li><a href="tel:+919600029991">+91 96000 29991</a></li><li><a href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="mailto:beyondconceptz@gmail.com">beyondconceptz@gmail.com</a></li><li>224, Pathari Road, Thousand Lights, Chennai 600006</li><li><a href="https://www.instagram.com/beyond_conceptz/" target="_blank" rel="noopener">Instagram</a></li></ul></div>
   </div>
   <div class="wrap f-name" aria-hidden="true"><svg viewBox="0 0 256 370"><use href="#mark"/></svg><b>BEYOND CONCEPTZ</b></div>
   <div class="f-base"><div class="wrap f-base-in"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>Website by Marvice Media</span></div></div>
 </footer>
+<nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></nav>
 <script src="assets/site.js"></script>
 </body>
 </html>
