@@ -77,7 +77,7 @@ FOOTER = """<footer>
     <div><h2>Explore</h2><ul><li><a href="about.html">About</a></li><li><a href="services.html">Services</a></li><li><a href="collections.html">Collections</a></li><li><a href="process.html">Process</a></li><li><a href="projects.html">Projects</a></li></ul></div>
     <div><h2>Contact</h2><ul><li><a href="tel:+919600029991">+91 96000 29991</a></li><li><a href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></li><li><a href="mailto:beyondconceptz@gmail.com">beyondconceptz@gmail.com</a></li><li>224, Pathari Road, Thousand Lights, Chennai 600006</li><li><a href="https://www.instagram.com/beyond_conceptz/" target="_blank" rel="noopener">Instagram</a></li></ul></div>
   </div>
-  <div class="wrap f-name" aria-hidden="true"><svg viewBox="0 0 256 370"><use href="#mark"/></svg><b>BEYOND CONCEPTZ</b></div>
+  <div class="wrap f-name" aria-hidden="true"><svg viewBox="0 0 256 370"><use href="#mark"/></svg><span class="wm-big"><b>BEYOND</b><span>CONCEPTZ</span></span></div>
   <div class="f-base"><div class="wrap f-base-in"><span>© <span id="yr">2026</span> Beyond Conceptz</span><span>GSTIN 33DUYPR3142B1ZI</span><span>Website by Marvice Media</span></div></div>
 </footer>
 """
@@ -325,7 +325,7 @@ BODY = {
 FONTS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
     '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Marcellus&display=swap">\n'
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Marcellus&family=Montserrat:wght@400;700&display=swap">\n'
 )
 THREE = (
     '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n'
