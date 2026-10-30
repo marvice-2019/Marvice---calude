@@ -361,7 +361,7 @@ BUSINESS = {
     "description": "Architecture, interiors and turnkey construction for independent homes and office and restaurant interiors across Tamil Nadu, Bengaluru and Andhra Pradesh, from a studio in Chennai.",
     "url": SITE,
     "image": SITE + "img/hero.jpg",
-    "logo": SITE + "assets/favicon.svg",
+    "logo": SITE + "assets/icon-512.png",
     "telephone": "+91-96000-29991",
     "email": "beyondconceptz@gmail.com",
     "taxID": "33DUYPR3142B1ZI",
@@ -423,6 +423,13 @@ def head_meta(fname, title):
             f'<meta name="geo.region" content="IN-TN">\n<meta name="geo.placename" content="Chennai">\n')
 
 
+MANIFEST = json.dumps({
+    "name": "Beyond Conceptz", "short_name": "Beyond Conceptz", "start_url": "/", "display": "browser",
+    "background_color": "#EFEEE9", "theme_color": "#EFEEE9",
+    "icons": [{"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png"},
+              {"src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}],
+}, indent=2) + "\n"
+
 ROBOTS = f"""User-agent: *
 Allow: /
 
@@ -480,7 +487,7 @@ def page(fname, title, full):
     meta = (
         f'<title>{title}</title>\n<meta name="description" content="{DESC[fname]}">\n'
         + FONTS
-        + '<link rel="stylesheet" href="assets/site.css">\n<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">\n'
+        + '<link rel="stylesheet" href="assets/site.css">\n<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">\n<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">\n<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">\n<link rel="manifest" href="site.webmanifest">\n<meta name="theme-color" content="#EFEEE9">\n'
         + head_meta(fname, title)
         + schema(fname, title)
     )
@@ -528,7 +535,8 @@ def build():
         os.makedirs(d)
         shutil.copytree(os.path.join(ROOT, "assets"), os.path.join(d, "assets"))
         shutil.copytree(os.path.join(ROOT, "img"), os.path.join(d, "img"))
-        for name, body in (("robots.txt", ROBOTS), ("sitemap.xml", sitemap()), ("llms.txt", llms())):
+        shutil.copy(os.path.join(ROOT, "assets", "favicon.ico"), os.path.join(d, "favicon.ico"))
+        for name, body in (("robots.txt", ROBOTS), ("sitemap.xml", sitemap()), ("llms.txt", llms()), ("site.webmanifest", MANIFEST)):
             with open(os.path.join(d, name), "w") as fh:
                 fh.write(body)
         for fname, _, title in PAGES:
