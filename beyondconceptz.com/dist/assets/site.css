@@ -403,3 +403,6 @@ nav a[aria-current="page"]{text-decoration:underline;text-decoration-color:var(-
 
 /* A tone field followed by the call to action: no plaster strip between them */
 .model + .cta-band{margin-top:0}
+
+/* City note on the planner result */
+.est-note{margin-top:1.4rem;font-size:var(--t-small);color:var(--on-dark-2)}
