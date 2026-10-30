@@ -496,3 +496,5 @@ html,body{overflow-x:clip}
 .wa-tip{position:absolute;right:calc(100% + 16px);top:50%;transform:translate(8px,-50%);white-space:nowrap;background:var(--ground);color:var(--ink);font:500 .9rem var(--f-body);padding:.6rem .95rem;border:1px solid var(--stone);opacity:0;pointer-events:none;transition:opacity .3s var(--ease),transform .3s var(--ease)}
 .wa-float:hover .wa-tip,.wa-float:focus-visible .wa-tip{opacity:1;transform:translate(0,-50%)}
 .callbar .c2 .wa-ico{width:20px;height:20px;margin-right:.55rem}
+/* Phone seal: inside the frame, with the claim line large enough to read */
+@media (max-width:860px){.stamp{right:14px;bottom:20px;width:124px;height:124px;padding:14px}.stamp b{font-size:1.6rem}.stamp span{font-size:.76rem;line-height:1.2}}
