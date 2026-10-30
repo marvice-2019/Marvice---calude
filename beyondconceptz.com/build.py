@@ -5,7 +5,10 @@ artifact/  same pages; index.html without <html>/<head> wrappers for the claude.
 Run: python3 build.py
 """
 
+import datetime
+import json
 import os
+import re
 import shutil
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -18,22 +21,22 @@ def part(name):
 
 
 PAGES = [  # file, nav label, <title>
-    ("index.html", "Home", "Beyond Conceptz"),
-    ("about.html", "About", "About | Beyond Conceptz"),
-    ("services.html", "Services", "Services | Beyond Conceptz"),
-    ("collections.html", "Collections", "Collections and pricing | Beyond Conceptz"),
-    ("process.html", "Process", "How we build | Beyond Conceptz"),
-    ("projects.html", "Projects", "Projects | Beyond Conceptz"),
-    ("contact.html", "Contact", "Contact | Beyond Conceptz"),
+    ("index.html", "Home", "Architects and Home Builders in Chennai | Beyond Conceptz"),
+    ("about.html", "About", "About Us | Architects in Thousand Lights, Chennai"),
+    ("services.html", "Services", "Architecture, Interiors and Construction | Beyond Conceptz"),
+    ("collections.html", "Collections", "House Construction Cost per sq.ft, Chennai | Beyond Conceptz"),
+    ("process.html", "Process", "How We Build Your Home, Step by Step | Beyond Conceptz"),
+    ("projects.html", "Projects", "Homes We Are Building | Beyond Conceptz"),
+    ("contact.html", "Contact", "Book a Free Site Visit | Beyond Conceptz, Chennai"),
 ]
 DESC = {
-    "index.html": "Beyond Conceptz designs and builds independent homes across Tamil Nadu, Bengaluru and Andhra Pradesh: plans, approvals, construction and interiors from one team.",
+    "index.html": "Architects and turnkey home builders in Chennai. Plans, approvals, construction and interiors from one team, in Tamil Nadu, Bengaluru and Andhra Pradesh.",
     "about.html": "Why Beyond Conceptz keeps design and construction in one team, and how we work with home owners across Tamil Nadu, Bengaluru and Andhra Pradesh.",
-    "services.html": "Architecture and planning, approval drawings, turnkey construction, interiors, renovation and design-only services.",
-    "collections.html": "Essential, Signature and Bespoke collections with their specifications, and a budget planner for your home.",
-    "process.html": "Six steps from site visit to handover, stage-wise payments and video updates from site.",
-    "projects.html": "Homes Beyond Conceptz is designing and building across Tamil Nadu, Bengaluru and Andhra Pradesh.",
-    "contact.html": "Book a free site visit with Beyond Conceptz. Tell us about your plot and we will call within one working day.",
+    "services.html": "Architecture and planning, approval drawings, turnkey house construction, interiors, renovation, and office and restaurant interiors, from a Chennai studio.",
+    "collections.html": "House construction cost in Chennai: ₹2,100 to ₹3,800 per sq.ft built-up across three written specifications, with a budget planner and stage-wise payments.",
+    "process.html": "How we build your home in six steps, from a free site visit to handover, with payments tied to stages and photo and video updates from site.",
+    "projects.html": "Independent homes Beyond Conceptz is designing and building, including the Sampath Residence in Kanchipuram. Ask us for a site walkthrough.",
+    "contact.html": "Book a free site visit with Beyond Conceptz. Call or WhatsApp +91 96000 29991, or visit our studio at 224, Pathari Road, Thousand Lights, Chennai.",
 }
 
 
@@ -81,15 +84,6 @@ FOOTER = """<footer>
 CALLBAR = """<nav class="callbar" aria-label="Quick contact"><a class="c1" href="tel:+919600029991">Call</a><a class="c2" href="https://wa.me/919600029991" target="_blank" rel="noopener">WhatsApp</a></nav>
 """
 
-SCHEMA = """<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"GeneralContractor","name":"Beyond Conceptz",
-"description":"Architecture, interiors and turnkey construction for independent homes and office and restaurant interiors across Tamil Nadu, Bengaluru and Andhra Pradesh, from a studio in Chennai.",
-"url":"https://beyondconceptz.com/","telephone":"+91-96000-29991","taxID":"33DUYPR3142B1ZI","founder":{"@type":"Person","name":"Md Khaleel"},"email":"beyondconceptz@gmail.com",
-"address":{"@type":"PostalAddress","streetAddress":"224, Pathari Road, Thousand Lights East","addressLocality":"Chennai","addressRegion":"Tamil Nadu","postalCode":"600006","addressCountry":"IN"},
-"areaServed":[{"@type":"State","name":"Tamil Nadu"},{"@type":"City","name":"Bengaluru"},{"@type":"State","name":"Andhra Pradesh"}],
-"sameAs":["https://www.instagram.com/beyond_conceptz/","https://www.indiamart.com/beyond-conceptz-company/"]}
-</script>
-"""
 
 CTA = """<section class="cta-band" aria-labelledby="cta-h">
   <div class="wrap cta-in">
@@ -339,6 +333,144 @@ THREE = (
 )
 
 
+# ---------- SEO, AEO and GEO ----------
+
+SITE = "https://beyondconceptz.com/"
+AREA = ["Tamil Nadu", "Bengaluru", "Andhra Pradesh"]
+TIERS = [("Essential", 2100, 2400), ("Signature", 2500, 2900), ("Bespoke", 3100, 3800)]
+SERVICES = [
+    "Architecture and planning",
+    "Plan approval drawings and structural design",
+    "Turnkey house construction",
+    "Home interiors",
+    "Renovation and extensions",
+    "Design only",
+    "Office and restaurant interiors",
+]
+
+
+def url(fname):
+    return SITE if fname == "index.html" else SITE + fname
+
+
+BUSINESS = {
+    "@type": "GeneralContractor",
+    "@id": SITE + "#business",
+    "name": "Beyond Conceptz",
+    "description": "Architecture, interiors and turnkey construction for independent homes and office and restaurant interiors across Tamil Nadu, Bengaluru and Andhra Pradesh, from a studio in Chennai.",
+    "url": SITE,
+    "image": SITE + "img/hero.jpg",
+    "logo": SITE + "assets/favicon.svg",
+    "telephone": "+91-96000-29991",
+    "email": "beyondconceptz@gmail.com",
+    "taxID": "33DUYPR3142B1ZI",
+    "founder": {"@type": "Person", "name": "Md Khaleel"},
+    "priceRange": "₹2,100 to ₹3,800 per sq.ft",
+    "address": {"@type": "PostalAddress", "streetAddress": "224, Pathari Road, Thousand Lights East",
+                "addressLocality": "Chennai", "addressRegion": "Tamil Nadu", "postalCode": "600006", "addressCountry": "IN"},
+    "hasMap": "https://maps.google.com/?q=Beyond+Conceptz+224+Pathari+Road+Thousand+Lights+Chennai+600006",
+    "areaServed": [{"@type": "State", "name": "Tamil Nadu"}, {"@type": "City", "name": "Bengaluru"}, {"@type": "State", "name": "Andhra Pradesh"}],
+    "knowsAbout": ["Residential architecture", "Turnkey house construction", "Interior design", "Vastu-aligned floor plans", "Plan approval drawings"],
+    "sameAs": ["https://www.instagram.com/beyond_conceptz/", "https://www.indiamart.com/beyond-conceptz-company/"],
+}
+
+
+def faq_items():
+    """FAQPage answers are read from the visible FAQ, so markup and page never drift apart."""
+    items = []
+    for q, a in re.findall(r"<summary>(.*?)<svg.*?</summary><p>(.*?)</p>", part("faq"), re.S):
+        items.append({"@type": "Question", "name": q.strip(),
+                      "acceptedAnswer": {"@type": "Answer", "text": re.sub(r"<[^>]+>", "", a).strip()}})
+    return items
+
+
+def schema(fname, title):
+    graph = [BUSINESS]
+    if fname == "index.html":
+        graph.append({"@type": "WebSite", "@id": SITE + "#website", "url": SITE, "name": "Beyond Conceptz",
+                      "publisher": {"@id": SITE + "#business"}, "inLanguage": "en-IN"})
+    else:
+        label = next(lbl for f, lbl, _ in PAGES if f == fname)
+        graph.append({"@type": "BreadcrumbList", "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": SITE},
+            {"@type": "ListItem", "position": 2, "name": label, "item": url(fname)}]})
+    if fname == "services.html":
+        graph.append({"@type": "OfferCatalog", "name": "Beyond Conceptz services",
+                      "itemListElement": [{"@type": "Offer", "itemOffered": {"@type": "Service", "name": s,
+                                           "provider": {"@id": SITE + "#business"},
+                                           "areaServed": [{"@type": "Place", "name": a} for a in AREA]}} for s in SERVICES]})
+    if fname == "collections.html":
+        graph.append({"@type": "Service", "name": "Turnkey house construction in Chennai",
+                      "provider": {"@id": SITE + "#business"}, "areaServed": {"@type": "City", "name": "Chennai"},
+                      "offers": [{"@type": "Offer", "name": n + " collection",
+                                  "priceSpecification": {"@type": "UnitPriceSpecification", "priceCurrency": "INR",
+                                                         "minPrice": lo, "maxPrice": hi, "unitText": "per sq.ft built-up"}}
+                                 for n, lo, hi in TIERS]})
+    if fname == "contact.html":
+        graph.append({"@type": "FAQPage", "mainEntity": faq_items()})
+    data = {"@context": "https://schema.org", "@graph": graph}
+    return '<script type="application/ld+json">' + json.dumps(data, ensure_ascii=False) + "</script>\n"
+
+
+def head_meta(fname, title):
+    u = url(fname)
+    return (f'<link rel="canonical" href="{u}">\n'
+            f'<meta property="og:type" content="website">\n<meta property="og:site_name" content="Beyond Conceptz">\n'
+            f'<meta property="og:title" content="{title}">\n<meta property="og:description" content="{DESC[fname]}">\n'
+            f'<meta property="og:url" content="{u}">\n<meta property="og:image" content="{SITE}img/hero.jpg">\n'
+            f'<meta property="og:locale" content="en_IN">\n<meta name="twitter:card" content="summary_large_image">\n'
+            f'<meta name="geo.region" content="IN-TN">\n<meta name="geo.placename" content="Chennai">\n')
+
+
+ROBOTS = f"""User-agent: *
+Allow: /
+
+# AI answer engines are welcome to read and cite this site
+User-agent: GPTBot
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+
+Sitemap: {SITE}sitemap.xml
+"""
+
+
+def sitemap():
+    today = datetime.date.today().isoformat()
+    rows = "".join(f"  <url><loc>{url(f)}</loc><lastmod>{today}</lastmod></url>\n" for f, _, _ in PAGES)
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + rows + "</urlset>\n"
+
+
+def llms():
+    lines = [
+        "# Beyond Conceptz",
+        "",
+        "> Architects and turnkey home builders with a studio in Thousand Lights, Chennai. One team designs and builds independent homes, and fits out offices and restaurants, across Tamil Nadu, Bengaluru and Andhra Pradesh. Led by Md Khaleel.",
+        "",
+        "## Facts",
+        "- Studio: 224, Pathari Road, Thousand Lights East, Chennai, Tamil Nadu 600006, India",
+        "- Phone and WhatsApp: +91 96000 29991",
+        "- Email: beyondconceptz@gmail.com",
+        "- Instagram: https://www.instagram.com/beyond_conceptz/",
+        "- GSTIN: 33DUYPR3142B1ZI",
+        "- Service area: Tamil Nadu, Bengaluru, Andhra Pradesh",
+        "- Services: " + "; ".join(SERVICES),
+        "- Construction rates in Chennai (per sq.ft built-up): " + "; ".join(f"{n} ₹{lo:,} to ₹{hi:,}" for n, lo, hi in TIERS) + ". Bengaluru and Andhra Pradesh are quoted after a site visit. Approval fees and government charges are extra.",
+        "- Payments are tied to construction stages and released after each stage is shown to the owner. Photos, video and an engineer's checklist are sent at every stage.",
+        "- The first site visit and consultation are free.",
+        "",
+        "## Pages",
+    ]
+    lines += [f"- [{lbl}]({url(f)}): {DESC[f]}" for f, lbl, _ in PAGES]
+    return "\n".join(lines) + "\n"
+
+
 def page(fname, title, full):
     body = BODY[fname]
     scripts = '<script src="assets/site.js"></script>\n' + (
@@ -348,7 +480,8 @@ def page(fname, title, full):
         f'<title>{title}</title>\n<meta name="description" content="{DESC[fname]}">\n'
         + FONTS
         + '<link rel="stylesheet" href="assets/site.css">\n<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">\n'
-        + SCHEMA
+        + head_meta(fname, title)
+        + schema(fname, title)
     )
     content = (
         part("defs")
@@ -362,7 +495,7 @@ def page(fname, title, full):
     )
     if full:
         return (
-            '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+            '<!doctype html>\n<html lang="en-IN">\n<head>\n<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
             '<meta name="claude:viewport-fit-sides" content="cover">\n'
             + meta
@@ -384,6 +517,9 @@ def build():
         os.makedirs(d)
         shutil.copytree(os.path.join(ROOT, "assets"), os.path.join(d, "assets"))
         shutil.copytree(os.path.join(ROOT, "img"), os.path.join(d, "img"))
+        for name, body in (("robots.txt", ROBOTS), ("sitemap.xml", sitemap()), ("llms.txt", llms())):
+            with open(os.path.join(d, name), "w") as fh:
+                fh.write(body)
         for fname, _, title in PAGES:
             full = full_index or fname != "index.html"
             with open(os.path.join(d, fname), "w") as fh:
