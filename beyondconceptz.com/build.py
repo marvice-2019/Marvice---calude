@@ -6,6 +6,7 @@ Run: python3 build.py
 """
 
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -510,6 +511,16 @@ def page(fname, title, full):
     )
 
 
+def fingerprint(html):
+    """Append a content hash to every local asset URL. Browsers may cache assets for 30 days,
+    so a changed file must get a new URL or visitors keep seeing the old one."""
+    def ver(m):
+        path = m.group(2)
+        with open(os.path.join(ROOT, path), "rb") as fh:
+            return f'{m.group(1)}{path}?v={hashlib.sha1(fh.read()).hexdigest()[:10]}"'
+    return re.sub(r'((?:href|src)=")((?:assets|img)/[^"?#]+)"', ver, html)
+
+
 def build():
     for out, full_index in (("dist", True), ("artifact", False)):
         d = os.path.join(ROOT, out)
@@ -523,7 +534,7 @@ def build():
         for fname, _, title in PAGES:
             full = full_index or fname != "index.html"
             with open(os.path.join(d, fname), "w") as fh:
-                fh.write(page(fname, title, full))
+                fh.write(fingerprint(page(fname, title, full)))
     print("built", [p[0] for p in PAGES])
 
 
