@@ -20,7 +20,8 @@ export type BookingEventPayload = {
   ends_at: string;
   guests: number;
   name: string;
-  phone_e164: string;
+  /** Null for a walk-in who gave no phone. */
+  phone_e164: string | null;
   notes: string | null;
   cancelled_by?: "guest" | "staff";
 };

@@ -1,0 +1,2 @@
+ALTER TABLE "bookings" ALTER COLUMN "phone_e164" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_phone_required" CHECK ("bookings"."phone_e164" IS NOT NULL OR "bookings"."source" = 'walk_in');

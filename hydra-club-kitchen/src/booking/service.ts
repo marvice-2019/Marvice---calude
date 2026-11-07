@@ -332,7 +332,8 @@ async function findByRef(db: Db, raw: unknown) {
     .innerJoin(zones, eq(zones.id, tables.zoneId))
     .where(eq(bookings.ref, parsed.data.ref));
   // Same answer for an unknown ref and a wrong last-4, so refs can't be probed.
-  if (!row || !row.b.phoneE164.endsWith(parsed.data.last4)) return null;
+  // A walk-in with no phone can never be looked up by a guest.
+  if (!row || !row.b.phoneE164 || !row.b.phoneE164.endsWith(parsed.data.last4)) return null;
   return row;
 }
 
@@ -553,4 +554,97 @@ export async function listHolds(db: Db, from: string) {
     .leftJoin(zones, eq(zones.id, tableHolds.zoneId))
     .where(and(sql`${tableHolds.date} >= ${from}`, or(isNotNull(tableHolds.tableId), isNotNull(tableHolds.zoneId))))
     .orderBy(asc(tableHolds.date));
+}
+
+export const walkInSchema = z.object({
+  table: z.string().max(20),
+  /** "now", or a slot time (HH:mm) on tonight's service date. */
+  time: z.union([z.literal("now"), z.string().refine(isHHmm, "Pick a time.")]),
+  guests: z.coerce.number().int().min(1, "At least 1 guest.").max(50),
+  name: cleanText(80).pipe(z.string().min(1, "Add a name (first name is fine).")),
+  /** Optional for walk-ins. */
+  phone: z.string().max(30).optional().default(""),
+  notes: cleanText(500).optional().default(""),
+});
+
+/**
+ * Seat a walk-in on tonight's service date: confirmed straight away, source 'walk_in',
+ * phone optional. The no-overlap constraint still refuses a table that is taken.
+ * No guest notification is sent (staff are talking to the guest already).
+ */
+export async function createWalkIn(db: Db, s: Settings, userId: string, raw: unknown, now = new Date()) {
+  const parsed = walkInSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fields: Record<string, string> = {};
+    for (const i of parsed.error.issues) fields[String(i.path[0] ?? "form")] ??= i.message;
+    return fail(400, "invalid", "Check the highlighted fields.", { fields });
+  }
+  const input = parsed.data;
+  let phone: string | null = null;
+  if (input.phone.trim() !== "") {
+    phone = toIndianE164(input.phone);
+    if (!phone) return fail(400, "invalid", "Check the highlighted fields.", { fields: { phone: "Enter a 10-digit Indian mobile number, or leave it empty." } });
+  }
+
+  const date = serviceDateOf(now);
+  let startsAt: Date;
+  let endsAt: Date;
+  if (input.time === "now") {
+    startsAt = new Date(Math.floor(now.getTime() / 60_000) * 60_000);
+    endsAt = new Date(startsAt.getTime() + s.slot_length_minutes * 60_000);
+  } else {
+    const slot = slotsFor(s.hours, date, s.slot_length_minutes).find((x) => x.time === input.time);
+    if (!slot) return fail(400, "bad_time", "That time isn't a slot tonight.");
+    ({ startsAt, endsAt } = slot);
+  }
+
+  const [table] = await db
+    .select({ id: tables.id, code: tables.code, zoneId: tables.zoneId, zone: zones.key })
+    .from(tables)
+    .innerJoin(zones, eq(zones.id, tables.zoneId))
+    .where(and(eq(tables.code, input.table), eq(tables.active, true)));
+  if (!table) return fail(400, "bad_table", "Pick a table.");
+
+  const [hold] = await db
+    .select({ id: tableHolds.id })
+    .from(tableHolds)
+    .where(and(eq(tableHolds.date, date), or(eq(tableHolds.tableId, table.id), eq(tableHolds.zoneId, table.zoneId))));
+  if (hold) return fail(409, "table_taken", `${table.code} is held tonight. Pick another table.`);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const ref = newRef();
+    try {
+      const row = await db.transaction(async (tx) => {
+        const [inserted] = await tx
+          .insert(bookings)
+          .values({
+            ref,
+            tableId: table.id,
+            startsAt,
+            endsAt,
+            guests: input.guests,
+            name: input.name,
+            phoneE164: phone,
+            notes: input.notes || null,
+            status: "confirmed",
+            source: "walk_in",
+          })
+          .returning();
+        await tx.insert(auditLog).values({
+          userId,
+          action: "booking.walk_in",
+          entity: "booking",
+          entityId: ref,
+          diff: { table: table.code, startsAt: startsAt.toISOString(), guests: input.guests },
+        });
+        return inserted!;
+      });
+      return { ok: true as const, booking: summarise(row, table.code, table.zone) };
+    } catch (err) {
+      if (pgCode(err) === "23P01") return fail(409, "table_taken", `${table.code} is already booked at that time. Pick another table.`);
+      if (pgCode(err) === "23505" && pgConstraint(err) === "bookings_ref_unique") continue;
+      throw err;
+    }
+  }
+  throw new Error("Could not allocate a unique booking reference");
 }
