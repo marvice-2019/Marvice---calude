@@ -109,7 +109,8 @@ export const bookings = pgTable(
     ),
     guests: integer("guests").notNull(),
     name: text("name").notNull(),
-    phoneE164: text("phone_e164").notNull(),
+    /** Null only for walk-ins (bookings_phone_required). */
+    phoneE164: text("phone_e164"),
     notes: text("notes"),
     contactConsentAt: timestamp("contact_consent_at", { withTimezone: true }),
     status: bookingStatusEnum("status").notNull().default("pending"),
@@ -126,6 +127,7 @@ export const bookings = pgTable(
     check("bookings_guests_range", sql`${t.guests} BETWEEN 1 AND 50`),
     check("bookings_ref_format", sql`${t.ref} ~ '^HYD-[A-Z0-9]{4}$'`),
     check("bookings_phone_in_mobile", sql`${t.phoneE164} ~ '^\\+91[6-9][0-9]{9}$'`),
+    check("bookings_phone_required", sql`${t.phoneE164} IS NOT NULL OR ${t.source} = 'walk_in'`),
     check("bookings_name_len", sql`char_length(${t.name}) BETWEEN 1 AND 80`),
     check("bookings_notes_len", sql`${t.notes} IS NULL OR char_length(${t.notes}) <= 500`),
   ],
