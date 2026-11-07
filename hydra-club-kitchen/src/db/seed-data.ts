@@ -29,10 +29,13 @@ export type WeekdayHours = { open: string; close: string } | null;
 
 /** Settings keys and their seed values. `null` / "" = unconfirmed, hidden on the site. */
 export const SETTINGS: Record<string, unknown> = {
-  // Unconfirmed (§12): three numbers are in circulation, listings disagree on hours.
+  // Unconfirmed (§12): three numbers are in circulation.
   whatsapp: "",
   phone: "",
-  hours: null as Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", WeekdayHours> | null,
+  // Confirmed by the client on 2026-11-07: open every day, 11:30 AM to 1 AM.
+  hours: Object.fromEntries(
+    (["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const).map((d) => [d, { open: "11:30", close: "01:00" }]),
+  ) as Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", WeekdayHours>,
   // Verified, except 5th vs 6th Block (flagged until the client confirms).
   address:
     "106/A, 4th C Cross, 1st Main Road, KHB Colony, Industrial Area, Koramangala 5th Block, Bengaluru 560095",

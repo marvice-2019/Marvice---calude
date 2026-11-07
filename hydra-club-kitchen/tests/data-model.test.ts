@@ -49,7 +49,9 @@ describe("seed", () => {
     const s = Object.fromEntries((await conn.db.select().from(settings)).map((r) => [r.key, r.value]));
     expect(s.whatsapp).toBe("");
     expect(s.phone).toBe("");
-    expect(s.hours).toBeNull();
+    // Hours were confirmed by the client (2026-11-07): every day 11:30 AM to 1 AM.
+    const day = { open: "11:30", close: "01:00" };
+    expect(s.hours).toEqual({ mon: day, tue: day, wed: day, thu: day, fri: day, sat: day, sun: day });
     expect(s.address_block_confirmed).toBe(false);
     const zoneRows = await conn.db.select().from(zones);
     expect(zoneRows.every((z) => z.seats === null && z.minSpendPaise === null)).toBe(true);

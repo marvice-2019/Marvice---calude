@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* Hydra design tokens (brief §2). Dark only by brief: there is no light mode. */
+:root {
+  --bg: #03070d;
+  --surface: #08111b;
+  --surface2: #0e1b29;
+  --text: #eaf2f8;
+  --muted: #8da2b5;
+  --line: rgba(255, 255, 255, 0.1);
+  --aqua: #2bb8dc;
+  --neon: #2bb8dc; /* changed at runtime by the light-show colour modes */
+  --blue: #4a93e8;
+  --amber: #e3b26a;
+  --violet: #8b5cf6;
+  --on-aqua: #021015; /* button text on aqua: near-black */
+  --beat: 0; /* 0..1, driven by the kick drum when sound is on */
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-aqua: var(--aqua);
+  --color-neon: var(--neon);
+  --color-blue: var(--blue);
+  --color-amber: var(--amber);
+  --color-violet: var(--violet);
+  --color-on-aqua: var(--on-aqua);
+  --font-display: var(--font-syne), system-ui, sans-serif;
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --tracking-display: -0.05em;
+}
+
+@layer base {
+  html {
+    overflow-x: clip;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: 72px;
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  ::selection {
+    background: var(--neon);
+    color: var(--on-aqua);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
