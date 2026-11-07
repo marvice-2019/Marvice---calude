@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "../styles/motion.css";
+@import "../styles/content.css";
+@import "../styles/booking.css";
+@import "../styles/admin.css";
 
 /* Hydra design tokens (brief §2). Dark only by brief: there is no light mode. */
 :root {
