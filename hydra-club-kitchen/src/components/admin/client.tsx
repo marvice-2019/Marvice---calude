@@ -26,6 +26,8 @@ export function AdminToasts({ children }: { children: React.ReactNode }) {
   );
 }
 
+export const useAdminToast = () => useContext(ToastCtx);
+
 /**
  * Sends an admin mutation to /api/admin/* (same origin, so the CSRF origin
  * check passes), shows the result, and refreshes the server data.
