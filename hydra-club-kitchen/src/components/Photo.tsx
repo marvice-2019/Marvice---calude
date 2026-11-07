@@ -45,5 +45,9 @@ export async function Photo({
     placeholder: blur ? ("blur" as const) : ("empty" as const),
     blurDataURL: blur,
   };
-  return fill ? <Image {...common} fill /> : <Image {...common} width={photo.width} height={photo.height} />;
+  return fill ? (
+    <Image {...common} alt={photo.alt} fill />
+  ) : (
+    <Image {...common} alt={photo.alt} width={photo.width} height={photo.height} />
+  );
 }
