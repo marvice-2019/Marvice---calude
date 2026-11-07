@@ -108,6 +108,12 @@ export function createLightRenderer(canvas: HTMLCanvasElement, opts: Options): L
     const dt = lastFrame ? now - lastFrame : 16;
     lastFrame = now;
     if (quality.frame(dt)) resize();
+    if (quality.giveUp) {
+      // Device can't keep up even at the lowest resolution: hand over to the CSS beams.
+      destroyed = true;
+      opts.onLost?.();
+      return;
+    }
     dropLevel = Math.max(0, dropLevel - (dt / 1000) * DROP_DECAY);
     if (opts.interactive && now - lastPointer > AIM_IDLE_MS) aimTarget = 0;
     aim += (aimTarget - aim) * Math.min(1, dt / 250);

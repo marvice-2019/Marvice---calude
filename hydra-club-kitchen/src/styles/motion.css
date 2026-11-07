@@ -64,7 +64,7 @@
 
 /* ---------- Story: word-by-word reveal (full text without JS: --p defaults to 1) ---------- */
 .hydra-story { --p: 1; }
-.hydra-word { opacity: clamp(0.16, calc(var(--p) * var(--n) * 1.25 - var(--i)), 1); transition: opacity .25s linear; }
+.hydra-word { opacity: clamp(0.5, calc(0.5 + (var(--p) * var(--n) * 1.25 - var(--i)) * 0.5), 1); transition: opacity .25s linear; }
 @media (prefers-reduced-motion: reduce) { .hydra-word { opacity: 1; } }
 
 /* ---------- Mobile menu stagger ---------- */

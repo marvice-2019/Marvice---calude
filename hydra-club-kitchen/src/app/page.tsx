@@ -13,6 +13,7 @@ import { Story } from "@/components/home/Story";
 import { Vip } from "@/components/home/Vip";
 import { Visit } from "@/components/home/Visit";
 import { getHomeData } from "@/lib/home-data";
+import { jsonLdString, venueJsonLd } from "@/lib/seo";
 
 // Rendered per request: admin edits show at once, and the Docker build needs no database.
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ export default async function Home() {
   const data = await getHomeData();
   return (
     <>
+      {/* Data block, not executed, so the CSP nonce isn't needed. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(venueJsonLd(data.settings)) }} />
       <Header data={data} />
       <main>
         <Hero data={data} />

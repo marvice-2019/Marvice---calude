@@ -46,8 +46,12 @@ test("home renders with no console errors and no sideways scroll", async ({ page
 test("the hero light show runs on WebGL and keeps animating", async ({ page }) => {
   await countDraws(page);
   await page.goto("/");
+  await expect(page.locator("#fx").locator("..")).toHaveAttribute("data-gl", "pending"); // CSS beams until the visitor interacts
+  await page.waitForTimeout(1500);
+  await expect(page.locator("#fx").locator("..")).toHaveAttribute("data-gl", "pending");
+  await page.mouse.move(200, 300); // first interaction starts the WebGL show
   const host = page.locator("#fx").locator("..");
-  await expect(host).toHaveAttribute("data-gl", "on", { timeout: 5000 });
+  await expect(host).toHaveAttribute("data-gl", "on", { timeout: 10000 });
   await expect(host.locator(".hydra-beams")).toBeHidden();
   const first = await draws(page, "fx");
   // Headless Chromium renders WebGL in software, so frame rates are low here; prove it keeps drawing.
@@ -64,8 +68,10 @@ test("without WebGL the CSS beams stay", async ({ page }) => {
     } as typeof orig;
   });
   await page.goto("/");
+  await page.waitForLoadState("networkidle"); // hydrated, so the interaction listener is attached
+  await page.mouse.move(200, 300); // the hero show starts on first interaction
   const host = page.locator("#fx").locator("..");
-  await expect(host).toHaveAttribute("data-gl", "off", { timeout: 5000 });
+  await expect(host).toHaveAttribute("data-gl", "off", { timeout: 10000 });
   await expect(host.locator(".hydra-beams")).toBeVisible();
 });
 
@@ -74,7 +80,9 @@ test("reduced motion: one static frame, no pinning, stacked clock", async ({ bro
   const page = await context.newPage();
   await countDraws(page);
   await page.goto("/");
-  await expect(page.locator("#fx").locator("..")).toHaveAttribute("data-gl", "on", { timeout: 5000 });
+  await page.waitForLoadState("networkidle"); // hydrated, so the interaction listener is attached
+  await page.mouse.move(200, 300); // the hero show starts on first interaction
+  await expect(page.locator("#fx").locator("..")).toHaveAttribute("data-gl", "on", { timeout: 10000 });
   await page.waitForTimeout(800);
   expect(await draws(page, "fx")).toBeLessThanOrEqual(2);
   const heroHeight = await page.locator("#top").evaluate((el) => el.getBoundingClientRect().height);

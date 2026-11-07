@@ -211,7 +211,6 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
     } catch {
       utm = undefined;
     }
-    track("booking_submit", { table: table!, date });
     try {
       const res = await fetch("/api/bookings", {
         method: "POST",
@@ -221,6 +220,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
       const body = (await res.json()) as { ok: true; booking: Omit<Confirmed, "last4"> } | ApiError;
       if (body.ok) {
         setDone({ ...body.booking, last4: last4(form.phone) });
+        track("booking_submit", { table: body.booking.table, date: body.booking.date, ref: body.booking.ref });
         setAnnounce(`Booked. Your reference is ${body.booking.ref}.`);
         requestAnimationFrame(() => document.getElementById("booking-confirmation")?.focus());
         return;
@@ -284,7 +284,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
                 type="button"
                 aria-pressed={d === date}
                 onClick={() => chooseDate(d)}
-                className="min-h-11 shrink-0 rounded-full border border-line px-4 text-sm whitespace-nowrap aria-pressed:border-neon aria-pressed:bg-neon aria-pressed:text-on-aqua aria-pressed:font-semibold"
+                className="min-h-11 shrink-0 rounded-full border border-line px-4 text-sm whitespace-nowrap aria-pressed:border-neon aria-pressed:bg-aqua aria-pressed:text-on-aqua aria-pressed:font-semibold"
               >
                 {dateLabel(d, i)}
               </button>
@@ -309,11 +309,11 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
                   name="time"
                   disabled={s.available === 0}
                   aria-pressed={s.time === time}
-                  aria-label={`${formatTime(s.time)}, ${s.available} tables free`}
                   onClick={() => setTime(s.time)}
-                  className="flex min-h-11 shrink-0 flex-col items-center justify-center rounded-xl border border-line px-3 text-sm leading-tight disabled:opacity-35 aria-pressed:border-neon aria-pressed:bg-neon aria-pressed:text-on-aqua"
+                  className="relative flex min-h-11 shrink-0 flex-col items-center justify-center rounded-xl border border-line px-3 text-sm leading-tight disabled:opacity-35 aria-pressed:border-neon aria-pressed:bg-aqua aria-pressed:text-on-aqua"
                 >
                   <span className="font-semibold">{formatTime(s.time)}</span>
+                  <span className="sr-only">, </span>
                   <span className="text-[11px] opacity-80">{s.available} free</span>
                 </button>
               ))}
@@ -499,7 +499,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => track("whatsapp_click", { from: "confirmation" })}
-                  className="flex min-h-11 items-center justify-center rounded-xl bg-neon px-4 font-semibold text-on-aqua"
+                  className="flex min-h-11 items-center justify-center rounded-xl bg-aqua px-4 font-semibold text-on-aqua"
                 >
                   Message us on WhatsApp
                 </a>
@@ -665,7 +665,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-12 w-full rounded-xl bg-neon px-4 text-lg font-semibold text-on-aqua disabled:opacity-60"
+              className="min-h-12 w-full rounded-xl bg-aqua px-4 text-lg font-semibold text-on-aqua disabled:opacity-60"
             >
               {submitting ? "Booking…" : selected && time ? `Book ${selected.code} · ${formatTime(time)}` : "Book a table"}
             </button>
@@ -690,7 +690,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
           <a
             href={selected ? "#book" : "#floor"}
             tabIndex={barVisible ? 0 : -1}
-            className="flex min-h-12 items-center justify-center rounded-xl bg-neon font-semibold text-on-aqua"
+            className="flex min-h-12 items-center justify-center rounded-xl bg-aqua font-semibold text-on-aqua"
           >
             {selected ? `Book ${selected.code}` : "Pick your table"}
           </a>

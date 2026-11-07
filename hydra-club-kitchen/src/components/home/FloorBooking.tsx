@@ -39,7 +39,7 @@ export function FloorBooking({ data, initial }: { data: HomeData; initial?: { da
                   href={settings.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-neon px-5 font-semibold text-on-aqua"
+                  className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-aqua px-5 font-semibold text-on-aqua"
                 >
                   Message us on Instagram
                 </a>

@@ -63,7 +63,7 @@ export function LightShow({
 
     // After first paint; interactive canvases additionally wait until they are near the viewport.
     const idle = (cb: () => void) => {
-      if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(cb, { timeout: 1500 });
+      if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(cb, { timeout: 3000 });
       else setTimeout(cb, 300); // Safari has no requestIdleCallback
     };
     let io: IntersectionObserver | null = null;
@@ -79,7 +79,15 @@ export function LightShow({
       );
       io.observe(canvas);
     } else {
-      idle(() => void load());
+      // The hero show starts on the visitor's first interaction (the CSS beams play until then), so the
+      // GPU-heavy renderer never competes with first paint, hydration or a phone that's only loading.
+      const events = ["pointermove", "pointerdown", "touchstart", "wheel", "scroll", "keydown"] as const;
+      const start = () => {
+        events.forEach((ev) => window.removeEventListener(ev, start));
+        idle(() => void load());
+      };
+      events.forEach((ev) => window.addEventListener(ev, start, { once: true, passive: true }));
+      offs.push(() => events.forEach((ev) => window.removeEventListener(ev, start)));
     }
 
     return () => {

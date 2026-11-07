@@ -14,6 +14,13 @@ export const QUALITY = {
   floor: 0.36,
   /** Weight of the newest frame in the exponential moving average. */
   smoothing: 0.1,
+  /**
+   * Low-end bail-out (our addition to the brief's rule): frames this slow for
+   * this many frames in a row mean the device can't run the show at all, so
+   * the caller switches to the CSS beams instead of waiting ~20 s for drops.
+   */
+  severeMs: 120,
+  severeFrames: 8,
 } as const;
 
 export function baseScale(touch: boolean): number {
@@ -28,6 +35,8 @@ export function canvasSize(cssWidth: number, cssHeight: number, dpr: number, sca
 
 export type QualityController = {
   readonly scale: number;
+  /** True once frames have been too slow to keep going: fall back to the CSS beams. */
+  readonly giveUp: boolean;
   /** Feed one frame time in ms; returns true when the scale just dropped. */
   frame(ms: number): boolean;
 };
@@ -36,11 +45,16 @@ export function createQualityController(start: number): QualityController {
   let scale = start;
   let average: number | null = null;
   let slow = 0;
+  let severe = 0;
   return {
     get scale() {
       return scale;
     },
+    get giveUp() {
+      return severe >= QUALITY.severeFrames;
+    },
     frame(ms) {
+      severe = ms > QUALITY.severeMs ? severe + 1 : 0;
       average = average === null ? ms : average + (ms - average) * QUALITY.smoothing;
       slow = average > QUALITY.slowMs ? slow + 1 : 0;
       if (slow < QUALITY.slowFrames || scale <= QUALITY.floor) return false;
