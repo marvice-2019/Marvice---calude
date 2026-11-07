@@ -73,12 +73,13 @@ const check = (name, ok, extra = "") => {
   await page.click('button[type="submit"]');
   await page.waitForURL(`${BASE}/admin`);
   const body = await page.textContent("main");
-  check("new password signs in to the dashboard", body.includes("Hi ") && body.includes("users:manage"), body.slice(0, 80));
+  const ownerNav = await page.locator('nav[aria-label="Admin"] a:visible', { hasText: "Users" }).count();
+  check("new password signs in to Today, with the owner-only Users link", body.includes("Tonight") && ownerNav > 0, body.slice(0, 80));
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   check("no horizontal overflow at 390px", !overflow);
 
-  await page.click("text=Sign out");
+  await page.locator('button:visible', { hasText: "Sign out" }).click();
   await page.waitForURL(/\/admin\/login/);
   await page.goto(`${BASE}/admin`);
   check("sign out ends the session", page.url().includes("/admin/login"), page.url());

@@ -1,1 +1,12 @@
 /* Stage 4/5 slice stylesheet: admin. Prefer Tailwind utilities; put only keyframes and effects Tailwind cannot express here. */
+
+/* ---------- Admin: sign-in cards (login, change password) ---------- */
+.admin-card { width: min(100%, 420px); padding: 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.admin-card h1 { margin: 0 0 16px; font-family: var(--font-display); font-size: 1.75rem; letter-spacing: -0.04em; }
+.admin-form { display: grid; gap: 14px; }
+.admin-form label { display: grid; gap: 6px; color: var(--muted); font-size: 0.9rem; }
+.admin-form input, .admin-input { min-height: 44px; padding: 0 12px; border: 1px solid rgb(255 255 255 / 0.18); border-radius: 10px; background: var(--surface2); color: var(--text); font-size: 1rem; }
+.admin-card button, .admin-btn { min-height: 44px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--aqua); color: var(--on-aqua); font-weight: 700; font-size: 1rem; cursor: pointer; }
+.admin-card button:disabled, .admin-btn:disabled { opacity: 0.6; }
+.admin-error { color: #ff8a8a; font-size: 0.9rem; min-height: 1em; margin: 0; }
+.admin-ok { color: #7fe3c4; }
