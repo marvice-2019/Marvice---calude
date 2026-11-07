@@ -47,6 +47,7 @@ export const SETTINGS: Record<string, unknown> = {
   booking_window_days: 14,
   max_guests_per_table: 12,
   booking_enabled: true,
+  captcha_enabled: false,
 };
 
 /**

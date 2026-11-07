@@ -8,7 +8,8 @@ Next.js 15 + Postgres 16 + Drizzle. Built by Marvice Media Private Limited.
 |---|---|
 | 1. Data model | Done: schema, migrations, seed, DB tests |
 | 2. Auth and roles | Done: staff sign-in, roles, forced first password change, rate limits |
-| 3–8 | Not started |
+| 3. Booking flow and API | Done: availability, bookings, guest lookup/cancel, .ics, admin bookings and holds, n8n webhook + workflow |
+| 4–8 | Not started (4 needs `/reference/`) |
 
 ## Database
 
@@ -47,6 +48,31 @@ The matrix lives in `src/auth/roles.ts`. Every admin page calls `requireUser(per
 - **Brute force:** 10 attempts per email and 30 per IP per 15 minutes (Postgres sliding window, `src/lib/rate-limit.ts`). Unknown emails take the same time as wrong passwords.
 - **CSRF:** cookies are SameSite=Lax; admin API mutations also require a matching `Origin` (`NEXT_PUBLIC_SITE_URL`). Server actions get Next.js's built-in origin check.
 - Every sign-in, failure, lockout and password change is written to `audit_log`.
+
+## Booking API
+
+All rules live in `src/booking/service.ts` (no Next.js inside, tested directly against Postgres); route handlers only parse, rate-limit and map results to HTTP.
+
+| Endpoint | Who | What |
+|---|---|---|
+| `GET /api/availability?date=` | public | Time slots for that night with free-table counts |
+| `GET /api/availability?date=&time=` | public | Every table: `available`, `booked` or `held` |
+| `POST /api/bookings` | public | Creates a `pending` booking, returns `ref` (`HYD-XXXX`) |
+| `GET /api/bookings/:ref?last4=` | guest | Their booking (ref + last 4 phone digits) |
+| `POST /api/bookings/:ref/cancel` `{last4}` | guest | Cancels an upcoming booking |
+| `GET /api/bookings/:ref/ics?last4=` | guest | Add-to-calendar file |
+| `GET /api/admin/bookings?date=&status=&zone=` | bookings:read | A night's bookings |
+| `PATCH /api/admin/bookings` `{id, action}` | bookings:write | confirm, cancel, no_show, complete |
+| `GET/POST/DELETE /api/admin/holds` | holds:write (GET: bookings:read) | Block a table or zone for a night; POST lists bookings it clashes with |
+
+Rules:
+
+- **Nights, not calendar days.** `date` is the service date. Times before 05:00 belong to the previous night, so on Friday's list `00:00` means just after midnight.
+- **Slots** start every 30 minutes from opening; the last start is an hour before closing; a booking lasts `slot_length_minutes` but never past closing. No hours set → booking is closed and the UI hides.
+- **Double booking** is refused by Postgres; the API answers 409 "That table was just taken" with up to 5 free tables at the same time, same zone first.
+- **Abuse:** honeypot field `website` (bots get a fake success, nothing stored), 5 attempts per IP per hour (failed ones count), Turnstile behind the `captcha_enabled` setting, 20 lookups/cancels per IP per hour, a wrong last-4 looks exactly like an unknown ref.
+- **Phones:** any common Indian format, stored as `+91XXXXXXXXXX`; only mobiles starting 6–9.
+- **Notifications:** every create/confirm/cancel/no-show/complete is sent to n8n after the response (`after()`), HMAC-signed, retried 2 s/10 s/30 s; a final failure is written to `audit_log` as `webhook.failed`, never shown to the guest. n8n setup: `n8n/README.md`.
 
 Browser check of the whole first-login journey (server running, owner just bootstrapped):
 
