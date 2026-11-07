@@ -1,1 +1,47 @@
 /* Stage 4/5 slice stylesheet: content. Prefer Tailwind utilities; put only keyframes and effects Tailwind cannot express here. */
+
+/* VIP cards: rotating conic neon border (brief §8). */
+@property --hy-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.hy-conic {
+  background: conic-gradient(from var(--hy-angle), transparent 0 55%, var(--zone, var(--aqua)) 75%, var(--neon) 85%, transparent 100%);
+  animation: hy-spin 6s linear infinite;
+}
+@keyframes hy-spin {
+  to {
+    --hy-angle: 360deg;
+  }
+}
+
+/* Nights flyers: sweeping light beams. */
+.hy-beams::before {
+  content: "";
+  position: absolute;
+  inset: -40% -60%;
+  background: linear-gradient(105deg, transparent 40%, color-mix(in srgb, var(--accent, var(--aqua)) 28%, transparent) 50%, transparent 60%);
+  animation: hy-sweep 5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes hy-sweep {
+  from {
+    transform: translateX(-35%);
+  }
+  to {
+    transform: translateX(35%);
+  }
+}
+
+/* Map placeholder before click-to-load. */
+.hy-map-ph {
+  background: radial-gradient(circle at 30% 40%, color-mix(in srgb, var(--aqua) 18%, transparent), transparent 60%), var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hy-conic,
+  .hy-beams::before {
+    animation: none;
+  }
+}
