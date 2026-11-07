@@ -25,7 +25,7 @@ export const FLOOR = {
     { label: "DJ / Stage", x: 520, y: 70, w: 250, h: 100, kind: "stage" },
     { label: "Dance floor", x: 430, y: 230, w: 430, h: 330, kind: "dance" },
     { label: "Bar", x: 70, y: 200, w: 100, h: 560, kind: "bar" },
-    { label: "Mezzanine · upstairs", x: 1080, y: 110, w: 150, h: 800, kind: "mezz" },
+    { label: "Mezzanine", x: 1080, y: 110, w: 150, h: 800, kind: "mezz" },
     { label: "Entrance", x: 580, y: 990, w: 130, h: 40, kind: "entrance" },
   ] satisfies FloorFeature[],
   tables: [

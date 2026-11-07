@@ -49,6 +49,8 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
   const formRef = useRef<HTMLFormElement>(null);
   const honeypotRef = useRef<HTMLInputElement>(null);
   const [barVisible, setBarVisible] = useState(false);
+  /** True once the guest (or a deep link / Nights card) picked the night; stops the auto-advance. */
+  const dateChosen = useRef(Boolean(initialDate && dates.includes(initialDate)));
 
   const zoneByKey = useMemo(() => new Map(zones.map((z) => [z.key, z])), [zones]);
   const selected = table ? FLOOR.tables.find((t) => t.code === table) ?? null : null;
@@ -71,7 +73,10 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
   // Other sections: Nights cards pre-fill a date, VIP cards filter a zone.
   useEffect(() => {
     const offDate = on("hydra:pick-date", ({ date: d }) => {
-      if (dates.includes(d)) setDate(d);
+      if (dates.includes(d)) {
+        dateChosen.current = true;
+        setDate(d);
+      }
     });
     const offZone = on("hydra:pick-zone", ({ zone }) => setZoneFilter(zone));
     return () => {
@@ -89,6 +94,11 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
       .then((res: { ok: boolean; slots?: Slot[] }) => {
         if (cancelled) return;
         const list = res.ok && res.slots ? res.slots : [];
+        // Late at night tonight has no times left: move on to tomorrow unless the guest chose this night.
+        if (!list.some((s) => s.available > 0) && !dateChosen.current && date === dates[0] && dates[1]) {
+          setDate(dates[1]);
+          return;
+        }
         setSlots(list);
         setTime((prev) => {
           if (prev && list.some((s) => s.time === prev && s.available > 0)) return prev;
@@ -100,7 +110,12 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, dates]);
+
+  function chooseDate(d: string) {
+    dateChosen.current = true;
+    setDate(d);
+  }
 
   const loadStates = useCallback(async (d: string, t: string) => {
     const res = (await fetch(`/api/availability?date=${d}&time=${t}`).then((r) => r.json())) as {
@@ -260,7 +275,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
 
       {/* Planner */}
       <div className="min-w-0 space-y-4">
-        <fieldset>
+        <fieldset className="min-w-0">
           <legend className="mb-2 text-sm text-muted">Night</legend>
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
             {dates.map((d, i) => (
@@ -268,7 +283,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
                 key={d}
                 type="button"
                 aria-pressed={d === date}
-                onClick={() => setDate(d)}
+                onClick={() => chooseDate(d)}
                 className="min-h-11 shrink-0 rounded-full border border-line px-4 text-sm whitespace-nowrap aria-pressed:border-neon aria-pressed:bg-neon aria-pressed:text-on-aqua aria-pressed:font-semibold"
               >
                 {dateLabel(d, i)}
@@ -277,7 +292,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
           </div>
         </fieldset>
 
-        <fieldset>
+        <fieldset className="min-w-0">
           <legend className="mb-2 text-sm text-muted">
             Time {errors.time && <span className="text-[#ff8a8a]">· {errors.time}</span>}
           </legend>
@@ -670,6 +685,7 @@ export function BookingPlanner({ dates, initialDate, initialTable, zones, maxGue
         <div
           className={`fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/85 p-3 backdrop-blur transition-transform lg:hidden ${barVisible ? "translate-y-0" : "pointer-events-none translate-y-full"}`}
           aria-hidden={!barVisible}
+          data-bottom-bar=""
         >
           <a
             href={selected ? "#book" : "#floor"}
