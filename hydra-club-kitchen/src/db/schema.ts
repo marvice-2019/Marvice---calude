@@ -45,6 +45,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: roleEnum("role").notNull(),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  /** Sessions issued before this instant are rejected (password change, forced logout). */
+  passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }),
   createdAt: createdAt(),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
 });
@@ -239,4 +241,18 @@ export const auditLog = pgTable(
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("audit_log_entity_idx").on(t.entity, t.entityId), index("audit_log_at_idx").on(t.at)],
+);
+
+/**
+ * Sliding-window rate limiting without Redis: one row per counted hit.
+ * Keys look like "login:email:<addr>", "login:ip:<ip>", "booking:ip:<ip>".
+ */
+export const rateLimitHits = pgTable(
+  "rate_limit_hits",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    key: text("key").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("rate_limit_hits_key_at_idx").on(t.key, t.at), index("rate_limit_hits_at_idx").on(t.at)],
 );

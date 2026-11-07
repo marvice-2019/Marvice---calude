@@ -1,4 +1,5 @@
 import { sql as dsql } from "drizzle-orm";
+import { ensureOwner } from "../src/auth/core";
 import { createDb, type Db } from "../src/db/client";
 import { nights, settings, tables, zones } from "../src/db/schema";
 import { NIGHTS, SETTINGS, TABLES, ZONES } from "../src/db/seed-data";
@@ -41,6 +42,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const { db, sql } = createDb(process.env.DATABASE_URL ?? "", { max: 1 });
   seed(db)
     .then(() => console.log(`seeded ${ZONES.length} zones, ${TABLES.length} tables, ${Object.keys(SETTINGS).length} settings, ${NIGHTS.length} nights`))
+    .then(() => ensureOwner(db, { ADMIN_SEED_EMAIL: process.env.ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD: process.env.ADMIN_SEED_PASSWORD }))
+    .then((owner) => console.log(`owner account: ${owner}`))
     .catch((err) => {
       console.error(err);
       process.exitCode = 1;
