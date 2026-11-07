@@ -18,7 +18,8 @@
     "photos:import": "tsx scripts/import-photos.ts",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "retention": "tsx scripts/retention.ts"
   },
   "dependencies": {
     "@auth/core": "0.41.3",

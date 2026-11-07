@@ -5,7 +5,7 @@ import sharp from "sharp";
 import type { PhotoInfo } from "@/lib/home-data";
 
 /** Tiny blurred PNG from the stored blurhash, inlined as the placeholder (no client JS). */
-async function blurDataUrl(hash: string, width: number, height: number): Promise<string | undefined> {
+export async function blurDataUrl(hash: string, width: number, height: number): Promise<string | undefined> {
   try {
     const w = 32;
     const h = Math.max(1, Math.round((32 * height) / width));

@@ -5,7 +5,7 @@
  */
 export function Emblem({ className, title = "Hydra Club & Kitchen" }: { className?: string; title?: string }) {
   return (
-    <svg viewBox="0 0 64 64" className={className} role="img" aria-label={title}>
+    <svg viewBox="0 0 64 64" className={className} {...(title ? { role: "img", "aria-label": title } : { "aria-hidden": true })}>
       <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" strokeWidth="3" />
       <path d="M21 17v30M43 17v30M21 32h22" stroke="currentColor" strokeWidth="5" strokeLinecap="round" fill="none" />
     </svg>

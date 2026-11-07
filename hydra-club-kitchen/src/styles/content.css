@@ -45,3 +45,11 @@
     animation: none;
   }
 }
+
+/* ---------- Gallery tiles: tilt, glare, drift ---------- */
+.hydra-tile { --rx: 0deg; --ry: 0deg; --gx: 50%; --gy: 50%; transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)); transition: transform .25s ease; }
+.hydra-glare { pointer-events: none; position: absolute; inset: 0; opacity: 0; transition: opacity .3s; background: radial-gradient(circle at var(--gx) var(--gy), rgb(255 255 255 / 0.22), transparent 55%); }
+.hydra-tile:hover .hydra-glare { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .hydra-tile { translate: 0 calc((var(--gp, 0.5) - 0.5) * var(--d, 0) * -36px); }
+}
