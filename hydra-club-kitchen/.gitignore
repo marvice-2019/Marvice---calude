@@ -7,3 +7,4 @@ public/media/
 test-results/
 playwright-report/
 uploads/
+dist-scripts/

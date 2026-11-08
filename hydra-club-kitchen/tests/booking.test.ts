@@ -173,6 +173,41 @@ describe("create booking", () => {
     expect(results.filter((r) => !r.ok).every((r) => !r.ok && r.code === "table_taken")).toBe(true);
   });
 
+  it("a busy-night rush never surfaces a database deadlock to a guest", async () => {
+    // Concurrent inserts can deadlock inside Postgres's exclusion check (40P01). The loser must
+    // still get "table taken", not a 500. Without the per-table lock each deadlock also stalls a guest for deadlock_timeout (1 s).
+    for (let round = 0; round < 8; round++) {
+      await conn.db.delete(bookings);
+      // allSettled: never leave racers running into the next test.
+      const settled = await Promise.allSettled(Array.from({ length: 8 }, () => create({}, NOW, ip())));
+      const results = settled.map((r) => { if (r.status === "rejected") throw r.reason; return r.value; });
+      expect(results.filter((r) => r.ok)).toHaveLength(1);
+      expect(results.filter((r) => !r.ok).map((r) => !r.ok && r.code)).toEqual(Array(7).fill("table_taken"));
+    }
+  }, 30_000);
+
+  it("retries the insert when Postgres aborts it as a deadlock victim", async () => {
+    // Deterministic version of the race above: a one-shot trigger fails the first insert with 40P01.
+    // A sequence is not rolled back with the failed insert, so the trigger fires exactly once.
+    await conn.db.execute(sql`create sequence if not exists deadlock_once`);
+    await conn.db.execute(sql`
+      create or replace function fake_deadlock() returns trigger language plpgsql as $$
+      begin
+        if nextval('deadlock_once') = 1 then
+          raise exception 'deadlock detected' using errcode = '40P01';
+        end if;
+        return new;
+      end $$`);
+    await conn.db.execute(sql`create trigger fake_deadlock before insert on bookings for each row execute function fake_deadlock()`);
+    try {
+      expect(await create()).toMatchObject({ ok: true });
+      expect(await conn.db.select().from(bookings)).toHaveLength(1);
+    } finally {
+      await conn.db.execute(sql`drop trigger fake_deadlock on bookings`);
+      await conn.db.execute(sql`drop sequence deadlock_once`);
+    }
+  });
+
   it("refuses held tables", async () => {
     await createHold(conn.db, staffId, { table: "T4", date: "2026-12-04", reason: "Band setup" });
     expect(await create()).toMatchObject({ status: 409, code: "table_taken", message: "T4 is reserved that night. Try another table." });

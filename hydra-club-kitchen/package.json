@@ -20,7 +20,8 @@
     "build": "next build",
     "start": "next start",
     "retention": "tsx scripts/retention.ts",
-    "brand:assets": "tsx scripts/brand-assets.ts"
+    "brand:assets": "tsx scripts/brand-assets.ts",
+    "scripts:bundle": "node scripts/bundle-scripts.mjs"
   },
   "dependencies": {
     "@auth/core": "0.41.3",
@@ -46,6 +47,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "0.25.12",
     "eslint": "9.39.5",
     "eslint-config-next": "15.5.29",
     "tailwindcss": "4.3.5",

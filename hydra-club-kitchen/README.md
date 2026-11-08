@@ -9,7 +9,15 @@ Next.js 15 + Postgres 16 + Drizzle. Built by Marvice Media Private Limited.
 | 1. Data model | Done: schema, migrations, seed, DB tests |
 | 2. Auth and roles | Done: staff sign-in, roles, forced first password change, rate limits |
 | 3. Booking flow and API | Done: availability, bookings, guest lookup/cancel, .ics, admin bookings and holds, n8n webhook + workflow |
-| 4–8 | Not started (4 needs `/reference/`) |
+| 4. Public site | Done: light show, sound, floor-plan booking, menu, gallery, nights, legal pages, client logo |
+| 5. Admin | Done: Today, bookings, walk-ins, holds, CSV, photos, menu, nights, settings, staff |
+| 6. SEO, performance, accessibility | Done: JSON-LD, sitemap, nonce CSP, consent-gated GA4/Pixel/CAPI, Lighthouse 96–99 mobile |
+| 7. Docker and Coolify | Done: `Dockerfile`, `docker-entrypoint.sh`, `/api/health`, `docker-compose.yml`, [DEPLOY.md](DEPLOY.md) |
+| 8. QA | Done: [QA-REPORT.md](QA-REPORT.md); staff guide in [ADMIN-GUIDE.md](ADMIN-GUIDE.md) |
+
+Production: `docker build --build-arg NEXT_PUBLIC_SITE_URL=https://hydraclubkitchen.com .`; the container
+migrates, seeds and starts on its own. Ops scripts ship bundled (`pnpm scripts:bundle` → `dist-scripts/`):
+`node scripts/retention.mjs`, `node scripts/import-photos.mjs <dir>` inside the container.
 
 ## Database
 

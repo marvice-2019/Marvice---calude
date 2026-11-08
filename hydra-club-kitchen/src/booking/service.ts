@@ -235,32 +235,61 @@ export async function createBooking(
   for (let attempt = 0; attempt < 5; attempt++) {
     const ref = newRef();
     try {
-      const [row] = await db
-        .insert(bookings)
-        .values({
-          ref,
-          tableId: table.id,
-          startsAt: slot.startsAt,
-          endsAt: slot.endsAt,
-          guests: input.guests,
-          name: input.name,
-          phoneE164: phone,
-          notes: input.notes || null,
-          contactConsentAt: now,
-          status: "pending",
-          source: ctx.source ?? "web",
-          utm: input.utm && Object.keys(input.utm).length > 0 ? (input.utm as Record<string, string>) : null,
-        })
-        .returning();
+      const row = await db.transaction(async (tx) => {
+        await lockTable(tx, table.id);
+        const [inserted] = await tx
+          .insert(bookings)
+          .values({
+            ref,
+            tableId: table.id,
+            startsAt: slot.startsAt,
+            endsAt: slot.endsAt,
+            guests: input.guests,
+            name: input.name,
+            phoneE164: phone,
+            notes: input.notes || null,
+            contactConsentAt: now,
+            status: "pending",
+            source: ctx.source ?? "web",
+            utm: input.utm && Object.keys(input.utm).length > 0 ? (input.utm as Record<string, string>) : null,
+          })
+          .returning();
+        return inserted;
+      });
       const booking = summarise(row!, table.code, table.zone);
       return { ok: true, booking, event: { type: "booking.created", payload: eventPayload(booking, row!) } };
     } catch (err) {
       if (pgCode(err) === "23P01") return taken(db, s, input.date, input.time, table.code, now, "booked");
       if (pgCode(err) === "23505" && pgConstraint(err) === "bookings_ref_unique") continue; // ref collision: new ref
+      if (await retryableRace(err)) continue; // deadlock victim: the retry wins or gets "taken"
       throw err;
     }
   }
-  throw new Error("Could not allocate a unique booking reference");
+  throw new Error("Could not insert the booking after 5 attempts (ref collisions or repeated deadlocks)");
+}
+
+/** Bookings namespace for transaction-scoped advisory locks (two-int form: namespace, table id). */
+const TABLE_LOCK_NS = 4810;
+
+/**
+ * Queue concurrent inserts for the same table. Without this, two in-flight inserts can each wait on
+ * the other inside the exclusion-constraint check and Postgres kills one as a deadlock (1 s stall).
+ * Released at commit/rollback; different tables never wait on each other.
+ */
+async function lockTable(tx: Parameters<Parameters<Db["transaction"]>[0]>[0], tableId: number) {
+  await tx.execute(sql`select pg_advisory_xact_lock(${TABLE_LOCK_NS}, ${tableId})`);
+}
+
+/**
+ * Simultaneous inserts on one table can deadlock inside Postgres's exclusion-constraint check (40P01),
+ * or fail serialization (40001). lockTable prevents the first; this stays as a safety net (e.g. a manual
+ * insert outside the app). Postgres aborts one side and nothing was written, so wait a moment and retry.
+ */
+async function retryableRace(err: unknown): Promise<boolean> {
+  const code = pgCode(err);
+  if (code !== "40P01" && code !== "40001") return false;
+  await new Promise((r) => setTimeout(r, 10 + Math.random() * 40));
+  return true;
 }
 
 /** "That table was just taken", with up to 5 free tables at the same time, same zone first. */
@@ -615,6 +644,7 @@ export async function createWalkIn(db: Db, s: Settings, userId: string, raw: unk
     const ref = newRef();
     try {
       const row = await db.transaction(async (tx) => {
+        await lockTable(tx, table.id);
         const [inserted] = await tx
           .insert(bookings)
           .values({
@@ -643,8 +673,9 @@ export async function createWalkIn(db: Db, s: Settings, userId: string, raw: unk
     } catch (err) {
       if (pgCode(err) === "23P01") return fail(409, "table_taken", `${table.code} is already booked at that time. Pick another table.`);
       if (pgCode(err) === "23505" && pgConstraint(err) === "bookings_ref_unique") continue;
+      if (await retryableRace(err)) continue;
       throw err;
     }
   }
-  throw new Error("Could not allocate a unique booking reference");
+  throw new Error("Could not insert the booking after 5 attempts (ref collisions or repeated deadlocks)");
 }

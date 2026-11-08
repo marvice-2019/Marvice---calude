@@ -42,3 +42,10 @@ test("a VIP card jumps to the floor plan filtered to that zone", async ({ page }
   await page.locator("#vip").getByRole("button").filter({ hasText: /^VVIP/ }).first().click();
   await expect(page.getByRole("button", { name: "VVIP", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
+
+test("health endpoint reports the database and is never cached", async ({ request }) => {
+  const res = await request.get("/api/health");
+  expect(res.status()).toBe(200);
+  expect(res.headers()["cache-control"]).toBe("no-store");
+  expect(await res.json()).toMatchObject({ ok: true, db: "up" });
+});

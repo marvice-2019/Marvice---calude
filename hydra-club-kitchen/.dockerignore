@@ -1,0 +1,17 @@
+.git
+node_modules
+.next
+dist-scripts
+.smoke
+.env
+.env.*
+!.env.example
+uploads
+public/media
+test-results
+playwright-report
+tests
+reference
+*.tsbuildinfo
+Dockerfile
+docker-compose*.yml
