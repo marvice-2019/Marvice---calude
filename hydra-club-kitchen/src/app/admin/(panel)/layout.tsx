@@ -15,7 +15,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       <div className="lg:grid lg:min-h-dvh lg:grid-cols-[220px_1fr]">
         <aside className="hidden border-r border-line bg-surface p-4 lg:flex lg:flex-col">
           <Link href="/admin" className="flex min-h-11 items-center gap-2 font-display text-xl tracking-[-0.05em]">
-            <Emblem className="size-7 text-aqua" /> Hydra admin
+            <Emblem className="size-8" title="" /> Hydra admin
           </Link>
           <nav aria-label="Admin" className="mt-6 flex flex-col gap-1">
             {nav.map((n) => (
@@ -38,7 +38,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         <div className="min-w-0 pb-24 lg:pb-0">
           <header className="flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
             <Link href="/admin" className="flex min-h-11 items-center gap-2 font-display text-lg tracking-[-0.05em]">
-              <Emblem className="size-7 text-aqua" /> Admin
+              <Emblem className="size-8" title="" /> Admin
             </Link>
             <form action={logoutAction}>
               <button type="submit" className="min-h-11 text-sm text-muted underline underline-offset-4">

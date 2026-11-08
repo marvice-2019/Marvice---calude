@@ -20,7 +20,7 @@ export function Header({ data }: { data: HomeData }) {
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 md:px-8">
           <a href="#top" className="flex min-h-11 items-center gap-2 font-display text-xl tracking-[-0.05em]">
-            <Emblem className="size-8 text-aqua drop-shadow-[0_0_10px_rgba(43,184,220,.6)]" />
+            <Emblem className="size-9 drop-shadow-[0_0_10px_rgba(43,184,220,.55)]" title="" />
             Hydra
           </a>
           <nav aria-label="Site" className="ml-6 hidden flex-1 items-center gap-1 lg:flex">

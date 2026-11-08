@@ -9,7 +9,7 @@ export function Footer({ data }: { data?: HomeData }) {
     <footer className="border-t border-line px-4 py-12 text-sm text-muted md:px-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
         <Link href="/" className="inline-flex min-h-11 items-center gap-3 text-text">
-          <Emblem className="size-9" />
+          <Emblem className="size-9" title="" />
           <span>© {new Date().getFullYear()} Hydra Club & Kitchen</span>
         </Link>
         <nav aria-label="Legal" className="flex flex-wrap gap-x-6">

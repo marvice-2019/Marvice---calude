@@ -15,7 +15,7 @@ export function Nights({ data }: { data: HomeData }) {
           Nights at the club
         </h2>
         {data.nights.length === 0 ? (
-          <div data-testid="nights-empty" className="hy-beams mt-8 overflow-hidden rounded-3xl border border-line bg-surface/70 p-6 md:p-10">
+          <div data-testid="nights-empty" className="hy-beams relative mt-8 overflow-hidden rounded-3xl border border-line bg-surface/70 p-6 md:p-10">
             <p className="relative text-lg">Weekly nights are announced on Instagram.</p>
             {instagram && (
               <a

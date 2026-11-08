@@ -25,7 +25,7 @@ async function setup(page: Page) {
   await page.getByRole("button", { name: /^9:00 PM/ }).click();
   await expect(page.locator('[data-id="T1"]')).toBeVisible();
   // Every chip in the scrolling time row must be reachable on a phone (regression: fieldset min-content width).
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => [window.innerWidth, document.documentElement.scrollWidth])).toEqual([page.viewportSize()!.width, page.viewportSize()!.width]); // phones widen innerWidth on overflow
   return errors;
 }
 
@@ -60,7 +60,7 @@ test("book a table end to end and get a reference", async ({ page }, info) => {
   const file = await page.request.get(ics!);
   expect(file.headers()["content-type"]).toContain("text/calendar");
   expect(await file.text()).toContain("BEGIN:VEVENT");
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => [window.innerWidth, document.documentElement.scrollWidth])).toEqual([page.viewportSize()!.width, page.viewportSize()!.width]); // phones widen innerWidth on overflow
   expect(errors).toEqual([]);
 });
 

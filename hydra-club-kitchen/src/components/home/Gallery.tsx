@@ -23,7 +23,7 @@ export async function Gallery({ data, full = false }: { data: HomeData; full?: b
     <section id="gallery" aria-labelledby="gallery-heading" className="scroll-mt-20 px-4 py-24 md:px-8 lg:px-16">
       <div className="mx-auto max-w-7xl">
         <p className="text-sm tracking-[0.2em] text-aqua uppercase">Gallery</p>
-        <Heading id="gallery-heading" className="mt-2 font-display text-[clamp(2.4rem,7vw,5rem)] leading-[0.95] tracking-[-0.05em]">
+        <Heading id="gallery-heading" className="mt-2 font-display text-[clamp(1.6rem,8.4vw,5rem)] md:text-[clamp(2.4rem,7vw,5rem)] leading-[0.95] tracking-[-0.05em]">
           Inside the nightclub in Koramangala
         </Heading>
         <div className="mt-8">

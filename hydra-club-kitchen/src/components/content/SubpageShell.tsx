@@ -9,7 +9,7 @@ export function SubpageShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-line bg-bg/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
           <Link href="/" className="flex min-h-11 items-center gap-2 font-display text-xl tracking-[-0.05em]">
-            <Emblem className="size-8 text-aqua" />
+            <Emblem className="size-9" title="" />
             Hydra
           </Link>
           <Link href="/book" className="inline-flex min-h-11 items-center rounded-full bg-aqua px-5 text-sm font-semibold text-on-aqua">

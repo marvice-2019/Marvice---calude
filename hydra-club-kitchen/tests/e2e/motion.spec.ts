@@ -23,7 +23,10 @@ test("home renders with no console errors and no sideways scroll", async ({ page
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Hydra");
   // Regression: the phone header once pushed the Menu button off-screen, and the wordmark was clipped.
-  const outside = await page.evaluate(() =>
+  // Measure against the real screen width: on phones window.innerWidth grows with any overflow, so it hides the bug.
+  const screenW = page.viewportSize()!.width;
+  expect(await page.evaluate(() => window.innerWidth)).toBe(screenW);
+  const outside = await page.evaluate((vw) =>
     [...document.querySelectorAll<HTMLElement>("[data-site-header] a, [data-site-header] button, h1")]
       .filter((el) => el.offsetParent !== null && el.getBoundingClientRect().width > 0)
       .filter((el) => {
@@ -32,14 +35,15 @@ test("home renders with no console errors and no sideways scroll", async ({ page
         // Visible text only: the h1's sr-only suffix is deliberately positioned off-screen.
         range.selectNodeContents(el.tagName === "H1" ? (el.firstChild ?? el) : el);
         const text = range.getBoundingClientRect();
-        return r.left < 0 || r.right > window.innerWidth || text.left < 0 || text.right > window.innerWidth;
+        return r.left < 0 || r.right > vw || text.left < 0 || text.right > vw;
       })
       .map((el) => (el.textContent ?? "").trim().slice(0, 20)),
+    screenW,
   );
   expect(outside).toEqual([]);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.waitForTimeout(1500); // overflow from an unanchored animated layer grows over time
+  expect(await page.evaluate(() => [window.innerWidth, document.documentElement.scrollWidth])).toEqual([screenW, screenW]);
   expect(errors).toEqual([]);
 });
 

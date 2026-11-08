@@ -1,13 +1,12 @@
+import Image from "next/image";
+import emblem from "../../public/brand/hydra-emblem.png";
+
 /**
- * PLACEHOLDER mark until the client's dragon emblem arrives (Hydra_logo.png now,
- * SVG requested). Every use of the logo goes through this component, so the swap
- * happens here only: drop the PNG in public/brand/ and render it instead.
+ * The Hydra dragon emblem, cut from the client's logo by `pnpm brand:assets`.
+ * Every use of the logo goes through here. When Hydra sends the SVG, swap the
+ * source in scripts/brand-assets.ts and re-run it; nothing else changes.
+ * Pass title="" where the emblem is decorative (next to the word "Hydra").
  */
-export function Emblem({ className, title = "Hydra Club & Kitchen" }: { className?: string; title?: string }) {
-  return (
-    <svg viewBox="0 0 64 64" className={className} {...(title ? { role: "img", "aria-label": title } : { "aria-hidden": true })}>
-      <circle cx="32" cy="32" r="29" fill="none" stroke="currentColor" strokeWidth="3" />
-      <path d="M21 17v30M43 17v30M21 32h22" stroke="currentColor" strokeWidth="5" strokeLinecap="round" fill="none" />
-    </svg>
-  );
+export function Emblem({ className = "", title = "Hydra Club & Kitchen", priority = false }: { className?: string; title?: string; priority?: boolean }) {
+  return <Image src={emblem} alt={title} priority={priority} sizes="(min-width: 768px) 160px, 120px" className={`object-contain ${className}`} />;
 }

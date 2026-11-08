@@ -22,7 +22,7 @@ export function Hero({ data }: { data: HomeData }) {
                   <Photo photo={photo} fill sizes="100vw" priority={i === 0} className="hydra-kenburns object-cover" />
                 ) : (
                   <div className={`hydra-art hydra-art-${s.tag} absolute inset-0`}>
-                    <Emblem className="absolute top-1/2 left-1/2 size-[70vmin] -translate-x-1/2 -translate-y-1/2 text-white/[.04]" title="" />
+                    <Emblem className="absolute top-1/2 left-1/2 size-[70vmin] -translate-x-1/2 -translate-y-1/2 opacity-[0.07] blur-[1px]" title="" />
                   </div>
                 )}
               </div>
@@ -32,7 +32,7 @@ export function Hero({ data }: { data: HomeData }) {
         </div>
         <LightShow id="fx" shockOnTap className="mix-blend-screen" />
         <div className="relative z-10 flex h-full flex-col items-center justify-center px-4 text-center">
-          <Emblem className="hydra-hero-emblem size-20 text-aqua md:size-24" title="" />
+          <Emblem className="hydra-hero-emblem size-24 md:size-32" title="" priority />
           <h1 className="hydra-wordmark mt-4 font-display text-[clamp(4.5rem,21vw,20rem)] leading-[0.8] tracking-[-0.06em] text-text">
             Hydra
             <span className="sr-only"> Club &amp; Kitchen, nightclub and kitchen in Koramangala, Bengaluru</span>

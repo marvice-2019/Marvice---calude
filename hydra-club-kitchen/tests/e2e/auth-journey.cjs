@@ -76,7 +76,7 @@ const check = (name, ok, extra = "") => {
   const ownerNav = await page.locator('nav[aria-label="Admin"] a:visible', { hasText: "Users" }).count();
   check("new password signs in to Today, with the owner-only Users link", body.includes("Tonight") && ownerNav > 0, body.slice(0, 80));
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  const overflow = await page.evaluate((vw) => window.innerWidth !== vw || document.documentElement.scrollWidth > vw, page.viewportSize().width);
   check("no horizontal overflow at 390px", !overflow);
 
   await page.locator('button:visible', { hasText: "Sign out" }).click();

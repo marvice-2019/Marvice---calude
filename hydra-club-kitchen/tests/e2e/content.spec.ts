@@ -13,7 +13,7 @@ for (const path of ["/", "/menu", "/gallery", "/privacy", "/terms"]) {
     await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await page.waitForTimeout(400);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(await page.evaluate(() => [window.innerWidth, document.documentElement.scrollWidth])).toEqual([page.viewportSize()!.width, page.viewportSize()!.width]); // phones widen innerWidth on overflow
     expect(errors).toEqual([]);
   });
 }

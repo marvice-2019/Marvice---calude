@@ -19,7 +19,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "retention": "tsx scripts/retention.ts"
+    "retention": "tsx scripts/retention.ts",
+    "brand:assets": "tsx scripts/brand-assets.ts"
   },
   "dependencies": {
     "@auth/core": "0.41.3",

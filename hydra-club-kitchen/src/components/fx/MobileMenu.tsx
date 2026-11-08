@@ -71,7 +71,7 @@ export function MobileMenu() {
         className="fixed inset-0 z-[60] hidden flex-col bg-bg/95 px-6 pt-5 pb-10 backdrop-blur-xl target:flex data-[open=true]:flex lg:hidden"
       >
         <div className="flex items-center justify-between">
-          <Emblem className="size-9 text-aqua" />
+          <Emblem className="size-10" />
           <a
             href="#"
             onClick={(e) => {

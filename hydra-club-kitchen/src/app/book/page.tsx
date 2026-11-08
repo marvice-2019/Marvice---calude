@@ -21,7 +21,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
     <>
       <header id="top" className="flex items-center justify-between px-4 py-4 md:px-8 lg:px-16">
         <Link href="/" className="flex min-h-11 items-center gap-2 font-display text-lg tracking-[-0.05em]">
-          <Emblem className="size-8 text-neon" />
+          <Emblem className="size-9" title="" />
           Hydra
         </Link>
         <Link href="/#visit" className="min-h-11 content-center text-sm text-muted underline-offset-4 hover:underline">
