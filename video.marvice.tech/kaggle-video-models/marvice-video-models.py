@@ -14,6 +14,8 @@ from pathlib import Path
 T0 = time.time()
 # Reduces fragmentation out-of-memory errors on the 16 GB T4 (must be set before torch loads).
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+# Kaggle's ~/.cache/huggingface is read-only on newer images (run 1 failed there); download to /tmp.
+os.environ["HF_HOME"] = "/tmp/hf"
 subprocess.run(
     [
         sys.executable,
@@ -48,7 +50,9 @@ NEGATIVE = (
     "cartoon, painting, still picture"
 )
 LIMIT_S = 60 * 60
-FP = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16  # T4: float16
+# Always float16: a T4 only emulates bfloat16, and in bfloat16 PyTorch falls back to full attention,
+# which asked for 13-48 GB in run 1. float16 enables memory-efficient attention on the T4.
+FP = torch.float16
 
 # key, repo, height, width, frames, fps, steps, guidance, offload ("model" or "sequential"), licence
 MODELS = [
@@ -103,7 +107,7 @@ MODELS = [
     ),
     (
         "hunyuanvideo-1.5",
-        "tencent/HunyuanVideo-1.5",
+        "hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-480p_t2v_distilled",
         832,
         480,
         121,
@@ -219,9 +223,7 @@ for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS:
         torch.cuda.empty_cache()
         # Free disk before the next model: each download is 10-40 GB.
         cache = (
-            Path.home()
-            / ".cache/huggingface/hub"
-            / ("models--" + repo.replace("/", "--"))
+            Path(os.environ["HF_HOME"]) / "hub" / ("models--" + repo.replace("/", "--"))
         )
         shutil.rmtree(cache, ignore_errors=True)
     r["elapsed_total_s"] = round(time.time() - T0)
