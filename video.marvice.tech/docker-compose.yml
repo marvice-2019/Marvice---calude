@@ -52,6 +52,18 @@ services:
       timeout: 5s
       start_period: 30s
 
+  # OpenMotion (reference-video remakes) at https://motion.marvice.tech, behind the same gate.
+  motion:
+    build:
+      context: ./openmotion
+    restart: unless-stopped
+    environment:
+      ATLASCLOUD_API_KEY: ${ATLASCLOUD_API_KEY:-}
+      FAL_KEY: ${FAL_KEY:-}
+    volumes:
+      - openmotion-data:/data
+    shm_size: "1gb"
+
   # Studio and the creator have no login of their own (they can read, write and
   # delete files and start renders), so they are only reachable through this gate.
   auth:
@@ -65,6 +77,8 @@ services:
     depends_on:
       - studio
       - creator
+      - motion
 
 volumes:
   hyperframes-projects:
+  openmotion-data:
