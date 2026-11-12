@@ -102,6 +102,10 @@
         <button type="button" class="mw-cancel" id="mw-cancel" hidden>Cancel</button>
       </div>
       <p class="mw-status" id="mw-status" role="status" aria-live="polite"></p>
+      <div class="mw-row" id="mw-keybox" hidden>
+        <label class="mw-model" style="flex:1 1 320px">fal.ai key<input type="password" id="mw-key" autocomplete="off" spellcheck="false" placeholder="Paste your fal.ai key" style="height:40px;padding:0 10px;background:var(--mw-field);color:var(--mw-text);border:1px solid var(--mw-border);border-radius:8px;font:14px system-ui,sans-serif"></label>
+        <button type="button" class="mw-btn" id="mw-savekey" disabled>Save key</button>
+      </div>
       <div class="mw-results" id="mw-results"></div>
     </section>
 
@@ -200,14 +204,29 @@
       });
     });
   }
-  api("models/capabilities").then(function (s) {
-    var fal = (s.providers || []).filter(function (p) { return p.id === "fal"; })[0];
-    falReady = !!(fal && fal.available);
-    if (!falReady) say(fal && fal.verification === "rejected"
-      ? "fal.ai rejected the key (wrong key or no credit). Enter a working key in the editor: Go to editor → Model settings → fal.ai."
-      : "No fal.ai key yet. Add it in the editor (Go to editor → Model settings → fal.ai), or set FAL_KEY in Coolify and redeploy.", true);
-    refreshButton();
-  }).catch(function () { /* Gateway still starting; the Generate call will report any problem. */ });
+  // fal.ai key: if none is set (or fal rejected it), show a box to paste one. It is saved on the
+  // server by OpenMotion's gateway (same call as its Model settings) and never sent back to the page.
+  var keybox = document.getElementById("mw-keybox"), keyInput = document.getElementById("mw-key"), saveKey = document.getElementById("mw-savekey");
+  function checkFal() {
+    return api("models/capabilities").then(function (s) {
+      var fal = (s.providers || []).filter(function (p) { return p.id === "fal"; })[0];
+      falReady = !!(fal && fal.available);
+      keybox.hidden = falReady;
+      if (!falReady) say(fal && fal.verification === "rejected"
+        ? "fal.ai rejected the saved key (wrong key or no credit). Paste a working key below."
+        : "No fal.ai key yet. Paste your key below to turn on photo and video generation.", true);
+      refreshButton();
+    });
+  }
+  keyInput.addEventListener("input", function () { saveKey.disabled = !keyInput.value.trim(); });
+  saveKey.addEventListener("click", function () {
+    saveKey.disabled = true; say("Saving key…");
+    api("models/providers/fal", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: keyInput.value.trim(), enabled: true }) })
+      .then(function () { keyInput.value = ""; return checkFal(); })
+      .then(function () { if (falReady) say("Key saved. fal.ai checks it on your first generation."); })
+      .catch(function (error) { saveKey.disabled = !keyInput.value.trim(); say(error.message, true); });
+  });
+  checkFal().catch(function () { /* Gateway still starting; the Generate call will report any problem. */ });
   // Recent results (from here or the editor) stay visible after a reload.
   api("generations").then(function (data) {
     (data.jobs || []).filter(function (j) { return j.state === "completed" && j.modality !== "audio"; }).slice(0, 8).reverse()
@@ -239,7 +258,11 @@
       var phase = { queued: "Queued", "provider-queue": "Waiting in fal.ai's queue", generating: "Generating", submitted: "Sent to fal.ai" }[job.phase] || "Working";
       say(phase + "… " + secs + "s" + (job.modality === "video" ? " (videos usually take 1–5 minutes)" : ""));
       setTimeout(function () { poll(id, started); }, 3000);
-    }).catch(function (error) { setBusy(false); say(error.message, true); });
+    }).catch(function (error) {
+      setBusy(false); say(error.message, true);
+      // A rejected key flips fal to unavailable; show the key box again if so.
+      if (/401|403|rejected/i.test(error.message)) checkFal().catch(function () {});
+    });
   }
   cancel.addEventListener("click", function () {
     if (!currentJob) return;
