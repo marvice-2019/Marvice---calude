@@ -24,9 +24,10 @@ The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are
 | `openmotion/` | OpenMotion image, built from a pinned upstream commit (`OPENMOTION_REF`). OpenMotion only answers on `127.0.0.1` with a `localhost` Host header, so `socat` publishes it on port 4180 and the Caddy gate rewrites Host and the matching Origin. Data lives in the `openmotion-data` volume |
 | `studio-brand/` | Patches the Studio's `index.html` during the image build (inline logo, CSS and a small script). If a HyperFrames upgrade changes that page, the build stops with a message instead of shipping it unbranded |
 
-## 1. DNS (Hostinger)
+## 1. DNS (Cloudflare)
 
-In hPanel → Domains → `marvice.tech` → DNS, add:
+In Cloudflare → `marvice.tech` → DNS → Records, add (Proxy status: **DNS only**, grey cloud, so Coolify can issue the
+certificate and long renders are not cut off by Cloudflare's 100-second timeout):
 
 | Type | Name | Points to | TTL |
 | --- | --- | --- | --- |
