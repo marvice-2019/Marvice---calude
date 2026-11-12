@@ -17,7 +17,7 @@ RUN git init -q . && git remote add origin https://github.com/nexu-io/openmotion
     && rm -rf .git && npm ci
 
 # Rebrand as "Marvice | Motion" and make English the only UI language, then build the UI.
-COPY openmotion/brand.mjs openmotion/features.html creator/public/marvice-logo.svg creator/public/marvice-mark.svg /brand/
+COPY openmotion/brand.mjs openmotion/welcome.html creator/public/marvice-logo.svg creator/public/marvice-mark.svg /brand/
 RUN node /brand/brand.mjs /app /brand && npm run build:studio && npm cache clean --force
 
 ENV NODE_ENV=production \

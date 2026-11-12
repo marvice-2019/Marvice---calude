@@ -1,0 +1,75 @@
+<!-- Marvice | Motion welcome screen. Inserted at the top of <body> in studio/index.html by brand.mjs.
+     Shown at the main address (/) once per browser tab, over the editor, which keeps loading underneath.
+     Direct project links (?project= or #project/) skip it. Light theme = data-theme="paper". -->
+<style>
+#marvice-welcome { --mw-bg: #121616; --mw-text: #f2eee8; --mw-muted: #a9b1af; --mw-card: #1b2020; --mw-border: #2c3433; --mw-copper: #bd8b53; --mw-on-copper: #121616;
+  position: fixed; inset: 0; z-index: 2147483000; overflow-y: auto; background: var(--mw-bg); color: var(--mw-text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+[data-theme="paper"] #marvice-welcome { --mw-bg: #f6f3ee; --mw-text: #1f2a29; --mw-muted: #56615f; --mw-card: #ffffff; --mw-border: #e3ddd3; --mw-copper: #8a5f2e; --mw-on-copper: #ffffff; }
+#marvice-welcome[hidden] { display: none; }
+.mw-inner { box-sizing: border-box; max-width: 1180px; min-height: 100%; margin: 0 auto; padding: 40px 32px 56px; display: flex; flex-direction: column; }
+.mw-logo { height: 26px; width: auto; align-self: flex-start; }
+.mw-logo-dark { display: none; } [data-theme="paper"] .mw-logo-light { display: none; } [data-theme="paper"] .mw-logo-dark { display: block; }
+.mw-hero { margin: auto 0 0; padding: 56px 0 36px; }
+.mw-eyebrow { margin: 0 0 14px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mw-copper); }
+.mw-hero h1 { margin: 0; font-size: clamp(34px, 5.4vw, 64px); font-weight: 650; line-height: 1.04; letter-spacing: -.035em; text-wrap: balance; }
+.mw-hero p { max-width: 560px; margin: 16px 0 0; font-size: 16px; line-height: 1.55; color: var(--mw-muted); }
+.mw-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 0 0 36px; padding: 0; list-style: none; }
+.mw-steps li { display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 20px 18px 22px; background: var(--mw-card); border: 1px solid var(--mw-border); border-top: 2px solid var(--mw-copper); border-radius: 12px; animation: mw-in 520ms cubic-bezier(.2, .7, .2, 1) both; }
+.mw-steps li:nth-child(1) { animation-delay: 80ms; } .mw-steps li:nth-child(2) { animation-delay: 200ms; } .mw-steps li:nth-child(3) { animation-delay: 320ms; }
+.mw-steps li:nth-child(4) { animation-delay: 440ms; } .mw-steps li:nth-child(5) { animation-delay: 560ms; }
+.mw-num { font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--mw-muted); }
+.mw-label { font-size: 11px; font-weight: 650; line-height: 1.2; letter-spacing: .1em; text-transform: uppercase; color: var(--mw-copper); }
+.mw-steps strong { font-size: 16px; font-weight: 620; line-height: 1.3; letter-spacing: -.01em; text-wrap: balance; }
+.mw-steps p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--mw-muted); }
+.mw-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: auto; }
+.mw-start { display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 24px; border: 0; border-radius: 10px; background: var(--mw-copper); color: var(--mw-on-copper); font: 600 15px system-ui, sans-serif; cursor: pointer; }
+.mw-start:hover { filter: brightness(1.08); }
+.mw-start:focus-visible { outline: 2px solid var(--mw-text); outline-offset: 3px; }
+.mw-hint { font-size: 13px; color: var(--mw-muted); }
+@keyframes mw-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mw-steps li { animation: none; } }
+@media (max-width: 1100px) { .mw-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .mw-inner { padding: 24px 16px 40px; } .mw-hero { padding: 40px 0 28px; } .mw-steps { grid-template-columns: minmax(0, 1fr); } .mw-start { width: 100%; justify-content: center; } }
+</style>
+<div id="marvice-welcome" role="dialog" aria-modal="true" aria-labelledby="mw-title" hidden>
+  <div class="mw-inner">
+    <img class="mw-logo mw-logo-light" src="/web/design-system/opendesign-light.svg" alt="Marvice Motion" width="151" height="26">
+    <img class="mw-logo mw-logo-dark" src="/web/design-system/opendesign-dark.svg" alt="Marvice Motion" width="151" height="26">
+    <div class="mw-hero">
+      <p class="mw-eyebrow">Marvice | Motion</p>
+      <h1 id="mw-title">Full-Stack Video Generator</h1>
+      <p>Recreate any reference video with your own brand and copy, edit it shot by shot, and export an MP4.</p>
+    </div>
+    <ol class="mw-steps">
+      <li><span class="mw-num">01</span><span class="mw-label">Motion MD</span><strong>A Style Your Agent Can Read.</strong><p>Reusable style rules—visuals, rhythm, layout, and assets—your agent can follow.</p></li>
+      <li><span class="mw-num">02</span><span class="mw-label">Resources</span><strong>100+ Brand Studies. 890+ Creative Resources.</strong><p>Brand-video studies, motion components, and editable templates to remix.</p></li>
+      <li><span class="mw-num">03</span><span class="mw-label">Quality</span><strong>99% Reconstruction Fidelity.</strong><p>Recreate a reference's shots, timing, and transitions with your own brand.</p></li>
+      <li><span class="mw-num">04</span><span class="mw-label">Create &amp; Edit</span><strong>Code Video with HTML. Fully Editable.</strong><p>Edit shots, timing, and media with your agent or in Studio, then export MP4.</p></li>
+      <li><span class="mw-num">05</span><span class="mw-label">BYOA &amp; BYOK</span><strong>Your Agent. Your Keys. Your Studio.</strong><p>Runs locally in your agent, with your own keys for image, video, music, and voice.</p></li>
+    </ol>
+    <div class="mw-actions">
+      <button type="button" class="mw-start" id="mw-start">Start creating <span aria-hidden="true">→</span></button>
+      <span class="mw-hint">Opens the editor. Templates are in the sidebar.</span>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var el = document.getElementById("marvice-welcome");
+  var direct = new URLSearchParams(location.search).has("project") || location.hash.indexOf("#project/") === 0;
+  var seen = false;
+  try { seen = sessionStorage.getItem("marvice-welcome-seen") === "1"; } catch (e) {}
+  if (location.pathname !== "/" || direct || seen) { el.remove(); return; }
+  el.hidden = false;
+  var start = document.getElementById("mw-start");
+  function close() {
+    try { sessionStorage.setItem("marvice-welcome-seen", "1"); } catch (e) {}
+    el.remove();
+    document.removeEventListener("keydown", onKey, true);
+  }
+  function onKey(event) { if (event.key === "Escape") { event.stopPropagation(); close(); } }
+  start.addEventListener("click", close);
+  document.addEventListener("keydown", onKey, true);
+  start.focus();
+})();
+</script>
