@@ -20,6 +20,9 @@ RUN git init -q . && git remote add origin https://github.com/nexu-io/openmotion
 COPY openmotion/brand.mjs openmotion/welcome.html creator/public/marvice-logo.svg creator/public/marvice-mark.svg /brand/
 RUN node /brand/brand.mjs /app /brand && npm run build:studio && npm cache clean --force
 
+# stdio -> Streamable HTTP bridge for the MCP endpoint (see entrypoint.sh). Pinned.
+RUN npm install -g supergateway@4.2.1 && npm cache clean --force
+
 ENV NODE_ENV=production \
     PORT=4173 \
     MOTION_DATA_DIR=/data \
@@ -35,7 +38,7 @@ COPY openmotion/entrypoint.sh /usr/local/bin/openmotion-entrypoint.sh
 RUN chmod +x /usr/local/bin/openmotion-entrypoint.sh
 
 VOLUME ["/data"]
-EXPOSE 4180
+EXPOSE 4180 4190
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
   CMD curl -fsS -H "Host: localhost:4173" http://127.0.0.1:4173/ >/dev/null || exit 1

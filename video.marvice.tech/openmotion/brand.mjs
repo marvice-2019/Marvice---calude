@@ -41,6 +41,8 @@ await patch("studio/index.html", [
 ]);
 await patch("web/connect.html", [["<strong>OpenMotion</strong>", "<strong>Marvice Motion</strong>"]]);
 
+await patch("workspace.ts", [["title: '初始工程'", "title: 'First project'"]]);
+
 // English by default; Chinese is ignored if saved and removed from the language menu.
 await patch("studio/src/i18n/I18n.tsx", [
   ["if (isLocale(saved)) return saved;", "if (isLocale(saved) && saved !== 'zh-CN') return saved;"],

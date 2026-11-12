@@ -8,10 +8,16 @@
 # Origin matches that Host, so both are rewritten here (a foreign Origin is
 # left alone and still rejected).
 http://motion.marvice.tech:8080 {
-	import gate
-	reverse_proxy motion:4180 {
-		header_up Host localhost:4173
-		header_up Origin ^https://motion\.marvice\.tech$ http://localhost:4173
+	# MCP for AI tools: authenticated by its own Bearer token (MCP_API_KEY), not basic auth.
+	handle /mcp* {
+		reverse_proxy motion:4190
+	}
+	handle {
+		import gate
+		reverse_proxy motion:4180 {
+			header_up Host localhost:4173
+			header_up Origin ^https://motion\.marvice\.tech$ http://localhost:4173
+		}
 	}
 }
 

@@ -44,6 +44,14 @@
 .mw-result div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 12px; color: var(--mw-muted); }
 .mw-result p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mw-result a { flex-shrink: 0; color: var(--mw-copper); font-weight: 600; text-decoration: none; }
+.mw-starters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.mw-starters button { height: 30px; padding: 0 12px; border: 1px solid var(--mw-border); border-radius: 999px; background: transparent; color: var(--mw-text); font: 500 13px system-ui, sans-serif; cursor: pointer; }
+.mw-starters button:hover { border-color: var(--mw-copper); }
+.mw-starters button:focus-visible, .mw-check input:focus-visible, .mw-cancel:focus-visible { outline: 2px solid var(--mw-copper); outline-offset: 2px; }
+.mw-check { flex-direction: row !important; align-items: center; gap: 8px !important; height: 40px; font-size: 13px !important; color: var(--mw-text) !important; cursor: pointer; }
+.mw-check input { width: 16px; height: 16px; accent-color: var(--mw-copper); }
+.mw-cancel { height: 44px; padding: 0 16px; border: 1px solid var(--mw-border); border-radius: 10px; background: transparent; color: var(--mw-text); font: 600 14px system-ui, sans-serif; cursor: pointer; }
+.mw-cancel[hidden] { display: none; }
 .mw-steps-title { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--mw-muted); }
 .mw-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 0 0 36px; padding: 0; list-style: none; }
 .mw-steps li { display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 20px 18px 22px; background: var(--mw-card); border: 1px solid var(--mw-border); border-top: 2px solid var(--mw-copper); border-radius: 12px; animation: mw-in 520ms cubic-bezier(.2, .7, .2, 1) both; }
@@ -82,13 +90,16 @@
         <button type="button" data-kind="image" aria-pressed="true">Photo</button>
         <button type="button" data-kind="video" aria-pressed="false">Video</button>
       </div>
+      <div class="mw-starters" id="mw-starters" role="group" aria-label="Prompt starters"></div>
       <label for="mw-prompt" class="mw-steps-title" style="display:block;margin-bottom:8px">Prompt</label>
       <textarea id="mw-prompt" maxlength="4000" placeholder="A chef plating biryani in a busy Chennai restaurant kitchen, warm window light, shallow depth of field, shot on 35mm"></textarea>
       <div class="mw-row">
         <label class="mw-model">Model<select id="mw-model"></select></label>
         <label>Shape<select id="mw-shape"><option value="16:9">16:9 Landscape</option><option value="9:16">9:16 Reel</option><option value="1:1">1:1 Square</option></select></label>
         <label id="mw-length-field" hidden>Length<select id="mw-length"><option value="5">5 seconds</option><option value="10">10 seconds</option></select></label>
+        <label class="mw-check"><input type="checkbox" id="mw-real" checked> Realistic look</label>
         <button type="button" class="mw-btn mw-generate" id="mw-generate">Generate</button>
+        <button type="button" class="mw-cancel" id="mw-cancel" hidden>Cancel</button>
       </div>
       <p class="mw-status" id="mw-status" role="status" aria-live="polite"></p>
       <div class="mw-results" id="mw-results"></div>
@@ -134,7 +145,20 @@
     image: [["fal:fal-ai/flux-pro/v1.1-ultra", "FLUX 1.1 Pro Ultra — most realistic"], ["fal:fal-ai/nano-banana-pro", "Nano Banana Pro — follows detailed prompts"]],
     video: [["fal:kling/v4/text-to-video", "Kling 4.0 — realistic, 1080p"], ["fal:kling/v4/flash/text-to-video", "Kling 4.0 Flash — faster, 720p"]]
   };
-  var kind = "image", busy = false, falReady = null;
+  // One-click starters for common client work; they fill the prompt and pick Photo or Video.
+  var STARTERS = [
+    ["Product shot", "image", "A matte black wireless earbud case on wet slate, water droplets, soft studio light from the left, clean dark background, commercial product photography"],
+    ["Food", "image", "Hyderabadi chicken biryani on a brass thali with raita and mirchi ka salan, steam rising, warm restaurant window light, 45-degree angle"],
+    ["Portrait", "image", "A confident Indian woman founder in her 30s in a modern Bengaluru office, natural window light, shallow depth of field, editorial portrait"],
+    ["Real estate", "image", "A sunlit modern 3BHK living room with floor-to-ceiling windows overlooking a green city skyline, warm evening light, wide-angle interior photo"],
+    ["Café reel", "video", "Slow push-in on a barista pouring latte art in a cosy Hyderabad café, morning light, handheld feel, shallow depth of field"],
+    ["Shoe ad", "video", "A running shoe splashing through a puddle on a rainy Mumbai street at night, neon reflections, slow motion, low-angle tracking shot"]
+  ];
+  // Added when "Realistic look" is on.
+  var REAL = { image: ", photorealistic, natural lighting, true-to-life skin and materials, shot on a full-frame camera, 50mm lens",
+               video: ", photorealistic live-action footage, natural motion and lighting, real camera movement, true-to-life detail" };
+  var kind = "image", busy = false, falReady = null, currentJob = null;
+  var cancel = document.getElementById("mw-cancel"), real = document.getElementById("mw-real"), starters = document.getElementById("mw-starters");
   var prompt = document.getElementById("mw-prompt"), model = document.getElementById("mw-model"), shape = document.getElementById("mw-shape");
   var lengthField = document.getElementById("mw-length-field"), length = document.getElementById("mw-length");
   var button = document.getElementById("mw-generate"), status = document.getElementById("mw-status"), results = document.getElementById("mw-results");
@@ -146,16 +170,27 @@
     lengthField.hidden = kind !== "video";
   }
   function refreshButton() { button.disabled = busy || falReady === false || !prompt.value.trim(); }
-  el.querySelectorAll(".mw-tabs button").forEach(function (tab) {
-    tab.addEventListener("click", function () {
-      if (busy) return;
-      kind = tab.dataset.kind;
-      el.querySelectorAll(".mw-tabs button").forEach(function (t) { t.setAttribute("aria-pressed", String(t === tab)); });
-      fillModels();
-    });
+  function setKind(next) {
+    if (busy || next === kind) return;
+    kind = next;
+    el.querySelectorAll(".mw-tabs button").forEach(function (t) { t.setAttribute("aria-pressed", String(t.dataset.kind === kind)); });
+    fillModels();
+  }
+  el.querySelectorAll(".mw-tabs button").forEach(function (tab) { tab.addEventListener("click", function () { setKind(tab.dataset.kind); }); });
+  STARTERS.forEach(function (s) {
+    var chip = document.createElement("button"); chip.type = "button";
+    chip.textContent = s[0] + (s[1] === "video" ? " · video" : "");
+    chip.addEventListener("click", function () { if (busy) return; setKind(s[1]); prompt.value = s[2]; refreshButton(); prompt.focus(); });
+    starters.appendChild(chip);
   });
   prompt.addEventListener("input", refreshButton);
   fillModels(); refreshButton();
+  function setBusy(on) {
+    busy = on; button.textContent = on ? "Generating…" : "Generate";
+    cancel.hidden = !on; cancel.disabled = false; refreshButton();
+    if (!on) currentJob = null;
+  }
+  function shown(text) { return [REAL.image, REAL.video].reduce(function (t, s) { return t.split(s).join(""); }, text); }
 
   function api(path, options) {
     return fetch("/motion-api/" + path, options).then(function (r) {
@@ -171,6 +206,11 @@
     if (!falReady) say("Photo and video generation needs a fal.ai key: add FAL_KEY in Coolify (Environment Variables) and redeploy.", true);
     refreshButton();
   }).catch(function () { /* Gateway still starting; the Generate call will report any problem. */ });
+  // Recent results (from here or the editor) stay visible after a reload.
+  api("generations").then(function (data) {
+    (data.jobs || []).filter(function (j) { return j.state === "completed" && j.modality !== "audio"; }).slice(0, 8).reverse()
+      .forEach(function (j) { (j.assets || []).forEach(function (a) { if (a.available !== false) addResult(j, a); }); });
+  }).catch(function () {});
 
   function addResult(job, asset) {
     var url = "/api/projects/" + encodeURIComponent(job.projectId) + "/preview/" + asset.path.split("/").map(encodeURIComponent).join("/");
@@ -179,7 +219,7 @@
     media.src = url;
     if (media.tagName === "VIDEO") { media.controls = true; media.playsInline = true; media.preload = "metadata"; } else { media.alt = job.prompt; media.loading = "lazy"; }
     var bar = document.createElement("div"), caption = document.createElement("p"), link = document.createElement("a");
-    caption.textContent = job.prompt; caption.title = job.prompt;
+    caption.textContent = shown(job.prompt); caption.title = shown(job.prompt);
     link.href = url; link.download = asset.path.split("/").pop(); link.textContent = "Download";
     bar.appendChild(caption); bar.appendChild(link); card.appendChild(media); card.appendChild(bar);
     results.insertBefore(card, results.firstChild);
@@ -190,24 +230,31 @@
       if (job.state === "completed") {
         (job.assets || []).forEach(function (a) { addResult(job, a); });
         say("Done in " + secs + "s. Saved to the project's media library.");
-        busy = false; button.textContent = "Generate"; refreshButton(); return;
+        setBusy(false); return;
       }
-      if (job.state === "failed" || job.state === "cancelled") throw new Error(job.error || "Generation " + job.state);
+      if (job.state === "cancelled") { say("Cancelled."); setBusy(false); return; }
+      if (job.state === "failed") throw new Error(job.error || "Generation failed");
       var phase = { queued: "Queued", "provider-queue": "Waiting in fal.ai's queue", generating: "Generating", submitted: "Sent to fal.ai" }[job.phase] || "Working";
-      say(phase + "… " + secs + "s" + (kind === "video" ? " (videos usually take 1–5 minutes)" : ""));
+      say(phase + "… " + secs + "s" + (job.modality === "video" ? " (videos usually take 1–5 minutes)" : ""));
       setTimeout(function () { poll(id, started); }, 3000);
-    }).catch(function (error) { busy = false; button.textContent = "Generate"; refreshButton(); say(error.message, true); });
+    }).catch(function (error) { setBusy(false); say(error.message, true); });
   }
+  cancel.addEventListener("click", function () {
+    if (!currentJob) return;
+    cancel.disabled = true; say("Cancelling…");
+    api("generations/" + currentJob + "/cancel", { method: "POST" }).catch(function (error) { cancel.disabled = false; say(error.message, true); });
+  });
   button.addEventListener("click", function () {
     var text = prompt.value.trim(); if (!text || busy) return;
+    if (real.checked) text += REAL[kind];
     var parameters = { aspect_ratio: shape.value };
     if (kind === "video") parameters.duration = Number(length.value);
-    busy = true; button.textContent = "Generating…"; refreshButton(); say("Starting…");
+    setBusy(true); cancel.disabled = true; say("Starting…");
     var key = "mw-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     api("generations", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ modality: kind, model: model.value, prompt: text, parameters: parameters, idempotencyKey: key }) })
-      .then(function (data) { poll(data.job.id, Date.now()); })
-      .catch(function (error) { busy = false; button.textContent = "Generate"; refreshButton(); say(error.message, true); });
+      .then(function (data) { currentJob = data.job.id; cancel.disabled = false; poll(data.job.id, Date.now()); })
+      .catch(function (error) { setBusy(false); say(error.message, true); });
   });
   prompt.focus();
 })();

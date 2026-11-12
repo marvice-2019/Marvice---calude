@@ -61,6 +61,8 @@ services:
     environment:
       ATLASCLOUD_API_KEY: ${ATLASCLOUD_API_KEY:-}
       FAL_KEY: ${FAL_KEY:-}
+      # Turns on https://motion.marvice.tech/mcp for AI tools (sent as a Bearer token).
+      MCP_API_KEY: ${MCP_API_KEY:-}
     volumes:
       - openmotion-data:/data
     shm_size: "1gb"

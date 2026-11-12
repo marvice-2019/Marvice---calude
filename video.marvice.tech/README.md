@@ -105,6 +105,34 @@ the active project's media library and can be downloaded. Realistic models added
 Each generation is billed to the fal.ai account behind `FAL_KEY` (see each model's page on fal.ai for its price). If fal
 rejects the key, OpenMotion marks it rejected until the key is changed in **Model settings** or the service is restarted.
 
+The prompt box also has one-click starters (product shot, food, portrait, real estate, café reel, shoe ad), a
+**Realistic look** switch (on by default; adds photographic wording to the prompt), a Cancel button, and shows the last
+8 results again after a reload.
+
+### MCP for AI tools (`https://motion.marvice.tech/mcp`)
+
+Claude Code, Cursor, Codex and other MCP clients can drive Marvice Motion with OpenMotion's 11 tools (create a project
+from a prompt, template or reference video, edit it, list versions, restore, export MP4). It is off until you set
+`MCP_API_KEY` in Coolify and redeploy. Generate a long random token, for example:
+
+```bash
+openssl rand -hex 32
+```
+
+The endpoint uses that token (`Authorization: Bearer <token>`), not the site's basic-auth login, so it can be rotated on
+its own. Setup per tool (replace `<token>`):
+
+- **Claude Code:** `claude mcp add --transport http marvice-motion https://motion.marvice.tech/mcp --header "Authorization: Bearer <token>"`
+- **Cursor** (`~/.cursor/mcp.json`): `{"mcpServers": {"marvice-motion": {"url": "https://motion.marvice.tech/mcp", "headers": {"Authorization": "Bearer <token>"}}}}`
+- **Codex** (`~/.codex/config.toml`): `[mcp_servers.marvice-motion]` with `url = "https://motion.marvice.tech/mcp"` and
+  `bearer_token_env_var = "MARVICE_MOTION_TOKEN"`, then set that variable to the token.
+
+Limits: Claude.ai and ChatGPT web connectors need OAuth and cannot use this endpoint. The tools run on the server, so
+`openmotion_import_assets` can only import files already on the server, and `openmotion_list_templates` returns a file path
+on the server (use `openmotion_get_template` with a known template ID from the gallery instead). Links the tools return
+point at `localhost`; open the project at https://motion.marvice.tech instead. How it works: `supergateway` (pinned)
+runs OpenMotion's own MCP server per session inside the `motion` container and attaches it to the running editor.
+
 To upgrade, change `OPENMOTION_REF` in `openmotion/Dockerfile` to a newer upstream commit and redeploy.
 
 ## Updating
