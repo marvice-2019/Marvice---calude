@@ -56,6 +56,18 @@ await patch("studio/src/i18n/LanguageMenu.tsx", [
   ["{languages.map(", "{languages.filter(language => language.locale !== 'zh-CN').map("],
 ]);
 
+// Realistic photo and video models on fal.ai (needs FAL_KEY). IDs and options checked against
+// fal's catalogue and OpenAPI schemas on 2026-11-12; Veo is deprecated on fal, so Kling 4.0 is the video pick.
+await patch("gateway/catalog.ts", [["export const builtinModels: Model[] = [", `export const builtinModels: Model[] = [
+  { ...builtin('fal', 'fal-ai/flux-pro/v1.1-ultra', 'FLUX 1.1 Pro Ultra (realistic photo)', 'image', 'text-to-image'), defaults: { raw: true, output_format: 'jpeg' } },
+  { ...builtin('fal', 'fal-ai/nano-banana-pro', 'Nano Banana Pro', 'image', 'text-to-image'), defaults: { resolution: '2K' } },
+  { ...builtin('fal', 'kling/v4/text-to-video', 'Kling 4.0 (realistic video, 1080p)', 'video', 'text-to-video'), defaults: { resolution: '1080p' } },
+  builtin('fal', 'kling/v4/flash/text-to-video', 'Kling 4.0 Flash (faster, 720p)', 'video', 'text-to-video'),`]]);
+// The editor's generator: pass shape and length to those models.
+await patch("studio/src/motion/MediaGenerator.tsx", [["  if (model.provider === 'fal' && model.modelId.startsWith('fal-ai/flux/'))", `  if (model.provider === 'fal' && ['fal-ai/flux-pro/v1.1-ultra', 'fal-ai/nano-banana-pro'].includes(model.modelId)) return { aspect_ratio: ratio, ...extra };
+  if (model.provider === 'fal' && model.modelId.startsWith('kling/v4/')) return { aspect_ratio: ratio, duration: Math.min(15, Math.max(3, Math.round(duration))), ...extra };
+  if (model.provider === 'fal' && model.modelId.startsWith('fal-ai/flux/'))`]]);
+
 // Welcome screen at the main address: "Full-Stack Video Generator" with five steps.
 // (OpenMotion's / route opens the editor directly; its old home component is unused upstream.)
 const welcome = await readFile(join(brandDir, "welcome.html"), "utf8");

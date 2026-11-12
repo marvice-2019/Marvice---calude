@@ -90,6 +90,21 @@ OpenMotion's model gateway (images, video, music, voice) uses `ATLASCLOUD_API_KE
 also be entered in its **Model settings**. Its local-Codex image generation and its "bring your own agent" MCP flow are
 desktop features and do not work on the server; templates, the editor and MP4 export do. Telemetry is switched off.
 
+**Prompt to photo or video.** The welcome screen (shown at `/` once per tab, any time at `/?welcome`) has a prompt box:
+Photo or Video, model, shape (16:9, 9:16, 1:1) and, for video, 5 or 10 seconds. It needs `FAL_KEY`. Results are saved to
+the active project's media library and can be downloaded. Realistic models added to OpenMotion's list by `brand.mjs`
+(fal.ai IDs checked 2026-11-12; Veo is deprecated on fal):
+
+| Kind | Model | fal ID |
+| --- | --- | --- |
+| Photo | FLUX 1.1 Pro Ultra, raw mode (most realistic) | `fal-ai/flux-pro/v1.1-ultra` |
+| Photo | Nano Banana Pro, 2K | `fal-ai/nano-banana-pro` |
+| Video | Kling 4.0, 1080p | `kling/v4/text-to-video` |
+| Video | Kling 4.0 Flash, 720p (faster) | `kling/v4/flash/text-to-video` |
+
+Each generation is billed to the fal.ai account behind `FAL_KEY` (see each model's page on fal.ai for its price). If fal
+rejects the key, OpenMotion marks it rejected until the key is changed in **Model settings** or the service is restarted.
+
 To upgrade, change `OPENMOTION_REF` in `openmotion/Dockerfile` to a newer upstream commit and redeploy.
 
 ## Updating
