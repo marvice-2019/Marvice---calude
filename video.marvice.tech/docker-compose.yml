@@ -88,7 +88,9 @@ services:
       - "traefik.http.routers.marvice-openmotion-https.service=marvice-openmotion"
       - "traefik.http.routers.marvice-openmotion-http.rule=Host(`motion.marvice.tech`)"
       - "traefik.http.routers.marvice-openmotion-http.entrypoints=http"
-      - "traefik.http.routers.marvice-openmotion-http.middlewares=redirect-to-https"
+      - "traefik.http.routers.marvice-openmotion-http.middlewares=marvice-openmotion-redirect"
+      - "traefik.http.middlewares.marvice-openmotion-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.marvice-openmotion-redirect.redirectscheme.permanent=true"
       - "traefik.http.services.marvice-openmotion.loadbalancer.server.port=8080"
 
 volumes:
