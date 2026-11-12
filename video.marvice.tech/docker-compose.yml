@@ -55,7 +55,8 @@ services:
   # OpenMotion (reference-video remakes) at https://motion.marvice.tech, behind the same gate.
   motion:
     build:
-      context: ./openmotion
+      context: .
+      dockerfile: openmotion/Dockerfile
     restart: unless-stopped
     environment:
       ATLASCLOUD_API_KEY: ${ATLASCLOUD_API_KEY:-}

@@ -14,8 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 RUN git init -q . && git remote add origin https://github.com/nexu-io/openmotion.git \
     && git fetch -q --depth 1 origin "$OPENMOTION_REF" && git checkout -q FETCH_HEAD \
-    && rm -rf .git \
-    && npm ci && npm run build:studio && npm cache clean --force
+    && rm -rf .git && npm ci
+
+# Rebrand as "Marvice | Motion" and make English the only UI language, then build the UI.
+COPY openmotion/brand.mjs creator/public/marvice-logo.svg creator/public/marvice-mark.svg /brand/
+RUN node /brand/brand.mjs /app /brand && npm run build:studio && npm cache clean --force
 
 ENV NODE_ENV=production \
     PORT=4173 \
@@ -28,7 +31,7 @@ ENV NODE_ENV=production \
     OPENMOTION_TELEMETRY=0 \
     DO_NOT_TRACK=1
 
-COPY entrypoint.sh /usr/local/bin/openmotion-entrypoint.sh
+COPY openmotion/entrypoint.sh /usr/local/bin/openmotion-entrypoint.sh
 RUN chmod +x /usr/local/bin/openmotion-entrypoint.sh
 
 VOLUME ["/data"]
