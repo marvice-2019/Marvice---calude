@@ -150,6 +150,58 @@ class TooSlow(Exception):
     pass
 
 
+def ram_available_gb():
+    with open("/proc/meminfo") as f:
+        info = dict(line.split(":", 1) for line in f)
+    return round(int(info["MemAvailable"].split()[0]) / 1e6, 1)
+
+
+report["ram_total_gb"] = round(
+    os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 1e9, 1
+)
+report["disk_free_gb"] = {
+    p: round(shutil.disk_usage(p).free / 1e9, 1) for p in ("/tmp", "/kaggle/working")
+}
+print(
+    "machine:",
+    report["ram_total_gb"],
+    "GB RAM, free disk",
+    report["disk_free_gb"],
+    flush=True,
+)
+
+# Run 2: Wan 2.2 5B finished all 50 steps, then the process was killed (out of RAM) while decoding.
+# So prompts are encoded first and the text encoder (about 11 GB) is unloaded before generation.
+EMBED_NAMES = {
+    2: ("prompt_embeds", "negative_prompt_embeds"),
+    4: (
+        "prompt_embeds",
+        "prompt_attention_mask",
+        "negative_prompt_embeds",
+        "negative_prompt_attention_mask",
+    ),
+}
+
+
+def pre_encode(pipe):
+    import inspect
+
+    params = inspect.signature(pipe.encode_prompt).parameters
+    kwargs = {"prompt": PROMPT}
+    for name, value in (
+        ("negative_prompt", NEGATIVE),
+        ("do_classifier_free_guidance", True),
+        ("device", torch.device("cuda")),
+    ):
+        if name in params:
+            kwargs[name] = value
+    with torch.no_grad():
+        out = pipe.encode_prompt(**kwargs)
+    if not isinstance(out, tuple) or len(out) not in EMBED_NAMES:
+        return None
+    return dict(zip(EMBED_NAMES[len(out)], out))
+
+
 for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS:
     r = {
         "key": key,
@@ -182,6 +234,22 @@ for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS:
         r["pipeline"] = type(pipe).__name__
         r["load_s"] = round(time.time() - t)
 
+        prompt_args = {"prompt": PROMPT, "negative_prompt": NEGATIVE}
+        try:
+            embeds = pre_encode(pipe)
+        except Exception as e:  # noqa: BLE001 - fall back to the pipeline's own prompt encoding
+            embeds, r["pre_encode_error"] = None, f"{type(e).__name__}: {e}"[:200]
+        if embeds:
+            prompt_args = embeds
+            for attr in ("text_encoder", "text_encoder_2"):
+                if getattr(pipe, attr, None) is not None:
+                    getattr(pipe, attr).to(
+                        "meta"
+                    )  # frees the weights; the attribute stays for dtype checks
+            gc.collect()
+        r["text_encoder_unloaded"] = bool(embeds)
+        r["ram_free_gb_before_generate"] = ram_available_gb()
+
         start = time.time()
 
         def guard(_pipe, _step, _timestep, callback_kwargs, start=start, steps=steps):
@@ -193,8 +261,7 @@ for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS:
 
         torch.cuda.reset_peak_memory_stats()
         out = pipe(
-            prompt=PROMPT,
-            negative_prompt=NEGATIVE,
+            **prompt_args,
             height=h,
             width=w,
             num_frames=frames,
