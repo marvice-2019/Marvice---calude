@@ -105,6 +105,24 @@ the active project's media library and can be downloaded. Realistic models added
 Each generation is billed to the fal.ai account behind `FAL_KEY` (see each model's page on fal.ai for its price). If fal
 rejects the key, OpenMotion marks it rejected until the key is changed in **Model settings** or the service is restarted.
 
+**Free photos: Cloudflare Workers AI.** `brand.mjs` adds Cloudflare as a provider, with three photo models that run
+on Cloudflare's free daily allowance (10,000 neurons a day per account, resets 00:00 UTC; pricing page checked
+2026-11-12). Video has no free option.
+
+| Model | Cloudflare ID | Free images a day (approx.) |
+| --- | --- | --- |
+| FLUX.2 Klein (default free pick) | `@cf/black-forest-labs/flux-2-klein-4b` | ~95 at 1:1, ~60 at 16:9 |
+| Lucid Origin (most realistic) | `@cf/leonardo/lucid-origin` | ~2–3 |
+| FLUX.1 Schnell (square only) | `@cf/black-forest-labs/flux-1-schnell` | ~100 |
+
+Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Coolify, or paste `account-id:api-token` into the key box on
+the welcome screen. The token needs the **Workers AI** permission (Cloudflare dashboard → My Profile → API Tokens →
+Create Token → "Workers AI" template). On the Workers Free plan, usage past the allowance is refused, not billed; on
+Workers Paid it is billed at $0.011 per 1,000 neurons.
+
+The welcome screen shows a key box for whichever provider the selected model needs, when that provider has no key or
+its key was rejected.
+
 The prompt box also has one-click starters (product shot, food, portrait, real estate, café reel, shoe ad), a
 **Realistic look** switch (on by default; adds photographic wording to the prompt), a Cancel button, and shows the last
 8 results again after a reload.

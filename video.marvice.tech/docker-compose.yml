@@ -61,6 +61,9 @@ services:
     environment:
       ATLASCLOUD_API_KEY: ${ATLASCLOUD_API_KEY:-}
       FAL_KEY: ${FAL_KEY:-}
+      # Free photo generation (Cloudflare Workers AI daily allowance); both are needed.
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       # Turns on https://motion.marvice.tech/mcp for AI tools (sent as a Bearer token).
       MCP_API_KEY: ${MCP_API_KEY:-}
     volumes:

@@ -103,7 +103,7 @@
       </div>
       <p class="mw-status" id="mw-status" role="status" aria-live="polite"></p>
       <div class="mw-row" id="mw-keybox" hidden>
-        <label class="mw-model" style="flex:1 1 320px">fal.ai key<input type="password" id="mw-key" autocomplete="off" spellcheck="false" placeholder="Paste your fal.ai key" style="height:40px;padding:0 10px;background:var(--mw-field);color:var(--mw-text);border:1px solid var(--mw-border);border-radius:8px;font:14px system-ui,sans-serif"></label>
+        <label class="mw-model" style="flex:1 1 320px"><span id="mw-keylabel">fal.ai key</span><input type="password" id="mw-key" autocomplete="off" spellcheck="false" placeholder="Paste your fal.ai key" style="height:40px;padding:0 10px;background:var(--mw-field);color:var(--mw-text);border:1px solid var(--mw-border);border-radius:8px;font:14px system-ui,sans-serif"></label>
         <button type="button" class="mw-btn" id="mw-savekey" disabled>Save key</button>
       </div>
       <div class="mw-results" id="mw-results"></div>
@@ -146,8 +146,11 @@
 
   // Realistic models on fal.ai, added to OpenMotion's model list at build (openmotion/brand.mjs).
   var MODELS = {
-    image: [["fal:fal-ai/flux-pro/v1.1-ultra", "FLUX 1.1 Pro Ultra — most realistic"], ["fal:fal-ai/nano-banana-pro", "Nano Banana Pro — follows detailed prompts"]],
-    video: [["fal:kling/v4/text-to-video", "Kling 4.0 — realistic, 1080p"], ["fal:kling/v4/flash/text-to-video", "Kling 4.0 Flash — faster, 720p"]]
+    image: [["cloudflare:@cf/black-forest-labs/flux-2-klein-4b", "FLUX.2 Klein — free (Cloudflare, ~60–95 a day)"],
+            ["cloudflare:@cf/leonardo/lucid-origin", "Lucid Origin — most realistic free (Cloudflare, ~2 a day)"],
+            ["fal:fal-ai/flux-pro/v1.1-ultra", "FLUX 1.1 Pro Ultra — realistic (fal.ai credits)"],
+            ["fal:fal-ai/nano-banana-pro", "Nano Banana Pro — detailed prompts (fal.ai credits)"]],
+    video: [["fal:kling/v4/text-to-video", "Kling 4.0 — realistic, 1080p (fal.ai credits)"], ["fal:kling/v4/flash/text-to-video", "Kling 4.0 Flash — faster, 720p (fal.ai credits)"]]
   };
   // One-click starters for common client work; they fill the prompt and pick Photo or Video.
   var STARTERS = [
@@ -161,7 +164,7 @@
   // Added when "Realistic look" is on.
   var REAL = { image: ", photorealistic, natural lighting, true-to-life skin and materials, shot on a full-frame camera, 50mm lens",
                video: ", photorealistic live-action footage, natural motion and lighting, real camera movement, true-to-life detail" };
-  var kind = "image", busy = false, falReady = null, currentJob = null;
+  var kind = "image", busy = false, providers = {}, keyMessage = false, currentJob = null;
   var cancel = document.getElementById("mw-cancel"), real = document.getElementById("mw-real"), starters = document.getElementById("mw-starters");
   var prompt = document.getElementById("mw-prompt"), model = document.getElementById("mw-model"), shape = document.getElementById("mw-shape");
   var lengthField = document.getElementById("mw-length-field"), length = document.getElementById("mw-length");
@@ -173,12 +176,14 @@
     MODELS[kind].forEach(function (m) { var o = document.createElement("option"); o.value = m[0]; o.textContent = m[1]; model.appendChild(o); });
     lengthField.hidden = kind !== "video";
   }
-  function refreshButton() { button.disabled = busy || falReady === false || !prompt.value.trim(); }
+  function provider() { return model.value.split(":")[0]; }
+  function ready() { var p = providers[provider()]; return !p || p.available; }
+  function refreshButton() { button.disabled = busy || !ready() || !prompt.value.trim(); }
   function setKind(next) {
     if (busy || next === kind) return;
     kind = next;
     el.querySelectorAll(".mw-tabs button").forEach(function (t) { t.setAttribute("aria-pressed", String(t.dataset.kind === kind)); });
-    fillModels();
+    fillModels(); updateKeyUI();
   }
   el.querySelectorAll(".mw-tabs button").forEach(function (tab) { tab.addEventListener("click", function () { setKind(tab.dataset.kind); }); });
   STARTERS.forEach(function (s) {
@@ -188,6 +193,7 @@
     starters.appendChild(chip);
   });
   prompt.addEventListener("input", refreshButton);
+  model.addEventListener("change", function () { updateKeyUI(); });
   fillModels(); refreshButton();
   function setBusy(on) {
     busy = on; button.textContent = on ? "Generating…" : "Generate";
@@ -204,29 +210,42 @@
       });
     });
   }
-  // fal.ai key: if none is set (or fal rejected it), show a box to paste one. It is saved on the
-  // server by OpenMotion's gateway (same call as its Model settings) and never sent back to the page.
-  var keybox = document.getElementById("mw-keybox"), keyInput = document.getElementById("mw-key"), saveKey = document.getElementById("mw-savekey");
-  function checkFal() {
+  // Provider keys: if the selected model's provider has no key (or it was rejected), show a box to paste
+  // one. It is saved on the server by OpenMotion's gateway (same call as its Model settings) and never
+  // sent back to the page. Cloudflare's key is "<account id>:<API token>".
+  var KEYS = {
+    fal: { label: "fal.ai key", placeholder: "Paste your fal.ai key", name: "fal.ai",
+      none: "No fal.ai key yet. Paste it below, or pick a free Cloudflare model.", rejected: "fal.ai rejected the saved key (wrong key or no credit). Paste a working key below, or pick a free Cloudflare model." },
+    cloudflare: { label: "Cloudflare key (account ID:API token)", placeholder: "account-id:api-token", name: "Cloudflare",
+      none: "Free Cloudflare models need your Cloudflare account ID and a Workers AI API token, pasted below as account-id:api-token.", rejected: "Cloudflare rejected the saved key. Paste account-id:api-token below (the token needs Workers AI permission)." }
+  };
+  var keybox = document.getElementById("mw-keybox"), keyInput = document.getElementById("mw-key"), saveKey = document.getElementById("mw-savekey"), keyLabel = document.getElementById("mw-keylabel");
+  function updateKeyUI() {
+    var id = provider(), p = providers[id], info = KEYS[id];
+    var missing = !!(p && !p.available && info);
+    keybox.hidden = !missing;
+    if (missing) {
+      keyLabel.textContent = info.label; keyInput.placeholder = info.placeholder;
+      say(p.verification === "rejected" ? info.rejected : info.none, true); keyMessage = true;
+    } else if (keyMessage && !busy) { say(""); keyMessage = false; }
+    refreshButton();
+  }
+  function checkProviders() {
     return api("models/capabilities").then(function (s) {
-      var fal = (s.providers || []).filter(function (p) { return p.id === "fal"; })[0];
-      falReady = !!(fal && fal.available);
-      keybox.hidden = falReady;
-      if (!falReady) say(fal && fal.verification === "rejected"
-        ? "fal.ai rejected the saved key (wrong key or no credit). Paste a working key below."
-        : "No fal.ai key yet. Paste your key below to turn on photo and video generation.", true);
-      refreshButton();
+      (s.providers || []).forEach(function (p) { providers[p.id] = p; });
+      updateKeyUI();
     });
   }
   keyInput.addEventListener("input", function () { saveKey.disabled = !keyInput.value.trim(); });
   saveKey.addEventListener("click", function () {
+    var id = provider(), name = (KEYS[id] || {}).name || id;
     saveKey.disabled = true; say("Saving key…");
-    api("models/providers/fal", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: keyInput.value.trim(), enabled: true }) })
-      .then(function () { keyInput.value = ""; return checkFal(); })
-      .then(function () { if (falReady) say("Key saved. fal.ai checks it on your first generation."); })
+    api("models/providers/" + id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: keyInput.value.trim(), enabled: true }) })
+      .then(function () { keyInput.value = ""; return checkProviders(); })
+      .then(function () { if (ready()) { say("Key saved. " + name + " checks it on your first generation."); keyMessage = false; } })
       .catch(function (error) { saveKey.disabled = !keyInput.value.trim(); say(error.message, true); });
   });
-  checkFal().catch(function () { /* Gateway still starting; the Generate call will report any problem. */ });
+  checkProviders().catch(function () { /* Gateway still starting; the Generate call will report any problem. */ });
   // Recent results (from here or the editor) stay visible after a reload.
   api("generations").then(function (data) {
     (data.jobs || []).filter(function (j) { return j.state === "completed" && j.modality !== "audio"; }).slice(0, 8).reverse()
@@ -261,7 +280,7 @@
     }).catch(function (error) {
       setBusy(false); say(error.message, true);
       // A rejected key flips fal to unavailable; show the key box again if so.
-      if (/401|403|rejected/i.test(error.message)) checkFal().catch(function () {});
+      if (/401|403|rejected/i.test(error.message)) checkProviders().catch(function () {});
     });
   }
   cancel.addEventListener("click", function () {

@@ -65,6 +65,51 @@ await patch("gateway/catalog.ts", [["export const builtinModels: Model[] = [", `
   { ...builtin('fal', 'fal-ai/nano-banana-pro', 'Nano Banana Pro', 'image', 'text-to-image'), defaults: { resolution: '2K' } },
   { ...builtin('fal', 'kling/v4/text-to-video', 'Kling 4.0 (realistic video, 1080p)', 'video', 'text-to-video'), defaults: { resolution: '1080p' } },
   builtin('fal', 'kling/v4/flash/text-to-video', 'Kling 4.0 Flash (faster, 720p)', 'video', 'text-to-video'),`]]);
+// Free photo generation: Cloudflare Workers AI (10,000 free neurons/day per account; checked 2026-11-12).
+// Key is "<account id>:<API token>" (Model settings / welcome screen), or CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN.
+await patch("shared/gateway.ts", [["export type ProviderId = 'codex' | 'atlascloud' | 'fal';", "export type ProviderId = 'codex' | 'atlascloud' | 'fal' | 'cloudflare';"]]);
+await patch("gateway/catalog.ts", [
+  ["fal: 'fal.ai' };", "fal: 'fal.ai', cloudflare: 'Cloudflare Workers AI' };"],
+  ["export const builtinModels: Model[] = [", `export const builtinModels: Model[] = [
+  builtin('cloudflare', '@cf/black-forest-labs/flux-2-klein-4b', 'FLUX.2 Klein (free, Cloudflare)', 'image', 'text-to-image'),
+  builtin('cloudflare', '@cf/leonardo/lucid-origin', 'Lucid Origin (photoreal, free ~2/day, Cloudflare)', 'image', 'text-to-image'),
+  builtin('cloudflare', '@cf/black-forest-labs/flux-1-schnell', 'FLUX.1 Schnell (free, square, Cloudflare)', 'image', 'text-to-image'),`],
+]);
+await patch("gateway/service.ts", [["id === 'fal' ? process.env.FAL_KEY : undefined;",
+  "id === 'fal' ? process.env.FAL_KEY : id === 'cloudflare' && process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN ? process.env.CLOUDFLARE_ACCOUNT_ID + ':' + process.env.CLOUDFLARE_API_TOKEN : undefined;"]]);
+await patch("gateway/providers.ts", [["export const providerAdapters: Record<'atlascloud' | 'fal', ProviderAdapter> = { atlascloud: atlas, fal };", `/** Cloudflare Workers AI. Key: "<account id>:<API token>". Returns the image inline (base64). */
+const CF_SIZES: Record<string, [number, number]> = { '16:9': [1280, 720], '9:16': [720, 1280], '1:1': [1024, 1024], '4:3': [1024, 768], '3:4': [768, 1024] };
+const cloudflare: ProviderAdapter = {
+  async generate(job, ctx) {
+    const split = ctx.key.indexOf(':'), account = ctx.key.slice(0, split), token = ctx.key.slice(split + 1);
+    if (split < 1 || !/^[a-f0-9]{32}$/.test(account) || !token) throw new ProviderError('Cloudflare key must be "<account id>:<API token>"', 401);
+    const { aspect_ratio, ...rest } = { ...job.model.defaults, ...job.parameters } as Record<string, unknown>;
+    const [width, height] = CF_SIZES[String(aspect_ratio)] ?? CF_SIZES['1:1'];
+    const headers: Record<string, string> = { Authorization: \`Bearer \${token}\` };
+    let body;
+    if (job.model.modelId.includes('flux-2-klein')) {
+      body = new FormData(); body.append('prompt', job.prompt); body.append('width', String(width)); body.append('height', String(height));
+    } else {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(job.model.modelId.includes('flux-1-schnell') ? { steps: 8, ...rest, prompt: job.prompt } : { width, height, ...rest, prompt: job.prompt });
+    }
+    await ctx.progress('generating');
+    let result;
+    try { result = await apiJson(ctx.fetcher, \`https://api.cloudflare.com/client/v4/accounts/\${account}/ai/run/\${job.model.modelId}\`, { method: 'POST', headers, body, signal: ctx.signal }); }
+    catch (error) {
+      if (error instanceof ProviderError && error.status === 429) throw new Error('Cloudflare free daily allowance used up (resets 00:00 UTC) or rate limited; try later or pick a cheaper model');
+      throw error;
+    }
+    const image = result?.result?.image;
+    if (typeof image !== 'string' || !image) throw new Error('Cloudflare returned no image');
+    return [\`data:image/jpeg;base64,\${image}\`];
+  },
+};
+export const providerAdapters: Record<'atlascloud' | 'fal' | 'cloudflare', ProviderAdapter> = { atlascloud: atlas, fal, cloudflare };`]]);
+// The editor's generator: pass shape to Cloudflare models.
+await patch("studio/src/motion/MediaGenerator.tsx", [["  if (model.provider === 'codex') return { aspect_ratio: ratio, ...extra };",
+  "  if (model.provider === 'codex' || model.provider === 'cloudflare') return { aspect_ratio: ratio, ...extra };"]]);
+
 // The editor's generator: pass shape and length to those models.
 await patch("studio/src/motion/MediaGenerator.tsx", [["  if (model.provider === 'fal' && model.modelId.startsWith('fal-ai/flux/'))", `  if (model.provider === 'fal' && ['fal-ai/flux-pro/v1.1-ultra', 'fal-ai/nano-banana-pro'].includes(model.modelId)) return { aspect_ratio: ratio, ...extra };
   if (model.provider === 'fal' && model.modelId.startsWith('kling/v4/')) return { aspect_ratio: ratio, duration: Math.min(15, Math.max(3, Math.round(duration))), ...extra };
