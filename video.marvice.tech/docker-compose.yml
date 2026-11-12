@@ -78,6 +78,18 @@ services:
       - studio
       - creator
       - motion
+    # Second public host for OpenMotion. Set here instead of in Coolify's Domains
+    # field; Coolify keeps custom labels and its Traefik picks them up.
+    labels:
+      - "traefik.http.routers.marvice-openmotion-https.rule=Host(`motion.marvice.tech`)"
+      - "traefik.http.routers.marvice-openmotion-https.entrypoints=https"
+      - "traefik.http.routers.marvice-openmotion-https.tls=true"
+      - "traefik.http.routers.marvice-openmotion-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.marvice-openmotion-https.service=marvice-openmotion"
+      - "traefik.http.routers.marvice-openmotion-http.rule=Host(`motion.marvice.tech`)"
+      - "traefik.http.routers.marvice-openmotion-http.entrypoints=http"
+      - "traefik.http.routers.marvice-openmotion-http.middlewares=redirect-to-https"
+      - "traefik.http.services.marvice-openmotion.loadbalancer.server.port=8080"
 
 volumes:
   hyperframes-projects:

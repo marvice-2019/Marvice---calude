@@ -38,7 +38,7 @@ certificate and long renders are not cut off by Cloudflare's 100-second timeout)
 
 1. **Projects → + New → Resource → Public/Private Repository**, repo `marvice-2019/Marvice---calude`.
 2. Build pack: **Docker Compose**. Base directory: `/video.marvice.tech`. Compose file: `/docker-compose.yml`.
-3. Under the **`auth`** service, set **Domains** to `https://video.marvice.tech:8080,https://motion.marvice.tech:8080`.
+3. Under the **`auth`** service, set **Domains** to `https://video.marvice.tech:8080` (motion.marvice.tech is routed by the Traefik labels in `docker-compose.yml`).
    Leave `studio`, `creator` and `motion` with no domain.
    The `:8080` sets the container port; Traefik still serves the site on 443 with a Let's Encrypt certificate.
 4. **Environment Variables**: `BASIC_AUTH_USER` (default `admin`) and `BASIC_AUTH_PASSWORD` (required; the deploy
