@@ -93,6 +93,10 @@ MODELS = [
         "model",
         "LTX (custom)",
     ),
+]
+# Run 3: the disk turned read-only after about 70 GB of downloads (three models) in one Kaggle session,
+# so these three only run when RUN_HEAVY=1, in a session of their own.
+HEAVY = [
     (
         "cogvideox-5b",
         "zai-org/CogVideoX-5b",
@@ -202,7 +206,7 @@ def pre_encode(pipe):
     return dict(zip(EMBED_NAMES[len(out)], out))
 
 
-for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS:
+for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS + (HEAVY if os.environ.get("RUN_HEAVY") == "1" else []):
     r = {
         "key": key,
         "repo": repo,
@@ -224,6 +228,33 @@ for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS:
                 repo, subfolder="vae", torch_dtype=torch.float32
             )
         pipe = DiffusionPipeline.from_pretrained(repo, **kwargs)
+        r["pipeline"] = type(pipe).__name__
+        r["load_s"] = round(time.time() - t)
+
+        # Encode the prompt on the GPU before offload is switched on, then drop the text encoder from the
+        # pipeline entirely (run 3: unloading it after offload crashed, because offload moves it back).
+        encoders = [
+            a
+            for a in ("text_encoder", "text_encoder_2")
+            if getattr(pipe, a, None) is not None
+        ]
+        prompt_args = {"prompt": PROMPT, "negative_prompt": NEGATIVE}
+        try:
+            for a in encoders:
+                getattr(pipe, a).to("cuda")
+            embeds = pre_encode(pipe)
+        except Exception as e:  # noqa: BLE001 - fall back to the pipeline's own prompt encoding
+            embeds, r["pre_encode_error"] = None, f"{type(e).__name__}: {e}"[:200]
+        if embeds:
+            prompt_args = embeds
+            pipe.register_modules(**{a: None for a in encoders})
+        else:
+            for a in encoders:
+                getattr(pipe, a).to("cpu")
+        gc.collect()
+        torch.cuda.empty_cache()
+        r["text_encoder_unloaded"] = bool(embeds)
+
         if offload == "sequential":
             pipe.enable_sequential_cpu_offload()
         else:
@@ -231,23 +262,6 @@ for key, repo, h, w, frames, fps, steps, cfg, offload, licence in MODELS:
         for name in ("enable_tiling", "enable_slicing"):
             if hasattr(pipe, "vae") and hasattr(pipe.vae, name):
                 getattr(pipe.vae, name)()
-        r["pipeline"] = type(pipe).__name__
-        r["load_s"] = round(time.time() - t)
-
-        prompt_args = {"prompt": PROMPT, "negative_prompt": NEGATIVE}
-        try:
-            embeds = pre_encode(pipe)
-        except Exception as e:  # noqa: BLE001 - fall back to the pipeline's own prompt encoding
-            embeds, r["pre_encode_error"] = None, f"{type(e).__name__}: {e}"[:200]
-        if embeds:
-            prompt_args = embeds
-            for attr in ("text_encoder", "text_encoder_2"):
-                if getattr(pipe, attr, None) is not None:
-                    getattr(pipe, attr).to(
-                        "meta"
-                    )  # frees the weights; the attribute stays for dtype checks
-            gc.collect()
-        r["text_encoder_unloaded"] = bool(embeds)
         r["ram_free_gb_before_generate"] = ram_available_gb()
 
         start = time.time()
