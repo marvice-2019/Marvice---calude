@@ -203,7 +203,9 @@
   api("models/capabilities").then(function (s) {
     var fal = (s.providers || []).filter(function (p) { return p.id === "fal"; })[0];
     falReady = !!(fal && fal.available);
-    if (!falReady) say("Photo and video generation needs a fal.ai key: add FAL_KEY in Coolify (Environment Variables) and redeploy.", true);
+    if (!falReady) say(fal && fal.verification === "rejected"
+      ? "fal.ai rejected the key (wrong key or no credit). Enter a working key in the editor: Go to editor → Model settings → fal.ai."
+      : "No fal.ai key yet. Add it in the editor (Go to editor → Model settings → fal.ai), or set FAL_KEY in Coolify and redeploy.", true);
     refreshButton();
   }).catch(function () { /* Gateway still starting; the Generate call will report any problem. */ });
   // Recent results (from here or the editor) stay visible after a reload.
