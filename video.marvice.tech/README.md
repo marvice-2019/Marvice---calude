@@ -6,6 +6,9 @@ Marvice Studio runs on the Coolify server at **https://video.marvice.tech**, beh
 - **https://video.marvice.tech/editor**: Marvice Editor Studio, the video editor. It is [HyperFrames](https://github.com/heygen-com/hyperframes)
   Studio (the `hyperframes preview` server with rendering to MP4), rebranded at build time by `studio-brand/`:
   Marvice logo, copper accent, tab title and favicon; the HeyGen Framey button and the project-name label are hidden.
+- **https://motion.marvice.tech**: [OpenMotion](https://github.com/nexu-io/openmotion), which remakes a reference video
+  with your own brand and copy (templates, Studio editor, MP4 export). Same login. Linked from the Studio header as
+  **Remake a video**. It runs on its own subdomain because its app uses absolute paths, the same as the editor's.
 
 The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are cropped from `marvice_R_logo.ai`.
 
@@ -18,6 +21,7 @@ The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are
 | `docker-compose.yml` | Coolify Docker Compose resource: `studio` (private) + `auth` (public) and a persistent volume |
 | `Dockerfile.auth`, `Caddyfile`, `auth-entrypoint.sh` | Caddy basic-auth gate; the only service exposed to the internet. Routes `/` and `/create*` to `creator`, everything else (the editor at `/editor`, its assets and API) to `studio` |
 | `creator/` | Prompt-to-video service at `/create` (runs from the `studio` image with the `creator` command) |
+| `openmotion/` | OpenMotion image, built from a pinned upstream commit (`OPENMOTION_REF`). OpenMotion only answers on `127.0.0.1` with a `localhost` Host header, so `socat` publishes it on port 4180 and the Caddy gate rewrites Host and the matching Origin. Data lives in the `openmotion-data` volume |
 | `studio-brand/` | Patches the Studio's `index.html` during the image build (inline logo, CSS and a small script). If a HyperFrames upgrade changes that page, the build stops with a message instead of shipping it unbranded |
 
 ## 1. DNS (Hostinger)
@@ -27,12 +31,14 @@ In hPanel → Domains → `marvice.tech` → DNS, add:
 | Type | Name | Points to | TTL |
 | --- | --- | --- | --- |
 | A | `video` | public IP of the Coolify server | 300 |
+| A | `motion` | public IP of the Coolify server | 300 |
 
 ## 2. Coolify
 
 1. **Projects → + New → Resource → Public/Private Repository**, repo `marvice-2019/Marvice---calude`.
 2. Build pack: **Docker Compose**. Base directory: `/video.marvice.tech`. Compose file: `/docker-compose.yml`.
-3. Under the **`auth`** service, set **Domains** to `https://video.marvice.tech:8080`. Leave `studio` with no domain.
+3. Under the **`auth`** service, set **Domains** to `https://video.marvice.tech:8080,https://motion.marvice.tech:8080`.
+   Leave `studio`, `creator` and `motion` with no domain.
    The `:8080` sets the container port; Traefik still serves the site on 443 with a Let's Encrypt certificate.
 4. **Environment Variables**: `BASIC_AUTH_USER` (default `admin`) and `BASIC_AUTH_PASSWORD` (required; the deploy
    fails without it). The password is hashed with bcrypt when the container starts.
@@ -76,6 +82,14 @@ Claude's effort.
 
 Veo, Sora and Grok make 8-second clips, the fal.ai models 10-second clips, up to 3 per video. All clips are 16:9 or 9:16;
 square and 4:5 videos crop them. Generated footage is billed by the provider per second.
+
+## OpenMotion (`motion.marvice.tech`)
+
+OpenMotion's model gateway (images, video, music, voice) uses `ATLASCLOUD_API_KEY` and/or `FAL_KEY` from Coolify; keys can
+also be entered in its **Model settings**. Its local-Codex image generation and its "bring your own agent" MCP flow are
+desktop features and do not work on the server; templates, the editor and MP4 export do. Telemetry is switched off.
+
+To upgrade, change `OPENMOTION_REF` in `openmotion/Dockerfile` to a newer upstream commit and redeploy.
 
 ## Updating
 

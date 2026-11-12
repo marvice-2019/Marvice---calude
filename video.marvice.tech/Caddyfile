@@ -1,7 +1,22 @@
-:8080 {
+(gate) {
 	basic_auth {
 		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
 	}
+}
+
+# OpenMotion. It only accepts a localhost Host, and a write only when its
+# Origin matches that Host, so both are rewritten here (a foreign Origin is
+# left alone and still rejected).
+http://motion.marvice.tech:8080 {
+	import gate
+	reverse_proxy motion:4180 {
+		header_up Host localhost:4173
+		header_up Origin ^https://motion\.marvice\.tech$ http://localhost:4173
+	}
+}
+
+:8080 {
+	import gate
 	# Home page: Marvice Studio (prompt to video).
 	handle / {
 		rewrite * /create
