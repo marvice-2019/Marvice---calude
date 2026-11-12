@@ -56,4 +56,9 @@ await patch("studio/src/i18n/LanguageMenu.tsx", [
   ["{languages.map(", "{languages.filter(language => language.locale !== 'zh-CN').map("],
 ]);
 
+// "Full-Stack Video Generator" with five steps, on the Connect page (OpenMotion's landing
+// screen, opened from Connect Agent) between the how-to and the template gallery.
+const features = await readFile(join(brandDir, "features.html"), "utf8");
+await patch("web/connect.html", [['<section class="connect-templates"', `${features}<section class="connect-templates"`]]);
+
 console.log("Branded OpenMotion as Marvice | Motion (English)");
