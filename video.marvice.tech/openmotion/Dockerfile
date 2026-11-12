@@ -34,6 +34,7 @@ ENV NODE_ENV=production \
     OPENMOTION_TELEMETRY=0 \
     DO_NOT_TRACK=1
 
+COPY openmotion/rename-projects.mjs /app/rename-projects.mjs
 COPY openmotion/entrypoint.sh /usr/local/bin/openmotion-entrypoint.sh
 RUN chmod +x /usr/local/bin/openmotion-entrypoint.sh
 

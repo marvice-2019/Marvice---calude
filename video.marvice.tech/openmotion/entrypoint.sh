@@ -1,5 +1,7 @@
 #!/bin/sh
 set -e
+# Old projects created before the English build kept Chinese titles; rename them once.
+node /app/rename-projects.mjs || echo "Project rename skipped" >&2
 # OpenMotion binds 127.0.0.1:4173 only; publish it to the compose network on 4180.
 socat TCP-LISTEN:4180,fork,reuseaddr TCP:127.0.0.1:4173 &
 
