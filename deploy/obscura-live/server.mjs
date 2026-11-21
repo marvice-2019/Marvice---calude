@@ -21,8 +21,13 @@ const LIVE_HOST = env('LIVE_HOST').toLowerCase();
 const PUBLIC_WS_BASE = env('PUBLIC_WS_BASE').replace(/\/$/, ''); // e.g. wss://browser.example.com
 const CAPTURE_MS = Number(env('CAPTURE_MS', '1000'));
 const JPEG_QUALITY = Number(env('JPEG_QUALITY', '50'));
+const CAPTURE_TIMEOUT_MS = Number(env('CAPTURE_TIMEOUT_MS', '10000'));
 const MAX_PAYLOAD = 256 * 1024 * 1024;
 const INJECT_BASE = 2_000_000_000; // ids the gateway uses for its own CDP commands
+const VIEWER_BUFFER_LIMIT = 2 * 1024 * 1024; // a viewer this far behind skips frames until it drains
+const MAX_VIEWERS = 20;
+// Agent WebSocket paths: /devtools/browser, /devtools/page/<id>, with an optional query. No '#', no '..'.
+const DEVTOOLS_PATH = /^\/devtools\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*(\?[^#]*)?$/;
 
 if (TOKEN.length < 32) throw new Error('OBSCURA_CDP_TOKEN must be at least 32 characters');
 if (VIEWER_PASSWORD.length < 16) throw new Error('VIEWER_PASSWORD must be at least 16 characters');
@@ -54,7 +59,11 @@ const viewers = new Set();
 
 function broadcast(event, payload) {
   const chunk = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-  for (const res of viewers) res.write(chunk);
+  for (const res of viewers) {
+    // A stalled viewer (e.g. a backgrounded phone tab) must not make the gateway buffer frames without limit.
+    if (event === 'frame' && res.writableLength > VIEWER_BUFFER_LIMIT) continue;
+    res.write(chunk);
+  }
 }
 
 setInterval(() => { for (const res of viewers) res.write(': keepalive\n\n'); }, 20_000).unref();
@@ -69,7 +78,9 @@ class Relay {
     this.client = client;
     this.ip = clientIp(req);
     this.sessions = new Map(); // sessionId -> { targetId, url, title, frame, pending, errors, pausedUntil }
-    this.injected = new Map(); // injected id -> sessionId
+    this.injected = new Map(); // injected id -> { sessionId, at }
+    this.agentIds = new Set(); // agent ids >= INJECT_BASE still awaiting a reply; never reused for injection
+    this.remap = new Map(); // gateway id -> agent's original id, when an agent id clashed with a pending capture
     this.attachRequests = new Map(); // client id -> targetId for Target.attachToTarget
     this.nextInjectId = INJECT_BASE;
     this.queue = [];
@@ -95,10 +106,27 @@ class Relay {
     log(`conn ${this.id} open from ${this.ip} path=${req.url}`);
   }
 
+  freshId() {
+    let id = this.nextInjectId++;
+    while (this.agentIds.has(id) || this.injected.has(id) || this.remap.has(id)) id = this.nextInjectId++;
+    return id;
+  }
+
   fromClient(data, isBinary) {
     if (!isBinary) {
       try {
         const msg = JSON.parse(data.toString());
+        if (typeof msg.id === 'number' && msg.id >= INJECT_BASE) {
+          if (this.injected.has(msg.id)) {
+            // The agent picked an id a capture is using: send it under a fresh id and restore it on reply.
+            const original = msg.id;
+            msg.id = this.freshId();
+            this.remap.set(msg.id, original);
+            data = JSON.stringify(msg);
+          } else {
+            this.agentIds.add(msg.id);
+          }
+        }
         if (msg.method === 'Target.attachToTarget' && msg.params?.targetId) {
           this.attachRequests.set(msg.id, msg.params.targetId);
         } else if (msg.method === 'Page.navigate' && msg.sessionId && msg.params?.url) {
@@ -116,9 +144,19 @@ class Relay {
     if (!isBinary) {
       try { msg = JSON.parse(data.toString()); } catch { /* relay as-is */ }
     }
-    if (msg && typeof msg.id === 'number' && this.injected.has(msg.id)) {
-      this.onCapture(msg);
-      return; // the agent never sees the gateway's own commands
+    if (msg && typeof msg.id === 'number') {
+      if (this.remap.has(msg.id)) {
+        const gatewayId = msg.id;
+        msg.id = this.remap.get(gatewayId);
+        this.remap.delete(gatewayId);
+        data = JSON.stringify(msg);
+        isBinary = false;
+      } else if (this.injected.has(msg.id)) {
+        this.onCapture(msg);
+        return; // the agent never sees the gateway's own commands
+      } else {
+        this.agentIds.delete(msg.id);
+      }
     }
     if (msg) this.observe(msg);
     if (this.client.readyState === WebSocket.OPEN) this.client.send(data, { binary: isBinary });
@@ -177,11 +215,18 @@ class Relay {
   capture() {
     if (this.upstream.readyState !== WebSocket.OPEN) return;
     const now = Date.now();
+    // A capture upstream never answered must not freeze that page's tile forever.
+    for (const [id, entry] of this.injected) {
+      if (now - entry.at < CAPTURE_TIMEOUT_MS) continue;
+      this.injected.delete(id);
+      const stale = this.sessions.get(entry.sessionId);
+      if (stale) stale.pending = false;
+    }
     for (const [sessionId, s] of this.sessions) {
       if (s.pending || s.pausedUntil > now) continue;
-      const id = this.nextInjectId++;
+      const id = this.freshId();
       s.pending = true;
-      this.injected.set(id, sessionId);
+      this.injected.set(id, { sessionId, at: now });
       this.upstream.send(JSON.stringify({
         id, sessionId, method: 'Page.captureScreenshot',
         params: { format: 'jpeg', quality: JPEG_QUALITY },
@@ -190,7 +235,7 @@ class Relay {
   }
 
   onCapture(msg) {
-    const sessionId = this.injected.get(msg.id);
+    const { sessionId } = this.injected.get(msg.id);
     this.injected.delete(msg.id);
     const s = this.sessions.get(sessionId);
     if (!s) return;
@@ -263,6 +308,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(VIEWER_HTML);
       }
       if (path === '/events') {
+        if (viewers.size >= MAX_VIEWERS) return json(res, 503, { error: 'too many viewers' });
         res.writeHead(200, {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-store, no-transform',
@@ -294,14 +340,28 @@ const server = http.createServer(async (req, res) => {
 const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: MAX_PAYLOAD });
 
 server.on('upgrade', (req, socket, head) => {
+  // Node drops its own socket error handler once 'upgrade' fires; without this a client that resets
+  // mid-reply raises an uncaught ECONNRESET and kills the process.
+  socket.on('error', () => socket.destroy());
   const reject = (status, text) => {
     socket.end(`HTTP/1.1 ${status} ${text}\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{"error":"${text.toLowerCase()}"}`);
   };
   if (hostOf(req) === LIVE_HOST) return reject(404, 'Not Found');
   if (!bearerOk(req)) { log(`rejected unauthenticated upgrade from ${clientIp(req)}`); return reject(401, 'Unauthorized'); }
-  if (!(req.url || '').startsWith('/devtools/')) return reject(404, 'Not Found');
-  wss.handleUpgrade(req, socket, head, (client) => new Relay(client, req));
+  if (!DEVTOOLS_PATH.test(req.url || '')) return reject(404, 'Not Found');
+  wss.handleUpgrade(req, socket, head, (client) => {
+    try {
+      new Relay(client, req);
+    } catch (err) {
+      log('relay setup failed:', err.message);
+      client.close(1011);
+    }
+  });
 });
+
+// Last resort: log and keep serving the other sessions rather than dropping every agent at once.
+process.on('uncaughtException', (err) => log('uncaught exception:', err.stack || err.message));
+process.on('unhandledRejection', (err) => log('unhandled rejection:', err?.stack || err));
 
 server.listen(PORT, () => log(`gateway listening on ${PORT}, upstream ${UPSTREAM}, viewer host ${LIVE_HOST}`));
 

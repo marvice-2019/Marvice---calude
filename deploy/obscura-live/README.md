@@ -48,25 +48,45 @@ with people who should see that.
 ## Updating the code
 ```bash
 cd deploy/obscura-live
+npm install && npm test          # 5 regression tests against a fake upstream browser
 bash build-inline-dockerfile.sh > /tmp/Dockerfile.inline
 # Coolify UI: obscura-live-gateway → Configuration → Dockerfile, paste the file, Deploy
 ```
+`Dockerfile` and `build-inline-dockerfile.sh` must stay in step: both pin `node:22-alpine` by digest and
+install from `package-lock.json` with `npm ci`.
 
-Local test against any Obscura instance:
-```bash
-npm install
-UPSTREAM=wss://browser.marvice.tech OBSCURA_CDP_TOKEN=... VIEWER_USER=me VIEWER_PASSWORD=change-me-1234567 \
-LIVE_HOST=live.local PUBLIC_WS_BASE=wss://browser.marvice.tech PORT=8091 node server.mjs
-curl -u me:change-me-1234567 -H 'Host: live.local' localhost:8091/   # viewer page
-```
+## Hardening
+- **Container:** Coolify runs it with `--read-only --tmpfs /tmp --cap-drop=ALL --security-opt=no-new-privileges`
+  as the non-root `node` user.
+- **Agent paths:** WebSocket upgrades must match `/devtools/<segment>[/<segment>…][?query]`. Anything with `#`
+  or `..` is refused.
+- **Slow viewers:** a viewer more than 2 MB behind skips frames until it catches up. At most 20 viewers can
+  connect at once.
+- **Stuck captures:** a capture upstream doesn't answer within `CAPTURE_TIMEOUT_MS` (10 s) is dropped, so the
+  tile keeps updating.
+- **Id clashes:** if an agent uses a CDP id a pending capture holds, the gateway sends it under a fresh id and
+  restores the original on the reply.
+- **Last-resort handlers:** they log uncaught errors instead of dropping every session.
 
-## Verified on 2026-11-21
-- Requests without a token or with a wrong one get 401, over HTTP and WebSocket; a valid token gets 200 and
-  discovery returns `wss://browser.marvice.tech/devtools/browser`.
-- The viewer returns 401 without the password or with a wrong one, and 200 with the right one. The live host
-  refuses CDP upgrades.
-- A raw CDP session through `wss://browser.marvice.tech` loaded `https://example.com` and returned a
-  screenshot, while the viewer received 14 live frames and the gone events when the page closed.
+## Security review (2026-11-21)
+An independent review found two high-severity issues, plus three medium and low ones. All five are fixed,
+and each has a regression test in `test/gateway.test.mjs` that fails with its fix removed:
+
+| Finding | Severity | Test |
+|---|---|---|
+| Unauthenticated upgrade + TCP reset crashed the process | High | `reset mid-reply` |
+| Stalled viewer buffered frames without limit (276 MB in 4 s in the test) | High | `stalled viewer` |
+| `#` in an agent path threw inside the upgrade callback | Medium | `# in the path` |
+| Agent ids ≥ 2,000,000,000 could have their replies swallowed | Medium | `id clashes` |
+| An unanswered capture froze a tile forever | Low | `never answers` |
+
+Open items:
+- **Cloudflare SSL:** the zone is in *Full* mode. A configuration rule that sets *Full (strict)* for
+  `browser.marvice.tech` only is pending. The origin has a valid Let's Encrypt certificate, so it is safe.
+- **Origin exposure:** the DNS-only live host reveals the origin IP, so the CDP host can be reached without
+  going through Cloudflare. The token still applies. Restricting the `browser` router to Cloudflare IP ranges
+  in Traefik would close this.
+- **Forgeable log IPs:** `CF-Connecting-IP` in the logs can be forged by clients that bypass Cloudflare.
 
 ## Known limits
 - **Idle sessions:** Cloudflare may close idle WebSocket connections on `browser.marvice.tech` after about

@@ -6,7 +6,8 @@
   "description": "CDP gateway for Obscura with a password-protected live view",
   "main": "server.mjs",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs"
   },
   "engines": {
     "node": ">=22"
