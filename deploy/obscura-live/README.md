@@ -83,10 +83,33 @@ and each has a regression test in `test/gateway.test.mjs` that fails with its fi
 Open items:
 - **Cloudflare SSL:** the zone is in *Full* mode. A configuration rule that sets *Full (strict)* for
   `browser.marvice.tech` only is pending. The origin has a valid Let's Encrypt certificate, so it is safe.
-- **Origin exposure:** the DNS-only live host reveals the origin IP, so the CDP host can be reached without
-  going through Cloudflare. The token still applies. Restricting the `browser` router to Cloudflare IP ranges
-  in Traefik would close this.
+- **Origin exposure (partly closed 2026-11-21):** the DNS-only live host reveals the origin IP. The
+  `browser.marvice.tech` routes now accept only Cloudflare source IPs (see "Cloudflare-only browser routes"
+  below). That still admits any traffic from Cloudflare's network, such as WARP users, not just this zone's
+  proxy. Authenticated Origin Pulls (mTLS between Cloudflare and Traefik) would close this fully.
 - **Forgeable log IPs:** `CF-Connecting-IP` in the logs can be forged by clients that bypass Cloudflare.
+
+## Cloudflare-only browser routes
+Traefik's `browser.marvice.tech` routes (`http-0-…` and `https-0-…`) carry an `ipallowlist` middleware named
+`cf-only`, holding Cloudflare's published ranges (22 ranges, from `GET https://api.cloudflare.com/client/v4/ips`,
+2026-11-21). Direct requests to the origin IP with `Host: browser.marvice.tech` get 403 from any non-Cloudflare
+address. The live host is not restricted, because it is DNS-only by design.
+
+```
+traefik.http.middlewares.cf-only.ipallowlist.sourcerange=<Cloudflare IPv4 and IPv6 ranges, comma-separated>
+traefik.http.routers.http-0-mi2akusa7h8jhepsnoam4zwh.middlewares=redirect-to-https,cf-only
+traefik.http.routers.https-0-mi2akusa7h8jhepsnoam4zwh.middlewares=gzip-sse,cf-only
+```
+
+- **Hand-edited labels:** they live in Coolify → obscura-live-gateway → Configuration → Container Labels, and
+  label auto-generation is off for this app. If you change either domain, update the router names and rules by
+  hand.
+- **Stale ranges:** Cloudflare rarely changes its ranges. If they change, `browser.marvice.tech` starts
+  returning 403 for some visitors. Refresh the `sourcerange` from the API above.
+- **Verification:** the server runs Traefik v3 (`ipallowlist`). A deny-all list returned 403 both through
+  Cloudflare and direct. Removing the range a test client came from turned its 401 into 403.
+- **Testing caveat:** tests from a sandbox whose outbound traffic leaves through Cloudflare (162.158.0.0/15)
+  are allowed, as designed. Test from a normal ISP or VPS connection instead.
 
 ## Known limits
 - **Idle sessions:** Cloudflare may close idle WebSocket connections on `browser.marvice.tech` after about
