@@ -140,7 +140,11 @@ regular expression (for example `fastlane|docker compose .* up|npm publish`). Wh
 agent runs a matching command, the commit hook says `/docs-sync` is due. Leave it empty if
 there are none.
 
-release-commands:
+release-commands: coolify\.marvice\.tech/api/v1/(deploy|(applications|services)/[^ /]+/(start|restart))|install\.sh|docker[ -]compose\b.*\bup\b
+
+Deploys run through Coolify: the Deploy button in the dashboard (no command, so run
+`/docs-sync` by hand afterwards), the Coolify API, or a `deploy/*/install.sh` run on the
+server. Sources: `aistudio.marvice.tech/README.md:29`, `deploy/agent-reach/README.md:15`.
 
 ## Security
 
