@@ -15,3 +15,9 @@ Append-only. Newest entries at the bottom.
 
 - One page from the code just worked on: `subsystems/agent-skills.md` (`skills-lock.json`,
   `.agents/skills/reverse-api-engineer/`). The rest of the repository is not covered yet.
+
+## [2026-11-21] sync | after Coolify deploy
+
+- Code commits since `7b721e1`: 1 (`5b3f109`, `voice-bot/.gitignore` now ignores `.venv/`).
+- Affected pages: 0. `[[agent-skills]]` sources untouched, `verified_at` left at `7b721e1`.
+- Uncovered: `voice-bot/` has no page yet; proposed, not created.
