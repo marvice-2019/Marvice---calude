@@ -1,0 +1,17 @@
+{
+  "name": "obscura-live-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CDP gateway for Obscura with a password-protected live view",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ws": "8.23.0"
+  }
+}
