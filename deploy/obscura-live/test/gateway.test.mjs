@@ -168,3 +168,20 @@ test('a capture upstream never answers does not freeze the tile', async () => {
     assert.ok(v.frames.length > 0, 'no frame arrived after the dropped capture');
   } finally { v.close(); await gw.stop(); await up.close(); }
 });
+
+test('a browser opening the CDP address is sent to the live view; API requests are not', async () => {
+  const up = await startUpstream();
+  const gw = await startGateway(up.port);
+  const get = (path, headers) => new Promise((resolve) => {
+    http.get({ port: gw.port, path, headers: { Host: 'browser.test', ...headers } }, (res) => { res.resume(); resolve(res); });
+  });
+  try {
+    const html = 'text/html,application/xhtml+xml,*/*;q=0.8';
+    const page = await get('/', { Accept: html });
+    assert.equal(page.statusCode, 302);
+    assert.equal(page.headers.location, `https://${LIVE}/`);
+    assert.equal((await get('/', { Accept: 'application/json' })).statusCode, 401, 'non-browser root must stay 401');
+    assert.equal((await get('/json/version', { Accept: html })).statusCode, 401, 'discovery must stay 401');
+    assert.equal((await get('/', { Accept: html, Authorization: 'Bearer nope' })).statusCode, 401, 'requests carrying a token must not redirect');
+  } finally { await gw.stop(); await up.close(); }
+});

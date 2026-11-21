@@ -327,6 +327,11 @@ const server = http.createServer(async (req, res) => {
       return json(res, 404, { error: 'not found' });
     }
 
+    // A person opening the CDP address in a browser goes to the live view; CDP clients never send this shape.
+    if (req.method === 'GET' && path === '/' && !req.headers.authorization && (req.headers.accept || '').includes('text/html')) {
+      res.writeHead(302, { Location: `https://${LIVE_HOST}/`, 'Cache-Control': 'no-store' });
+      return res.end();
+    }
     if (!bearerOk(req)) return json(res, 401, { error: 'authentication required' });
     if (req.method === 'GET' && /^\/json(\/version|\/list)?\/?$/.test(path)) return await proxyDiscovery(req, res);
     return json(res, 404, { error: 'not found' });
