@@ -1,0 +1,167 @@
+/* DRAVA beverage menu — 2 pages at the client's trim size (151.2 x 213.9 mm) */
+@page { size: 151.2mm 213.9mm; margin: 0; }
+:root{
+  --ink:#14110d; --gold:#d6a24a; --gold-hi:#f2cf7e;
+  --cream:#efe6d4; --muted:#a39780; --hair:rgba(214,162,74,.38); --hair2:rgba(239,230,212,.09);
+  --band:44mm;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{width:151.2mm;height:213.9mm;position:relative;overflow:hidden;page-break-after:always;
+  background:radial-gradient(120% 60% at 50% 100%, #1c1711 0%, rgba(28,23,17,0) 70%), var(--ink);
+  color:var(--cream);padding:calc(var(--band) + 2.4mm) 12.5mm 10.5mm;display:flex;flex-direction:column}
+.page:last-child{page-break-after:auto}
+.frame{position:absolute;inset:6mm;border:.35pt solid var(--hair);pointer-events:none;z-index:1}
+.frame::before{content:"";position:absolute;inset:1.1mm;border:.25pt solid rgba(214,162,74,.16)}
+
+/* ---------- photo band ---------- */
+.band{position:absolute;left:0;right:0;top:0;height:var(--band);z-index:2}
+.strip{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:.7mm;background:var(--ink)}
+.ph{background-size:cover;background-position:center}
+.shade{position:absolute;inset:0;background:
+  linear-gradient(180deg,rgba(14,11,8,.88) 0%,rgba(14,11,8,.35) 26%,rgba(14,11,8,0) 44%,rgba(14,11,8,0) 62%,rgba(20,17,13,.75) 86%,var(--ink) 100%)}
+.brand{position:absolute;top:4.6mm;left:0;right:0;text-align:center}
+.logo{width:25mm;display:inline-block;filter:drop-shadow(0 .6mm 1.6mm rgba(0,0,0,.7))}
+.band .kicker{position:absolute;left:0;right:0;bottom:1.4mm;display:flex;align-items:center;justify-content:center;gap:3mm;
+  font:italic 600 13pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);letter-spacing:.02em;text-shadow:0 .4mm 1.2mm rgba(0,0,0,.8)}
+.band .kicker span{display:block;width:12mm;height:.35pt;background:var(--gold)}
+
+/* ---------- headings ---------- */
+h3{display:flex;align-items:flex-end;gap:2mm;margin:0 0 1mm}
+h3 .ico{height:4mm;width:auto;flex:none;margin-right:-.5mm;overflow:visible}
+h3 .t{font:600 10pt/1 'Cormorant Garamond',serif;color:var(--gold);letter-spacing:.01em;white-space:nowrap}
+h3 .rule{flex:1;height:.3pt;background:var(--hair);transform:translateY(-1mm)}
+h3 .unit{font:500 4.6pt/1 'Jost',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);transform:translateY(-.4mm)}
+svg .ln *{fill:none;stroke:var(--gold);stroke-width:.55pt;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+svg .liq{stroke:none}
+
+/* ---------- rows ---------- */
+ul{list-style:none}
+li{display:flex;justify-content:space-between;align-items:baseline;gap:2mm;padding:.45mm 0;border-bottom:.25pt solid var(--hair2)}
+li:last-child{border-bottom:0}
+.n{font:400 6.1pt/1.15 'Jost',sans-serif;letter-spacing:.075em;text-transform:uppercase;color:var(--cream)}
+.p{font:500 6.4pt/1.15 'Jost',sans-serif;letter-spacing:.03em;color:var(--gold-hi);font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
+
+.cols.two{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0 9mm;position:relative;align-content:start}
+.cols.two::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:.3pt;background:rgba(214,162,74,.22)}
+.col{display:flex;flex-direction:column}
+.sec{break-inside:avoid;margin-bottom:2.4mm}
+
+/* draught table */
+.draught table{width:100%;border-collapse:collapse}
+.draught th{font:500 4.3pt/1 'Jost',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:right;padding:0 0 .6mm;width:9.5mm}
+.draught th:first-child{width:auto}
+.draught td{font:500 6pt/1.1 'Jost',sans-serif;color:var(--gold-hi);text-align:right;padding:.3mm 0;border-bottom:.25pt solid var(--hair2);font-variant-numeric:tabular-nums lining-nums}
+.draught tr:last-child td{border-bottom:0}
+.draught td.n{text-align:left;font-weight:400;color:var(--cream);font-size:5.75pt}
+
+/* page 1 density */
+.p1 li{padding:.3mm 0}
+.p1 .n{font-size:5.75pt;line-height:1.1}
+.p1 .p{font-size:6pt;line-height:1.1}
+.p1 h3 .t{font-size:9.4pt}
+.p1 h3 .ico{height:3.5mm}
+.p1 .sec{margin-bottom:1.9mm}
+
+/* cocktail descriptions */
+li.d{display:block;padding:.7mm 0 .8mm}
+li.d .row{display:flex;justify-content:space-between;align-items:baseline;gap:2mm}
+li.d .n{font-weight:500}
+.desc{font:italic 500 7pt/1.15 'Cormorant Garamond',serif;color:var(--muted);margin-top:.3mm;padding-right:2mm;text-wrap:pretty}
+.p2 li:not(.d){padding:.32mm 0}
+.p2 .n{font-size:5.9pt}
+.p2 .p{font-size:6.2pt}
+.p2 .sec{margin-bottom:2mm}
+
+/* Drava Special */
+.special{border:.35pt solid var(--hair);padding:2.4mm 3.2mm .8mm;margin:.4mm 0 0;
+  background:linear-gradient(180deg,rgba(214,162,74,.08),rgba(214,162,74,.02))}
+.sp-head{text-align:center;margin-bottom:1mm}
+.sp-k{font:500 4.6pt/1 'Jost',sans-serif;letter-spacing:.32em;text-transform:uppercase;color:var(--gold)}
+.sp-t{font:italic 600 14pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);margin-top:1mm}
+.sp-s{font:italic 500 7.2pt/1.2 'Cormorant Garamond',serif;color:var(--muted);margin-top:.8mm}
+.special li.d{border-bottom-color:rgba(214,162,74,.14)}
+.after-special{margin-top:2.8mm}
+
+footer{margin-top:1.6mm;text-align:center;font:400 4.8pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+
+/* screen / QR view */
+@media screen{
+  html,body{background:#0b0907}
+  body{padding:24px 0;display:flex;flex-direction:column;align-items:center;gap:24px}
+  .page{box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  @media (max-width:600px){body{padding:0;gap:0;zoom:calc(100vw / 571.5px)}}
+}
+.logo{width:23mm}
+.brand{top:4mm}
+.shade{background:linear-gradient(180deg,rgba(14,11,8,.92) 0%,rgba(14,11,8,.5) 24%,rgba(14,11,8,0) 42%,rgba(14,11,8,0) 64%,rgba(20,17,13,.8) 87%,var(--ink) 100%)}
+:root{--band:42mm}
+li.d{padding:.5mm 0 .6mm}
+.special{padding-top:2.2mm}
+.shade{background:linear-gradient(180deg,rgba(14,11,8,.95) 0%,rgba(14,11,8,.6) 24%,rgba(14,11,8,0) 44%,rgba(14,11,8,0) 64%,rgba(20,17,13,.8) 87%,var(--ink) 100%)}
+.p2 .sec{margin-bottom:1.6mm}
+.after-special{margin-top:2mm}
+li.d{padding:.4mm 0 .5mm}
+.special{padding:2mm 3.2mm .5mm}
+.sp-t{font-size:13pt}
+.desc{line-height:1.1}
+.brand::before{content:"";position:absolute;left:50%;top:-4mm;width:46mm;height:22mm;transform:translateX(-50%);
+  background:radial-gradient(closest-side,rgba(10,8,6,.85),rgba(10,8,6,0));z-index:-1}
+.brand{z-index:1}
+/* venue interior as toned background */
+.bg{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0;opacity:.55}
+.bg::after{content:"";position:absolute;inset:0;background:
+  radial-gradient(85% 60% at 50% 56%, rgba(16,13,10,.86) 0%, rgba(16,13,10,.72) 60%, rgba(16,13,10,.45) 100%)}
+.page{background:var(--ink)}
+.page>.cols,.page>footer{position:relative;z-index:1}
+
+/* ===== v4: slim header + photo banners beside their prices ===== */
+:root{--band:0mm}
+.page{padding-top:8.6mm}
+.hd{position:relative;z-index:1;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:5mm;margin-bottom:3.4mm}
+.hd .logo{width:21mm;filter:none}
+.hl{display:flex;align-items:center;gap:2.4mm;justify-content:flex-end}
+.hr{display:flex;align-items:center;gap:2.4mm;justify-content:flex-start}
+.hl::before,.hr::after{content:"";flex:1;height:.3pt;background:var(--hair)}
+.hk{font:italic 600 12pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);white-space:nowrap}
+.hs{font:500 4.6pt/1.4 'Jost',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.bn{position:relative;height:13.5mm;background-size:cover;background-position:right center;margin-bottom:1.2mm;
+  border-top:.35pt solid var(--hair);border-bottom:.35pt solid var(--hair);display:flex;align-items:center;padding:0 2.4mm}
+.bn .bt{font:italic 600 12.5pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);text-shadow:0 .3mm 1mm rgba(0,0,0,.8)}
+.bn .unit{position:absolute;left:2.4mm;bottom:1.3mm;font:500 4.4pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.bn .bt{transform:translateY(-.8mm)}
+.bn:not(:has(.unit)) .bt{transform:none}
+.special{margin-top:1.4mm}
+
+/* ===== v5: photos blended into the page (no boxes) ===== */
+.bn{height:16mm;border:0;margin:-.6mm -3mm .6mm;padding:0 5.4mm;background-color:transparent;
+  -webkit-mask-image:radial-gradient(ellipse 62% 118% at 74% 50%,#000 38%,rgba(0,0,0,.55) 66%,transparent 100%);
+          mask-image:radial-gradient(ellipse 62% 118% at 74% 50%,#000 38%,rgba(0,0,0,.55) 66%,transparent 100%)}
+.bnw{position:relative}
+.bnw .bt,.bnw .unit{position:absolute;z-index:2}
+.bnw .bt{left:2.4mm;top:50%;transform:translateY(-62%);font:italic 600 14pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);
+  text-shadow:0 .3mm 1.4mm rgba(0,0,0,.9)}
+.bnw .unit{left:2.5mm;bottom:2.2mm}
+.bnw::after{content:"";position:absolute;left:0;right:0;bottom:.3mm;height:.3pt;
+  background:linear-gradient(90deg,var(--hair),rgba(214,162,74,.15) 70%,transparent)}
+.bn{-webkit-mask-image:none;mask-image:none}
+.bnw .unit{font:500 4.4pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.bn{background-size:100% auto;background-position:right center;height:17mm}
+
+/* ===== v6: illustrated banners (vector, animated on screen) ===== */
+.bnw{height:16mm;margin-bottom:.8mm}
+.scene-bn{position:absolute;right:-1mm;top:0;height:100%;width:100%;overflow:visible}
+.scene-bn .ln *{stroke-width:.7pt}
+svg .sheen{fill:url(#sheen);stroke:none}
+svg .bub{fill:var(--gold-hi);opacity:.8}
+svg .spark{fill:var(--gold-hi)}
+svg .floor{fill:rgba(214,162,74,.12)}
+@media screen{
+  svg .bub{animation:rise 3.2s ease-in infinite}
+  svg .spark{transform-box:fill-box;transform-origin:center;animation:twinkle 2.8s ease-in-out infinite}
+  svg .liq{animation:shimmer 5s ease-in-out infinite}
+  @keyframes rise{0%{transform:translateY(0);opacity:0}15%{opacity:.85}100%{transform:translateY(-12px);opacity:0}}
+  @keyframes twinkle{0%,100%{opacity:.25;scale:.6}50%{opacity:1;scale:1.15}}
+  @keyframes shimmer{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+}
+@media screen and (prefers-reduced-motion:reduce){*{animation:none!important}}

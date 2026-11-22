@@ -1,0 +1,51 @@
+
+/* ===== OPTION B — "Club" style: venue photo, big drink photo, yellow bold serif, green tags ===== */
+.tb{--gold:#f4c430;--gold-hi:#f4c430;--cream:#ffffff;--muted:#cfc6b4;--hair:rgba(255,255,255,.7);--hair2:rgba(255,255,255,.08)}
+.tb .page{background:#0c0d10;padding-top:0}
+.tb .bg{opacity:.75}
+.tb .bg::after{background:linear-gradient(180deg,rgba(8,9,12,.55) 0%,rgba(8,9,12,.82) 30%,rgba(8,9,12,.88) 70%,rgba(8,9,12,.8) 100%)}
+.tb .hero{position:absolute;right:0;bottom:0;width:62%;height:56%;z-index:0;opacity:.55;
+  background-size:contain;background-repeat:no-repeat;background-position:right bottom}
+
+/* top bar with display title */
+.tb .hbar{position:relative;z-index:2;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4mm;
+  margin:0 -12.5mm 3.4mm;padding:4.2mm 9mm 3.4mm;background:linear-gradient(180deg,rgba(0,0,0,.85),rgba(0,0,0,.55))}
+.tb .hbar .logo{width:19mm;filter:none}
+.tb .htitle{font:400 25pt/1 'Italiana',serif;color:#fff;letter-spacing:.02em;text-align:center}
+.tb .hnote{font:600 6.4pt/1.2 'Jost',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#fff;text-align:right}
+.tb .hnote small{display:block;font:500 4.4pt/1.6 'Jost',sans-serif;letter-spacing:.18em;color:var(--muted)}
+
+/* rounded white panel frame */
+.tb .frame{inset:22.5mm 5.5mm 5.5mm;border:.6pt solid rgba(255,255,255,.8);border-radius:3.5mm}
+.tb .frame::before{display:none}
+.tb .cols.two{margin-top:1mm}
+.tb .cols.two::before{background:rgba(255,255,255,.18)}
+
+/* green tags */
+.tb .tag{margin:0 0 1.8mm}
+.tb .tag span{display:inline-block;background:#1e7a4b;color:#fff;font:600 5.6pt/1 'Jost',sans-serif;letter-spacing:.16em;
+  text-transform:uppercase;padding:1.1mm 2.4mm .9mm}
+
+/* headings: yellow bold serif, no rules/icons */
+.tb h3 .ico{display:none}
+.tb h3 .rule{background:transparent}
+.tb h3 .t{font:400 11.5pt/1 'Abril Fatface',serif;color:var(--gold);letter-spacing:.01em}
+.tb .p1 h3 .t{font-size:10.6pt}
+.tb h3 .unit{color:#fff}
+
+/* rows */
+.tb .n{font-weight:500;color:#fff;text-shadow:0 0 1.2mm rgba(0,0,0,.9)}
+.tb .p{color:var(--gold);text-shadow:0 0 1.2mm rgba(0,0,0,.9)}
+.tb .desc{color:var(--muted);text-shadow:0 0 1mm rgba(0,0,0,.9)}
+.tb .draught th{color:#fff}
+.tb .draught td{color:var(--gold)}
+.tb .draught td.n{color:#fff;font-weight:500}
+
+/* special */
+.tb .special{border:.6pt solid var(--gold);border-radius:2mm;background:rgba(10,10,12,.55)}
+.tb .sp-k{color:#7fd3a3}
+.tb .sp-t{font:400 15pt/1 'Abril Fatface',serif;font-style:normal;color:var(--gold)}
+.tb .special li.d{border-bottom-color:rgba(244,196,48,.18)}
+.tb footer{color:var(--muted)}
+.tb .hero{width:54%;height:46%;opacity:.42}
+.tb .p2 .hero{width:50%;height:42%;opacity:.38}

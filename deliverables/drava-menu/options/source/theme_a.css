@@ -1,0 +1,60 @@
+
+/* ===== OPTION A — "Klub" style: cream paper, maroon condensed heads, ink-sketch drinks ===== */
+.ta{--paper:#ede3d0;--gold:#7a2318;--gold-hi:#1f2a44;--cream:#1f2a44;--muted:#6f675b;
+  --hair:rgba(122,35,24,.55);--hair2:rgba(31,42,68,.07)}
+.ta,.ta body{background:var(--paper)}
+.ta .page{background:radial-gradient(120% 80% at 50% 40%,#f3ebdb 0%,#e9dec8 100%);color:var(--cream)}
+.ta .frame{inset:4.5mm;border:.5pt solid var(--gold)}
+.ta .frame::before{display:none}
+
+/* header: logo centre, maroon condensed title */
+.ta .hk{font:400 17pt/1 'Bebas Neue',sans-serif;letter-spacing:.06em;color:var(--gold)}
+.ta .hs{color:var(--gold-hi);font-weight:500}
+.ta .hl::before,.ta .hr::after{background:var(--hair)}
+
+/* headings */
+.ta h3 .t{font:400 13.5pt/1 'Bebas Neue',sans-serif;letter-spacing:.03em;color:var(--gold)}
+.ta .p1 h3 .t{font-size:12.5pt}
+.ta h3 .rule{background:rgba(122,35,24,.3)}
+.ta h3 .unit,.ta .bnw .unit{color:var(--gold);font-weight:500}
+.ta .bnw .bt{font:400 18pt/1 'Bebas Neue',sans-serif;letter-spacing:.03em;color:var(--gold);text-shadow:none}
+.ta .bnw::after{background:linear-gradient(90deg,var(--hair),rgba(122,35,24,.1))}
+
+/* rows */
+.ta .n{font-weight:500;color:var(--cream)}
+.ta .p{font-weight:500;color:var(--gold-hi)}
+.ta .desc{color:var(--muted)}
+.ta .draught td{color:var(--gold-hi)}
+.ta .draught td.n{color:var(--cream);font-weight:500}
+.ta .draught th{color:var(--gold)}
+.ta .cols.two::before{background:rgba(122,35,24,.25)}
+
+/* drawings become ink sketches with coloured drinks */
+.ta svg .ln *{stroke:#3b2a20}
+.ta .scene-bn .ln *{stroke-width:.65pt}
+.ta svg .liq{fill-opacity:.9!important}
+.ta svg .floor{fill:rgba(59,42,32,.10)}
+.ta svg .spark{fill:#b07a26}
+.ta svg .bub{fill:#fff}
+
+/* Drava Special */
+.ta .special{border:.5pt solid var(--gold);background:rgba(122,35,24,.05)}
+.ta .sp-k{color:var(--gold)}
+.ta .sp-t{font:400 19pt/1 'Bebas Neue',sans-serif;letter-spacing:.04em;color:var(--gold);font-style:normal}
+.ta .sp-s{color:var(--muted)}
+.ta .special li.d{border-bottom-color:rgba(122,35,24,.15)}
+
+footer{position:relative;z-index:1}
+.ta footer{color:var(--gold)}
+
+/* soft deco pattern rising from the bottom edge */
+.ta .pattern{position:absolute;left:0;right:0;bottom:0;height:30mm;z-index:0;opacity:.5;
+  background:
+    linear-gradient(180deg,#ece2cf 0%,rgba(236,226,207,0) 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg fill='none' stroke='%23b9a17c' stroke-width='1'%3E%3Cpath d='M0 48a24 24 0 0 1 48 0'/%3E%3Cpath d='M8 48a16 16 0 0 1 32 0'/%3E%3Cpath d='M16 48a8 8 0 0 1 16 0'/%3E%3Cpath d='M-24 24a24 24 0 0 1 48 0M24 24a24 24 0 0 1 48 0'/%3E%3Cpath d='M-16 24a16 16 0 0 1 32 0M32 24a16 16 0 0 1 32 0'/%3E%3C/g%3E%3C/svg%3E") repeat left bottom/9mm 9mm}
+@media screen{ .ta,.ta body{background:#d9cdb5} }
+.ta .bnw{height:14mm}
+.ta .bnw .bt{font-size:15.5pt}
+.ta .scene-bn{right:-1.5mm}
+.ta .p1 .sec{margin-bottom:1.6mm}
+.ta .p1 li{padding:.26mm 0}
