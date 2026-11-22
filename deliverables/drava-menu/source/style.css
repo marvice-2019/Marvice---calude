@@ -132,3 +132,18 @@ li.d{padding:.4mm 0 .5mm}
 .bn .bt{transform:translateY(-.8mm)}
 .bn:not(:has(.unit)) .bt{transform:none}
 .special{margin-top:1.4mm}
+
+/* ===== v5: photos blended into the page (no boxes) ===== */
+.bn{height:16mm;border:0;margin:-.6mm -3mm .6mm;padding:0 5.4mm;background-color:transparent;
+  -webkit-mask-image:radial-gradient(ellipse 62% 118% at 74% 50%,#000 38%,rgba(0,0,0,.55) 66%,transparent 100%);
+          mask-image:radial-gradient(ellipse 62% 118% at 74% 50%,#000 38%,rgba(0,0,0,.55) 66%,transparent 100%)}
+.bnw{position:relative}
+.bnw .bt,.bnw .unit{position:absolute;z-index:2}
+.bnw .bt{left:2.4mm;top:50%;transform:translateY(-62%);font:italic 600 14pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);
+  text-shadow:0 .3mm 1.4mm rgba(0,0,0,.9)}
+.bnw .unit{left:2.5mm;bottom:2.2mm}
+.bnw::after{content:"";position:absolute;left:0;right:0;bottom:.3mm;height:.3pt;
+  background:linear-gradient(90deg,var(--hair),rgba(214,162,74,.15) 70%,transparent)}
+.bn{-webkit-mask-image:none;mask-image:none}
+.bnw .unit{font:500 4.4pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.bn{background-size:100% auto;background-position:right center;height:17mm}

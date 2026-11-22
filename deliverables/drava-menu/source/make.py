@@ -125,9 +125,9 @@ def bgimg(name):
 
 
 def banner(photo_name, title, unit=""):
-    b = base64.b64encode((HERE / "img" / f"bn_{photo_name}.jpg").read_bytes()).decode()
+    b = base64.b64encode((HERE / "img" / f"bz_{photo_name}.webp").read_bytes()).decode()
     u = f'<span class="unit">{E(unit)}</span>' if unit else ""
-    return (f'<div class="bn" style="background-image:url(data:image/jpeg;base64,{b})">'
+    return (f'<div class="bnw"><div class="bn" style="background-image:url(data:image/webp;base64,{b})"></div>'
             f'<span class="bt">{E(title)}</span>{u}</div>')
 
 
