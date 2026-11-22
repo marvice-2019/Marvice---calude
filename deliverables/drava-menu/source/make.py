@@ -1,6 +1,6 @@
 """Build the DRAVA beverage menu as HTML, then print to PDF with Chromium."""
 import html, base64, pathlib, sys
-from art import glass
+from art import glass, scene
 
 HERE = pathlib.Path(__file__).parent
 E = html.escape
@@ -124,11 +124,9 @@ def bgimg(name):
     return f'<div class="bg" style="background-image:url(data:image/jpeg;base64,{b})"></div>'
 
 
-def banner(photo_name, title, unit=""):
-    b = base64.b64encode((HERE / "img" / f"bz_{photo_name}.webp").read_bytes()).decode()
+def banner(kind, title, unit=""):
     u = f'<span class="unit">{E(unit)}</span>' if unit else ""
-    return (f'<div class="bnw"><div class="bn" style="background-image:url(data:image/webp;base64,{b})"></div>'
-            f'<span class="bt">{E(title)}</span>{u}</div>')
+    return f'<div class="bnw">{scene(kind)}<span class="bt">{E(title)}</span>{u}</div>'
 
 
 def header(left, right):

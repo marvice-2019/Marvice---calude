@@ -131,3 +131,30 @@ def duo():
         spark(140, 30, .9, 0), spark(22, 40, .7, 1.3),
     ]
     return f'<svg class="duo" viewBox="0 0 160 118">{DEFS}<ellipse cx="80" cy="60" rx="90" ry="62" fill="url(#glow)"/>{"".join(parts)}</svg>'
+
+
+def bottle_g(x, y, s, color):
+    return g_inline("bottle", x, y, s, color, .5, bubbles=False)
+
+
+SCENES = {
+    # each: list of svg parts in a 200x60 box, art sits on the right
+    "beer": lambda: [g_inline("mug", 150, 2, 1.0, "#e0962e", .65), g_inline("mug", 118, 10, .85, "#d9a03a", .5),
+                     spark(108, 14, .6, .2), spark(196, 8, .5, 1.1)],
+    "whisky": lambda: [bottle_g(150, 1, 1.0, "#b06a22"), g_inline("rocks", 118, 12, .85, "#c4762b", .62, bubbles=False),
+                       ice(104, 50, .7, 15), spark(194, 10, .5, .6)],
+    "wine": lambda: [bottle_g(152, 1, 1.0, "#6e1a26"), g_inline("wine", 120, 6, .92, "#8f1d2c", .7, bubbles=False),
+                     spark(110, 12, .55, .9)],
+    "coupe": lambda: [g_inline("coupe", 150, 4, .98, "#c0303c", .68), citrus(140, 52, 5), leaf(118, 50, .6, -15),
+                      g_inline("flute", 120, 6, .9, "#e7c45a", .45), spark(196, 10, .55, .3), spark(110, 8, .45, 1.4)],
+    "martini": lambda: [g_inline("martini", 150, 4, .98, "#e3b04a", .45, bubbles=False),
+                        g_inline("highball", 118, 4, .95, "#d26a2e", .5), spark(196, 12, .55, .5), spark(108, 16, .45, 1.2)],
+    "mojito": lambda: [g_inline("highball", 152, 3, .98, "#7da23f", .5), g_inline("hurricane", 118, 5, .92, "#e8862f", .55),
+                       leaf(106, 50, .6, 200), citrus(196, 50, 4.5, "#d9c13e"), spark(110, 10, .5, .8)],
+}
+
+
+def scene(kind):
+    parts = "".join(SCENES[kind]())
+    return (f'<svg class="scene-bn" viewBox="0 0 200 60" preserveAspectRatio="xMaxYMid meet">{DEFS}'
+            f'<ellipse cx="160" cy="57" rx="48" ry="2.2" class="floor"/>{parts}</svg>')

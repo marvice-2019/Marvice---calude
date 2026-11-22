@@ -147,3 +147,21 @@ li.d{padding:.4mm 0 .5mm}
 .bn{-webkit-mask-image:none;mask-image:none}
 .bnw .unit{font:500 4.4pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
 .bn{background-size:100% auto;background-position:right center;height:17mm}
+
+/* ===== v6: illustrated banners (vector, animated on screen) ===== */
+.bnw{height:16mm;margin-bottom:.8mm}
+.scene-bn{position:absolute;right:-1mm;top:0;height:100%;width:100%;overflow:visible}
+.scene-bn .ln *{stroke-width:.7pt}
+svg .sheen{fill:url(#sheen);stroke:none}
+svg .bub{fill:var(--gold-hi);opacity:.8}
+svg .spark{fill:var(--gold-hi)}
+svg .floor{fill:rgba(214,162,74,.12)}
+@media screen{
+  svg .bub{animation:rise 3.2s ease-in infinite}
+  svg .spark{transform-box:fill-box;transform-origin:center;animation:twinkle 2.8s ease-in-out infinite}
+  svg .liq{animation:shimmer 5s ease-in-out infinite}
+  @keyframes rise{0%{transform:translateY(0);opacity:0}15%{opacity:.85}100%{transform:translateY(-12px);opacity:0}}
+  @keyframes twinkle{0%,100%{opacity:.25;scale:.6}50%{opacity:1;scale:1.15}}
+  @keyframes shimmer{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+}
+@media screen and (prefers-reduced-motion:reduce){*{animation:none!important}}
