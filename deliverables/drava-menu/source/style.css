@@ -114,3 +114,21 @@ li.d{padding:.4mm 0 .5mm}
   radial-gradient(85% 60% at 50% 56%, rgba(16,13,10,.86) 0%, rgba(16,13,10,.72) 60%, rgba(16,13,10,.45) 100%)}
 .page{background:var(--ink)}
 .page>.cols,.page>footer{position:relative;z-index:1}
+
+/* ===== v4: slim header + photo banners beside their prices ===== */
+:root{--band:0mm}
+.page{padding-top:8.6mm}
+.hd{position:relative;z-index:1;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:5mm;margin-bottom:3.4mm}
+.hd .logo{width:21mm;filter:none}
+.hl{display:flex;align-items:center;gap:2.4mm;justify-content:flex-end}
+.hr{display:flex;align-items:center;gap:2.4mm;justify-content:flex-start}
+.hl::before,.hr::after{content:"";flex:1;height:.3pt;background:var(--hair)}
+.hk{font:italic 600 12pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);white-space:nowrap}
+.hs{font:500 4.6pt/1.4 'Jost',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.bn{position:relative;height:13.5mm;background-size:cover;background-position:right center;margin-bottom:1.2mm;
+  border-top:.35pt solid var(--hair);border-bottom:.35pt solid var(--hair);display:flex;align-items:center;padding:0 2.4mm}
+.bn .bt{font:italic 600 12.5pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);text-shadow:0 .3mm 1mm rgba(0,0,0,.8)}
+.bn .unit{position:absolute;left:2.4mm;bottom:1.3mm;font:500 4.4pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.bn .bt{transform:translateY(-.8mm)}
+.bn:not(:has(.unit)) .bt{transform:none}
+.special{margin-top:1.4mm}

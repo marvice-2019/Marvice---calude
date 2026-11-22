@@ -95,10 +95,12 @@ def ico(title):
     return glass(ICON[title]) if title in ICON else ""
 
 
-def section(title, unit, rows, cls=""):
+def section(title, unit, rows, cls="", photo=None):
     items = "".join(
         f'<li><span class="n">{E(n)}</span><span class="p">{price(p)}</span></li>' for n, p in rows)
     u = f'<span class="unit">{E(unit)}</span>' if unit else ""
+    if photo:
+        return f'<section class="sec {cls}">{banner(photo, title, unit)}<ul>{items}</ul></section>'
     return f'<section class="sec {cls}"><h3>{ico(title)}<span class="t">{E(title)}</span><span class="rule"></span>{u}</h3><ul>{items}</ul></section>'
 
 
@@ -122,6 +124,18 @@ def bgimg(name):
     return f'<div class="bg" style="background-image:url(data:image/jpeg;base64,{b})"></div>'
 
 
+def banner(photo_name, title, unit=""):
+    b = base64.b64encode((HERE / "img" / f"bn_{photo_name}.jpg").read_bytes()).decode()
+    u = f'<span class="unit">{E(unit)}</span>' if unit else ""
+    return (f'<div class="bn" style="background-image:url(data:image/jpeg;base64,{b})">'
+            f'<span class="bt">{E(title)}</span>{u}</div>')
+
+
+def header(left, right):
+    return (f'<header class="hd"><div class="hl"><span class="hk">{left}</span></div>{LOGO}'
+            f'<div class="hr"><span class="hs">{right}</span></div></header>')
+
+
 def band(names, kicker):
     return (f'<div class="band"><div class="strip">{"".join(photo(n) for n in names)}</div>'
             f'<div class="shade"></div><div class="brand">{LOGO}</div>'
@@ -129,28 +143,29 @@ def band(names, kicker):
 
 
 S = {t: (u, r) for t, u, r in P1_SECTIONS}
+PH = {"Whisky": "whisky", "Wine": "wine"}
 
 
 def sec(t):
-    return section(t, *S[t])
+    return section(t, *S[t], photo=PH.get(t))
 
 
 draught_rows = "".join(
     f'<tr><td class="n">{E(n)}</td><td>{price(a)}</td><td>{price(b)}</td><td>{price(c)}</td></tr>'
     for n, a, b, c in DRAUGHT)
 DRAUGHT_SEC = f"""<section class="sec draught">
-    <h3>{ico("Draught Beer")}<span class="t">Draught Beer</span><span class="rule"></span></h3>
+    {banner("beer", "Draught Beer")}
     <table><thead><tr><th></th><th>Mug</th><th>Pitcher</th><th>Tower</th></tr></thead>
     <tbody>{draught_rows}</tbody></table></section>"""
 
 page1 = f"""
 <div class="page p1">
   {bgimg("bg1")}
-  {band(["beer", "whisky", "wine"], "The Bar")}
+  {header("The Bar", "Spirits · Beer · Wine")}
   <div class="frame"></div>
   <div class="cols two">
-    <div class="col">{DRAUGHT_SEC}{''.join(sec(t) for t in ["Beer", "Single Malt", "Whisky", "Sparkling Wine"])}</div>
-    <div class="col">{''.join(sec(t) for t in ["Brandy", "Rum", "Gin", "Vodka", "Tequila", "Liqueur", "Wine"])}</div>
+    <div class="col">{DRAUGHT_SEC}{''.join(sec(t) for t in ["Beer", "Single Malt", "Whisky"])}</div>
+    <div class="col">{''.join(sec(t) for t in ["Brandy", "Rum", "Gin", "Vodka", "Tequila", "Liqueur", "Sparkling Wine", "Wine"])}</div>
   </div>
   <footer>Spirits served in 30 ml &nbsp;·&nbsp; Prices in ₹ &nbsp;·&nbsp; Government taxes as applicable</footer>
 </div>"""
@@ -158,11 +173,11 @@ page1 = f"""
 page2 = f"""
 <div class="page p2">
   {bgimg("bg2")}
-  {band(["mojito", "coupe", "martini"], "Cocktails")}
+  {header("Cocktails", "Signatures · Classics · Mocktails")}
   <div class="frame"></div>
   <div class="cols two">
     <div class="col">
-      <section class="sec"><h3>{ico("Signature Cocktails")}<span class="t">Signature Cocktails</span><span class="rule"></span></h3>
+      <section class="sec">{banner("coupe", "Signature Cocktails")}
         <ul>{described(SIGNATURE)}</ul></section>
       <section class="special">
         <div class="sp-head"><div class="sp-k">House Strong</div><div class="sp-t">The Drava Special</div>
@@ -172,10 +187,10 @@ page2 = f"""
       {section("Shooters", "", SHOOTERS)}
     </div>
     <div class="col">
-      {section("Classic Cocktails", "", [(c, 449) for c in CLASSIC])}
+      {section("Classic Cocktails", "", [(c, 449) for c in CLASSIC], photo="martini")}
       {section("Tall Boys", "", TALL)}
       {section("Breezers", "", BREEZERS)}
-      {section("Mocktails", "", MOCK)}
+      {section("Mocktails", "", MOCK, photo="mojito")}
       {section("Mixers & Soft Drinks", "", MIXERS)}
     </div>
   </div>
