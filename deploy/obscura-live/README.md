@@ -81,8 +81,11 @@ and each has a regression test in `test/gateway.test.mjs` that fails with its fi
 | An unanswered capture froze a tile forever | Low | `never answers` |
 
 Open items:
-- **Cloudflare SSL:** the zone is in *Full* mode. A configuration rule that sets *Full (strict)* for
-  `browser.marvice.tech` only is pending. The origin has a valid Let's Encrypt certificate, so it is safe.
+- **Cloudflare SSL (closed 2026-11-21):** a Cloudflare Configuration Rule sets *Full (strict)* for
+  `browser.marvice.tech` only (`http.host eq "browser.marvice.tech"`, ruleset `de441644324d4c70aa6d83722b9f9256`).
+  The rest of the zone stays in *Full* mode. Verified after the change: requests through Cloudflare returned
+  200/401 as expected, a full agent session ran, and there were no 526 errors. If the origin certificate ever
+  lapses, this host returns 526 until Traefik renews it.
 - **Origin exposure (partly closed 2026-11-21):** the DNS-only live host reveals the origin IP. The
   `browser.marvice.tech` routes now accept only Cloudflare source IPs (see "Cloudflare-only browser routes"
   below). That still admits any traffic from Cloudflare's network, such as WARP users, not just this zone's

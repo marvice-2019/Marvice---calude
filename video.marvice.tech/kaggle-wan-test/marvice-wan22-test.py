@@ -2,11 +2,17 @@
 # Wan 2.2 TI2V-5B (Apache-2.0) text-to-video, 5 s at 24 fps, 704x1280 (9:16 reel).
 # Writes /kaggle/working/cafe-reel.mp4 and /kaggle/working/report.json (timings, GPU, frame check).
 import json
+import os
 import subprocess
 import sys
 import time
 
 T0 = time.time()
+# Same environment fixes as marvice-video-models.py (both must be set before torch loads):
+# fewer fragmentation out-of-memory errors on the 16 GB T4, and a writable download cache, since Kaggle's
+# ~/.cache/huggingface is read-only on newer images.
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["HF_HOME"] = "/tmp/hf"
 report = {
     "model": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
     "steps": 50,
@@ -41,7 +47,9 @@ report["gpus"] = [
 ]
 report["torch"] = torch.__version__
 # T4 has no native bfloat16, so the transformer runs in float16; the VAE stays in float32.
-dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+# is_bf16_supported() is True on a T4 too (emulated), and emulated bfloat16 falls back to full attention,
+# so check for native support (Ampere, compute capability 8.0+) instead.
+dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
 report["dtype"] = str(dtype)
 
 t = time.time()
