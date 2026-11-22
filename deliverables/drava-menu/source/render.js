@@ -5,11 +5,12 @@ const path = require('path');
   const b = await chromium.launch();
   const p = await b.newPage();
   await p.goto('file://' + path.join(dir, 'menu.html'));
+  await p.emulateMedia({ media: 'print' });
   await p.evaluate(() => document.fonts.ready);
   // overflow check: any page whose content exceeds its box
   const over = await p.evaluate(() => [...document.querySelectorAll('.page')].map(pg => {
     const r = pg.getBoundingClientRect();
-    const cols = pg.querySelector('.cols');
+    const cols = pg.querySelector('.cols') || pg;
     return { pageH: r.height, scrollH: pg.scrollHeight, colsOverflowX: cols.scrollWidth > cols.clientWidth + 1 };
   }));
   console.log(JSON.stringify(over));

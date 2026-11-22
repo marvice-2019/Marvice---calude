@@ -124,3 +124,88 @@ li.d{padding:.75mm 0 .85mm}
 .p1 footer{margin-top:2mm}
 .desc{padding-right:2mm;text-wrap:pretty}
 .after-special{margin-top:3.2mm}
+
+/* ===== illustrations ===== */
+.ico,.hero,.trio,.duo{overflow:visible}
+svg .ln path,svg .ln circle,svg g.ln>*{fill:none;stroke:var(--gold);stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+svg g.ln path[style],svg g.ln circle[style]{}
+.ico .ln *{stroke-width:.55pt}
+.hero .ln *{stroke-width:1.05pt}
+.trio .ln *,.duo .ln *{stroke-width:.75pt}
+svg .liq{stroke:none}
+svg .bub{fill:var(--gold-hi);opacity:.75}
+svg .spark{fill:var(--gold-hi)}
+svg .floor{fill:rgba(214,162,74,.10)}
+h3 .ico{width:auto;height:4.4mm;flex:none;align-self:flex-end;margin-right:-.6mm;transform:translateY(.4mm)}
+.p1 h3 .ico{height:3.9mm}
+
+/* cocktails page scene */
+.scene{margin-top:auto;padding-top:2mm;text-align:center}
+.trio{width:44mm;height:auto}
+
+/* cover */
+.cover{align-items:center;justify-content:center;text-align:center;padding:14mm}
+.cv-top .logo{width:46mm}
+.cv-art{margin:8mm 0 4mm;width:100%}
+.hero{width:108mm;height:auto}
+.cv-title{font:italic 600 30pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);margin-top:2mm}
+.cv-sub{margin-top:4mm;display:flex;align-items:center;gap:3mm;font:500 5.6pt/1 'Jost',sans-serif;
+  letter-spacing:.28em;text-transform:uppercase;color:var(--cream)}
+.cv-sub span{width:9mm;height:.3pt;background:var(--hair)}
+.cv-tag{margin-top:auto;font:italic 500 10pt/1 'Cormorant Garamond',serif;color:var(--muted)}
+
+/* back */
+.back{align-items:center;text-align:center;padding:18mm 14mm 14mm}
+.duo{width:58mm;height:auto}
+.bk-quote{margin-top:8mm;font:italic 500 17pt/1.25 'Cormorant Garamond',serif;color:var(--gold-hi)}
+.bk-pills{margin-top:9mm;display:flex;gap:0;justify-content:center}
+.bk-pills span{font:500 5.2pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--cream);
+  padding:0 3.2mm;border-left:.3pt solid var(--hair)}
+.bk-pills span:first-child{border-left:0}
+.bk-logo{margin-top:auto}.bk-logo .logo{width:30mm}
+.bk-note{margin-top:5mm;font:400 4.8pt/1.8 'Jost',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+/* ===== digital (QR) version: screen only, animated ===== */
+@media screen{
+  html,body{background:#0b0907}
+  body{padding:24px 0;display:flex;flex-direction:column;align-items:center;gap:24px}
+  .page{box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  @media (max-width:600px){body{padding:0;gap:0;zoom:calc(100vw / 571.5px)}}
+  svg .bub{animation:rise 3.2s ease-in infinite}
+  svg .spark{transform-box:fill-box;transform-origin:center;animation:twinkle 2.8s ease-in-out infinite}
+  svg .liq{animation:shimmer 5s ease-in-out infinite}
+  .cv-title,.cv-top{animation:fadeUp 1.4s ease-out both}
+  .cv-art{animation:fadeUp 1.6s .25s ease-out both}
+  @keyframes rise{0%{transform:translateY(0);opacity:0}15%{opacity:.85}100%{transform:translateY(-14px);opacity:0}}
+  @keyframes twinkle{0%,100%{opacity:.25;scale:.6}50%{opacity:1;scale:1.15}}
+  @keyframes shimmer{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+}
+@media screen and (prefers-reduced-motion:reduce){*{animation:none!important}}
+svg .sheen{fill:url(#sheen);stroke:none}
+.p1 h3 .ico{height:3.6mm;margin:-.9mm -.6mm -.9mm 0}
+h3 .ico{margin-top:-.8mm;margin-bottom:-.8mm}
+.trio{width:50mm}
+.scene{padding-top:3mm}
+/* cover rebalance */
+.cover{justify-content:flex-start;padding-top:16mm}
+.cv-art{margin:auto 0 0}
+.hero{width:122mm}
+.cv-title{margin-top:5mm;font-size:34pt}
+.cv-sub{margin-bottom:auto}
+.cv-tag{margin-top:0}
+/* back rebalance */
+.back{padding-top:14mm}
+.bk-art{margin-top:auto}
+.duo{width:78mm}
+.trio{width:39mm}
+.scene{padding-top:1mm}
+.col{position:relative}
+.scene{position:absolute;left:0;right:0;bottom:0;padding:0}
+.trio{width:44mm}
+.p1 h3{align-items:flex-end;margin-bottom:.8mm}
+.p1 h3 .ico{height:3.3mm;margin:0 -.4mm 0 0;transform:translateY(.15mm)}
+.p1 h3 .rule{transform:translateY(-.9mm)}
+.trio{width:40mm}
+.p1 .sec{margin-bottom:1.45mm}
+.p1 li,.p1 .draught td{padding:.23mm 0}

@@ -1,5 +1,6 @@
 """Build the DRAVA beverage menu as HTML, then print to PDF with Chromium."""
 import html, base64, pathlib, sys
+from art import glass, hero, trio, duo
 
 HERE = pathlib.Path(__file__).parent
 E = html.escape
@@ -82,11 +83,23 @@ def price(p):
     return f"{p:,}"
 
 
+ICON = {"Draught Beer": "mug", "Beer": "bottle", "Single Malt": "rocks", "Whisky": "rocks",
+        "Brandy": "snifter", "Rum": "highball", "Gin": "coupe", "Vodka": "martini", "Tequila": "shot",
+        "Liqueur": "coupe", "Shooters": "shot", "Breezers": "bottle", "Sparkling Wine": "flute",
+        "Wine": "wine", "Signature Cocktails": "coupe", "Classic Cocktails": "martini",
+        "Tall Boys": "hurricane", "Cocktail Pitchers": "pitcher", "Mocktails": "highball",
+        "Mixers & Soft Drinks": "bottle"}
+
+
+def ico(title):
+    return glass(ICON[title]) if title in ICON else ""
+
+
 def section(title, unit, rows, cls=""):
     items = "".join(
         f'<li><span class="n">{E(n)}</span><span class="p">{price(p)}</span></li>' for n, p in rows)
     u = f'<span class="unit">{E(unit)}</span>' if unit else ""
-    return f'<section class="sec {cls}"><h3><span class="t">{E(title)}</span><span class="rule"></span>{u}</h3><ul>{items}</ul></section>'
+    return f'<section class="sec {cls}"><h3>{ico(title)}<span class="t">{E(title)}</span><span class="rule"></span>{u}</h3><ul>{items}</ul></section>'
 
 
 def described(rows):
@@ -108,12 +121,32 @@ page1 = f"""
   <header>{LOGO}<div class="kicker"><span></span>The Bar<span></span></div></header>
   <div class="cols">
   <section class="sec draught">
-    <h3><span class="t">Draught Beer</span><span class="rule"></span></h3>
+    <h3>{ico("Draught Beer")}<span class="t">Draught Beer</span><span class="rule"></span></h3>
     <table><thead><tr><th></th><th>Mug</th><th>Pitcher</th><th>Tower</th></tr></thead>
     <tbody>{draught_rows}</tbody></table>
   </section>
   {''.join(section(*s) for s in P1_SECTIONS)}</div>
   <footer>Spirits served in 30 ml &nbsp;·&nbsp; Prices in ₹ &nbsp;·&nbsp; Government taxes as applicable</footer>
+</div>"""
+
+cover = f"""
+<div class="page cover">
+  <div class="frame"></div>
+  <div class="cv-top">{LOGO}</div>
+  <div class="cv-art">{hero()}</div>
+  <div class="cv-title">Drinks Menu</div>
+  <div class="cv-sub"><span></span>Cocktails &nbsp;·&nbsp; Spirits &nbsp;·&nbsp; Beer &nbsp;·&nbsp; Wine<span></span></div>
+  <div class="cv-tag">Good drinks. Good food. Good vibes.</div>
+</div>"""
+
+back = f"""
+<div class="page back">
+  <div class="frame"></div>
+  <div class="bk-art">{duo()}</div>
+  <div class="bk-quote">“Here’s to good drinks<br>and better company.”</div>
+  <div class="bk-pills"><span>Great Drinks</span><span>Good Food</span><span>Great Music</span><span>Good Vibes</span></div>
+  <div class="bk-logo">{LOGO}</div>
+  <div class="bk-note">Prices in ₹ · Government taxes as applicable<br>We serve alcohol only to guests of legal drinking age · Please drink responsibly</div>
 </div>"""
 
 page2 = f"""
@@ -122,7 +155,7 @@ page2 = f"""
   <header>{LOGO}<div class="kicker"><span></span>Cocktails<span></span></div></header>
   <div class="cols two">
     <div class="col">
-      <section class="sec"><h3><span class="t">Signature Cocktails</span><span class="rule"></span></h3>
+      <section class="sec"><h3>{ico("Signature Cocktails")}<span class="t">Signature Cocktails</span><span class="rule"></span></h3>
         <ul>{described(SIGNATURE)}</ul></section>
       <section class="special">
         <div class="sp-head"><div class="sp-k">House Strong</div><div class="sp-t">The Drava Special</div>
@@ -135,6 +168,7 @@ page2 = f"""
       {section("Tall Boys", "", TALL)}
       {section("Mocktails", "", MOCK)}
       {section("Mixers & Soft Drinks", "", MIXERS)}
+      <div class="scene">{trio()}</div>
     </div>
   </div>
   <footer>Prices in ₹ &nbsp;·&nbsp; Government taxes as applicable &nbsp;·&nbsp; Please drink responsibly</footer>
@@ -142,6 +176,6 @@ page2 = f"""
 
 css = (HERE / "fonts" / "fonts.css").read_text() + (HERE / "style.css").read_text()
 doc = f"""<!doctype html><html><head><meta charset="utf-8"><title>Drava Menu</title>
-<style>{css}</style></head><body>{page1}{page2}</body></html>"""
+<style>{css}</style></head><body>{cover}{page1}{page2}{back}</body></html>"""
 (HERE / "menu.html").write_text(doc)
 print("html ok")
