@@ -37,6 +37,33 @@ while someone has the viewer open, so there's no extra load otherwise.
 | `PORT` | `8080` |
 | `CAPTURE_MS` / `JPEG_QUALITY` | optional, default `1000` / `50` |
 
+## Using it from Claude Code (personal use)
+This setup is only for our own machines; the service is not offered publicly. Claude Code connects through
+the [Playwright MCP server](https://github.com/microsoft/playwright-mcp), which drives Obscura over CDP via
+this gateway, so every Claude Code session also shows up in the live view.
+
+One-time setup on each Mac or Linux machine (needs Node 18+ and Claude Code):
+```bash
+bash deploy/obscura-live/claude-code/setup-obscura-mcp.sh   # paste the CDP token when asked
+```
+The script:
+1. Checks the token against `browser.marvice.tech` and stops if it isn't accepted, without writing anything.
+2. Writes `~/.config/obscura-mcp/config.json` (mode 600) with `browser.cdpEndpoint`,
+   `browser.cdpHeaders.Authorization` and an `outputDir` for screenshots.
+3. Registers it for all projects with
+   `claude mcp add obscura --scope user -- npx -y @playwright/mcp@latest --config <that file>`.
+
+Then start a new Claude Code session, run `/mcp` to confirm `obscura` is connected, and ask, for example,
+"Use the obscura browser to open example.com and tell me the page title".
+
+- **Token placement:** the token lives only in that local file. It never goes into the repo or a shell
+  command line.
+- **Rotating the token:** re-run the script on each machine after you change it in Coolify.
+- **Not yet verified end to end:** a local hook in the cloud session that wrote this blocks running browser
+  automation, so the MCP server was never run against Obscura there. The gateway path itself was verified
+  with a raw CDP session, and the script was dry-run with a stand-in `claude` command. The first `/mcp`
+  check on a real machine is the end-to-end test.
+
 ## Using the live view
 Open https://live.browser.marvice.tech, sign in with `VIEWER_USER` / `VIEWER_PASSWORD`, and leave it open. Each
 page an agent opens through `browser.marvice.tech` appears as a tile with its URL; tap a tile to enlarge it.
