@@ -1,6 +1,6 @@
 """Build the DRAVA beverage menu as HTML, then print to PDF with Chromium."""
 import html, base64, pathlib, sys
-from art import glass, hero, trio, duo
+from art import glass
 
 HERE = pathlib.Path(__file__).parent
 E = html.escape
@@ -40,10 +40,6 @@ P1_SECTIONS = [
         ("Patrón Silver", 799), ("Camino Real Silver", 499), ("Camino Real Gold", 499), ("Tequila Silver", 349)]),
     ("Liqueur", "30 ml", [
         ("Jägermeister", 599), ("Baileys", 399), ("Kahlúa", 399), ("Sambuca", 399)]),
-    ("Shooters", "", [
-        ("Jäger Bomb", 899), ("B-52", 449), ("Kamikaze", 349), ("Chilli Tequila", 349), ("Fireball", 299)]),
-    ("Breezers", "", [
-        ("Cranberry", 399), ("Orange", 399), ("Jamaican", 399), ("Watermelon", 399), ("Bacardi & Cranberry", 399)]),
     ("Sparkling Wine", "Bottle", [
         ("Cinzano Prosecco", 4999), ("Fratelli Noi", 4499)]),
     ("Wine", "Glass", [
@@ -75,6 +71,10 @@ PITCHER = [("L.I.I.T.", 1599), ("Mojito", 1599), ("Sangria", 1599), ("Caipiroska
 MIXERS = [
         ("Red Bull", 379), ("Canned Juice", 189), ("Ginger Ale", 149), ("Tonic Water", 149),
         ("Mineral Water 1 L", 75), ("Soda Water", 79), ("Sprite / Coke", 95)]
+SHOOTERS = [
+        ("Jäger Bomb", 899), ("B-52", 449), ("Kamikaze", 349), ("Chilli Tequila", 349), ("Fireball", 299)]
+BREEZERS = [
+        ("Cranberry", 399), ("Orange", 399), ("Jamaican", 399), ("Watermelon", 399), ("Bacardi & Cranberry", 399)]
 MOCK = [("Spicy Guava", 349), ("Mango Chilli", 349), ("Blue Iceland Tea", 349), ("White Lady", 349),
         ("Virgin Choice", 349), ("Fruit Punch", 349)]
 
@@ -111,48 +111,48 @@ def described(rows):
 logo = base64.b64encode((HERE / "logo.png").read_bytes()).decode()
 LOGO = f'<img class="logo" src="data:image/png;base64,{logo}" alt="Drava Bar &amp; Kitchen">'
 
+
+def photo(name):
+    b = base64.b64encode((HERE / "img" / f"{name}.jpg").read_bytes()).decode()
+    return f'<div class="ph" style="background-image:url(data:image/jpeg;base64,{b})"></div>'
+
+
+def band(names, kicker):
+    return (f'<div class="band"><div class="strip">{"".join(photo(n) for n in names)}</div>'
+            f'<div class="shade"></div><div class="brand">{LOGO}</div>'
+            f'<div class="kicker"><span></span>{kicker}<span></span></div></div>')
+
+
+S = {t: (u, r) for t, u, r in P1_SECTIONS}
+
+
+def sec(t):
+    return section(t, *S[t])
+
+
 draught_rows = "".join(
     f'<tr><td class="n">{E(n)}</td><td>{price(a)}</td><td>{price(b)}</td><td>{price(c)}</td></tr>'
     for n, a, b, c in DRAUGHT)
+DRAUGHT_SEC = f"""<section class="sec draught">
+    <h3>{ico("Draught Beer")}<span class="t">Draught Beer</span><span class="rule"></span></h3>
+    <table><thead><tr><th></th><th>Mug</th><th>Pitcher</th><th>Tower</th></tr></thead>
+    <tbody>{draught_rows}</tbody></table></section>"""
 
 page1 = f"""
 <div class="page p1">
+  {band(["beer", "whisky", "wine"], "The Bar")}
   <div class="frame"></div>
-  <header>{LOGO}<div class="kicker"><span></span>The Bar<span></span></div></header>
-  <div class="cols">
-  <section class="sec draught">
-    <h3>{ico("Draught Beer")}<span class="t">Draught Beer</span><span class="rule"></span></h3>
-    <table><thead><tr><th></th><th>Mug</th><th>Pitcher</th><th>Tower</th></tr></thead>
-    <tbody>{draught_rows}</tbody></table>
-  </section>
-  {''.join(section(*s) for s in P1_SECTIONS)}</div>
+  <div class="cols two">
+    <div class="col">{DRAUGHT_SEC}{''.join(sec(t) for t in ["Beer", "Single Malt", "Whisky", "Sparkling Wine"])}</div>
+    <div class="col">{''.join(sec(t) for t in ["Brandy", "Rum", "Gin", "Vodka", "Tequila", "Liqueur", "Wine"])}</div>
+  </div>
   <footer>Spirits served in 30 ml &nbsp;·&nbsp; Prices in ₹ &nbsp;·&nbsp; Government taxes as applicable</footer>
 </div>"""
 
-cover = f"""
-<div class="page cover">
-  <div class="frame"></div>
-  <div class="cv-top">{LOGO}</div>
-  <div class="cv-art">{hero()}</div>
-  <div class="cv-title">Drinks Menu</div>
-  <div class="cv-sub"><span></span>Cocktails &nbsp;·&nbsp; Spirits &nbsp;·&nbsp; Beer &nbsp;·&nbsp; Wine<span></span></div>
-  <div class="cv-tag">Good drinks. Good food. Good vibes.</div>
-</div>"""
-
-back = f"""
-<div class="page back">
-  <div class="frame"></div>
-  <div class="bk-art">{duo()}</div>
-  <div class="bk-quote">“Here’s to good drinks<br>and better company.”</div>
-  <div class="bk-pills"><span>Great Drinks</span><span>Good Food</span><span>Great Music</span><span>Good Vibes</span></div>
-  <div class="bk-logo">{LOGO}</div>
-  <div class="bk-note">Prices in ₹ · Government taxes as applicable<br>We serve alcohol only to guests of legal drinking age · Please drink responsibly</div>
-</div>"""
-
 page2 = f"""
-<div class="page">
+<div class="page p2">
+  {band(["mojito", "coupe", "martini"], "Cocktails")}
   <div class="frame"></div>
-  <header>{LOGO}<div class="kicker"><span></span>Cocktails<span></span></div></header>
   <div class="cols two">
     <div class="col">
       <section class="sec"><h3>{ico("Signature Cocktails")}<span class="t">Signature Cocktails</span><span class="rule"></span></h3>
@@ -162,20 +162,21 @@ page2 = f"""
         <div class="sp-s">Our strongest, longest Long Island iced teas</div></div>
         <ul>{described(SPECIAL)}</ul></section>
       {section("Cocktail Pitchers", "", PITCHER, "after-special")}
+      {section("Shooters", "", SHOOTERS)}
     </div>
     <div class="col">
       {section("Classic Cocktails", "", [(c, 449) for c in CLASSIC])}
       {section("Tall Boys", "", TALL)}
+      {section("Breezers", "", BREEZERS)}
       {section("Mocktails", "", MOCK)}
       {section("Mixers & Soft Drinks", "", MIXERS)}
-      <div class="scene">{trio()}</div>
     </div>
   </div>
   <footer>Prices in ₹ &nbsp;·&nbsp; Government taxes as applicable &nbsp;·&nbsp; Please drink responsibly</footer>
 </div>"""
 
 css = (HERE / "fonts" / "fonts.css").read_text() + (HERE / "style.css").read_text()
-doc = f"""<!doctype html><html><head><meta charset="utf-8"><title>Drava Menu</title>
-<style>{css}</style></head><body>{cover}{page1}{page2}{back}</body></html>"""
+doc = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Drava Menu</title>
+<style>{css}</style></head><body>{page1}{page2}</body></html>"""
 (HERE / "menu.html").write_text(doc)
 print("html ok")

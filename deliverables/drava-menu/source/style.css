@@ -1,211 +1,110 @@
-
-/* Page = client's original trim size (151.2 x 213.9 mm) */
+/* DRAVA beverage menu — 2 pages at the client's trim size (151.2 x 213.9 mm) */
 @page { size: 151.2mm 213.9mm; margin: 0; }
 :root{
-  --ink:#14110d; --ink2:#1d1812;
-  --gold:#d6a24a; --gold-hi:#f2cf7e; --gold-lo:#9c6a2a;
+  --ink:#14110d; --gold:#d6a24a; --gold-hi:#f2cf7e;
   --cream:#efe6d4; --muted:#a39780; --hair:rgba(214,162,74,.38); --hair2:rgba(239,230,212,.09);
+  --band:44mm;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.page{
-  width:151.2mm;height:213.9mm;position:relative;overflow:hidden;page-break-after:always;
-  background:
-    radial-gradient(120% 70% at 50% 0%, #241d15 0%, rgba(36,29,21,0) 60%),
-    radial-gradient(120% 60% at 50% 100%, #1c1711 0%, rgba(28,23,17,0) 70%),
-    var(--ink);
-  color:var(--cream);
-  padding:11mm 12.5mm 12mm;
-  display:flex;flex-direction:column;
-}
+.page{width:151.2mm;height:213.9mm;position:relative;overflow:hidden;page-break-after:always;
+  background:radial-gradient(120% 60% at 50% 100%, #1c1711 0%, rgba(28,23,17,0) 70%), var(--ink);
+  color:var(--cream);padding:calc(var(--band) + 2.4mm) 12.5mm 10.5mm;display:flex;flex-direction:column}
 .page:last-child{page-break-after:auto}
-.frame{position:absolute;inset:6mm;border:.35pt solid var(--hair);pointer-events:none}
+.frame{position:absolute;inset:6mm;border:.35pt solid var(--hair);pointer-events:none;z-index:1}
 .frame::before{content:"";position:absolute;inset:1.1mm;border:.25pt solid rgba(214,162,74,.16)}
 
-header{text-align:center;margin-bottom:4.2mm}
-.logo{width:34mm;display:block;margin:0 auto}
-.kicker{margin-top:2.6mm;display:flex;align-items:center;justify-content:center;gap:3mm;
-  font:italic 500 11pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);letter-spacing:.02em}
-.kicker span{display:block;width:9mm;height:.3pt;background:var(--hair)}
+/* ---------- photo band ---------- */
+.band{position:absolute;left:0;right:0;top:0;height:var(--band);z-index:2}
+.strip{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:.7mm;background:var(--ink)}
+.ph{background-size:cover;background-position:center}
+.shade{position:absolute;inset:0;background:
+  linear-gradient(180deg,rgba(14,11,8,.88) 0%,rgba(14,11,8,.35) 26%,rgba(14,11,8,0) 44%,rgba(14,11,8,0) 62%,rgba(20,17,13,.75) 86%,var(--ink) 100%)}
+.brand{position:absolute;top:4.6mm;left:0;right:0;text-align:center}
+.logo{width:25mm;display:inline-block;filter:drop-shadow(0 .6mm 1.6mm rgba(0,0,0,.7))}
+.band .kicker{position:absolute;left:0;right:0;bottom:1.4mm;display:flex;align-items:center;justify-content:center;gap:3mm;
+  font:italic 600 13pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);letter-spacing:.02em;text-shadow:0 .4mm 1.2mm rgba(0,0,0,.8)}
+.band .kicker span{display:block;width:12mm;height:.35pt;background:var(--gold)}
 
-/* section headings */
-h3{display:flex;align-items:baseline;gap:2mm;margin:0 0 1.3mm}
-h3 .t{font:600 10.4pt/1 'Cormorant Garamond',serif;color:var(--gold);letter-spacing:.01em;white-space:nowrap}
-h3 .rule{flex:1;height:.3pt;background:var(--hair);transform:translateY(-.6mm)}
-h3 .unit{font:500 4.6pt/1 'Jost',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+/* ---------- headings ---------- */
+h3{display:flex;align-items:flex-end;gap:2mm;margin:0 0 1mm}
+h3 .ico{height:4mm;width:auto;flex:none;margin-right:-.5mm;overflow:visible}
+h3 .t{font:600 10pt/1 'Cormorant Garamond',serif;color:var(--gold);letter-spacing:.01em;white-space:nowrap}
+h3 .rule{flex:1;height:.3pt;background:var(--hair);transform:translateY(-1mm)}
+h3 .unit{font:500 4.6pt/1 'Jost',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);transform:translateY(-.4mm)}
+svg .ln *{fill:none;stroke:var(--gold);stroke-width:.55pt;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+svg .liq{stroke:none}
 
-/* list rows */
+/* ---------- rows ---------- */
 ul{list-style:none}
-li{display:flex;justify-content:space-between;align-items:baseline;gap:2mm;
-  padding:.62mm 0;border-bottom:.25pt solid var(--hair2)}
+li{display:flex;justify-content:space-between;align-items:baseline;gap:2mm;padding:.45mm 0;border-bottom:.25pt solid var(--hair2)}
 li:last-child{border-bottom:0}
 .n{font:400 6.1pt/1.15 'Jost',sans-serif;letter-spacing:.075em;text-transform:uppercase;color:var(--cream)}
-.p{font:500 6.4pt/1.15 'Jost',sans-serif;letter-spacing:.03em;color:var(--gold-hi);
-  font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
+.p{font:500 6.4pt/1.15 'Jost',sans-serif;letter-spacing:.03em;color:var(--gold-hi);font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
 
-/* draught table */
-.draught{margin-bottom:3.6mm}
-.draught table{width:100%;border-collapse:collapse}
-.draught th{font:500 4.6pt/1 'Jost',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);
-  text-align:right;padding:0 0 1mm;width:16mm}
-.draught th:first-child{width:auto}
-.draught td{font:500 6.4pt/1.15 'Jost',sans-serif;color:var(--gold-hi);text-align:right;padding:.62mm 0;
-  border-bottom:.25pt solid var(--hair2);font-variant-numeric:tabular-nums lining-nums}
-.draught tr:last-child td{border-bottom:0}
-.draught td.n{text-align:left;font-weight:400;color:var(--cream)}
-
-/* columns */
-.cols{flex:1;column-count:2;column-gap:9mm;column-rule:.3pt solid rgba(214,162,74,.22);column-fill:balance}
-.sec{break-inside:avoid;margin-bottom:3.1mm}
-.cols.two{column-count:auto;display:grid;grid-template-columns:1fr 1fr;gap:0 9mm;position:relative}
+.cols.two{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0 9mm;position:relative;align-content:start}
 .cols.two::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:.3pt;background:rgba(214,162,74,.22)}
 .col{display:flex;flex-direction:column}
+.sec{break-inside:avoid;margin-bottom:2.4mm}
 
-/* described items (cocktails) */
-li.d{display:block;padding:1.05mm 0 1.15mm}
+/* draught table */
+.draught table{width:100%;border-collapse:collapse}
+.draught th{font:500 4.3pt/1 'Jost',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:right;padding:0 0 .6mm;width:9.5mm}
+.draught th:first-child{width:auto}
+.draught td{font:500 6pt/1.1 'Jost',sans-serif;color:var(--gold-hi);text-align:right;padding:.3mm 0;border-bottom:.25pt solid var(--hair2);font-variant-numeric:tabular-nums lining-nums}
+.draught tr:last-child td{border-bottom:0}
+.draught td.n{text-align:left;font-weight:400;color:var(--cream);font-size:5.75pt}
+
+/* page 1 density */
+.p1 li{padding:.3mm 0}
+.p1 .n{font-size:5.75pt;line-height:1.1}
+.p1 .p{font-size:6pt;line-height:1.1}
+.p1 h3 .t{font-size:9.4pt}
+.p1 h3 .ico{height:3.5mm}
+.p1 .sec{margin-bottom:1.9mm}
+
+/* cocktail descriptions */
+li.d{display:block;padding:.7mm 0 .8mm}
 li.d .row{display:flex;justify-content:space-between;align-items:baseline;gap:2mm}
-li.d .n{font-weight:500;color:var(--cream)}
-.desc{font:italic 500 7.2pt/1.2 'Cormorant Garamond',serif;color:var(--muted);margin-top:.5mm;padding-right:6mm}
+li.d .n{font-weight:500}
+.desc{font:italic 500 7pt/1.15 'Cormorant Garamond',serif;color:var(--muted);margin-top:.3mm;padding-right:2mm;text-wrap:pretty}
+.p2 li:not(.d){padding:.32mm 0}
+.p2 .n{font-size:5.9pt}
+.p2 .p{font-size:6.2pt}
+.p2 .sec{margin-bottom:2mm}
 
-/* Drava Special panel */
-.special{margin-top:1.6mm;border:.35pt solid var(--hair);padding:3.2mm 3.4mm 1.4mm;position:relative;
-  background:linear-gradient(180deg,rgba(214,162,74,.07),rgba(214,162,74,.02))}
-.sp-head{text-align:center;margin-bottom:1.4mm}
+/* Drava Special */
+.special{border:.35pt solid var(--hair);padding:2.4mm 3.2mm .8mm;margin:.4mm 0 0;
+  background:linear-gradient(180deg,rgba(214,162,74,.08),rgba(214,162,74,.02))}
+.sp-head{text-align:center;margin-bottom:1mm}
 .sp-k{font:500 4.6pt/1 'Jost',sans-serif;letter-spacing:.32em;text-transform:uppercase;color:var(--gold)}
-.sp-t{font:italic 600 15pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);margin-top:1.3mm}
-.sp-s{font:italic 500 7.4pt/1.2 'Cormorant Garamond',serif;color:var(--muted);margin-top:1mm}
+.sp-t{font:italic 600 14pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);margin-top:1mm}
+.sp-s{font:italic 500 7.2pt/1.2 'Cormorant Garamond',serif;color:var(--muted);margin-top:.8mm}
 .special li.d{border-bottom-color:rgba(214,162,74,.14)}
+.after-special{margin-top:2.8mm}
 
-.sign{margin-top:auto;text-align:center;font:italic 500 9.6pt/1.3 'Cormorant Garamond',serif;color:var(--gold);padding-top:2mm}
+footer{margin-top:1.6mm;text-align:center;font:400 4.8pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
 
-footer{margin-top:2.6mm;text-align:center;font:400 4.8pt/1 'Jost',sans-serif;letter-spacing:.22em;
-  text-transform:uppercase;color:var(--muted)}
-
-/* ---- page 1: dense spirits list ---- */
-.p1{padding-top:10.5mm}
-.p1 header{margin-bottom:3.4mm}
-.p1 .logo{width:27mm}
-.p1 .kicker{margin-top:2mm;font-size:10pt}
-.p1 h3{margin-bottom:.7mm}
-.p1 h3 .t{font-size:9.6pt}
-.p1 .sec{margin-bottom:2.3mm}
-.p1 li,.p1 .draught td{padding:.4mm 0}
-.p1 .n,.p1 .draught td.n{font-size:5.85pt}
-.p1 .p,.p1 .draught td{font-size:6.1pt}
-.p1 .draught{margin-bottom:2.3mm}
-.p1 .draught th{width:9.5mm;padding-bottom:.6mm;font-size:4.3pt;letter-spacing:.14em}
-.p1 .draught th:first-child{width:auto}
-.p1 footer{margin-top:1.6mm}
-.p1{padding-bottom:10.5mm}
-.p1 li,.p1 .draught td{padding:.3mm 0}
-.p1 .n,.p1 .p,.p1 .draught td{line-height:1.1}
-.p1 .sec{margin-bottom:2mm}
-/* shared header, a touch smaller */
-.page header{margin-bottom:3.2mm}
-.page .logo{width:25mm}
-.page .kicker{margin-top:1.8mm;font-size:10pt}
-.page{padding-top:10mm}
-/* page 1 */
-.p1 .n,.p1 .draught td.n{font-size:5.75pt}
-.p1 .p,.p1 .draught td{font-size:6pt}
-.p1 h3 .t{font-size:9.2pt}
-.p1 h3{margin-bottom:.5mm}
-.p1 .sec{margin-bottom:1.8mm}
-.p1 footer{margin-top:1.2mm}
-/* page 2 */
-li.d{padding:.75mm 0 .85mm}
-.desc{margin-top:.3mm;line-height:1.15}
-.page:not(.p1) li:not(.d){padding:.45mm 0}
-.page:not(.p1) .sec{margin-bottom:2.6mm}
-.special{padding:2.6mm 3.2mm 1mm;margin-top:.6mm}
-.sp-t{font-size:14pt;margin-top:1mm}
-.p1 li,.p1 .draught td{padding:.25mm 0}
-.p1 .sec{margin-bottom:1.6mm}
-.p1 footer{margin-top:2mm}
-.desc{padding-right:2mm;text-wrap:pretty}
-.after-special{margin-top:3.2mm}
-
-/* ===== illustrations ===== */
-.ico,.hero,.trio,.duo{overflow:visible}
-svg .ln path,svg .ln circle,svg g.ln>*{fill:none;stroke:var(--gold);stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-svg g.ln path[style],svg g.ln circle[style]{}
-.ico .ln *{stroke-width:.55pt}
-.hero .ln *{stroke-width:1.05pt}
-.trio .ln *,.duo .ln *{stroke-width:.75pt}
-svg .liq{stroke:none}
-svg .bub{fill:var(--gold-hi);opacity:.75}
-svg .spark{fill:var(--gold-hi)}
-svg .floor{fill:rgba(214,162,74,.10)}
-h3 .ico{width:auto;height:4.4mm;flex:none;align-self:flex-end;margin-right:-.6mm;transform:translateY(.4mm)}
-.p1 h3 .ico{height:3.9mm}
-
-/* cocktails page scene */
-.scene{margin-top:auto;padding-top:2mm;text-align:center}
-.trio{width:44mm;height:auto}
-
-/* cover */
-.cover{align-items:center;justify-content:center;text-align:center;padding:14mm}
-.cv-top .logo{width:46mm}
-.cv-art{margin:8mm 0 4mm;width:100%}
-.hero{width:108mm;height:auto}
-.cv-title{font:italic 600 30pt/1 'Cormorant Garamond',serif;color:var(--gold-hi);margin-top:2mm}
-.cv-sub{margin-top:4mm;display:flex;align-items:center;gap:3mm;font:500 5.6pt/1 'Jost',sans-serif;
-  letter-spacing:.28em;text-transform:uppercase;color:var(--cream)}
-.cv-sub span{width:9mm;height:.3pt;background:var(--hair)}
-.cv-tag{margin-top:auto;font:italic 500 10pt/1 'Cormorant Garamond',serif;color:var(--muted)}
-
-/* back */
-.back{align-items:center;text-align:center;padding:18mm 14mm 14mm}
-.duo{width:58mm;height:auto}
-.bk-quote{margin-top:8mm;font:italic 500 17pt/1.25 'Cormorant Garamond',serif;color:var(--gold-hi)}
-.bk-pills{margin-top:9mm;display:flex;gap:0;justify-content:center}
-.bk-pills span{font:500 5.2pt/1 'Jost',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--cream);
-  padding:0 3.2mm;border-left:.3pt solid var(--hair)}
-.bk-pills span:first-child{border-left:0}
-.bk-logo{margin-top:auto}.bk-logo .logo{width:30mm}
-.bk-note{margin-top:5mm;font:400 4.8pt/1.8 'Jost',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-
-/* ===== digital (QR) version: screen only, animated ===== */
+/* screen / QR view */
 @media screen{
   html,body{background:#0b0907}
   body{padding:24px 0;display:flex;flex-direction:column;align-items:center;gap:24px}
   .page{box-shadow:0 20px 60px rgba(0,0,0,.6)}
   @media (max-width:600px){body{padding:0;gap:0;zoom:calc(100vw / 571.5px)}}
-  svg .bub{animation:rise 3.2s ease-in infinite}
-  svg .spark{transform-box:fill-box;transform-origin:center;animation:twinkle 2.8s ease-in-out infinite}
-  svg .liq{animation:shimmer 5s ease-in-out infinite}
-  .cv-title,.cv-top{animation:fadeUp 1.4s ease-out both}
-  .cv-art{animation:fadeUp 1.6s .25s ease-out both}
-  @keyframes rise{0%{transform:translateY(0);opacity:0}15%{opacity:.85}100%{transform:translateY(-14px);opacity:0}}
-  @keyframes twinkle{0%,100%{opacity:.25;scale:.6}50%{opacity:1;scale:1.15}}
-  @keyframes shimmer{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 }
-@media screen and (prefers-reduced-motion:reduce){*{animation:none!important}}
-svg .sheen{fill:url(#sheen);stroke:none}
-.p1 h3 .ico{height:3.6mm;margin:-.9mm -.6mm -.9mm 0}
-h3 .ico{margin-top:-.8mm;margin-bottom:-.8mm}
-.trio{width:50mm}
-.scene{padding-top:3mm}
-/* cover rebalance */
-.cover{justify-content:flex-start;padding-top:16mm}
-.cv-art{margin:auto 0 0}
-.hero{width:122mm}
-.cv-title{margin-top:5mm;font-size:34pt}
-.cv-sub{margin-bottom:auto}
-.cv-tag{margin-top:0}
-/* back rebalance */
-.back{padding-top:14mm}
-.bk-art{margin-top:auto}
-.duo{width:78mm}
-.trio{width:39mm}
-.scene{padding-top:1mm}
-.col{position:relative}
-.scene{position:absolute;left:0;right:0;bottom:0;padding:0}
-.trio{width:44mm}
-.p1 h3{align-items:flex-end;margin-bottom:.8mm}
-.p1 h3 .ico{height:3.3mm;margin:0 -.4mm 0 0;transform:translateY(.15mm)}
-.p1 h3 .rule{transform:translateY(-.9mm)}
-.trio{width:40mm}
-.p1 .sec{margin-bottom:1.45mm}
-.p1 li,.p1 .draught td{padding:.23mm 0}
+.logo{width:23mm}
+.brand{top:4mm}
+.shade{background:linear-gradient(180deg,rgba(14,11,8,.92) 0%,rgba(14,11,8,.5) 24%,rgba(14,11,8,0) 42%,rgba(14,11,8,0) 64%,rgba(20,17,13,.8) 87%,var(--ink) 100%)}
+:root{--band:42mm}
+li.d{padding:.5mm 0 .6mm}
+.special{padding-top:2.2mm}
+.shade{background:linear-gradient(180deg,rgba(14,11,8,.95) 0%,rgba(14,11,8,.6) 24%,rgba(14,11,8,0) 44%,rgba(14,11,8,0) 64%,rgba(20,17,13,.8) 87%,var(--ink) 100%)}
+.p2 .sec{margin-bottom:1.6mm}
+.after-special{margin-top:2mm}
+li.d{padding:.4mm 0 .5mm}
+.special{padding:2mm 3.2mm .5mm}
+.sp-t{font-size:13pt}
+.desc{line-height:1.1}
+.brand::before{content:"";position:absolute;left:50%;top:-4mm;width:46mm;height:22mm;transform:translateX(-50%);
+  background:radial-gradient(closest-side,rgba(10,8,6,.85),rgba(10,8,6,0));z-index:-1}
+.brand{z-index:1}
