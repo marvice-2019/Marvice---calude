@@ -108,3 +108,9 @@ li.d{padding:.4mm 0 .5mm}
 .brand::before{content:"";position:absolute;left:50%;top:-4mm;width:46mm;height:22mm;transform:translateX(-50%);
   background:radial-gradient(closest-side,rgba(10,8,6,.85),rgba(10,8,6,0));z-index:-1}
 .brand{z-index:1}
+/* venue interior as toned background */
+.bg{position:absolute;inset:0;background-size:cover;background-position:center;z-index:0;opacity:.55}
+.bg::after{content:"";position:absolute;inset:0;background:
+  radial-gradient(85% 60% at 50% 56%, rgba(16,13,10,.86) 0%, rgba(16,13,10,.72) 60%, rgba(16,13,10,.45) 100%)}
+.page{background:var(--ink)}
+.page>.cols,.page>footer{position:relative;z-index:1}

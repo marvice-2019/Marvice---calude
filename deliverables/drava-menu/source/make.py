@@ -117,6 +117,11 @@ def photo(name):
     return f'<div class="ph" style="background-image:url(data:image/jpeg;base64,{b})"></div>'
 
 
+def bgimg(name):
+    b = base64.b64encode((HERE / "img" / f"{name}.jpg").read_bytes()).decode()
+    return f'<div class="bg" style="background-image:url(data:image/jpeg;base64,{b})"></div>'
+
+
 def band(names, kicker):
     return (f'<div class="band"><div class="strip">{"".join(photo(n) for n in names)}</div>'
             f'<div class="shade"></div><div class="brand">{LOGO}</div>'
@@ -140,6 +145,7 @@ DRAUGHT_SEC = f"""<section class="sec draught">
 
 page1 = f"""
 <div class="page p1">
+  {bgimg("bg1")}
   {band(["beer", "whisky", "wine"], "The Bar")}
   <div class="frame"></div>
   <div class="cols two">
@@ -151,6 +157,7 @@ page1 = f"""
 
 page2 = f"""
 <div class="page p2">
+  {bgimg("bg2")}
   {band(["mojito", "coupe", "martini"], "Cocktails")}
   <div class="frame"></div>
   <div class="cols two">
