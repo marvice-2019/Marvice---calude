@@ -59,6 +59,7 @@
   },
   "enabledMcpjsonServers": [
     "coolify",
-    "hostinger-api"
+    "hostinger-api",
+    "obscura"
   ]
 }

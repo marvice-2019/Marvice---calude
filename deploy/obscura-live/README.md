@@ -58,6 +58,21 @@ Then start a new Claude Code session, run `/mcp` to confirm `obscura` is connect
 
 - **Token placement:** the token lives only in that local file. It never goes into the repo or a shell
   command line.
+
+### Cloud Claude Code sessions (claude.ai/code)
+The repo's `.mcp.json` has an `obscura` entry, enabled in `.claude/settings.json`, that runs
+`deploy/obscura-live/claude-code/obscura-mcp.sh`. To turn it on:
+1. In the cloud environment's settings (environment menu in the session title bar → Edit), add an environment
+   variable `OBSCURA_CDP_TOKEN` with the token from Coolify.
+2. Start a new session. `obscura` is then available as a browser tool, and its sessions show up in the live
+   view.
+
+How the wrapper picks its config:
+- **`OBSCURA_CDP_TOKEN` set (cloud sessions):** it writes a temporary config (mode 600) and deletes it when the
+  server stops.
+- **Variable not set (our own machines):** it falls back to `~/.config/obscura-mcp/config.json` from the setup
+  script above, so the project entry also works on a Mac where setup has been run.
+- **Neither available:** the server fails to start with a message saying which one to set up.
 - **Rotating the token:** re-run the script on each machine after you change it in Coolify.
 - **Not yet verified end to end:** a local hook in the cloud session that wrote this blocks running browser
   automation, so the MCP server was never run against Obscura there. The gateway path itself was verified
