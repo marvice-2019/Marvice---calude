@@ -6,6 +6,9 @@ Marvice Studio runs on the Coolify server at **https://video.marvice.tech**, beh
 - **https://video.marvice.tech/editor**: Marvice Editor Studio, the video editor. It is [HyperFrames](https://github.com/heygen-com/hyperframes)
   Studio (the `hyperframes preview` server with rendering to MP4), rebranded at build time by `studio-brand/`:
   Marvice logo, copper accent, tab title and favicon; the HeyGen Framey button and the project-name label are hidden.
+- **https://motion.marvice.tech**: [OpenMotion](https://github.com/nexu-io/openmotion), which remakes a reference video
+  with your own brand and copy (templates, Studio editor, MP4 export). Same login. Linked from the Studio header as
+  **Remake a video**. It runs on its own subdomain because its app uses absolute paths, the same as the editor's.
 
 The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are cropped from `marvice_R_logo.ai`.
 
@@ -18,21 +21,25 @@ The logo files in `creator/public/` (`marvice-logo.svg`, `marvice-mark.svg`) are
 | `docker-compose.yml` | Coolify Docker Compose resource: `studio` (private) + `auth` (public) and a persistent volume |
 | `Dockerfile.auth`, `Caddyfile`, `auth-entrypoint.sh` | Caddy basic-auth gate; the only service exposed to the internet. Routes `/` and `/create*` to `creator`, everything else (the editor at `/editor`, its assets and API) to `studio` |
 | `creator/` | Prompt-to-video service at `/create` (runs from the `studio` image with the `creator` command) |
+| `openmotion/` | OpenMotion image, built from a pinned upstream commit (`OPENMOTION_REF`). `brand.mjs` rebrands it as "Marvice \| Motion" (logo, title, favicon) and makes English the only UI language, and adds the "Full-Stack Video Generator" welcome screen with five steps (`welcome.html`) at the main address, shown once per browser tab; if an upstream change breaks a patch, the build stops. OpenMotion only answers on `127.0.0.1` with a `localhost` Host header, so `socat` publishes it on port 4180 and the Caddy gate rewrites Host and the matching Origin. Data lives in the `openmotion-data` volume |
 | `studio-brand/` | Patches the Studio's `index.html` during the image build (inline logo, CSS and a small script). If a HyperFrames upgrade changes that page, the build stops with a message instead of shipping it unbranded |
 
-## 1. DNS (Hostinger)
+## 1. DNS (Cloudflare)
 
-In hPanel → Domains → `marvice.tech` → DNS, add:
+In Cloudflare → `marvice.tech` → DNS → Records, add (Proxy status: **DNS only**, grey cloud, so Coolify can issue the
+certificate and long renders are not cut off by Cloudflare's 100-second timeout):
 
 | Type | Name | Points to | TTL |
 | --- | --- | --- | --- |
 | A | `video` | public IP of the Coolify server | 300 |
+| A | `motion` | public IP of the Coolify server | 300 |
 
 ## 2. Coolify
 
 1. **Projects → + New → Resource → Public/Private Repository**, repo `marvice-2019/Marvice---calude`.
 2. Build pack: **Docker Compose**. Base directory: `/video.marvice.tech`. Compose file: `/docker-compose.yml`.
-3. Under the **`auth`** service, set **Domains** to `https://video.marvice.tech:8080`. Leave `studio` with no domain.
+3. Under the **`auth`** service, set **Domains** to `https://video.marvice.tech:8080` (motion.marvice.tech is routed by the Traefik labels in `docker-compose.yml`).
+   Leave `studio`, `creator` and `motion` with no domain.
    The `:8080` sets the container port; Traefik still serves the site on 443 with a Let's Encrypt certificate.
 4. **Environment Variables**: `BASIC_AUTH_USER` (default `admin`) and `BASIC_AUTH_PASSWORD` (required; the deploy
    fails without it). The password is hashed with bcrypt when the container starts.
@@ -76,6 +83,75 @@ Claude's effort.
 
 Veo, Sora and Grok make 8-second clips, the fal.ai models 10-second clips, up to 3 per video. All clips are 16:9 or 9:16;
 square and 4:5 videos crop them. Generated footage is billed by the provider per second.
+
+## OpenMotion (`motion.marvice.tech`)
+
+OpenMotion's model gateway (images, video, music, voice) uses `ATLASCLOUD_API_KEY` and/or `FAL_KEY` from Coolify; keys can
+also be entered in its **Model settings**. Its local-Codex image generation and its "bring your own agent" MCP flow are
+desktop features and do not work on the server; templates, the editor and MP4 export do. Telemetry is switched off.
+
+**Prompt to photo or video.** The welcome screen (shown at `/` once per tab, any time at `/?welcome`) has a prompt box:
+Photo or Video, model, shape (16:9, 9:16, 1:1) and, for video, 5 or 10 seconds. It needs `FAL_KEY`. Results are saved to
+the active project's media library and can be downloaded. Realistic models added to OpenMotion's list by `brand.mjs`
+(fal.ai IDs checked 2026-11-12; Veo is deprecated on fal):
+
+| Kind | Model | fal ID |
+| --- | --- | --- |
+| Photo | FLUX 1.1 Pro Ultra, raw mode (most realistic) | `fal-ai/flux-pro/v1.1-ultra` |
+| Photo | Nano Banana Pro, 2K | `fal-ai/nano-banana-pro` |
+| Video | Kling 4.0, 1080p | `kling/v4/text-to-video` |
+| Video | Kling 4.0 Flash, 720p (faster) | `kling/v4/flash/text-to-video` |
+
+Each generation is billed to the fal.ai account behind `FAL_KEY` (see each model's page on fal.ai for its price). If fal
+rejects the key, OpenMotion marks it rejected until the key is changed in **Model settings** or the service is restarted.
+
+**Free photos: Cloudflare Workers AI.** `brand.mjs` adds Cloudflare as a provider, with three photo models that run
+on Cloudflare's free daily allowance (10,000 neurons a day per account, resets 00:00 UTC; pricing page checked
+2026-11-12). Video has no free option.
+
+| Model | Cloudflare ID | Free images a day (approx.) |
+| --- | --- | --- |
+| FLUX.2 Klein (default free pick) | `@cf/black-forest-labs/flux-2-klein-4b` | ~95 at 1:1, ~60 at 16:9 |
+| Lucid Origin (most realistic) | `@cf/leonardo/lucid-origin` | ~2–3 |
+| FLUX.1 Schnell (square only) | `@cf/black-forest-labs/flux-1-schnell` | ~100 |
+
+Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Coolify, or paste `account-id:api-token` into the key box on
+the welcome screen. The token needs the **Workers AI** permission (Cloudflare dashboard → My Profile → API Tokens →
+Create Token → "Workers AI" template). On the Workers Free plan, usage past the allowance is refused, not billed; on
+Workers Paid it is billed at $0.011 per 1,000 neurons.
+
+The welcome screen shows a key box for whichever provider the selected model needs, when that provider has no key or
+its key was rejected.
+
+The prompt box also has one-click starters (product shot, food, portrait, real estate, café reel, shoe ad), a
+**Realistic look** switch (on by default; adds photographic wording to the prompt), a Cancel button, and shows the last
+8 results again after a reload.
+
+### MCP for AI tools (`https://motion.marvice.tech/mcp`)
+
+Claude Code, Cursor, Codex and other MCP clients can drive Marvice Motion with OpenMotion's 11 tools (create a project
+from a prompt, template or reference video, edit it, list versions, restore, export MP4). It is off until you set
+`MCP_API_KEY` in Coolify and redeploy. Generate a long random token, for example:
+
+```bash
+openssl rand -hex 32
+```
+
+The endpoint uses that token (`Authorization: Bearer <token>`), not the site's basic-auth login, so it can be rotated on
+its own. Setup per tool (replace `<token>`):
+
+- **Claude Code:** `claude mcp add --transport http marvice-motion https://motion.marvice.tech/mcp --header "Authorization: Bearer <token>"`
+- **Cursor** (`~/.cursor/mcp.json`): `{"mcpServers": {"marvice-motion": {"url": "https://motion.marvice.tech/mcp", "headers": {"Authorization": "Bearer <token>"}}}}`
+- **Codex** (`~/.codex/config.toml`): `[mcp_servers.marvice-motion]` with `url = "https://motion.marvice.tech/mcp"` and
+  `bearer_token_env_var = "MARVICE_MOTION_TOKEN"`, then set that variable to the token.
+
+Limits: Claude.ai and ChatGPT web connectors need OAuth and cannot use this endpoint. The tools run on the server, so
+`openmotion_import_assets` can only import files already on the server, and `openmotion_list_templates` returns a file path
+on the server (use `openmotion_get_template` with a known template ID from the gallery instead). Links the tools return
+point at `localhost`; open the project at https://motion.marvice.tech instead. How it works: `supergateway` (pinned)
+runs OpenMotion's own MCP server per session inside the `motion` container and attaches it to the running editor.
+
+To upgrade, change `OPENMOTION_REF` in `openmotion/Dockerfile` to a newer upstream commit and redeploy.
 
 ## Updating
 

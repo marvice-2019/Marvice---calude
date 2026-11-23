@@ -1,0 +1,305 @@
+<!-- Marvice | Motion welcome screen. Inserted at the top of <body> in studio/index.html by brand.mjs.
+     Shown at the main address (/) once per browser tab (always with ?welcome), over the editor, which keeps
+     loading underneath. Direct project links (?project= or #project/) skip it. Light theme = data-theme="paper".
+     The prompt box uses OpenMotion's model gateway (/motion-api/generations); results are saved to the
+     active project's media library. Realistic models run on fal.ai and need FAL_KEY. -->
+<style>
+#marvice-welcome { --mw-bg: #121616; --mw-text: #f2eee8; --mw-muted: #a9b1af; --mw-card: #1b2020; --mw-field: #121616; --mw-border: #2c3433; --mw-copper: #bd8b53; --mw-on-copper: #121616; --mw-error: #f19a8f;
+  position: fixed; inset: 0; z-index: 2147483000; overflow-y: auto; background: var(--mw-bg); color: var(--mw-text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+[data-theme="paper"] #marvice-welcome { --mw-bg: #f6f3ee; --mw-text: #1f2a29; --mw-muted: #56615f; --mw-card: #ffffff; --mw-field: #f6f3ee; --mw-border: #e3ddd3; --mw-copper: #8a5f2e; --mw-on-copper: #ffffff; --mw-error: #a8321f; }
+#marvice-welcome[hidden] { display: none; }
+#marvice-welcome *, #marvice-welcome *::before, #marvice-welcome *::after { box-sizing: border-box; }
+.mw-inner { max-width: 1180px; min-height: 100%; margin: 0 auto; padding: 32px 32px 56px; display: flex; flex-direction: column; }
+.mw-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.mw-logo { height: 26px; width: auto; }
+.mw-logo-dark { display: none; } [data-theme="paper"] .mw-logo-light { display: none; } [data-theme="paper"] .mw-logo-dark { display: block; }
+.mw-link { border: 0; background: none; padding: 6px 0; color: var(--mw-muted); font: 500 14px system-ui, sans-serif; cursor: pointer; }
+.mw-link:hover { color: var(--mw-text); }
+.mw-hero { padding: 44px 0 24px; }
+.mw-eyebrow { margin: 0 0 12px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--mw-copper); }
+.mw-hero h1 { margin: 0; font-size: clamp(34px, 5.4vw, 64px); font-weight: 650; line-height: 1.04; letter-spacing: -.035em; text-wrap: balance; }
+.mw-hero > p { max-width: 600px; margin: 14px 0 0; font-size: 16px; line-height: 1.55; color: var(--mw-muted); }
+.mw-gen { margin: 0 0 40px; padding: 20px; background: var(--mw-card); border: 1px solid var(--mw-border); border-radius: 16px; }
+.mw-tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; background: var(--mw-field); border: 1px solid var(--mw-border); border-radius: 10px; }
+.mw-tabs button { min-width: 88px; height: 34px; padding: 0 16px; border: 0; border-radius: 7px; background: transparent; color: var(--mw-muted); font: 600 14px system-ui, sans-serif; cursor: pointer; }
+.mw-tabs button[aria-pressed="true"] { background: var(--mw-copper); color: var(--mw-on-copper); }
+.mw-gen textarea { display: block; width: 100%; min-height: 96px; padding: 14px 16px; resize: vertical; background: var(--mw-field); color: var(--mw-text); border: 1px solid var(--mw-border); border-radius: 10px; font: 15px/1.5 system-ui, sans-serif; }
+.mw-gen textarea::placeholder { color: var(--mw-muted); }
+.mw-gen textarea:focus-visible, .mw-gen select:focus-visible, .mw-tabs button:focus-visible, .mw-link:focus-visible, .mw-result a:focus-visible { outline: 2px solid var(--mw-copper); outline-offset: 2px; }
+.mw-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 12px; }
+.mw-row label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: var(--mw-muted); }
+.mw-row select { height: 40px; padding: 0 10px; background: var(--mw-field); color: var(--mw-text); border: 1px solid var(--mw-border); border-radius: 8px; font: 14px system-ui, sans-serif; }
+.mw-row .mw-model select { min-width: 260px; }
+.mw-generate { margin-left: auto; }
+.mw-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 44px; padding: 0 22px; border: 0; border-radius: 10px; background: var(--mw-copper); color: var(--mw-on-copper); font: 600 15px system-ui, sans-serif; cursor: pointer; }
+.mw-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.mw-btn:disabled { opacity: .55; cursor: not-allowed; }
+.mw-btn:focus-visible { outline: 2px solid var(--mw-text); outline-offset: 3px; }
+.mw-status { min-height: 20px; margin: 12px 0 0; font-size: 13px; color: var(--mw-muted); }
+.mw-status.mw-error { color: var(--mw-error); }
+.mw-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+.mw-results:empty { display: none; }
+.mw-result { overflow: hidden; background: var(--mw-field); border: 1px solid var(--mw-border); border-radius: 10px; }
+.mw-result img, .mw-result video { display: block; width: 100%; max-height: 360px; object-fit: contain; background: #000; }
+.mw-result div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 12px; color: var(--mw-muted); }
+.mw-result p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mw-result a { flex-shrink: 0; color: var(--mw-copper); font-weight: 600; text-decoration: none; }
+.mw-starters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.mw-starters button { height: 30px; padding: 0 12px; border: 1px solid var(--mw-border); border-radius: 999px; background: transparent; color: var(--mw-text); font: 500 13px system-ui, sans-serif; cursor: pointer; }
+.mw-starters button:hover { border-color: var(--mw-copper); }
+.mw-starters button:focus-visible, .mw-check input:focus-visible, .mw-cancel:focus-visible { outline: 2px solid var(--mw-copper); outline-offset: 2px; }
+.mw-check { flex-direction: row !important; align-items: center; gap: 8px !important; height: 40px; font-size: 13px !important; color: var(--mw-text) !important; cursor: pointer; }
+.mw-check input { width: 16px; height: 16px; accent-color: var(--mw-copper); }
+.mw-cancel { height: 44px; padding: 0 16px; border: 1px solid var(--mw-border); border-radius: 10px; background: transparent; color: var(--mw-text); font: 600 14px system-ui, sans-serif; cursor: pointer; }
+.mw-cancel[hidden] { display: none; }
+.mw-steps-title { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--mw-muted); }
+.mw-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin: 0 0 36px; padding: 0; list-style: none; }
+.mw-steps li { display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 20px 18px 22px; background: var(--mw-card); border: 1px solid var(--mw-border); border-top: 2px solid var(--mw-copper); border-radius: 12px; animation: mw-in 520ms cubic-bezier(.2, .7, .2, 1) both; }
+.mw-steps li:nth-child(1) { animation-delay: 80ms; } .mw-steps li:nth-child(2) { animation-delay: 200ms; } .mw-steps li:nth-child(3) { animation-delay: 320ms; }
+.mw-steps li:nth-child(4) { animation-delay: 440ms; } .mw-steps li:nth-child(5) { animation-delay: 560ms; }
+.mw-num { font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--mw-muted); }
+.mw-label { font-size: 11px; font-weight: 650; line-height: 1.2; letter-spacing: .1em; text-transform: uppercase; color: var(--mw-copper); }
+.mw-steps strong { font-size: 16px; font-weight: 620; line-height: 1.3; letter-spacing: -.01em; text-wrap: balance; }
+.mw-steps p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--mw-muted); }
+.mw-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.mw-hint { font-size: 13px; color: var(--mw-muted); }
+@keyframes mw-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mw-steps li { animation: none; } }
+@media (max-width: 1100px) { .mw-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+  .mw-inner { padding: 20px 16px 40px; } .mw-hero { padding: 28px 0 18px; } .mw-gen { padding: 14px; }
+  .mw-steps { grid-template-columns: minmax(0, 1fr); } .mw-row label, .mw-row .mw-model select { flex: 1 1 100%; min-width: 0; }
+  .mw-generate, .mw-actions .mw-btn { width: 100%; margin-left: 0; }
+}
+</style>
+<div id="marvice-welcome" role="dialog" aria-modal="true" aria-labelledby="mw-title" hidden>
+  <div class="mw-inner">
+    <div class="mw-top">
+      <img class="mw-logo mw-logo-light" src="/web/design-system/opendesign-light.svg" alt="Marvice Motion" width="151" height="26">
+      <img class="mw-logo mw-logo-dark" src="/web/design-system/opendesign-dark.svg" alt="Marvice Motion" width="151" height="26">
+      <button type="button" class="mw-link" data-mw-close>Go to editor →</button>
+    </div>
+    <div class="mw-hero">
+      <p class="mw-eyebrow">Marvice | Motion</p>
+      <h1 id="mw-title">Full-Stack Video Generator</h1>
+      <p>Type a prompt to generate a realistic photo or video, or recreate any reference video with your own brand and copy, edit it shot by shot, and export an MP4.</p>
+    </div>
+
+    <section class="mw-gen" aria-label="Generate from a prompt">
+      <div class="mw-tabs" role="group" aria-label="What to generate">
+        <button type="button" data-kind="image" aria-pressed="true">Photo</button>
+        <button type="button" data-kind="video" aria-pressed="false">Video</button>
+      </div>
+      <div class="mw-starters" id="mw-starters" role="group" aria-label="Prompt starters"></div>
+      <label for="mw-prompt" class="mw-steps-title" style="display:block;margin-bottom:8px">Prompt</label>
+      <textarea id="mw-prompt" maxlength="4000" placeholder="A chef plating biryani in a busy Chennai restaurant kitchen, warm window light, shallow depth of field, shot on 35mm"></textarea>
+      <div class="mw-row">
+        <label class="mw-model">Model<select id="mw-model"></select></label>
+        <label>Shape<select id="mw-shape"><option value="16:9">16:9 Landscape</option><option value="9:16">9:16 Reel</option><option value="1:1">1:1 Square</option></select></label>
+        <label id="mw-length-field" hidden>Length<select id="mw-length"><option value="5">5 seconds</option><option value="10">10 seconds</option></select></label>
+        <label class="mw-check"><input type="checkbox" id="mw-real" checked> Realistic look</label>
+        <button type="button" class="mw-btn mw-generate" id="mw-generate">Generate</button>
+        <button type="button" class="mw-cancel" id="mw-cancel" hidden>Cancel</button>
+      </div>
+      <p class="mw-status" id="mw-status" role="status" aria-live="polite"></p>
+      <div class="mw-row" id="mw-keybox" hidden>
+        <label class="mw-model" style="flex:1 1 320px"><span id="mw-keylabel">fal.ai key</span><input type="password" id="mw-key" autocomplete="off" spellcheck="false" placeholder="Paste your fal.ai key" style="height:40px;padding:0 10px;background:var(--mw-field);color:var(--mw-text);border:1px solid var(--mw-border);border-radius:8px;font:14px system-ui,sans-serif"></label>
+        <button type="button" class="mw-btn" id="mw-savekey" disabled>Save key</button>
+      </div>
+      <div class="mw-results" id="mw-results"></div>
+    </section>
+
+    <p class="mw-steps-title">What Marvice Motion does</p>
+    <ol class="mw-steps">
+      <li><span class="mw-num">01</span><span class="mw-label">Motion MD</span><strong>A Style Your Agent Can Read.</strong><p>Reusable style rules—visuals, rhythm, layout, and assets—your agent can follow.</p></li>
+      <li><span class="mw-num">02</span><span class="mw-label">Resources</span><strong>100+ Brand Studies. 890+ Creative Resources.</strong><p>Brand-video studies, motion components, and editable templates to remix.</p></li>
+      <li><span class="mw-num">03</span><span class="mw-label">Quality</span><strong>99% Reconstruction Fidelity.</strong><p>Recreate a reference's shots, timing, and transitions with your own brand.</p></li>
+      <li><span class="mw-num">04</span><span class="mw-label">Create &amp; Edit</span><strong>Code Video with HTML. Fully Editable.</strong><p>Edit shots, timing, and media with your agent or in Studio, then export MP4.</p></li>
+      <li><span class="mw-num">05</span><span class="mw-label">BYOA &amp; BYOK</span><strong>Your Agent. Your Keys. Your Studio.</strong><p>Runs locally in your agent, with your own keys for image, video, music, and voice.</p></li>
+    </ol>
+    <div class="mw-actions">
+      <button type="button" class="mw-btn" data-mw-close>Start creating <span aria-hidden="true">→</span></button>
+      <span class="mw-hint">Opens the editor. Generated photos and videos are in its media library. Come back here at /?welcome.</span>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var el = document.getElementById("marvice-welcome");
+  var params = new URLSearchParams(location.search);
+  var direct = params.has("project") || location.hash.indexOf("#project/") === 0;
+  var seen = false;
+  try { seen = sessionStorage.getItem("marvice-welcome-seen") === "1"; } catch (e) {}
+  if (location.pathname !== "/" || direct || (seen && !params.has("welcome"))) { el.remove(); return; }
+  el.hidden = false;
+
+  function close() {
+    try { sessionStorage.setItem("marvice-welcome-seen", "1"); } catch (e) {}
+    el.remove();
+    document.removeEventListener("keydown", onKey, true);
+  }
+  function onKey(event) { if (event.key === "Escape") { event.stopPropagation(); close(); } }
+  el.querySelectorAll("[data-mw-close]").forEach(function (b) { b.addEventListener("click", close); });
+  document.addEventListener("keydown", onKey, true);
+  // Keep typing in the prompt from reaching the editor's keyboard shortcuts underneath.
+  ["keydown", "keyup", "keypress"].forEach(function (type) { el.addEventListener(type, function (e) { if (e.key !== "Escape") e.stopPropagation(); }); });
+
+  // Realistic models on fal.ai, added to OpenMotion's model list at build (openmotion/brand.mjs).
+  var MODELS = {
+    image: [["cloudflare:@cf/black-forest-labs/flux-2-klein-4b", "FLUX.2 Klein — free (Cloudflare, ~60–95 a day)"],
+            ["cloudflare:@cf/leonardo/lucid-origin", "Lucid Origin — most realistic free (Cloudflare, ~2 a day)"],
+            ["fal:fal-ai/flux-pro/v1.1-ultra", "FLUX 1.1 Pro Ultra — realistic (fal.ai credits)"],
+            ["fal:fal-ai/nano-banana-pro", "Nano Banana Pro — detailed prompts (fal.ai credits)"]],
+    video: [["fal:kling/v4/text-to-video", "Kling 4.0 — realistic, 1080p (fal.ai credits)"], ["fal:kling/v4/flash/text-to-video", "Kling 4.0 Flash — faster, 720p (fal.ai credits)"]]
+  };
+  // One-click starters for common client work; they fill the prompt and pick Photo or Video.
+  var STARTERS = [
+    ["Product shot", "image", "A matte black wireless earbud case on wet slate, water droplets, soft studio light from the left, clean dark background, commercial product photography"],
+    ["Food", "image", "Hyderabadi chicken biryani on a brass thali with raita and mirchi ka salan, steam rising, warm restaurant window light, 45-degree angle"],
+    ["Portrait", "image", "A confident Indian woman founder in her 30s in a modern Bengaluru office, natural window light, shallow depth of field, editorial portrait"],
+    ["Real estate", "image", "A sunlit modern 3BHK living room with floor-to-ceiling windows overlooking a green city skyline, warm evening light, wide-angle interior photo"],
+    ["Café reel", "video", "Slow push-in on a barista pouring latte art in a cosy Hyderabad café, morning light, handheld feel, shallow depth of field"],
+    ["Shoe ad", "video", "A running shoe splashing through a puddle on a rainy Mumbai street at night, neon reflections, slow motion, low-angle tracking shot"]
+  ];
+  // Added when "Realistic look" is on.
+  var REAL = { image: ", photorealistic, natural lighting, true-to-life skin and materials, shot on a full-frame camera, 50mm lens",
+               video: ", photorealistic live-action footage, natural motion and lighting, real camera movement, true-to-life detail" };
+  var kind = "image", busy = false, providers = {}, keyMessage = false, currentJob = null;
+  var cancel = document.getElementById("mw-cancel"), real = document.getElementById("mw-real"), starters = document.getElementById("mw-starters");
+  var prompt = document.getElementById("mw-prompt"), model = document.getElementById("mw-model"), shape = document.getElementById("mw-shape");
+  var lengthField = document.getElementById("mw-length-field"), length = document.getElementById("mw-length");
+  var button = document.getElementById("mw-generate"), status = document.getElementById("mw-status"), results = document.getElementById("mw-results");
+
+  function say(text, error) { status.textContent = text; status.classList.toggle("mw-error", !!error); }
+  function fillModels() {
+    model.innerHTML = "";
+    MODELS[kind].forEach(function (m) { var o = document.createElement("option"); o.value = m[0]; o.textContent = m[1]; model.appendChild(o); });
+    lengthField.hidden = kind !== "video";
+  }
+  function provider() { return model.value.split(":")[0]; }
+  function ready() { var p = providers[provider()]; return !p || p.available; }
+  function refreshButton() { button.disabled = busy || !ready() || !prompt.value.trim(); }
+  function setKind(next) {
+    if (busy || next === kind) return;
+    kind = next;
+    el.querySelectorAll(".mw-tabs button").forEach(function (t) { t.setAttribute("aria-pressed", String(t.dataset.kind === kind)); });
+    fillModels(); updateKeyUI();
+  }
+  el.querySelectorAll(".mw-tabs button").forEach(function (tab) { tab.addEventListener("click", function () { setKind(tab.dataset.kind); }); });
+  STARTERS.forEach(function (s) {
+    var chip = document.createElement("button"); chip.type = "button";
+    chip.textContent = s[0] + (s[1] === "video" ? " · video" : "");
+    chip.addEventListener("click", function () { if (busy) return; setKind(s[1]); prompt.value = s[2]; refreshButton(); prompt.focus(); });
+    starters.appendChild(chip);
+  });
+  prompt.addEventListener("input", refreshButton);
+  model.addEventListener("change", function () { updateKeyUI(); });
+  fillModels(); refreshButton();
+  function setBusy(on) {
+    busy = on; button.textContent = on ? "Generating…" : "Generate";
+    cancel.hidden = !on; cancel.disabled = false; refreshButton();
+    if (!on) currentJob = null;
+  }
+  function shown(text) { return [REAL.image, REAL.video].reduce(function (t, s) { return t.split(s).join(""); }, text); }
+
+  function api(path, options) {
+    return fetch("/motion-api/" + path, options).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error(data.error || ("Request failed (" + r.status + ")"));
+        return data;
+      });
+    });
+  }
+  // Provider keys: if the selected model's provider has no key (or it was rejected), show a box to paste
+  // one. It is saved on the server by OpenMotion's gateway (same call as its Model settings) and never
+  // sent back to the page. Cloudflare's key is "<account id>:<API token>".
+  var KEYS = {
+    fal: { label: "fal.ai key", placeholder: "Paste your fal.ai key", name: "fal.ai",
+      none: "No fal.ai key yet. Paste it below, or pick a free Cloudflare model.", rejected: "fal.ai rejected the saved key (wrong key or no credit). Paste a working key below, or pick a free Cloudflare model." },
+    cloudflare: { label: "Cloudflare key (account ID:API token)", placeholder: "account-id:api-token", name: "Cloudflare",
+      none: "Free Cloudflare models need your Cloudflare account ID and a Workers AI API token, pasted below as account-id:api-token.", rejected: "Cloudflare rejected the saved key. Paste account-id:api-token below (the token needs Workers AI permission)." }
+  };
+  var keybox = document.getElementById("mw-keybox"), keyInput = document.getElementById("mw-key"), saveKey = document.getElementById("mw-savekey"), keyLabel = document.getElementById("mw-keylabel");
+  function updateKeyUI() {
+    var id = provider(), p = providers[id], info = KEYS[id];
+    var missing = !!(p && !p.available && info);
+    keybox.hidden = !missing;
+    if (missing) {
+      keyLabel.textContent = info.label; keyInput.placeholder = info.placeholder;
+      say(p.verification === "rejected" ? info.rejected : info.none, true); keyMessage = true;
+    } else if (keyMessage && !busy) { say(""); keyMessage = false; }
+    refreshButton();
+  }
+  function checkProviders() {
+    return api("models/capabilities").then(function (s) {
+      (s.providers || []).forEach(function (p) { providers[p.id] = p; });
+      updateKeyUI();
+    });
+  }
+  keyInput.addEventListener("input", function () { saveKey.disabled = !keyInput.value.trim(); });
+  saveKey.addEventListener("click", function () {
+    var id = provider(), name = (KEYS[id] || {}).name || id;
+    saveKey.disabled = true; say("Saving key…");
+    api("models/providers/" + id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: keyInput.value.trim(), enabled: true }) })
+      .then(function () { keyInput.value = ""; return checkProviders(); })
+      .then(function () { if (ready()) { say("Key saved. " + name + " checks it on your first generation."); keyMessage = false; } })
+      .catch(function (error) { saveKey.disabled = !keyInput.value.trim(); say(error.message, true); });
+  });
+  checkProviders().catch(function () { /* Gateway still starting; the Generate call will report any problem. */ });
+  // Recent results (from here or the editor) stay visible after a reload.
+  api("generations").then(function (data) {
+    (data.jobs || []).filter(function (j) { return j.state === "completed" && j.modality !== "audio"; }).slice(0, 8).reverse()
+      .forEach(function (j) { (j.assets || []).forEach(function (a) { if (a.available !== false) addResult(j, a); }); });
+  }).catch(function () {});
+
+  function addResult(job, asset) {
+    var url = "/api/projects/" + encodeURIComponent(job.projectId) + "/preview/" + asset.path.split("/").map(encodeURIComponent).join("/");
+    var card = document.createElement("figure"); card.className = "mw-result"; card.style.margin = "0";
+    var media = document.createElement(asset.mimeType.indexOf("video/") === 0 ? "video" : "img");
+    media.src = url;
+    if (media.tagName === "VIDEO") { media.controls = true; media.playsInline = true; media.preload = "metadata"; } else { media.alt = job.prompt; media.loading = "lazy"; }
+    var bar = document.createElement("div"), caption = document.createElement("p"), link = document.createElement("a");
+    caption.textContent = shown(job.prompt); caption.title = shown(job.prompt);
+    link.href = url; link.download = asset.path.split("/").pop(); link.textContent = "Download";
+    bar.appendChild(caption); bar.appendChild(link); card.appendChild(media); card.appendChild(bar);
+    results.insertBefore(card, results.firstChild);
+  }
+  function poll(id, started) {
+    api("generations/" + id).then(function (data) {
+      var job = data.job, secs = Math.round((Date.now() - started) / 1000);
+      if (job.state === "completed") {
+        (job.assets || []).forEach(function (a) { addResult(job, a); });
+        say("Done in " + secs + "s. Saved to the project's media library.");
+        setBusy(false); return;
+      }
+      if (job.state === "cancelled") { say("Cancelled."); setBusy(false); return; }
+      if (job.state === "failed") throw new Error(job.error || "Generation failed");
+      var phase = { queued: "Queued", "provider-queue": "Waiting in fal.ai's queue", generating: "Generating", submitted: "Sent to fal.ai" }[job.phase] || "Working";
+      say(phase + "… " + secs + "s" + (job.modality === "video" ? " (videos usually take 1–5 minutes)" : ""));
+      setTimeout(function () { poll(id, started); }, 3000);
+    }).catch(function (error) {
+      setBusy(false); say(error.message, true);
+      // A rejected key flips fal to unavailable; show the key box again if so.
+      if (/401|403|rejected/i.test(error.message)) checkProviders().catch(function () {});
+    });
+  }
+  cancel.addEventListener("click", function () {
+    if (!currentJob) return;
+    cancel.disabled = true; say("Cancelling…");
+    api("generations/" + currentJob + "/cancel", { method: "POST" }).catch(function (error) { cancel.disabled = false; say(error.message, true); });
+  });
+  button.addEventListener("click", function () {
+    var text = prompt.value.trim(); if (!text || busy) return;
+    if (real.checked) text += REAL[kind];
+    var parameters = { aspect_ratio: shape.value };
+    if (kind === "video") parameters.duration = Number(length.value);
+    setBusy(true); cancel.disabled = true; say("Starting…");
+    var key = "mw-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    api("generations", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ modality: kind, model: model.value, prompt: text, parameters: parameters, idempotencyKey: key }) })
+      .then(function (data) { currentJob = data.job.id; cancel.disabled = false; poll(data.job.id, Date.now()); })
+      .catch(function (error) { setBusy(false); say(error.message, true); });
+  });
+  prompt.focus();
+})();
+</script>

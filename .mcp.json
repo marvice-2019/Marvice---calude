@@ -14,6 +14,13 @@
       "env": {
         "HOSTINGER_API_TOKEN": "${HOSTINGER_API_TOKEN}"
       }
+    },
+    "obscura": {
+      "command": "bash",
+      "args": ["deploy/obscura-live/claude-code/obscura-mcp.sh"],
+      "env": {
+        "OBSCURA_CDP_TOKEN": "${OBSCURA_CDP_TOKEN:-}"
+      }
     }
   }
 }

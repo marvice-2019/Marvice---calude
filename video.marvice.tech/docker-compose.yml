@@ -52,6 +52,24 @@ services:
       timeout: 5s
       start_period: 30s
 
+  # OpenMotion (reference-video remakes) at https://motion.marvice.tech, behind the same gate.
+  motion:
+    build:
+      context: .
+      dockerfile: openmotion/Dockerfile
+    restart: unless-stopped
+    environment:
+      ATLASCLOUD_API_KEY: ${ATLASCLOUD_API_KEY:-}
+      FAL_KEY: ${FAL_KEY:-}
+      # Free photo generation (Cloudflare Workers AI daily allowance); both are needed.
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      # Turns on https://motion.marvice.tech/mcp for AI tools (sent as a Bearer token).
+      MCP_API_KEY: ${MCP_API_KEY:-}
+    volumes:
+      - openmotion-data:/data
+    shm_size: "1gb"
+
   # Studio and the creator have no login of their own (they can read, write and
   # delete files and start renders), so they are only reachable through this gate.
   auth:
@@ -65,6 +83,22 @@ services:
     depends_on:
       - studio
       - creator
+      - motion
+    # Second public host for OpenMotion. Set here instead of in Coolify's Domains
+    # field; Coolify keeps custom labels and its Traefik picks them up.
+    labels:
+      - "traefik.http.routers.marvice-openmotion-https.rule=Host(`motion.marvice.tech`)"
+      - "traefik.http.routers.marvice-openmotion-https.entrypoints=https"
+      - "traefik.http.routers.marvice-openmotion-https.tls=true"
+      - "traefik.http.routers.marvice-openmotion-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.marvice-openmotion-https.service=marvice-openmotion"
+      - "traefik.http.routers.marvice-openmotion-http.rule=Host(`motion.marvice.tech`)"
+      - "traefik.http.routers.marvice-openmotion-http.entrypoints=http"
+      - "traefik.http.routers.marvice-openmotion-http.middlewares=marvice-openmotion-redirect"
+      - "traefik.http.middlewares.marvice-openmotion-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.marvice-openmotion-redirect.redirectscheme.permanent=true"
+      - "traefik.http.services.marvice-openmotion.loadbalancer.server.port=8080"
 
 volumes:
   hyperframes-projects:
+  openmotion-data:
