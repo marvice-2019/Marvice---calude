@@ -79,6 +79,45 @@
   .call .ph{width:62px;height:62px;border-radius:50%;background:var(--bronze);display:grid;place-items:center}
   .call .n{font-family:Anton;font-size:40px;letter-spacing:1px;color:var(--cream);line-height:1}
   .call .w{font-size:16px;letter-spacing:4px;color:var(--bronze);font-weight:700;margin-top:4px}
+
+  /* ===== Format variants (?f=sq|st|ls) ===== */
+  /* Square 1080x1080 — IG/FB feed, WhatsApp share */
+  html.sq body,html.sq .poster{width:1080px;height:1080px}
+  html.sq .logo{top:30px;padding:16px 32px 16px 44px}html.sq .logo img{height:70px}
+  html.sq .bf{top:34px;right:48px}html.sq .bf .k{font-size:64px}html.sq .bf .d{display:none}
+  html.sq .tape{top:178px;height:48px;font-size:24px}
+  html.sq .head{left:50px;top:286px}html.sq .head .l1{font-size:112px}html.sq .head .l2{font-size:50px}
+  html.sq .ticket{left:50px;top:492px;transform:rotate(-2deg) scale(.78);transform-origin:top left}
+  html.sq .char{width:480px;top:246px;right:-22px}
+  html.sq .badge-m{left:836px;top:740px;width:52px;height:52px;font-size:28px}
+  html.sq .feats{top:842px;left:50px;right:50px}html.sq .f{padding:12px 14px}html.sq .f .ic{width:44px;height:44px}html.sq .f h4{font-size:22px}html.sq .f p{font-size:13px}
+  html.sq .foot{height:118px;padding:0 50px}html.sq .foot .cta{font-size:36px}html.sq .call .n{font-size:32px}html.sq .call .ph{width:52px;height:52px}
+
+  /* Story 1080x1920 — IG/FB stories, reels cover, WhatsApp status (top/bottom 250px kept clear) */
+  html.st body,html.st .poster{width:1080px;height:1920px}
+  html.st .logo{top:230px}html.st .bf{top:236px}
+  html.st .tape{top:500px}
+  html.st .head{top:610px}
+  html.st .ticket{top:900px}
+  html.st .char{width:660px;top:690px;right:-40px}
+  html.st .badge-m{left:760px;top:1330px}
+  html.st .feats{top:1460px}
+  html.st .foot{bottom:auto;top:1590px;height:140px;background:transparent}
+  html.st .foot .cta{color:var(--bronze)}html.st .foot .cta small{color:var(--cream)}
+
+  /* Landscape 1200x628 — FB/LinkedIn link ads, Google display, website banner */
+  html.ls body,html.ls .poster{width:1200px;height:628px}
+  html.ls .tape{display:none}
+  html.ls .logo{top:22px;padding:12px 28px 12px 36px}html.ls .logo img{height:54px}
+  html.ls .bf{top:24px;right:36px}html.ls .bf .k{font-size:50px}html.ls .bf .d{font-size:12px;letter-spacing:3px}
+  html.ls .head{left:40px;top:134px}html.ls .head .l1{font-size:96px}html.ls .head .l2{font-size:42px}
+  html.ls .ticket{left:40px;top:302px;transform:rotate(-2deg) scale(.6);transform-origin:top left}
+  html.ls .char{width:400px;top:96px;right:auto;left:440px}
+  html.ls .badge-m{left:612px;top:474px;width:46px;height:46px;font-size:26px}
+  html.ls .feats{left:auto;right:36px;top:170px;width:330px;grid-template-columns:1fr;gap:10px}
+  html.ls .f{padding:10px 14px}html.ls .f .ic{width:40px;height:40px}html.ls .f h4{font-size:21px}html.ls .f p{font-size:12px}
+  html.ls .foot{height:84px;padding:0 36px}html.ls .foot .cta{font-size:30px}html.ls .foot .cta small{font-size:12px;margin-top:4px}
+  html.ls .call{padding:8px 22px 8px 8px}html.ls .call .ph{width:46px;height:46px}html.ls .call .n{font-size:28px}html.ls .call .w{font-size:12px}
 </style>
 </head>
 <body>
@@ -126,6 +165,6 @@
     </div>
   </div>
 </div>
-<script>if(location.search.includes("hd"))document.body.style.zoom=2</script>
+<script>var q=new URLSearchParams(location.search);if(q.get("f"))document.documentElement.classList.add(q.get("f"));if(q.has("hd"))document.body.style.zoom=2</script>
 </body>
 </html>
