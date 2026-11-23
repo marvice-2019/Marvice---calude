@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Marvice Black Friday 3999</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;700;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0F0D0B; --ink2:#1B1714; --bronze:#C08A5B; --bronze-d:#9A6A40; --cream:#F4ECE2; --red:#E2412B;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{width:1080px;height:1350px;background:var(--ink);font-family:Archivo,sans-serif;color:var(--cream);overflow:hidden}
+  .poster{position:relative;width:1080px;height:1350px;overflow:hidden;
+    background:
+      radial-gradient(700px 600px at 78% 52%, rgba(192,138,91,.28), transparent 70%),
+      radial-gradient(500px 400px at 10% 95%, rgba(192,138,91,.12), transparent 70%),
+      var(--ink);}
+  /* grain */
+  .poster:before{content:"";position:absolute;inset:0;opacity:.09;pointer-events:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");}
+  /* diagonal sale tape */
+  .tape{position:absolute;left:-60px;top:262px;width:1300px;height:58px;background:var(--bronze);transform:rotate(-4deg);
+    display:flex;align-items:center;gap:34px;white-space:nowrap;font-family:Anton;font-size:30px;letter-spacing:3px;color:var(--ink);
+    box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:3;padding-left:40px}
+  .tape i{font-style:normal;opacity:.55}
+
+  .logo{position:absolute;left:0;top:44px;background:#fff;padding:22px 40px 22px 56px;border-radius:0 80px 80px 0;z-index:5;
+    box-shadow:0 14px 40px rgba(0,0,0,.4)}
+  .logo img{height:92px;display:block}
+
+  .bf{position:absolute;right:56px;top:54px;text-align:right;z-index:5}
+  .bf .k{font-family:Anton;font-size:86px;line-height:.86;letter-spacing:1px;color:var(--cream)}
+  .bf .k span{color:var(--bronze)}
+  .bf .d{margin-top:10px;font-weight:700;font-size:17px;letter-spacing:5px;color:var(--bronze)}
+
+  .head{position:absolute;left:60px;top:372px;z-index:4}
+  .head .l1{font-family:Anton;font-size:150px;line-height:.9;color:var(--cream);letter-spacing:1px}
+  .head .l2{font-family:Anton;font-size:66px;line-height:1;color:var(--bronze);letter-spacing:1px;margin-top:6px}
+  .head .l2 b{font-weight:400;color:var(--ink);background:var(--cream);padding:0 14px;margin-left:6px;border-radius:6px}
+
+  /* price ticket */
+  .ticket{position:absolute;left:60px;top:650px;width:500px;z-index:4;background:var(--cream);color:var(--ink);
+    border-radius:22px;padding:26px 30px 24px;transform:rotate(-2deg);box-shadow:0 24px 50px rgba(0,0,0,.5)}
+  .ticket:before,.ticket:after{content:"";position:absolute;top:50%;width:36px;height:36px;border-radius:50%;background:var(--ink);transform:translateY(-50%)}
+  .ticket:before{left:-18px}.ticket:after{right:-18px}
+  .was{display:flex;align-items:center;gap:14px;font-weight:700;font-size:22px;letter-spacing:2px;color:#6b5e52}
+  .was s{font-family:Anton;font-size:44px;letter-spacing:1px;color:#2a221c;text-decoration:none;position:relative}
+  .was s:after{content:"";position:absolute;left:-6px;right:-6px;top:50%;height:3px;background:var(--red);transform:rotate(-8deg);border-radius:3px}
+  .now{display:flex;align-items:flex-end;gap:12px;margin-top:2px}
+  .now .p{font-family:Anton;font-size:150px;line-height:.92;letter-spacing:-1px}
+  .now .p sup{font-size:84px;vertical-align:top;position:relative;top:14px;margin-right:4px}
+  .now .g{font-weight:700;font-size:22px;letter-spacing:1px;margin-bottom:20px;color:#6b5e52}
+  .perforation{border-top:3px dashed #cbbcaa;margin:14px -6px 12px}
+  .only{font-weight:900;font-size:19px;letter-spacing:1px}
+  .slots{display:flex;gap:7px;margin-top:10px}
+  .slots span{width:17px;height:24px;border:2.5px solid var(--ink);border-radius:4px}
+  .slots span:nth-child(-n+0){background:var(--ink)}
+  .off{position:absolute;right:-30px;top:-46px;width:132px;height:132px;border-radius:50%;background:var(--red);color:#fff;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(12deg);
+    font-family:Anton;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+  .off b{font-weight:400;font-size:52px;line-height:.9}.off small{font-size:20px;letter-spacing:3px}
+
+  .char{position:absolute;right:-10px;top:520px;width:560px;z-index:3}
+
+  .note{position:absolute;right:300px;top:604px;font-family:Caveat;font-size:40px;color:var(--bronze);transform:rotate(-7deg);z-index:4;line-height:1}
+  .note svg{display:block;margin:4px 0 0 150px}
+
+  .feats{position:absolute;left:60px;right:60px;top:1060px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;z-index:4}
+  .f{background:var(--ink2);border:1.5px solid rgba(192,138,91,.45);border-radius:16px;padding:18px 18px;display:flex;gap:14px;align-items:center}
+  .f .ic{width:52px;height:52px;flex:none;border-radius:12px;background:var(--bronze);display:grid;place-items:center}
+  .f h4{font-family:Anton;font-weight:400;font-size:27px;letter-spacing:.5px;line-height:1}
+  .f p{font-size:15px;color:#bfb2a4;margin-top:5px;font-weight:500}
+
+  .foot{position:absolute;left:0;right:0;bottom:0;height:150px;background:var(--bronze);display:flex;align-items:center;justify-content:space-between;padding:0 60px;z-index:4}
+  .foot .cta{font-family:Anton;font-size:44px;color:var(--ink);line-height:1}
+  .foot .cta small{display:block;font-family:Archivo;font-weight:700;font-size:16px;letter-spacing:3px;margin-top:8px;opacity:.75}
+  .call{display:flex;align-items:center;gap:16px;background:var(--ink);border-radius:80px;padding:14px 30px 14px 14px}
+  .call .ph{width:62px;height:62px;border-radius:50%;background:var(--bronze);display:grid;place-items:center}
+  .call .n{font-family:Anton;font-size:40px;letter-spacing:1px;color:var(--cream);line-height:1}
+  .call .w{font-size:16px;letter-spacing:4px;color:var(--bronze);font-weight:700;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="poster">
+
+  <div class="logo"><img src="marvice-logo.png" alt="Marvice"></div>
+
+  <div class="bf">
+    <div class="k">BLACK<br><span>FRIDAY</span></div>
+    <div class="d">SALE · LIMITED SLOTS</div>
+  </div>
+
+  <div class="tape">BLACK FRIDAY <i>✦</i> 90% OFF <i>✦</i> LIVE IN 1 DAY <i>✦</i> FIRST 20 ONLY <i>✦</i> BLACK FRIDAY <i>✦</i> 90% OFF <i>✦</i> LIVE IN 1 DAY <i>✦</i> FIRST 20 ONLY</div>
+
+  <div class="head">
+    <div class="l1">WEBSITE</div>
+    <div class="l2">DEVELOPMENT <b>+ SEO</b></div>
+  </div>
+
+  <div class="ticket">
+    <div class="off"><b>90%</b><small>OFF</small></div>
+    <div class="was">ACTUAL PRICE <s>₹40,000</s></div>
+    <div class="now"><div class="p"><sup>₹</sup>3,999</div><div class="g">+ GST</div></div>
+    <div class="perforation"></div>
+    <div class="only">ONLY FOR THE FIRST 20 WEBSITES</div>
+    <div class="slots"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  </div>
+
+
+  <!-- Character: hand-drawn SVG -->
+  <svg class="char" viewBox="0 0 540 520" xmlns="http://www.w3.org/2000/svg">
+    <!-- stopwatch bubble -->
+    <g transform="translate(450 96)">
+      <circle r="54" fill="#F4ECE2"/>
+      <rect x="-10" y="-70" width="20" height="14" rx="3" fill="#F4ECE2"/>
+      <circle r="44" fill="none" stroke="#0F0D0B" stroke-width="5"/>
+      <path d="M0 0 L0 -30" stroke="#0F0D0B" stroke-width="6" stroke-linecap="round"/>
+      <path d="M0 0 L20 12" stroke="#E2412B" stroke-width="6" stroke-linecap="round"/>
+      <circle r="6" fill="#0F0D0B"/>
+      <text y="80" text-anchor="middle" font-family="Anton" font-size="26" fill="#F4ECE2" letter-spacing="1">24 HRS</text>
+    </g>
+
+    <!-- raised arm (thumbs up) -->
+    <path d="M150 330 C 120 280, 104 220, 100 170" stroke="#5A4D45" stroke-width="58" stroke-linecap="round" fill="none"/>
+    <path d="M104 196 L 100 176" stroke="#C08A5B" stroke-width="60" fill="none"/>
+    <g transform="translate(100 140) rotate(-6)">
+      <rect x="-34" y="-20" width="68" height="62" rx="20" fill="#C98B62"/>
+      <rect x="-14" y="-74" width="26" height="62" rx="13" fill="#C98B62"/>
+      <path d="M-30 2 H26 M-30 20 H26" stroke="#A86F4A" stroke-width="4" stroke-linecap="round"/>
+    </g>
+
+    <!-- body / hoodie -->
+    <path d="M110 520 C 112 400, 150 330, 270 318 C 390 330, 428 400, 430 520 Z" fill="#5A4D45" stroke="#6E5F55" stroke-width="3"/>
+    <path d="M200 330 C 220 380, 320 380, 340 330 C 310 318, 230 318, 200 330 Z" fill="#3F3530"/>
+    <path d="M232 352 L226 430 M308 352 L314 430" stroke="#F4ECE2" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="226" cy="434" r="6" fill="#C08A5B"/><circle cx="314" cy="434" r="6" fill="#C08A5B"/>
+    <!-- tee -->
+    <path d="M238 336 Q 270 372 302 336 L 296 322 Q 270 340 244 322 Z" fill="#E9E0D4"/>
+    <!-- neck -->
+    <rect x="248" y="280" width="44" height="50" rx="14" fill="#B57A54"/>
+
+    <!-- head -->
+    <circle cx="186" cy="198" r="20" fill="#C98B62"/><circle cx="354" cy="198" r="20" fill="#C98B62"/>
+    <ellipse cx="270" cy="190" rx="86" ry="100" fill="#C98B62"/>
+    <!-- beard -->
+    <path d="M186 196 C 186 278, 228 300, 270 300 C 312 300, 354 278, 354 196 C 340 232, 326 246, 300 246 C 284 236, 256 236, 240 246 C 214 246, 200 232, 186 196 Z" fill="#2E211A"/>
+    <!-- smile -->
+    <path d="M238 250 Q 270 284 302 250 Q 270 262 238 250 Z" fill="#fff"/>
+    <!-- hair -->
+    <path d="M178 196 C 160 112, 206 52, 278 54 C 352 50, 384 112, 362 190 C 356 152, 338 128, 310 122 C 288 110, 238 108, 212 124 C 194 136, 184 162, 178 196 Z" fill="#2E211A"/>
+    <path d="M226 70 C 250 46, 302 40, 336 60" stroke="#4A372B" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <!-- brows -->
+    <path d="M214 158 Q 234 146 256 154" stroke="#2E211A" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <path d="M286 152 Q 308 144 328 156" stroke="#2E211A" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <!-- eyes -->
+    <ellipse cx="234" cy="190" rx="15" ry="17" fill="#fff"/><ellipse cx="306" cy="190" rx="15" ry="17" fill="#fff"/>
+    <circle cx="238" cy="192" r="8" fill="#1a1410"/><circle cx="310" cy="192" r="8" fill="#1a1410"/>
+    <circle cx="241" cy="188" r="2.6" fill="#fff"/><circle cx="313" cy="188" r="2.6" fill="#fff"/>
+    <!-- glasses -->
+    <rect x="200" y="166" width="66" height="50" rx="16" fill="none" stroke="#0F0D0B" stroke-width="7"/>
+    <rect x="274" y="166" width="66" height="50" rx="16" fill="none" stroke="#0F0D0B" stroke-width="7"/>
+    <path d="M266 186 Q 270 180 274 186" stroke="#0F0D0B" stroke-width="6" fill="none"/>
+    <path d="M200 180 L186 176 M340 180 L354 176" stroke="#0F0D0B" stroke-width="6" stroke-linecap="round"/>
+    <!-- nose -->
+    <path d="M268 206 Q 262 226 272 230" stroke="#A86F4A" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+    <!-- laptop (back facing viewer) -->
+    <path d="M150 520 L 176 388 L 424 388 L 450 520 Z" fill="#D8D2CA"/>
+    <path d="M176 388 L 424 388 L 428 404 L 172 404 Z" fill="#EDE8E1"/>
+    <!-- sticker -->
+    <g transform="translate(300 456) rotate(-8)">
+      <rect x="-62" y="-26" width="124" height="52" rx="12" fill="#C08A5B"/>
+      <text y="12" text-anchor="middle" font-family="Anton" font-size="32" fill="#0F0D0B" letter-spacing="2">SEO ✓</text>
+    </g>
+    <circle cx="210" cy="478" r="16" fill="#0F0D0B"/><text x="210" y="485" text-anchor="middle" font-family="Anton" font-size="18" fill="#C08A5B">M</text>
+    <!-- resting hand on laptop -->
+    <ellipse cx="404" cy="392" rx="30" ry="16" fill="#C98B62"/>
+  </svg>
+
+  <div class="feats">
+    <div class="f"><div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F0D0B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></div><div><h4>LIVE IN 1 DAY</h4><p>Development done in 24 hours</p></div></div>
+    <div class="f"><div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F0D0B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div><div><h4>FULLY CUSTOM</h4><p>Your brand, your colours, your content</p></div></div>
+    <div class="f"><div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F0D0B" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 11l2 2 3.5-4"/></svg></div><div><h4>SEO-READY</h4><p>Built to rank on Google from day one</p></div></div>
+  </div>
+
+  <div class="foot">
+    <div class="cta">CLAIM YOUR SLOT<small>BEFORE ALL 20 ARE GONE</small></div>
+    <div class="call">
+      <div class="ph"><svg width="30" height="30" viewBox="0 0 24 24" fill="#0F0D0B"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.6a1 1 0 0 1-.25 1z"/></svg></div>
+      <div><div class="n">+91 80562 91930</div><div class="w">WWW.MARVICE.IN</div></div>
+    </div>
+  </div>
+</div>
+<script>if(location.search.includes("hd"))document.body.style.zoom=2</script>
+</body>
+</html>
