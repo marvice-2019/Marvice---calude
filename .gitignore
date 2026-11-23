@@ -33,5 +33,7 @@ video.marvice.tech/brag-output/work/
 .locks/
 design-log/
 .prodscope/
+# Video frame scratch for poster renders
+posters/*/_frames/
 # Browser MCP tool scratch (screenshots, page logs)
 .playwright-mcp/
