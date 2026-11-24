@@ -251,23 +251,146 @@
     on(items[0].dataset.y);
   }
 
-  // ---------------------------------------------------------------- contact form
-  const form = $("#enquiry");
-  if (form) {
-    const pre = new URLSearchParams(location.search).get("product");
-    const sel = $('select[name="product"]', form);
-    if (pre && [...sel.options].some((o) => o.text === pre)) sel.value = pre;
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      let ok = true;
-      $$("[required]", form).forEach((el) => { const bad = !el.value.trim() || (el.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value)); el.setAttribute("aria-invalid", String(bad)); if (bad) ok = false; });
-      const note = $(".form__note", form);
-      if (!ok) { note.textContent = "Please add your name and a valid email address."; $('[aria-invalid="true"]', form).focus(); return; }
-      const d = Object.fromEntries(new FormData(form));
-      const body = [`Name: ${d.name}`, `Company: ${d.company}`, `Email: ${d.email}`, `Phone: ${d.phone}`, `Product: ${d.product}`, `Airflow (CFM): ${d.cfm}`, `City: ${d.city}`, `Quantity: ${d.qty}`, "", d.msg].join("\n");
-      location.href = `mailto:sales@luftek.in?subject=${encodeURIComponent(`Selection request: ${d.product} — ${d.company || d.name}`)}&body=${encodeURIComponent(body)}`;
-      note.textContent = "Your email app should now be open with the request filled in.";
+  // ---------------------------------------------------------------- lead tracking (first-touch source, kept for the session)
+  try {
+    if (!sessionStorage.getItem("lf_src")) {
+      const q = new URLSearchParams(location.search), src = {};
+      ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid"].forEach((k) => q.get(k) && (src[k] = q.get(k)));
+      src.landing = location.pathname; src.referrer = document.referrer || "direct";
+      sessionStorage.setItem("lf_src", JSON.stringify(src));
+    }
+  } catch (_) { /* storage blocked: source simply not attached */ }
+
+  // ---------------------------------------------------------------- lead form (multi-step)
+  const CFM_MIN = Math.log10(200), CFM_MAX = Math.log10(42000);
+  const toCfm = (v) => { const raw = Math.pow(10, CFM_MIN + (CFM_MAX - CFM_MIN) * (v / 1000)); const st = raw < 1000 ? 50 : raw < 10000 ? 100 : 500; return Math.round(raw / st) * st; };
+  const LABELS = { category: "Category", product: "Unit", application: "Application", airflow: "Airflow", quantity: "Quantity", city: "City", timeline: "Timeline", name: "Name", company: "Company", email: "Email", phone: "Mobile", role: "Role" };
+
+  function initLead(form) {
+    const steps = $$(".lf__step", form), rail = $$(".lf__rail li", form), bar = $(".lf__bar i", form);
+    const back = $("[data-back]", form), next = $("[data-next]", form), submit = $("[data-submit]", form);
+    const prodWrap = $(".lf__prod", form), prodChips = $("[data-prodchips]", form);
+    const PRODS = JSON.parse(form.dataset.products), sumEl = $("[data-summary]", form), sumBox = $(".lf__sum", form);
+    const range = $("[data-cfm]", form), cfmOut = $("[data-cfm-out]", form), unknown = $("[data-cfm-unknown]", form), air = $(".lf__air", form);
+    let at = 0;
+    const touched = new Set();
+
+    const val = (n) => { const el = form.elements[n]; if (!el) return ""; if (el instanceof RadioNodeList) return el.value; return el.type === "checkbox" ? el.checked : el.value.trim(); };
+    const data = () => ({
+      category: val("category"), product: val("product"), application: val("application"),
+      airflow: unknown.checked ? "Not known yet" : `${fmt(toCfm(+range.value))} CFM`, quantity: val("quantity"), city: val("city"), project: val("project"),
+      timeline: val("timeline"), name: val("name"), company: val("company"), email: val("email"), phone: val("phone"), role: val("role"), message: val("message"),
     });
+    const renderSummary = () => {
+      const d = data(), keys = ["category", "product", "application", "airflow", "quantity", "city", "timeline"];
+      const rows = keys.filter((k) => d[k] && (!["airflow", "quantity"].includes(k) || touched.has(k))).map((k) => `<div><dt>${LABELS[k]}</dt><dd>${esc(d[k])}</dd></div>`);
+      sumEl.innerHTML = rows.join("") || "<div><dt>Category</dt><dd>—</dd></div>";
+      sumBox.dataset.mini = [d.product || d.category, d.application, touched.has("airflow") ? d.airflow : ""].filter(Boolean).join(" · ") || "Start by choosing a category";
+    };
+    const show = (n) => {
+      at = n;
+      steps.forEach((s, k) => (s.hidden = k !== n));
+      rail.forEach((li, k) => { li.classList.toggle("is-done", k < n); k === n ? li.setAttribute("aria-current", "step") : li.removeAttribute("aria-current"); });
+      bar.style.width = `${((n + 1) / steps.length) * 100}%`;
+      back.hidden = n === 0; next.hidden = n === steps.length - 1; submit.hidden = n !== steps.length - 1;
+      if (n === steps.length - 1) review();
+      const lg = $("legend", steps[n]); if (lg && form.contains(document.activeElement)) { lg.setAttribute("tabindex", "-1"); lg.focus({ preventScroll: true }); }
+      const top = form.closest(".lfd__panel") || null;
+      if (top) top.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" }); else if (form.getBoundingClientRect().top < 80) form.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    };
+    const fail = (stepEl, msg, el) => { $(".lf__err", stepEl).textContent = msg; if (el) { el.setAttribute("aria-invalid", "true"); el.focus(); } return false; };
+    const check = (n) => {
+      const s = steps[n]; $$(".lf__err", s).forEach((x) => (x.textContent = "")); $$("[aria-invalid]", s).forEach((x) => x.removeAttribute("aria-invalid"));
+      if (n === 0 && !val("category")) return fail(s, "Choose a category to continue.");
+      if (n === 2) {
+        if (!val("name")) return fail(s, "Please add your name.", form.elements.name);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val("email"))) return fail(s, "Please add a valid email address.", form.elements.email);
+        if (val("phone").replace(/\D/g, "").length < 10) return fail(s, "Please add a mobile number with at least 10 digits.", form.elements.phone);
+        if (!val("consent")) return fail(s, "Please tick the consent box so we can contact you.");
+      }
+      return true;
+    };
+    const review = () => {
+      const d = data(), order = [["category", 0], ["product", 0], ["application", 1], ["airflow", 1], ["quantity", 1], ["city", 1], ["timeline", 1], ["name", 2], ["company", 2], ["email", 2], ["phone", 2], ["role", 2]];
+      $("[data-review]", form).innerHTML = order.filter(([k]) => d[k]).map(([k, st]) => `<div><dt>${LABELS[k]}</dt><dd>${esc(d[k])}</dd><button type="button" data-goto="${st}">Edit</button></div>`).join("");
+    };
+
+    form.addEventListener("change", (e) => {
+      if (e.target.name === "category") {
+        const fam = e.target.dataset.fam, list = PRODS[fam] || [];
+        prodWrap.hidden = !list.length;
+        prodChips.innerHTML = list.map((n) => `<label class="lf-chip"><input type="radio" name="product" value="${esc(n)}"><span>${esc(n)}</span></label>`).join("");
+        $(".lf__err", steps[0]).textContent = "";
+      }
+      renderSummary();
+    });
+    form.addEventListener("input", (e) => { if (e.target.name === "quantity") touched.add("quantity"); renderSummary(); });
+    range.addEventListener("input", () => { touched.add("airflow"); cfmOut.textContent = fmt(toCfm(+range.value)); renderSummary(); });
+    unknown.addEventListener("change", () => { touched.add("airflow"); air.classList.toggle("is-off", unknown.checked); range.disabled = unknown.checked; renderSummary(); });
+    $$("[data-q]", form).forEach((b) => b.addEventListener("click", () => { touched.add("quantity"); const q = form.elements.quantity; q.value = Math.max(1, Math.min(999, (parseInt(q.value, 10) || 1) + +b.dataset.q)); renderSummary(); }));
+    next.addEventListener("click", () => { if (check(at)) show(at + 1); });
+    back.addEventListener("click", () => show(at - 1));
+    form.addEventListener("click", (e) => { const g = e.target.closest("[data-goto]"); if (g) show(+g.dataset.goto); });
+    form.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "checkbox" && at < steps.length - 1) { e.preventDefault(); next.click(); } });
+
+    const done = (ref, fallback) => {
+      $(".lf__nav", form).hidden = true; steps.forEach((s) => (s.hidden = true)); $(".lf__rail", form).hidden = true; $(".lf__bar", form).hidden = true;
+      $("[data-ref]", form).textContent = ref; $("[data-fallback]", form).hidden = !fallback; $(".lf__done", form).hidden = false;
+    };
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!check(2)) { show(2); check(2); return; }
+      if (val("website")) { done("LFT-000000-0000", false); return; } // honeypot: silently accept bots
+      const d = data(), now = new Date();
+      const ref = `LFT-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${Math.floor(1000 + Math.random() * 9000)}`;
+      let src = {}; try { src = JSON.parse(sessionStorage.getItem("lf_src") || "{}"); } catch (_) { /* no source */ }
+      const payload = { ref, ...d, page: location.href, source: src, submitted_at: now.toISOString() };
+      const ep = form.dataset.endpoint;
+      submit.setAttribute("aria-busy", "true");
+      if (ep) {
+        try {
+          const r = await fetch(ep, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+          if (!r.ok) throw new Error(r.status);
+          submit.removeAttribute("aria-busy"); done(ref, false); return;
+        } catch (_) { /* network or endpoint error: fall back to email so the lead is not lost */ }
+      }
+      const body = [`Reference: ${ref}`, "", ...Object.entries(LABELS).map(([k, l]) => `${l}: ${d[k] || "-"}`), `Project: ${d.project || "-"}`, "", d.message || "", "", `Page: ${location.href}`, `Source: ${src.utm_source || src.referrer || "-"} ${src.utm_campaign ? "/ " + src.utm_campaign : ""}`].join("\n");
+      location.href = `mailto:sales@luftek.in?subject=${encodeURIComponent(`Selection request ${ref}: ${d.product || d.category} - ${d.company || d.name}`)}&body=${encodeURIComponent(body)}`;
+      submit.removeAttribute("aria-busy"); done(ref, true);
+    });
+    $("[data-reset]", form).addEventListener("click", () => {
+      form.reset(); touched.clear(); prodWrap.hidden = true; air.classList.remove("is-off"); range.disabled = false; cfmOut.textContent = fmt(toCfm(+range.value));
+      $(".lf__done", form).hidden = true; $(".lf__nav", form).hidden = false; $(".lf__rail", form).hidden = false; $(".lf__bar", form).hidden = false; renderSummary(); show(0);
+    });
+
+    form.preset = (product) => {
+      if (!product) return;
+      const fam = Object.keys(PRODS).find((k) => PRODS[k].includes(product));
+      const cat = fam && $(`input[name="category"][data-fam="${fam}"]`, form);
+      if (cat) { cat.checked = true; cat.dispatchEvent(new Event("change", { bubbles: true })); const p = $(`input[name="product"][value="${CSS.escape(product)}"]`, form); if (p) p.checked = true; renderSummary(); }
+    };
+    renderSummary(); show(0);
+    return form;
+  }
+  const leadForms = $$("[data-lead]").map(initLead);
+  const pagePreset = new URLSearchParams(location.search).get("product");
+  const pageForm = leadForms.find((f) => f.classList.contains("lf--page"));
+  if (pageForm && pagePreset) pageForm.preset(pagePreset);
+
+  // Slide-in drawer: every "Request a selection" link opens the form in place
+  const lfd = $("#leaddrawer");
+  if (lfd) {
+    const dForm = $("[data-lead]", lfd); let ret = null;
+    const open = (product) => { ret = document.activeElement; lfd.hidden = false; document.body.style.overflow = "hidden"; dForm.preset(product); setTimeout(() => $(".lfd__x", lfd).focus(), 50); };
+    const close = () => { lfd.hidden = true; document.body.style.overflow = ""; ret && ret.focus(); };
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest('a[href*="contact.html"]');
+      if (!a || e.metaKey || e.ctrlKey || a.closest(".foot, .drawer__c, .hdr__nav")) return;
+      e.preventDefault(); if (!drawer.hidden) burger.click(); open(new URL(a.href, location.href).searchParams.get("product"));
+    });
+    $(".lfd__x", lfd).addEventListener("click", close);
+    lfd.addEventListener("click", (e) => { if (e.target === lfd) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !lfd.hidden) close(); });
   }
 
   // ---------------------------------------------------------------- reveal on scroll

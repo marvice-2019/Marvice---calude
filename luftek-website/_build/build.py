@@ -9,7 +9,7 @@ import os
 from html import escape as e
 from urllib.parse import quote
 
-from data import CATEGORY, EN502, FAMILIES, OFFICES, PRODUCTS, PROJECTS, SECTORS, TIMELINE
+from data import CATEGORY, EN502, FAMILIES, LEAD_ENDPOINT, OFFICES, PRODUCTS, PROJECTS, SECTORS, TIMELINE
 
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BY_KEY = {p["key"]: p for p in PRODUCTS}
@@ -152,7 +152,7 @@ def header(root, active):
 """
 
 
-def footer(root):
+def footer(root, drawer=True):
     prods = "".join(f'<li><a href="{curl(root, fk)}">{f["name"]}</a></li>' for fk, f in FAMILIES.items())
     return f"""<section class="cta-band">
   <div class="wrap cta-band__in">
@@ -199,6 +199,7 @@ def footer(root):
   <figure class="lb__fig"><img alt=""><figcaption></figcaption></figure>
   <button class="lb__nav lb__next" aria-label="Next">{I['right']}</button>
 </div>
+{lead_drawer(root) if drawer else ''}
 <script src="{root}assets/js/main.js" defer></script>
 </body>
 </html>
@@ -219,6 +220,111 @@ def page_hero(crumbs, title, lede, root, img_name=None, dark=True, aside=""):
     {f'<div class="ph__aside">{aside}</div>' if aside else ''}
   </div>
 </section>"""
+
+
+def lead_form(root, mode):
+    """Multi-step selection request. mode = 'page' (contact page) or 'drawer' (slide-in on every page)."""
+    x = mode[0]  # id prefix keeps ids unique if both ever render
+    cats = "".join(f"""<label class="lf-card"><input type="radio" name="category" value="{f['name']}" data-fam="{fk}" required>
+      <span class="lf-card__img">{img(root, f['img'], '')}</span><b>{f['name']}</b><small>{sum(1 for p in PRODUCTS if p['fam'] == fk)} product line{'s' if sum(1 for p in PRODUCTS if p['fam'] == fk) > 1 else ''}</small></label>""" for fk, f in FAMILIES.items())
+    cats += f"""<label class="lf-card lf-card--q"><input type="radio" name="category" value="Not sure yet" data-fam="" required><span class="lf-card__img lf-card__q">?</span><b>Not sure yet</b><small>Our engineers will advise</small></label>"""
+    prods = json.dumps({fk: [p["name"] for p in PRODUCTS if p["fam"] == fk] for fk in FAMILIES})
+    apps = "".join(f'<label class="lf-chip"><input type="radio" name="application" value="{a}"><span>{a}</span></label>' for a in
+                   ["Hospital", "Pharma", "Commercial / IT", "Industrial", "Hotel / residential", "Education", "Airport", "Other"])
+    times = "".join(f'<label class="lf-chip"><input type="radio" name="timeline" value="{a}"><span>{a}</span></label>' for a in
+                    ["Immediate", "1 – 3 months", "3 – 6 months", "Planning stage"])
+    roles = "".join(f'<label class="lf-chip"><input type="radio" name="role" value="{a}"><span>{a}</span></label>' for a in
+                    ["Consultant", "Contractor", "Building owner", "Other"])
+    steps = ["Requirement", "Project", "Contact", "Review"]
+    rail = "".join(f'<li data-step="{i}"{" aria-current=step" if i == 0 else ""}><span>{i + 1}</span>{t}</li>' for i, t in enumerate(steps))
+    return f"""<form class="lf lf--{mode}" novalidate data-lead data-endpoint="{e(LEAD_ENDPOINT)}" data-products='{prods}' data-root="{root}">
+  <div class="lf__main">
+    <ol class="lf__rail" aria-label="Progress">{rail}</ol>
+    <div class="lf__bar"><i></i></div>
+
+    <fieldset class="lf__step" data-step="0">
+      <legend>What do you need?</legend>
+      <p class="lf__hint">Choose a category. You can pick the exact unit next.</p>
+      <div class="lf-cards">{cats}</div>
+      <div class="lf__prod" hidden><p class="lf__label">Specific unit <span>(optional)</span></p><div class="lf-chips" data-prodchips></div></div>
+      <p class="lf__err" role="alert"></p>
+    </fieldset>
+
+    <fieldset class="lf__step" data-step="1" hidden>
+      <legend>Tell us about the project</legend>
+      <p class="lf__label">Application</p><div class="lf-chips">{apps}</div>
+      <div class="lf__row">
+        <div class="lf__air">
+          <p class="lf__label">Design airflow per unit</p>
+          <div class="lf__airval"><output data-cfm-out>6,000</output> <span>CFM</span></div>
+          <input type="range" min="0" max="1000" value="620" data-cfm aria-label="Design airflow per unit">
+          <label class="lf__check"><input type="checkbox" data-cfm-unknown> I don't know the airflow yet</label>
+        </div>
+        <div class="lf__qty">
+          <p class="lf__label">Quantity</p>
+          <div class="lf-stepper"><button type="button" data-q="-1" aria-label="Fewer">−</button><input name="quantity" value="1" inputmode="numeric" aria-label="Quantity"><button type="button" data-q="1" aria-label="More">+</button></div>
+        </div>
+      </div>
+      <div class="lf__row">
+        <label class="lf-field"><input name="city" placeholder=" " autocomplete="address-level2"><span>Project city</span></label>
+        <label class="lf-field"><input name="project" placeholder=" "><span>Project name (optional)</span></label>
+      </div>
+      <p class="lf__label">Timeline</p><div class="lf-chips">{times}</div>
+    </fieldset>
+
+    <fieldset class="lf__step" data-step="2" hidden>
+      <legend>How do we reach you?</legend>
+      <div class="lf__row">
+        <label class="lf-field"><input name="name" required placeholder=" " autocomplete="name"><span>Full name *</span></label>
+        <label class="lf-field"><input name="company" placeholder=" " autocomplete="organization"><span>Company</span></label>
+      </div>
+      <div class="lf__row">
+        <label class="lf-field"><input name="email" type="email" required placeholder=" " autocomplete="email"><span>Work email *</span></label>
+        <label class="lf-field"><input name="phone" type="tel" required placeholder=" " autocomplete="tel" inputmode="tel"><span>Mobile *</span></label>
+      </div>
+      <p class="lf__label">You are a</p><div class="lf-chips">{roles}</div>
+      <label class="lf-field lf-field--area"><textarea name="message" rows="3" placeholder=" "></textarea><span>Anything else? ESP, coil duty, drawings…</span></label>
+      <label class="lf__hp" aria-hidden="true">Leave empty<input name="website" tabindex="-1" autocomplete="off"></label>
+      <label class="lf__check"><input type="checkbox" name="consent" required> I agree to Luftek contacting me about this enquiry, as described in the <a href="{root}privacy-policy.html">privacy policy</a>.</label>
+      <p class="lf__err" role="alert"></p>
+    </fieldset>
+
+    <fieldset class="lf__step" data-step="3" hidden>
+      <legend>Review your request</legend>
+      <dl class="lf__review" data-review></dl>
+      <p class="lf__err" role="alert"></p>
+    </fieldset>
+
+    <div class="lf__done" hidden>
+      <span class="lf__tick">{I['check']}</span>
+      <h3>Request received</h3>
+      <p>Reference <b data-ref></b>. A Luftek engineer will contact you within 24 hours on working days.</p>
+      <p class="lf__done-alt" data-fallback hidden>Your email app has opened with the request filled in. Please press send to complete it.</p>
+      <div class="pd__btns"><a class="btn btn--line" href="tel:+914448678556">{I['phone']} Call sales</a><button type="button" class="btn btn--dark" data-reset>New request</button></div>
+    </div>
+
+    <div class="lf__nav">
+      <button type="button" class="btn btn--line" data-back hidden>{I['left']} Back</button>
+      <button type="button" class="btn btn--red btn--lg" data-next>Continue {I['arrow']}</button>
+      <button type="submit" class="btn btn--red btn--lg" data-submit hidden>Send request {I['arrow']}</button>
+    </div>
+  </div>
+
+  <aside class="lf__sum" aria-live="polite">
+    <p class="lf__sum-k">Your request</p>
+    <dl data-summary><div><dt>Category</dt><dd>—</dd></div></dl>
+    <div class="lf__sum-foot"><p>{I['check']} Reply within 24 hours</p><p>{I['check']} Selection by Luftek engineers</p><p>{I['check']} No obligation</p></div>
+  </aside>
+</form>"""
+
+
+def lead_drawer(root):
+    return f"""<div class="lfd" id="leaddrawer" hidden role="dialog" aria-modal="true" aria-labelledby="lfd-title">
+  <div class="lfd__panel">
+    <div class="lfd__head"><div><p class="kicker">Selection request</p><h2 id="lfd-title">Get a unit selection</h2></div><button class="lfd__x" aria-label="Close">{I['x']}</button></div>
+    {lead_form(root, "drawer")}
+  </div>
+</div>"""
 
 
 def write(path, html):
@@ -902,7 +1008,6 @@ def page_contact():
       <p class="off__l"><a href="tel:{o['tel'].replace(' ', '')}">{I['phone']}{e(o['tel'])}</a>{f'<a href="mailto:{o["mail"]}">{I["mail"]}{o["mail"]}</a>' if o.get('mail') else ''}</p>
       <a class="link" href="https://www.google.com/maps/search/?api=1&amp;query={quote(o['q'])}" rel="noopener">Get directions {I['arrow']}</a>
     </article>""" for o in OFFICES)
-    opts = "".join(f"<option>{e(p['name'])}</option>" for p in PRODUCTS) + "<option>Not sure yet</option>"
     body = f"""{head("Contact Luftek Engineering | Chennai, Bengaluru, Hyderabad, Kochi, Mumbai", "Contact Luftek for AHU and FCU selections. Corporate office in Egmore, Chennai; plant at Cheyyar SIPCOT; offices in Bengaluru, Hyderabad, Kochi and Mumbai.", root, "contact.html")}
 {header(root, "contact")}
 <main id="main">
@@ -910,17 +1015,10 @@ def page_contact():
 
 <section class="sec">
   <div class="wrap contact">
-    <form class="form" id="enquiry" novalidate>
-      <h2>Request a selection</h2>
-      <p class="form__sub">Tell us about the project. Fields marked * are required.</p>
-      <div class="f2"><label>Name *<input name="name" required autocomplete="name"></label><label>Company<input name="company" autocomplete="organization"></label></div>
-      <div class="f2"><label>Email *<input name="email" type="email" required autocomplete="email"></label><label>Phone<input name="phone" type="tel" autocomplete="tel"></label></div>
-      <div class="f2"><label>Product<select name="product">{opts}</select></label><label>Airflow (CFM)<input name="cfm" inputmode="numeric" placeholder="e.g. 12,000"></label></div>
-      <div class="f2"><label>Project city<input name="city" placeholder="e.g. Chennai"></label><label>Quantity<input name="qty" inputmode="numeric" placeholder="e.g. 4"></label></div>
-      <label>Project and application<textarea name="msg" rows="5" placeholder="Hospital OT, 600 Pa ESP, chilled water 7/12 °C"></textarea></label>
-      <button class="btn btn--red btn--lg" type="submit">Send request {I['arrow']}</button>
-      <p class="form__note" role="status">Opens your email app with the request addressed to sales@luftek.in. See our <a href="privacy-policy.html">privacy policy</a>.</p>
-    </form>
+    <div class="contact__lead">
+      <div class="sec__head"><p class="kicker">Selection request</p><h2>Get a unit selection in four steps.</h2></div>
+      {lead_form(root, "page")}
+    </div>
     <aside class="contact__side">
       <div class="cbox"><p class="kicker">Sales</p><a class="cbox__big" href="tel:+914448678556">+91 44 4867 8556</a><a href="mailto:sales@luftek.in">sales@luftek.in</a></div>
       <div class="cbox"><p class="kicker">Plant</p><a class="cbox__big" href="tel:+914427663323">+91 44 2766 3323</a><a href="mailto:info@luftek.in">info@luftek.in</a></div>
@@ -940,7 +1038,7 @@ def page_contact():
   <iframe title="Luftek corporate office, Egmore, Chennai" src="https://maps.google.com/maps?q={quote('TASS Mahal Complex, Montieth Road, Egmore, Chennai')}&amp;z=15&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
 </section>
 </main>
-{footer(root)}"""
+{footer(root, drawer=False)}"""
     write("contact.html", body)
 
 

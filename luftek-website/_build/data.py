@@ -304,3 +304,8 @@ CATEGORY = {
         "hero": "p-rtpu-2",
     },
 }
+
+
+# Lead form delivery. Paste the n8n production webhook URL here (see _integrations/README.md).
+# Empty = the form falls back to opening a pre-filled email to sales@luftek.in.
+LEAD_ENDPOINT = ""

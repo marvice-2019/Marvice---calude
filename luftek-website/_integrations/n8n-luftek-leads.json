@@ -1,0 +1,191 @@
+{
+  "name": "Luftek website leads",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "luftek-lead",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "https://luftek.marvice.tech,https://www.luftek.in,https://luftek.in"
+        }
+      },
+      "name": "Lead webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "luftek-lead"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "leftValue": "={{ $json.body.email }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            },
+            {
+              "leftValue": "={{ $json.body.website ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Valid lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "sales@luftek.in",
+        "subject": "=New selection request {{ $json.body.ref }}: {{ $json.body.product || $json.body.category }} - {{ $json.body.company || $json.body.name }}",
+        "message": "=<h2>New website lead {{ $json.body.ref }}</h2><table cellpadding='6'><tr><td><b>Category</b></td><td>{{ $json.body.category }}</td></tr><tr><td><b>Unit</b></td><td>{{ $json.body.product }}</td></tr><tr><td><b>Application</b></td><td>{{ $json.body.application }}</td></tr><tr><td><b>Airflow</b></td><td>{{ $json.body.airflow }}</td></tr><tr><td><b>Quantity</b></td><td>{{ $json.body.quantity }}</td></tr><tr><td><b>City</b></td><td>{{ $json.body.city }}</td></tr><tr><td><b>Project</b></td><td>{{ $json.body.project }}</td></tr><tr><td><b>Timeline</b></td><td>{{ $json.body.timeline }}</td></tr><tr><td><b>Name</b></td><td>{{ $json.body.name }}</td></tr><tr><td><b>Company</b></td><td>{{ $json.body.company }}</td></tr><tr><td><b>Role</b></td><td>{{ $json.body.role }}</td></tr><tr><td><b>Email</b></td><td>{{ $json.body.email }}</td></tr><tr><td><b>Mobile</b></td><td>{{ $json.body.phone }}</td></tr><tr><td><b>Message</b></td><td>{{ $json.body.message }}</td></tr><tr><td><b>Page</b></td><td>{{ $json.body.page }}</td></tr><tr><td><b>Source</b></td><td>{{ $json.body.source.utm_source || $json.body.source.referrer }} {{ $json.body.source.utm_campaign }}</td></tr></table>",
+        "options": {
+          "replyTo": "={{ $json.body.email }}"
+        }
+      },
+      "name": "Email sales",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, ref: $('Lead webhook').item.json.body.ref } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "name": "Respond rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        460,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, error: 'delivery' } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "name": "Respond delivery failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Lead webhook": {
+      "main": [
+        [
+          {
+            "node": "Valid lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid lead?": {
+      "main": [
+        [
+          {
+            "node": "Email sales",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email sales": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond delivery failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
