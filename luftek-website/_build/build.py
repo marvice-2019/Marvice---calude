@@ -358,8 +358,8 @@ def page_home():
   <div class="wrap hs__in">
     <div class="hs__intro">
       <div><p class="kicker">Luftek Engineering · Since 2017</p>
-      <h1>Air handling units, fan coil units, hide away units and package units, engineered and built in India to European standards.</h1></div>
-      <ul class="hs__proof" aria-label="Certifications"><li><b>Eurovent</b> certified AHUs</li><li><b>AHRI 410</b> certified coils</li><li><b>ISO 9001:2015</b> quality system</li></ul>
+      <h1>HVAC equipment built to European standards.</h1></div>
+      <ul class="hs__proof" aria-label="Certifications"><li>Eurovent certified</li><li>AHRI 410</li><li>ISO 9001:2015</li></ul>
     </div>
     <div class="hs__stage">{slides}</div>
     <div class="hs__tabs" role="group" aria-label="Choose product">{tabs}</div>
