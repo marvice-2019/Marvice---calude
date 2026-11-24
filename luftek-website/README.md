@@ -2,7 +2,7 @@
 
 Multi-page static site for Luftek Engineering Private Limited (AHU / FCU manufacturer, Chennai). Plain HTML, CSS and JS: no framework, no server code.
 
-## Pages (16)
+## Pages (19)
 
 | Page | What's on it |
 |---|---|
@@ -10,9 +10,14 @@ Multi-page static site for Luftek Engineering Private Limited (AHU / FCU manufac
 | `products.html` | Family filter, all 10 products, airflow coverage chart (log scale), unit selector, comparison table |
 | `products/*.html` (10) | Gallery with lightbox, key specs, features, technical data, EN 1886 class scale, certification, applications with linked projects, related units |
 | `projects.html` | 37 references: sector filter, search, location filter, project detail viewer with previous/next, deep links (`?sector=pharma`, `?p=<id>`) |
+| `industries.html` | 7 sectors: what each needs, recommended units, reference projects, jump menu with scroll-spy |
 | `about.html` | Story, vision / mission / commitment, interactive timeline 2017–2024, plant, R&D, quality policy (PDF), careers |
 | `certifications.html` | 8 standards, AHRI certificate viewer, EN 1886 classes explained |
 | `contact.html` | Selection request form (product pre-filled from `?product=`), 6 offices with directions, map |
+| `privacy-policy.html` | Working draft under the DPDP Act 2023. **Have a lawyer review before launch.** |
+| `404.html` | Branded not-found page (set as the error page in Coolify / nginx) |
+
+Also generated: `sitemap.xml`, `robots.txt` (blocks `/_build/`).
 
 ## Editing content
 

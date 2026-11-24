@@ -106,6 +106,7 @@ def header(root, active):
       <div class="hdr__drop">
         <button class="hdr__link hdr__mega-btn" aria-expanded="false" aria-controls="mega"{prod_cur}>Products {I['chev']}</button>
       </div>
+      {nav("industries", "industries.html", "Industries")}
       {nav("projects", "projects.html", "Projects")}
       {nav("certs", "certifications.html", "Certification")}
       {nav("contact", "contact.html", "Contact")}
@@ -134,6 +135,7 @@ def header(root, active):
       <a href="{root}products.html">All products</a>
       {''.join(f'<a href="{purl(root, p)}">{e(p["name"])}</a>' for p in PRODUCTS)}
     </details>
+    <a href="{root}industries.html">Industries</a>
     <a href="{root}projects.html">Projects</a>
     <a href="{root}certifications.html">Certification</a>
     <a href="{root}contact.html">Contact</a>
@@ -167,8 +169,8 @@ def footer(root):
     </div>
     <div><h2 class="foot__h">Company</h2><ul>
       <li><a href="{root}about.html">About Luftek</a></li><li><a href="{root}about.html#plant">Manufacturing plant</a></li>
-      <li><a href="{root}projects.html">Projects</a></li><li><a href="{root}certifications.html">Certification</a></li>
-      <li><a href="{root}assets/docs/luftek-quality-policy.pdf">Quality policy (PDF)</a></li><li><a href="{root}contact.html">Contact</a></li></ul></div>
+      <li><a href="{root}industries.html">Industries</a></li><li><a href="{root}projects.html">Projects</a></li><li><a href="{root}certifications.html">Certification</a></li>
+      <li><a href="{root}assets/docs/luftek-quality-policy.pdf">Quality policy (PDF)</a></li><li><a href="{root}contact.html">Contact</a></li><li><a href="{root}privacy-policy.html">Privacy policy</a></li></ul></div>
     <div><h2 class="foot__h">Products</h2><ul>{prods}<li><a href="{root}products.html">All products</a></li></ul></div>
     <div><h2 class="foot__h">Branches</h2><ul class="foot__plain">
       <li>Chennai <span>Corporate office</span></li><li>Cheyyar <span>Manufacturing plant</span></li>
@@ -327,7 +329,7 @@ def page_home():
         <div class="ind__units">{units}</div>
         <p class="ind__k">Reference projects</p>
         <p class="ind__refs">{e(names)}</p>
-        <a class="link" href="projects.html?sector={sk}">See {s['name'].lower()} projects {I['arrow']}</a>
+        <div class="ind__links"><a class="link" href="industries.html#{sk}">{s['name']} in detail {I['arrow']}</a><a class="link" href="projects.html?sector={sk}">See projects {I['arrow']}</a></div>
       </div>
     </div>"""
 
@@ -885,7 +887,7 @@ def page_contact():
       <div class="f2"><label>Project city<input name="city" placeholder="e.g. Chennai"></label><label>Quantity<input name="qty" inputmode="numeric" placeholder="e.g. 4"></label></div>
       <label>Project and application<textarea name="msg" rows="5" placeholder="Hospital OT, 600 Pa ESP, chilled water 7/12 °C"></textarea></label>
       <button class="btn btn--red btn--lg" type="submit">Send request {I['arrow']}</button>
-      <p class="form__note" role="status">Opens your email app with the request addressed to sales@luftek.in.</p>
+      <p class="form__note" role="status">Opens your email app with the request addressed to sales@luftek.in. See our <a href="privacy-policy.html">privacy policy</a>.</p>
     </form>
     <aside class="contact__side">
       <div class="cbox"><p class="kicker">Sales</p><a class="cbox__big" href="tel:+914448678556">+91 44 4867 8556</a><a href="mailto:sales@luftek.in">sales@luftek.in</a></div>
@@ -910,6 +912,92 @@ def page_contact():
     write("contact.html", body)
 
 
+def page_industries():
+    root = ""
+    nav = "".join(f'<a href="#{k}">{s["name"]}</a>' for k, s in SECTORS.items())
+    blocks = ""
+    for n, (sk, s) in enumerate(SECTORS.items()):
+        projs = [p for p in PROJECTS if p[4] == sk]
+        units = "".join(product_card(root, BY_KEY[u]) for u in s["units"][:3])
+        more = s["units"][3:]
+        more_html = (f'<p class="indd__more">Also suited: ' + ", ".join(f'<a href="{purl(root, BY_KEY[u])}">{e(BY_KEY[u]["name"])}</a>' for u in more) + '</p>') if more else ""
+        thumbs = "".join(f'<a class="indd__pj" href="projects.html?p={f}">{img(root, "r-" + f, nm)}<span><b>{e(nm)}</b>{e(c)}</span></a>' for f, nm, c, co, _ in projs)
+        blocks += f"""<section class="indd{' indd--alt' if n % 2 else ''}" id="{sk}">
+  <div class="wrap">
+    <div class="indd__top">
+      <div class="indd__img">{img(root, s['img'], s['name'], lazy=n > 0)}</div>
+      <div>
+        <p class="kicker">{len(projs)} reference project{'s' if len(projs) != 1 else ''}</p>
+        <h2>{s['name']}</h2>
+        <p class="lead">{e(s['need'])}</p>
+        <ul class="ticks">{''.join(f"<li>{I['check']} {e(x)}</li>" for x in s['points'])}</ul>
+      </div>
+    </div>
+    <h3 class="indd__h">Recommended Luftek units</h3>
+    <div class="pgrid">{units}</div>
+    {more_html}
+    <h3 class="indd__h">Reference projects</h3>
+    <div class="indd__pjs">{thumbs}</div>
+  </div>
+</section>"""
+    body = f"""{head("Industries | HVAC for Hospitals, Pharma, Airports & Industry | Luftek", "How Luftek air handling units and fan coil units serve hospitals, pharma, airports, industry, commercial buildings, education and international projects.", root, "industries.html")}
+{header(root, "industries")}
+<main id="main">
+{page_hero([("Home", "index.html"), ("Industries", "industries.html")], "Industries we serve.", "Every sector asks something different of its air handling. Here is what matters in each, the Luftek units that suit it, and where they already run.", root, "r-Bangalore-International-Airport-Bangalore")}
+<nav class="fambar" aria-label="Industries" data-subnav><div class="wrap fambar__in fambar__in--links">{nav}</div></nav>
+{blocks}
+</main>
+{footer(root)}"""
+    write("industries.html", body)
+
+
+def page_privacy():
+    root = ""
+    secs = [
+        ("Who we are", "This website is operated by Luftek Engineering Private Limited, No.10, TASS Mahal Complex, 4th Floor, Montieth Road, Egmore, Chennai 600 008, India (“Luftek”, “we”). This policy explains how we handle personal data shared with us through this website, in line with the Digital Personal Data Protection Act, 2023."),
+        ("What we collect", "The selection request form collects your name, company, email address, phone number, project city and project details. The form does not send data to our servers: it opens your own email application with a pre-filled message to sales@luftek.in, which you choose whether to send. We receive only what you send us by email or phone."),
+        ("Why we use it", "We use your details to respond to your enquiry, prepare equipment selections and quotations, and follow up on that enquiry. We do not sell your personal data or use it for unrelated marketing without your consent."),
+        ("Who we share it with", "Your enquiry is handled by Luftek's sales and engineering teams. We may share it with our own branch offices to serve your project location, and with service providers who host our email, under confidentiality obligations."),
+        ("How long we keep it", "We keep enquiry correspondence for as long as needed to serve the enquiry and any resulting order, and as required by applicable tax and commercial record-keeping laws."),
+        ("Cookies and third parties", "This website does not set its own tracking or advertising cookies. Fonts are loaded from Google Fonts and the contact page embeds a Google Maps view; those services may receive your IP address under their own privacy policies."),
+        ("Your rights", "You may ask us to access, correct or erase your personal data, or withdraw consent, by writing to info@luftek.in. We will respond within a reasonable time and as required by law. If you are not satisfied, you may approach the Data Protection Board of India."),
+        ("Changes", "We may update this policy from time to time. The date below shows when it was last revised."),
+    ]
+    body_html = "".join(f"<h2>{e(t)}</h2><p>{e(x)}</p>" for t, x in secs)
+    body = f"""{head("Privacy Policy | Luftek Engineering", "How Luftek Engineering Private Limited handles personal data shared through this website.", root, "privacy-policy.html")}
+{header(root, "")}
+<main id="main">
+{page_hero([("Home", "index.html"), ("Privacy policy", "privacy-policy.html")], "Privacy policy", "How we handle the details you share with us.", root)}
+<section class="sec"><div class="wrap prose">{body_html}<p class="note">Last updated: November 2026</p></div></section>
+</main>
+{footer(root)}"""
+    write("privacy-policy.html", body)
+
+
+def page_404():
+    root = "/"
+    body = f"""{head("Page not found | Luftek Engineering", "The page you were looking for could not be found.", root, "404.html")}
+{header(root, "")}
+<main id="main">
+<section class="nf"><div class="wrap nf__in">
+  <p class="nf__code">404</p>
+  <h1>This page has moved or no longer exists.</h1>
+  <p>Try the product range, or tell us what you need and our engineers will help.</p>
+  <div class="hs__btns"><a class="btn btn--dark" href="/products.html">View products {I['arrow']}</a><a class="btn btn--line" href="/contact.html">Contact us</a></div>
+  <ul class="nf__links">{''.join(f'<li><a href="/{purl("", p)}">{e(p["name"])}</a></li>' for p in PRODUCTS[:6])}</ul>
+</div></section>
+</main>
+{footer(root)}"""
+    write("404.html", body)
+
+
+def write_seo():
+    urls = ["", "about.html", "products.html", "industries.html", "projects.html", "certifications.html", "contact.html", "privacy-policy.html"] + [f"products/{p['slug']}.html" for p in PRODUCTS]
+    sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "".join(f"  <url><loc>{SITE}/{u}</loc><lastmod>2026-11-24</lastmod></url>\n" for u in urls) + "</urlset>\n"
+    write("sitemap.xml", sm)
+    write("robots.txt", f"User-agent: *\nAllow: /\nDisallow: /_build/\n\nSitemap: {SITE}/sitemap.xml\n")
+
+
 if __name__ == "__main__":
     page_home()
     page_products()
@@ -919,4 +1007,8 @@ if __name__ == "__main__":
     page_about()
     page_certs()
     page_contact()
-    print("built", 6 + len(PRODUCTS), "pages")
+    page_industries()
+    page_privacy()
+    page_404()
+    write_seo()
+    print("built", 9 + len(PRODUCTS), "pages + sitemap.xml + robots.txt")
