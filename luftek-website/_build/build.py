@@ -199,15 +199,18 @@ def footer(root):
 """
 
 
-def page_hero(crumbs, title, lede, root, img_name=None, dark=True):
+def page_hero(crumbs, title, lede, root, img_name=None, dark=True, aside=""):
     cr = " ".join(f'<a href="{root}{h}">{e(t)}</a><span aria-hidden="true">/</span>' for t, h in crumbs[:-1])
     pic = f'<div class="ph__img">{img(root, img_name, "", lazy=False)}</div>' if img_name else ""
     return f"""<section class="ph{' ph--dark' if dark else ''}{' ph--img' if img_name else ''}">
   {pic}
-  <div class="wrap ph__in">
-    <nav class="crumbs" aria-label="Breadcrumb">{cr}<span aria-current="page">{e(crumbs[-1][0])}</span></nav>
-    <h1>{title}</h1>
-    <p class="ph__lede">{lede}</p>
+  <div class="wrap ph__in{' ph__in--aside' if aside else ''}">
+    <div>
+      <nav class="crumbs" aria-label="Breadcrumb">{cr}<span aria-current="page">{e(crumbs[-1][0])}</span></nav>
+      <h1>{title}</h1>
+      <p class="ph__lede">{lede}</p>
+    </div>
+    {f'<div class="ph__aside">{aside}</div>' if aside else ''}
   </div>
 </section>"""
 
@@ -348,8 +351,9 @@ def page_home():
 <section class="hs" data-carousel aria-roledescription="carousel" aria-label="Featured products">
   <div class="wrap hs__in">
     <div class="hs__intro">
-      <p class="kicker">Luftek Engineering · Since 2017</p>
-      <h1>Air handling equipment, engineered and built in India to European standards.</h1>
+      <div><p class="kicker">Luftek Engineering · Since 2017</p>
+      <h1>Air handling units, fan coil units and package units, engineered and built in India to European standards.</h1></div>
+      <ul class="hs__proof" aria-label="Certifications"><li><b>Eurovent</b> certified AHUs</li><li><b>AHRI 410</b> certified coils</li><li><b>ISO 9001:2015</b> quality system</li></ul>
     </div>
     <div class="hs__stage">{slides}</div>
     <div class="hs__tabs" role="group" aria-label="Choose product">{tabs}</div>
@@ -454,6 +458,10 @@ def page_products():
     groups = ""
     for fk, f in FAMILIES.items():
         cards = "".join(product_card(root, p) for p in PRODUCTS if p["fam"] == fk)
+        if fk == "pkg":
+            cards += f"""<a class="ptile ptile--slate" href="#selector"><span class="ptile__k">Unit selector</span><b>Not sure which unit fits?</b><span>Enter airflow and application for an instant shortlist.</span><span class="ptile__go">Open selector {I['arrow']}</span></a>
+      <a class="ptile" href="#compare"><span class="ptile__k">Comparison</span><b>All 10 units side by side</b><span>Airflow, rated ESP, casing and certification in one table.</span><span class="ptile__go">See the table {I['arrow']}</span></a>
+      <a class="ptile ptile--red" href="{root}contact.html"><span class="ptile__k">Custom builds</span><b>Built to your schedule</b><span>Construction, size and performance customised to each project.</span><span class="ptile__go">Request a selection {I['arrow']}</span></a>"""
         groups += f"""<div class="pgroup" id="{fk}" data-fam="{fk}">
       <div class="pgroup__head"><h2>{f['name']}</h2><p>{f['blurb']}</p></div>
       <div class="pgrid">{cards}</div>
@@ -471,7 +479,7 @@ def page_products():
     body = f"""{head("Products | Air Handling Units, Fan Coil Units & Package Units | Luftek", "Luftek's full range: UniFlow, Smart, Clean Room and Energy Recovery AHUs, fan coil units, hide away units and roof top package units. Compare airflow, casing and certification.", root, "products.html")}
 {header(root, "products")}
 <main id="main">
-{page_hero([("Home", "index.html"), ("Products", "products.html")], "Products", "Ten product lines across air handling units, fan coil units and package units. Compare airflow ranges, find your unit, or go straight to a datasheet.", root, "x-concealed")}
+{page_hero([("Home", "index.html"), ("Products", "products.html")], "Products", "Ten product lines across air handling units, fan coil units and package units. Compare airflow ranges, find your unit, or go straight to a datasheet.", root, "x-concealed", aside='<div class="phf"><b>10</b><span>product lines</span></div><div class="phf"><b>3</b><span>product families</span></div><div class="phf"><b>200 – 42,000</b><span>CFM airflow range</span></div><div class="phf"><b>35</b><span>UniFlow AHU models</span></div>')}
 
 <nav class="fambar" aria-label="Product families" data-fambar>
   <div class="wrap fambar__in">
@@ -504,7 +512,7 @@ def page_products():
 
 <section class="sec">
   <div class="wrap">
-    <div class="sec__head"><p class="kicker">Comparison</p><h2>The range at a glance.</h2></div>
+    <div class="sec__head" id="compare"><p class="kicker">Comparison</p><h2>The range at a glance.</h2></div>
     <div class="tbl-wrap"><table class="tbl">
       <thead><tr><th scope="col">Product</th><th scope="col">Family</th><th scope="col">Airflow</th><th scope="col">Rated ESP</th><th scope="col">Casing</th><th scope="col">Certification</th></tr></thead>
       <tbody>{trs}</tbody>
@@ -654,7 +662,7 @@ def page_projects():
     body = f"""{head("Projects & References | Luftek Engineering", "37 reference projects: Kempegowda and GMR Hyderabad airports, Apollo and MIOT hospitals, Pfizer, Renault Nissan, Kia, Flipkart, IIT Madras and more, across India, Qatar and Sri Lanka.", root, "projects.html")}
 {header(root, "projects")}
 <main id="main">
-{page_hero([("Home", "index.html"), ("Projects", "projects.html")], "Projects", "Airports, hospitals, pharma plants, factories, campuses and offices across India, Qatar and Sri Lanka run on Luftek air handling equipment.", root, "r-GMR-Hyd-Intl-Airport")}
+{page_hero([("Home", "index.html"), ("Projects", "projects.html")], "Projects", "Airports, hospitals, pharma plants, factories, campuses and offices across India, Qatar and Sri Lanka run on Luftek air handling equipment.", root, "r-GMR-Hyd-Intl-Airport", aside='<div class="phf"><b>2</b><span>international airports</span></div><div class="phf"><b>5</b><span>hospitals</span></div><div class="phf"><b>4</b><span>pharma plants</span></div><div class="phf"><b>9</b><span>industrial plants</span></div>')}
 
 <section class="pstats">
   <div class="wrap pstats__in">
@@ -712,7 +720,7 @@ def page_about():
     body = f"""{head("About Luftek Engineering | AHU Manufacturer, Chennai", "Established in 2017, Luftek Engineering designs and manufactures HVAC airside products at its own plant at Cheyyar SIPCOT, Tamil Nadu.", root, "about.html")}
 {header(root, "about")}
 <main id="main">
-{page_hero([("Home", "index.html"), ("About", "about.html")], "Engineering is our passion.", "Air conditioning products are our intellectual excellence, built with innovation and sustainability.", root, "x-plant")}
+{page_hero([("Home", "index.html"), ("About", "about.html")], "Engineering is our passion.", "Air conditioning products are our intellectual excellence, built with innovation and sustainability.", root, "x-plant", aside='<div class="phf"><b>2017</b><span>founded</span></div><div class="phf"><b>2024</b><span>new factory, Cheyyar SIPCOT</span></div><div class="phf"><b>6</b><span>offices and plant</span></div><div class="phf"><b>37+</b><span>reference projects</span></div>')}
 
 <section class="sec">
   <div class="wrap about">
@@ -818,7 +826,7 @@ def page_certs():
     body = f"""{head("Certification | Eurovent, AHRI 410, ISO 9001 | Luftek Engineering", "Luftek AHUs are Eurovent certified, coils are AHRI 410 certified, and the quality system follows ISO 9001:2015. EN 1886 casing ratings explained.", root, "certifications.html")}
 {header(root, "certs")}
 <main id="main">
-{page_hero([("Home", "index.html"), ("Certification", "certifications.html")], "Certified performance.", "Luftek products are backed by third-party certification and testing to global performance standards, so consultants can specify them with confidence.", root)}
+{page_hero([("Home", "index.html"), ("Certification", "certifications.html")], "Certified performance.", "Luftek products are backed by third-party certification and testing to global performance standards, so consultants can specify them with confidence.", root, aside='<div class="phb"><b>Eurovent</b><span>AHU performance and casing</span></div><div class="phb"><b>AHRI 410</b><span>Coil performance</span></div><div class="phb"><b>ISO 9001:2015</b><span>Quality management</span></div><div class="phb"><b>EN 1886</b><span>L1 · F9 · D1 · TB2 · T2</span></div>')}
 
 <section class="sec">
   <div class="wrap cert-intro">
@@ -874,7 +882,7 @@ def page_contact():
     body = f"""{head("Contact Luftek Engineering | Chennai, Bengaluru, Hyderabad, Kochi, Mumbai", "Contact Luftek for AHU and FCU selections. Corporate office in Egmore, Chennai; plant at Cheyyar SIPCOT; offices in Bengaluru, Hyderabad, Kochi and Mumbai.", root, "contact.html")}
 {header(root, "contact")}
 <main id="main">
-{page_hero([("Home", "index.html"), ("Contact", "contact.html")], "Let's associate.", "Call, write or walk in. We aim to answer every enquiry within 24 hours.", root)}
+{page_hero([("Home", "index.html"), ("Contact", "contact.html")], "Let's associate.", "Call, write or walk in. We aim to answer every enquiry within 24 hours.", root, aside=f'<a class="phc" href="tel:+914448678556">{I["phone"]}<span><small>Sales</small>+91 44 4867 8556</span></a><a class="phc" href="mailto:sales@luftek.in">{I["mail"]}<span><small>Email</small>sales@luftek.in</span></a><div class="phc">{I["pin"]}<span><small>Corporate office</small>Egmore, Chennai 600 008</span></div><p class="phc__h">Mon – Sat, 9:00 am – 6:00 pm</p>')}
 
 <section class="sec">
   <div class="wrap contact">
@@ -943,7 +951,7 @@ def page_industries():
     body = f"""{head("Industries | HVAC for Hospitals, Pharma, Airports & Industry | Luftek", "How Luftek air handling units and fan coil units serve hospitals, pharma, airports, industry, commercial buildings, education and international projects.", root, "industries.html")}
 {header(root, "industries")}
 <main id="main">
-{page_hero([("Home", "index.html"), ("Industries", "industries.html")], "Industries we serve.", "Every sector asks something different of its air handling. Here is what matters in each, the Luftek units that suit it, and where they already run.", root, "r-Bangalore-International-Airport-Bangalore")}
+{page_hero([("Home", "index.html"), ("Industries", "industries.html")], "Industries we serve.", "Every sector asks something different of its air handling. Here is what matters in each, the Luftek units that suit it, and where they already run.", root, "r-Bangalore-International-Airport-Bangalore", aside='<div class="phf"><b>7</b><span>sectors served</span></div><div class="phf"><b>37</b><span>reference projects</span></div><div class="phf"><b>3</b><span>countries</span></div><div class="phf"><b>10</b><span>product lines</span></div>')}
 <nav class="fambar" aria-label="Industries" data-subnav><div class="wrap fambar__in fambar__in--links">{nav}</div></nav>
 {blocks}
 </main>
