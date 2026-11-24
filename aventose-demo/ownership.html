@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Owning an Aventose — savings, warranty, charging</title>
+<meta name="description" content="Calculate your petrol savings and see warranty, charging and service details for the Aventose S110.">
+<meta property="og:title" content="Owning an Aventose — savings, warranty, charging">
+<meta property="og:description" content="Calculate your petrol savings and see warranty, charging and service details for the Aventose S110.">
+<meta property="og:image" content="assets/img/IntheVillage.webp">
+<meta name="theme-color" content="#0c0e0f">
+<link rel="icon" href="assets/logo_black.6dfd8e2.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=5c8d39e0">
+</head>
+<body data-page="ownership">
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="wrap bar">
+    <a href="index.html" aria-label="Aventose Energy home"><img src="assets/logo_black.6dfd8e2.png" alt="Aventose Energy"></a>
+    <nav id="nav" aria-label="Main"><a href="s110.html" data-nav="s110">S110</a><a href="range.html" data-nav="range">Range</a><a href="technology.html" data-nav="technology">Technology</a><a href="ownership.html" data-nav="ownership">Ownership</a><a href="about.html" data-nav="about">About</a></nav>
+    <div style="display:flex;gap:14px;align-items:center">
+      <a href="enquire.html" class="btn mag">Book a test ride</a>
+      <button class="menu" id="menu" aria-expanded="false" aria-controls="overlay"><span>Menu</span><i class="lines" aria-hidden="true"></i></button>
+    </div>
+  </div>
+</header>
+
+<div class="overlay" id="overlay">
+  <ol class="ov-links"><li><a href="index.html" data-nav="home" style="--i:0"><small>01</small>Home</a></li><li><a href="s110.html" data-nav="s110" style="--i:1"><small>02</small>S110</a></li><li><a href="range.html" data-nav="range" style="--i:2"><small>03</small>Range</a></li><li><a href="technology.html" data-nav="technology" style="--i:3"><small>04</small>Technology</a></li><li><a href="ownership.html" data-nav="ownership" style="--i:4"><small>05</small>Ownership</a></li><li><a href="about.html" data-nav="about" style="--i:5"><small>06</small>About</a></li><li><a href="enquire.html" data-nav="enquire" style="--i:6"><small>07</small>Enquire</a></li></ol>
+  <div class="ov-side">
+    <img src="assets/img/GreenBike.webp" alt="Aventose S110" loading="lazy">
+    <p>Aventose Energy Pvt Ltd · Designed and built in India<br>C-33, Arihant Amara, 49 Poonamallee High Road, Chennai 600056<br><a href="mailto:support@aventose.com">support@aventose.com</a></p>
+    <a class="btn light" href="enquire.html">Book a test ride</a>
+  </div>
+</div>
+
+<main>
+<section class="phero">
+  <img src="assets/img/FortheOfficeGoer.webp" alt="" data-parallax=".18" style="object-position:50% 40%" fetchpriority="high">
+  <div class="wrap">
+    <div class="crumbs"><a href="index.html">Home</a> / Ownership</div>
+    <h1 class="cond"><span class="ln"><span>Cheaper every</span></span><span class="ln"><span>single day.</span></span></h1>
+    <div class="phero-row"><p class="lede">Lower running cost, an 8-year battery warranty and parts that are easy to find. Here is what owning an S110 looks like.</p></div>
+  </div>
+</section><section id="savings">
+  <div class="wrap">
+    <div class="head">
+      <div><div class="label rv">Running cost</div><h2 class="cond rv">What petrol<br>costs you.</h2></div>
+      <p class="rv">Set your daily ride and your current bike's mileage. The S110 figure uses its own numbers: a 2.4 kWh battery for about 100 km.</p>
+    </div>
+    <div class="calc rv">
+      <div>
+        <label for="km">Daily ride <b id="kmV"></b></label><input type="range" id="km" min="5" max="120" value="40">
+        <label for="fuel">Petrol price <b id="fuelV"></b></label><input type="range" id="fuel" min="90" max="115" value="102">
+        <label for="mil">Your bike's mileage <b id="milV"></b></label><input type="range" id="mil" min="25" max="70" value="45">
+        <label for="tar">Electricity tariff <b id="tarV"></b></label><input type="range" id="tar" min="4" max="12" value="8">
+      </div>
+      <div class="save">
+        <span class="label">You save each year</span>
+        <b class="cond" id="saveY">₹0</b>
+        <div class="row">Petrol, per month <b id="pM"></b></div>
+        <div style="height:6px;background:#333;margin:-4px 0 10px"><i id="calcBarP" style="display:block;height:100%;background:#9a9994;width:0;transition:width .6s"></i></div>
+        <div class="row">S110 charging, per month <b id="eM"></b></div>
+        <div style="height:6px;background:#333;margin:-4px 0 10px"><i id="calcBarE" style="display:block;height:100%;background:var(--blue);width:0;transition:width .6s"></i></div>
+        <div class="row">Saved over 5 years <b id="s5"></b></div>
+        <div class="row">CO₂ avoided each year <b id="co2"></b></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="head"><div><div class="label rv">Warranty</div><h2 class="cond rv">Covered for<br>the long run.</h2></div></div>
+    <div class="big-nums">
+      <div class="rv"><b class="cond"><span data-count="8">8</span><small>years</small></b><span>Battery warranty, or 1,00,000 km</span></div>
+      <div class="rv"><b class="cond"><span data-count="3">3</span><small>years</small></b><span>Motor warranty, or 50,000 km</span></div>
+      <div class="rv"><b class="cond"><span data-count="200000">2,00,000</span><small>km</small></b><span>Service life, ARAI certified</span></div>
+    </div>
+  </div>
+</section>
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="teasers stagger">
+      <figure class="teaser"><div class="ph"><img src="assets/img/EaseofServiceability.webp" alt="S110 being serviced" loading="lazy"></div><div class="t"><h3 class="cond">Easy to service</h3><p>Modular mounting and easily available spares mean minimal downtime.</p></div></figure>
+      <figure class="teaser"><div class="ph"><img src="assets/img/LongStandby.webp" alt="S110 key and display" loading="lazy"></div><div class="t"><h3 class="cond">Long standby</h3><p>Complete shutdown when the ignition is off, with minimal self-discharge.</p></div></figure>
+      <figure class="teaser"><div class="ph"><img src="assets/img/PortableCharger.webp" alt="Portable charger" loading="lazy"></div><div class="t"><h3 class="cond">Portable charger</h3><p>Lightweight and easy to carry, so the plug point comes to you.</p></div></figure>
+    </div>
+  </div>
+</section>
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="head"><div><div class="label rv">Questions</div><h2 class="cond rv">Good to know.</h2></div></div>
+    <div class="acc rv"><details><summary>How far does the S110 go on a charge?</summary><div class="acc-body text">About 100 km on road with the standard 2.4 kWh LFP battery, and about 130 km with the extended-range 3.2 kWh NMC battery.</div></details><details><summary>Where can I charge it?</summary><div class="acc-body text">Anywhere with a regular plug point. Lift the battery out from under the seat and charge it at home, at work or at your shop with the portable charger. Fixed charging and battery swapping are also supported.</div></details><details><summary>How long does charging take?</summary><div class="acc-body text">80% in about 4 hours and a full charge in about 6 hours, according to the latest specification sheet.</div></details><details><summary>Can it handle waterlogged roads?</summary><div class="acc-body text">Yes. The motor, controller and battery are IP67 certified, and the VCU and display are IP65 rated against rain and dust.</div></details><details><summary>What is the warranty?</summary><div class="acc-body text">The battery is covered for 8 years or 1,00,000 km, and the motor for 3 years or 50,000 km. The S110 is ARAI certified for a two lakh kilometre service life.</div></details><details><summary>Can I take a test ride?</summary><div class="acc-body text">Yes. Book one online and the team will bring an S110 to you.</div></details></div>
+  </div>
+</section>
+</main>
+<a class="nextpage" href="about.html"><img src="assets/img/FortheEntrepreneur.webp" alt="" loading="lazy">
+  <div class="wrap"><div><div class="label">Next</div><h2 class="cond">About Aventose</h2></div><span class="arrow" aria-hidden="true">→</span></div></a>
+<footer>
+  <div class="wrap">
+    <div class="f-grid">
+      <div><img src="assets/logo_black.6dfd8e2.png" alt="Aventose Energy"><p style="margin-top:20px;max-width:320px">Rugged electric mobility, designed and built in India.<br>C-33, Arihant Amara, 49 Poonamallee High Road, Chennai 600056</p></div>
+      <div><h5>Explore</h5><ul><li><a href="s110.html">S110</a></li><li><a href="range.html">Range &amp; compare</a></li><li><a href="technology.html">Technology</a></li><li><a href="ownership.html">Ownership &amp; savings</a></li></ul></div>
+      <div><h5>Company</h5><ul><li><a href="about.html">About</a></li><li><a href="about.html#press">News</a></li><li><a href="enquire.html?type=fleet">Fleet sales</a></li><li><a href="enquire.html?type=dealer">Become a dealer</a></li><li><a href="mailto:support@aventose.com">support@aventose.com</a></li></ul></div>
+      <div><h5>Follow</h5><ul>
+        <li><a href="https://www.instagram.com/aventoseenergy/" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="https://www.youtube.com/aventoseenergy" target="_blank" rel="noopener">YouTube</a></li>
+        <li><a href="https://www.linkedin.com/company/aventoseenergy/" target="_blank" rel="noopener">LinkedIn</a></li>
+        <li><a href="https://twitter.com/Aventoseenergy" target="_blank" rel="noopener">X</a></li></ul></div>
+    </div>
+    <div class="f-bot"><span>© 2026 Aventose Energy Pvt Ltd</span><span>Website concept by Marvice Media Private Limited</span></div>
+  </div>
+</footer>
+<script src="assets/site.js?v=5c8d39e0" defer></script>
+</body>
+</html>

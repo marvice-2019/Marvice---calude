@@ -1,0 +1,23 @@
+<section id="savings">
+  <div class="wrap">
+    <div class="head">
+      <div><div class="label rv">Running cost</div><h2 class="cond rv">What petrol<br>costs you.</h2></div>
+      <p class="rv">Set your daily ride and your current bike's mileage. The S110 figure uses its own numbers: a 2.4 kWh battery for about 100 km.</p>
+    </div>
+    <div class="calc rv">
+      <div>
+        <label for="km">Daily ride <b id="kmV"></b></label><input type="range" id="km" min="5" max="120" value="40">
+        <label for="fuel">Petrol price <b id="fuelV"></b></label><input type="range" id="fuel" min="90" max="115" value="102">
+        <label for="mil">Your bike's mileage <b id="milV"></b></label><input type="range" id="mil" min="25" max="70" value="45">
+        <label for="tar">Electricity tariff <b id="tarV"></b></label><input type="range" id="tar" min="4" max="12" value="8">
+      </div>
+      <div class="save">
+        <span class="label">You save each year</span>
+        <b class="cond" id="saveY">₹0</b>
+        <div class="row">Petrol, per month <b id="pM"></b></div>
+        <div class="row">S110 charging, per month <b id="eM"></b></div>
+        <div class="row">Saved over 5 years <b id="s5"></b></div>
+      </div>
+    </div>
+  </div>
+</section>

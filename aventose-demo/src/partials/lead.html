@@ -1,0 +1,168 @@
+<section id="book" style="padding-top:0">
+  <div class="wrap">
+    <div class="lead rv">
+      <aside class="lead-side">
+        <div class="label" style="color:#7d7c78">Enquire</div>
+        <h2 class="cond">Let's find the right Aventose for you.</h2>
+        <p>Four short steps, about a minute. Tell us a little about yourself and the right team will reach out: sales, fleet or dealership.</p>
+        <ol class="steps" id="stepList">
+          <li class="on"><i>1</i><em>About you</em></li>
+          <li><i>2</i><em>Your needs</em></li>
+          <li><i>3</i><em>Contact</em></li>
+          <li><i>4</i><em>Done</em></li>
+        </ol>
+      </aside>
+
+      <form class="lead-main" id="lead" novalidate>
+        <div class="lead-bar"><i id="leadBar"></i></div>
+        <label aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">Website<input name="website" tabindex="-1" autocomplete="off"></label>
+
+        <!-- STEP 1: intent -->
+        <div class="step on" data-step="1">
+          <h3 class="cond">What brings you here?</h3>
+          <p class="sub">Pick the one that fits best.</p>
+          <div class="intents" role="radiogroup" aria-label="Enquiry type">
+            <label><input type="radio" name="intent" value="individual"><span class="card"><span class="ic">01</span><b>Buy for myself</b><small>Personal, family or small-business use. Includes a test ride.</small></span></label>
+            <label><input type="radio" name="intent" value="fleet"><span class="card"><span class="ic">02</span><b>Fleet or business</b><small>Delivery, rental, quick commerce or corporate fleets.</small></span></label>
+            <label><input type="radio" name="intent" value="dealer"><span class="card"><span class="ic">03</span><b>Become a dealer</b><small>Open an Aventose showroom or service point in your city.</small></span></label>
+          </div>
+        </div>
+
+        <!-- STEP 2: needs, branches by intent -->
+        <div class="step" data-step="2">
+          <div data-branch="individual">
+            <h3 class="cond">Tell us how you'll ride.</h3>
+            <p class="sub">This helps us recommend the right model and battery.</p>
+            <fieldset class="q"><legend>Model you're interested in <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="model" value="S110" required><span>S110</span></label>
+              <label><input type="radio" name="model" value="S110 ER"><span>S110 ER (130 km)</span></label>
+              <label><input type="radio" name="model" value="S125"><span>S125</span></label>
+              <label><input type="radio" name="model" value="M125"><span>M125</span></label>
+              <label><input type="radio" name="model" value="Not sure"><span>Help me choose</span></label></div></fieldset>
+            <fieldset class="q"><legend>Main use <em>*</em></legend><div class="pills">
+              <label><input type="checkbox" name="use" value="Daily commute"><span>Daily commute</span></label>
+              <label><input type="checkbox" name="use" value="Business / deliveries"><span>Business / deliveries</span></label>
+              <label><input type="checkbox" name="use" value="Family use"><span>Family use</span></label>
+              <label><input type="checkbox" name="use" value="Farm / rural roads"><span>Farm / rural roads</span></label></div></fieldset>
+            <div class="q rangeq"><span class="qt">Daily distance <output id="dkmO">30 km</output></span><input type="range" name="dailyKm" min="5" max="130" value="30" data-out="dkmO" data-unit=" km"></div>
+            <fieldset class="q"><legend>What do you ride today?</legend><div class="pills">
+              <label><input type="radio" name="current" value="Petrol scooter"><span>Petrol scooter</span></label>
+              <label><input type="radio" name="current" value="Petrol motorcycle"><span>Petrol motorcycle</span></label>
+              <label><input type="radio" name="current" value="Electric two-wheeler"><span>Electric</span></label>
+              <label><input type="radio" name="current" value="No two-wheeler"><span>Nothing yet</span></label></div></fieldset>
+            <fieldset class="q"><legend>When are you planning to buy? <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="timeline" value="This month"><span>This month</span></label>
+              <label><input type="radio" name="timeline" value="1–3 months"><span>1–3 months</span></label>
+              <label><input type="radio" name="timeline" value="3–6 months"><span>3–6 months</span></label>
+              <label><input type="radio" name="timeline" value="Just exploring"><span>Just exploring</span></label></div></fieldset>
+            <fieldset class="q"><legend>How would you like to pay?</legend><div class="pills">
+              <label><input type="radio" name="payment" value="Full payment"><span>Full payment</span></label>
+              <label><input type="radio" name="payment" value="EMI / finance"><span>EMI / finance</span></label>
+              <label><input type="radio" name="payment" value="Exchange old vehicle"><span>Exchange my old vehicle</span></label></div></fieldset>
+            <fieldset class="q"><legend>Can you charge where you park?</legend><div class="pills">
+              <label><input type="radio" name="charging" value="Yes, plug point at parking"><span>Yes, plug point nearby</span></label>
+              <label><input type="radio" name="charging" value="Will carry battery indoors"><span>I'll take the battery inside</span></label>
+              <label><input type="radio" name="charging" value="Not sure"><span>Not sure</span></label></div></fieldset>
+          </div>
+
+          <div data-branch="fleet" hidden>
+            <h3 class="cond">Tell us about your fleet.</h3>
+            <p class="sub">Our fleet team will size a plan, including battery swapping.</p>
+            <div class="grid2">
+              <label class="field">Company name *<input name="company" autocomplete="organization"></label>
+              <label class="field">Cities you operate in<input name="opCities" placeholder="e.g. Chennai, Coimbatore"></label>
+            </div>
+            <fieldset class="q" style="margin-top:22px"><legend>Industry <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="industry" value="Last-mile delivery"><span>Last-mile delivery</span></label>
+              <label><input type="radio" name="industry" value="Quick commerce"><span>Quick commerce</span></label>
+              <label><input type="radio" name="industry" value="Rental / subscription"><span>Rental / subscription</span></label>
+              <label><input type="radio" name="industry" value="Corporate / campus"><span>Corporate / campus</span></label>
+              <label><input type="radio" name="industry" value="Other"><span>Other</span></label></div></fieldset>
+            <fieldset class="q"><legend>Vehicles needed <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="fleetSize" value="1–10"><span>1–10</span></label>
+              <label><input type="radio" name="fleetSize" value="11–50"><span>11–50</span></label>
+              <label><input type="radio" name="fleetSize" value="51–200"><span>51–200</span></label>
+              <label><input type="radio" name="fleetSize" value="200+"><span>200+</span></label></div></fieldset>
+            <div class="q rangeq"><span class="qt">Distance per vehicle, per day <output id="fkmO">80 km</output></span><input type="range" name="fleetKm" min="20" max="200" value="80" data-out="fkmO" data-unit=" km"></div>
+            <fieldset class="q"><legend>Battery swapping needed?</legend><div class="pills">
+              <label><input type="radio" name="swap" value="Yes"><span>Yes</span></label>
+              <label><input type="radio" name="swap" value="No, depot charging"><span>No, we charge at depot</span></label>
+              <label><input type="radio" name="swap" value="Let's discuss"><span>Let's discuss</span></label></div></fieldset>
+            <fieldset class="q"><legend>When do you need vehicles? <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="timeline" value="This month"><span>This month</span></label>
+              <label><input type="radio" name="timeline" value="1–3 months"><span>1–3 months</span></label>
+              <label><input type="radio" name="timeline" value="3–6 months"><span>3–6 months</span></label>
+              <label><input type="radio" name="timeline" value="Planning stage"><span>Planning stage</span></label></div></fieldset>
+          </div>
+
+          <div data-branch="dealer" hidden>
+            <h3 class="cond">Tell us about your business.</h3>
+            <p class="sub">Our network team reviews every dealership application.</p>
+            <div class="grid2">
+              <label class="field">Business name *<input name="business" autocomplete="organization"></label>
+              <label class="field">Proposed city / district *<input name="dealerCity"></label>
+            </div>
+            <fieldset class="q" style="margin-top:22px"><legend>Your current business <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="bizType" value="Two-wheeler dealership"><span>Two-wheeler dealer</span></label>
+              <label><input type="radio" name="bizType" value="Four-wheeler dealership"><span>Four-wheeler dealer</span></label>
+              <label><input type="radio" name="bizType" value="EV dealership"><span>EV dealer</span></label>
+              <label><input type="radio" name="bizType" value="Other business"><span>Other business</span></label>
+              <label><input type="radio" name="bizType" value="New to automotive"><span>New to automotive</span></label></div></fieldset>
+            <fieldset class="q"><legend>Showroom space available</legend><div class="pills">
+              <label><input type="radio" name="space" value="Under 500 sq ft"><span>Under 500 sq ft</span></label>
+              <label><input type="radio" name="space" value="500–1,000 sq ft"><span>500–1,000 sq ft</span></label>
+              <label><input type="radio" name="space" value="1,000–2,000 sq ft"><span>1,000–2,000 sq ft</span></label>
+              <label><input type="radio" name="space" value="2,000+ sq ft"><span>2,000+ sq ft</span></label></div></fieldset>
+            <fieldset class="q"><legend>Investment you're planning <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="investment" value="₹10–25 lakh"><span>₹10–25 lakh</span></label>
+              <label><input type="radio" name="investment" value="₹25–50 lakh"><span>₹25–50 lakh</span></label>
+              <label><input type="radio" name="investment" value="₹50 lakh+"><span>₹50 lakh+</span></label></div></fieldset>
+            <fieldset class="q"><legend>When could you start? <em>*</em></legend><div class="pills">
+              <label><input type="radio" name="timeline" value="Within 3 months"><span>Within 3 months</span></label>
+              <label><input type="radio" name="timeline" value="3–6 months"><span>3–6 months</span></label>
+              <label><input type="radio" name="timeline" value="Exploring"><span>Exploring</span></label></div></fieldset>
+          </div>
+        </div>
+
+        <!-- STEP 3: contact -->
+        <div class="step" data-step="3">
+          <h3 class="cond">How do we reach you?</h3>
+          <p class="sub">We only use this to respond to your enquiry.</p>
+          <div class="grid2">
+            <label class="field">Full name *<input name="name" autocomplete="name"></label>
+            <label class="field">Mobile *<input name="phone" inputmode="numeric" maxlength="10" autocomplete="tel-national" placeholder="10-digit number"></label>
+            <label class="field">Email<input name="email" type="email" autocomplete="email"></label>
+            <label class="field">Pincode *<input name="pincode" inputmode="numeric" maxlength="6" autocomplete="postal-code"></label>
+          </div>
+          <fieldset class="q" style="margin-top:22px"><legend>Best way to reach you</legend><div class="pills">
+            <label><input type="radio" name="channel" value="WhatsApp" checked><span>WhatsApp</span></label>
+            <label><input type="radio" name="channel" value="Phone call"><span>Phone call</span></label>
+            <label><input type="radio" name="channel" value="Email"><span>Email</span></label></div></fieldset>
+          <fieldset class="q"><legend>Best time</legend><div class="pills">
+            <label><input type="radio" name="time" value="Morning (9–12)"><span>Morning</span></label>
+            <label><input type="radio" name="time" value="Afternoon (12–4)"><span>Afternoon</span></label>
+            <label><input type="radio" name="time" value="Evening (4–8)" checked><span>Evening</span></label></div></fieldset>
+          <label class="check" data-only="individual"><input type="checkbox" name="testRide" value="yes" checked>Bring an S110 to me for a test ride</label>
+          <label class="check"><input type="checkbox" name="consent" value="yes">I agree that Aventose Energy may contact me about this enquiry by call, SMS, WhatsApp or email. *</label>
+        </div>
+
+        <!-- STEP 4: done -->
+        <div class="step" data-step="4">
+          <h3 class="cond" id="doneTitle">Thank you.</h3>
+          <span class="done-ref" id="doneRef"></span>
+          <div class="summary" id="summary"></div>
+          <div class="label" style="margin-bottom:10px">What happens next</div>
+          <ol class="next" id="nextSteps"></ol>
+          <a class="btn" id="waBtn" target="_blank" rel="noopener">Continue on WhatsApp</a>
+          <details class="payload"><summary>Demo: lead data captured for the CRM</summary><pre id="payload"></pre></details>
+        </div>
+
+        <div class="err" id="leadErr" role="alert"></div>
+        <div class="lead-actions" id="leadActions">
+          <button type="button" class="btn line" id="leadBack">Back</button>
+          <button type="submit" class="btn" id="leadNext">Continue</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

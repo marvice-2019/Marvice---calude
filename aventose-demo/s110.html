@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aventose S110 — Configure, explore and specifications</title>
+<meta name="description" content="Choose battery and colour, explore every detail and see full specifications of the ARAI certified Aventose S110.">
+<meta property="og:title" content="Aventose S110 — Configure, explore and specifications">
+<meta property="og:description" content="Choose battery and colour, explore every detail and see full specifications of the ARAI certified Aventose S110.">
+<meta property="og:image" content="assets/img/IntheVillage.webp">
+<meta name="theme-color" content="#0c0e0f">
+<link rel="icon" href="assets/logo_black.6dfd8e2.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=5c8d39e0">
+</head>
+<body data-page="s110">
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="wrap bar">
+    <a href="index.html" aria-label="Aventose Energy home"><img src="assets/logo_black.6dfd8e2.png" alt="Aventose Energy"></a>
+    <nav id="nav" aria-label="Main"><a href="s110.html" data-nav="s110">S110</a><a href="range.html" data-nav="range">Range</a><a href="technology.html" data-nav="technology">Technology</a><a href="ownership.html" data-nav="ownership">Ownership</a><a href="about.html" data-nav="about">About</a></nav>
+    <div style="display:flex;gap:14px;align-items:center">
+      <a href="enquire.html" class="btn mag">Book a test ride</a>
+      <button class="menu" id="menu" aria-expanded="false" aria-controls="overlay"><span>Menu</span><i class="lines" aria-hidden="true"></i></button>
+    </div>
+  </div>
+</header>
+
+<div class="overlay" id="overlay">
+  <ol class="ov-links"><li><a href="index.html" data-nav="home" style="--i:0"><small>01</small>Home</a></li><li><a href="s110.html" data-nav="s110" style="--i:1"><small>02</small>S110</a></li><li><a href="range.html" data-nav="range" style="--i:2"><small>03</small>Range</a></li><li><a href="technology.html" data-nav="technology" style="--i:3"><small>04</small>Technology</a></li><li><a href="ownership.html" data-nav="ownership" style="--i:4"><small>05</small>Ownership</a></li><li><a href="about.html" data-nav="about" style="--i:5"><small>06</small>About</a></li><li><a href="enquire.html" data-nav="enquire" style="--i:6"><small>07</small>Enquire</a></li></ol>
+  <div class="ov-side">
+    <img src="assets/img/GreenBike.webp" alt="Aventose S110" loading="lazy">
+    <p>Aventose Energy Pvt Ltd · Designed and built in India<br>C-33, Arihant Amara, 49 Poonamallee High Road, Chennai 600056<br><a href="mailto:support@aventose.com">support@aventose.com</a></p>
+    <a class="btn light" href="enquire.html">Book a test ride</a>
+  </div>
+</div>
+
+<main>
+<section class="cfg">
+  <div class="wrap cfg-grid">
+    <div class="stage rv">
+      <img id="cfgGreen" src="assets/img/GreenBike.webp" alt="Aventose S110 in green">
+      <img id="cfgBlack" src="assets/img/BlackBike.webp" alt="Aventose S110 in black" hidden>
+    </div>
+    <div>
+      <div class="crumbs"><a href="index.html">Home</a> / S110</div>
+      <div class="label">Build yours</div>
+      <h1 class="cond" id="cfgName">S110</h1>
+      <div class="cfg-num"><b id="cfgRange" data-from="0">100</b><span>km on-road range</span></div>
+      <div class="cfg-bar"><i id="cfgBar"></i></div>
+      <div class="label">Battery</div>
+      <div class="opts" role="group" aria-label="Battery">
+        <button data-battery="std" aria-pressed="true">Standard <small>2.4 kWh</small></button>
+        <button data-battery="er" aria-pressed="false">Extended range <small>3.2 kWh</small></button>
+      </div>
+      <div class="label">Colour</div>
+      <div class="colors" role="group" aria-label="Colour">
+        <button data-show="cfgGreen" aria-pressed="true"><i style="background:rgb(31,100,97)"></i>Green</button>
+        <button data-show="cfgBlack" aria-pressed="false"><i style="background:#111;border:1px solid #444"></i>Black</button>
+      </div>
+      <div class="cfg-meta">
+        <div>Battery<b id="cfgKwh">2.4 kWh LFP</b></div>
+        <div>Colour<b id="cfgColour">Green</b></div>
+        <div>Top speed<b>60 km/h</b></div>
+        <div>Est. ex-showroom<b id="cfgPrice">₹1,19,900*</b></div>
+      </div>
+      <div class="cfg-acts"><a class="btn light mag" id="cfgEnquire" href="enquire.html?type=individual&amp;model=S110">Book a test ride</a><a class="btn line" href="#specs">Full specifications</a></div>
+    </div>
+  </div>
+</section><section class="explore" id="explore">
+  <div class="wrap">
+    <div class="head">
+      <div><div class="label rv">Explore the S110</div><h2 class="cond rv">Look closer.<br>Tap any point.</h2></div>
+      <p class="rv">Seven things that make the S110 rugged, practical and easy to own. Tap a point on the scooter, or let it walk you through.</p>
+    </div>
+    <div class="ex-grid">
+      <div class="ex-stage" id="exStage">
+        <img src="assets/img/GreenBike.webp" alt="Aventose S110, side view with interactive points" loading="lazy">
+        <div class="scan"></div>
+      </div>
+      <div class="ex-panel" id="exPanel" aria-live="polite">
+        <div class="ph"><img id="exImg" src="assets/img/SafeMode.webp" alt="" loading="lazy"></div>
+        <div class="ex-meta"><span class="count"><b id="exN">01</b> / 07</span>
+          <div class="ex-nav"><button id="exPrev" aria-label="Previous point">←</button><button id="exNext" aria-label="Next point">→</button></div></div>
+        <div class="swap"><h3 class="cond" id="exTitle"></h3><p id="exText"></p></div>
+        <div class="ex-bar"><i id="exBar"></i></div>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="reel" id="reel" style="padding:0">
+  <div class="reel-sticky">
+    <div class="wrap reel-head">
+      <div><div class="label">Everyday details</div><h2 class="cond">Nine small things.<br>One easy life.</h2></div>
+      <div class="reel-count"><b id="reelN">01</b> / 09 &nbsp;·&nbsp; scroll</div>
+    </div>
+    <div class="reel-track" id="reelTrack">
+      <figure><div class="ph"><img src="assets/img/ChargingAnywhere.webp" alt="Charging the S110 battery at home" loading="lazy"></div><h4><span>01</span>Charge anywhere</h4><p>Charging flexibility with a removable battery and portable charger.</p></figure>
+      <figure><div class="ph"><img src="assets/img/Removable.webp" alt="Removing the S110 battery" loading="lazy"></div><h4><span>02</span>Removable battery</h4><p>Under-seat battery storage for easy access and handling.</p></figure>
+      <figure><div class="ph"><img src="assets/img/PortableCharger.webp" alt="S110 portable charger" loading="lazy"></div><h4><span>03</span>Portable charger</h4><p>Lightweight charger for easy handling.</p></figure>
+      <figure><div class="ph"><img src="assets/img/SafeMode.webp" alt="S110 display in Safe Mode" loading="lazy"></div><h4><span>04</span>Safe Mode</h4><p>Detects abnormal temperature rise in critical parts and switches to Safe Mode. It also boosts range when the battery is low.</p></figure>
+      <figure><div class="ph"><img src="assets/img/Regeneration.webp" alt="S110 regeneration indicator" loading="lazy"></div><h4><span>05</span>Regeneration</h4><p>Charges the vehicle while it slows down, with an engine-braking feel for better control.</p></figure>
+      <figure><div class="ph"><img src="assets/img/LongStandby.webp" alt="S110 key and display" loading="lazy"></div><h4><span>06</span>Long standby</h4><p>Complete shutdown when the ignition is off, so the battery holds its charge.</p></figure>
+      <figure><div class="ph"><img src="assets/img/DiscBrakes.webp" alt="S110 front disc brake" loading="lazy"></div><h4><span>07</span>Disc brakes, CBS</h4><p>Front and rear discs with a combined braking system.</p></figure>
+      <figure><div class="ph"><img src="assets/img/vehicaleErgonomics.webp" alt="Rider on the S110 showing legroom" loading="lazy"></div><h4><span>08</span>Room to move</h4><p>Large, uninterrupted legroom and an adjustable handlebar for a comfortable posture.</p></figure>
+      <figure><div class="ph"><img src="assets/img/EaseofServiceability.webp" alt="S110 being serviced" loading="lazy"></div><h4><span>09</span>Easy to service</h4><p>Modular mounting and easily available spares mean minimal downtime.</p></figure>
+    </div>
+    <div class="reel-line"><i id="reelLine"></i></div>
+  </div>
+</section>
+<section id="specs">
+  <div class="wrap">
+    <div class="head"><div><div class="label rv">Specifications</div><h2 class="cond rv">Every number,<br>in one place.</h2></div>
+      <p class="rv">From Aventose Energy's published specification sheet. Specifications could vary slightly in the final product.</p></div>
+    <div class="acc rv">
+      <details open><summary>Performance</summary><div class="acc-body">
+        <div><span>Range (on road)</span><b>100 km · 130 km ER</b></div><div><span>Top speed</span><b>60 km/h</b></div>
+        <div><span>Wheel torque</span><b>156 Nm</b></div><div><span>Motor torque</span><b>20 Nm</b></div>
+        <div><span>Motor</span><b>Mid-mounted PMSM</b></div><div><span>Transmission</span><b>Double stage</b></div>
+        <div><span>Power (peak / rated)</span><b>3 / 2.1 kW</b></div><div><span>Motor protection</span><b>IP67</b></div></div></details>
+      <details><summary>Battery &amp; charging</summary><div class="acc-body">
+        <div><span>Battery</span><b>2.4 kWh LFP</b></div><div><span>Battery, ER</span><b>3.2 kWh NMC</b></div>
+        <div><span>Battery protection</span><b>IP67</b></div><div><span>Charging time</span><b>80% in 4 h · 100% in 6 h</b></div>
+        <div><span>Removable battery</span><b>Yes</b></div><div><span>Battery swapping</span><b>Yes</b></div>
+        <div><span>Fixed charging</span><b>Yes</b></div><div><span>Charger</span><b>Portable</b></div></div></details>
+      <details><summary>Chassis &amp; brakes</summary><div class="acc-body">
+        <div><span>Chassis</span><b>42 mm parallel tubular</b></div><div><span>Ground clearance</span><b>175 mm</b></div>
+        <div><span>Wheels</span><b>17" / 17" alloy</b></div><div><span>Tyres</span><b>Tubeless</b></div>
+        <div><span>Brakes</span><b>Front &amp; rear disc, CBS</b></div><div><span>Suspension</span><b>Hydraulic, twin rear shocks</b></div>
+        <div><span>Weight with battery</span><b>125 kg</b></div><div><span>Display &amp; VCU</span><b>IP65</b></div></div></details>
+      <details><summary>Warranty &amp; price</summary><div class="acc-body">
+        <div><span>Battery warranty</span><b>8 years / 1,00,000 km</b></div><div><span>Motor warranty</span><b>3 years / 50,000 km</b></div>
+        <div><span>Service life (ARAI)</span><b>2,00,000 km</b></div><div><span>Est. ex-showroom</span><b>₹1,19,900*</b></div></div></details>
+    </div>
+  </div>
+</section>
+</main>
+<a class="nextpage" href="range.html"><img src="assets/img/RenderFinal.webp" alt="" loading="lazy">
+  <div class="wrap"><div><div class="label">Next</div><h2 class="cond">The range</h2></div><span class="arrow" aria-hidden="true">→</span></div></a>
+<footer>
+  <div class="wrap">
+    <div class="f-grid">
+      <div><img src="assets/logo_black.6dfd8e2.png" alt="Aventose Energy"><p style="margin-top:20px;max-width:320px">Rugged electric mobility, designed and built in India.<br>C-33, Arihant Amara, 49 Poonamallee High Road, Chennai 600056</p></div>
+      <div><h5>Explore</h5><ul><li><a href="s110.html">S110</a></li><li><a href="range.html">Range &amp; compare</a></li><li><a href="technology.html">Technology</a></li><li><a href="ownership.html">Ownership &amp; savings</a></li></ul></div>
+      <div><h5>Company</h5><ul><li><a href="about.html">About</a></li><li><a href="about.html#press">News</a></li><li><a href="enquire.html?type=fleet">Fleet sales</a></li><li><a href="enquire.html?type=dealer">Become a dealer</a></li><li><a href="mailto:support@aventose.com">support@aventose.com</a></li></ul></div>
+      <div><h5>Follow</h5><ul>
+        <li><a href="https://www.instagram.com/aventoseenergy/" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="https://www.youtube.com/aventoseenergy" target="_blank" rel="noopener">YouTube</a></li>
+        <li><a href="https://www.linkedin.com/company/aventoseenergy/" target="_blank" rel="noopener">LinkedIn</a></li>
+        <li><a href="https://twitter.com/Aventoseenergy" target="_blank" rel="noopener">X</a></li></ul></div>
+    </div>
+    <div class="f-bot"><span>© 2026 Aventose Energy Pvt Ltd</span><span>Website concept by Marvice Media Private Limited</span></div>
+  </div>
+</footer>
+<script src="assets/site.js?v=5c8d39e0" defer></script>
+</body>
+</html>
