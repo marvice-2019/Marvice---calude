@@ -15,7 +15,7 @@ def fix_links(html):
 
 NAV = [('home', 'index.html', 'Home'), ('s110', 's110.html', 'S110'), ('range', 'range.html', 'Range'),
        ('technology', 'technology.html', 'Technology'), ('ownership', 'ownership.html', 'Ownership'),
-       ('about', 'about.html', 'About'), ('enquire', 'enquire.html', 'Enquire')]
+       ('about', 'about.html', 'About'), ('team', 'team.html', 'Team'), ('enquire', 'enquire.html', 'Enquire')]
 
 
 import hashlib
@@ -23,7 +23,7 @@ VER = hashlib.md5(open("assets/site.css","rb").read()+open("assets/site.js","rb"
 
 
 def layout(pid, title, desc, body, nxt=None):
-    inline = ''.join(f'<a href="{h}" data-nav="{i}">{t}</a>' for i, h, t in NAV[1:6])
+    inline = ''.join(f'<a href="{h}" data-nav="{i}">{t}</a>' for i, h, t in NAV[1:7])
     big = ''.join(f'<li><a href="{h}" data-nav="{i}" style="--i:{k}"><small>{k + 1:02d}</small>{t}</a></li>' for k, (i, h, t) in enumerate(NAV))
     nextblock = ''
     if nxt:
@@ -79,7 +79,7 @@ def layout(pid, title, desc, body, nxt=None):
     <div class="f-grid">
       <div><img src="assets/logo_black.6dfd8e2.png" alt="Aventose Energy"><p style="margin-top:20px;max-width:320px">Rugged electric mobility, designed and built in India.<br>C-33, Arihant Amara, 49 Poonamallee High Road, Chennai 600056</p></div>
       <div><h5>Explore</h5><ul><li><a href="s110.html">S110</a></li><li><a href="range.html">Range &amp; compare</a></li><li><a href="technology.html">Technology</a></li><li><a href="ownership.html">Ownership &amp; savings</a></li></ul></div>
-      <div><h5>Company</h5><ul><li><a href="about.html">About</a></li><li><a href="about.html#press">News</a></li><li><a href="enquire.html?type=fleet">Fleet sales</a></li><li><a href="enquire.html?type=dealer">Become a dealer</a></li><li><a href="mailto:support@aventose.com">support@aventose.com</a></li></ul></div>
+      <div><h5>Company</h5><ul><li><a href="about.html">About</a></li><li><a href="team.html">Team</a></li><li><a href="about.html#press">News</a></li><li><a href="enquire.html?type=fleet">Fleet sales</a></li><li><a href="enquire.html?type=dealer">Become a dealer</a></li><li><a href="mailto:support@aventose.com">support@aventose.com</a></li></ul></div>
       <div><h5>Follow</h5><ul>
         <li><a href="https://www.instagram.com/aventoseenergy/" target="_blank" rel="noopener">Instagram</a></li>
         <li><a href="https://www.youtube.com/aventoseenergy" target="_blank" rel="noopener">YouTube</a></li>
@@ -405,6 +405,60 @@ about = phero('FortheEntrepreneur.webp', 'About', 'Designed &amp; built', 'in In
   </div>
 </section>'''
 
+# ------------------------------------------------------------------ TEAM
+# Names, photos and LinkedIn links from aventoseenergy.com/team. Only Vilas Tank's
+# role is published (co-founder, per his LinkedIn founder interview); others await titles.
+TEAM = [
+    ('Vilas Tank', 'Co-founder', 'vilas-tank', 'https://www.linkedin.com/in/vilas-tank-711a5615/'),
+    ('Gayatri Soni', 'Leadership team', 'gayatri-soni', 'https://www.linkedin.com/in/gayatrisoni/'),
+    ('Nikhil Warwadekar', 'Leadership team', 'nikhil-warwadekar', 'https://www.linkedin.com/in/nikhilwarwadekar/'),
+    ('Geeth Prajwal Reddy', 'Leadership team', 'geeth-prajwal-reddy', 'https://www.linkedin.com/in/geethprajwal/'),
+    ('Rajesh Sreenath', 'Leadership team', 'rajesh-sreenath', 'https://www.linkedin.com/in/rajeshsreenath/'),
+]
+members = ''.join(f'''
+      <a class="member" href="{li}" target="_blank" rel="noopener" aria-label="{name}, {role} — LinkedIn profile">
+        <span class="m-num">{k + 1:02d}</span>
+        <span class="m-photo"><img src="assets/img/{img}.webp" alt="{name}" width="270" height="270" loading="lazy"></span>
+        <span class="label">{role}</span>
+        <h3 class="cond">{name}</h3>
+        <span class="m-li">LinkedIn ↗</span>
+      </a>''' for k, (name, role, img, li) in enumerate(TEAM))
+
+team = f'''<section class="team-hero">
+  <div class="wrap">
+    <div class="crumbs"><a href="index.html">Home</a> / Team</div>
+    <div class="label">Leadership</div>
+    <h1 class="cond"><span class="ln"><span>The people</span></span><span class="ln"><span>behind Aventose.</span></span></h1>
+    <p class="lede">Engineers and operators building rugged, safe and flexible-charging electric two-wheelers, designed and built in India.</p>
+  </div>
+</section>
+<section class="team-sec">
+  <div class="wrap">
+    <div class="team-grid stagger">{members}
+    </div>
+  </div>
+</section>
+<section class="team-feature">
+  <div class="wrap team-feature-grid">
+    <span class="m-photo big rv"><img src="assets/img/vilas-tank.webp" alt="Vilas Tank" width="270" height="270" loading="lazy"></span>
+    <div class="txt">
+      <div class="label rv">Founder interview</div>
+      <h3 class="cond rv">Vilas Tank on building Aventose Energy.</h3>
+      <p class="rv">Co-founder Vilas Tank's interview with Xtrawrkx on building Aventose Energy, published on LinkedIn.</p>
+      <p class="rv" style="margin-top:22px"><a class="btn line mag" href="https://www.linkedin.com/pulse/founder-interview-vilas-tank-cofounder-aventose-energy-xtrawrkx-nbekc/" target="_blank" rel="noopener">Read the interview on LinkedIn ↗</a></p>
+    </div>
+  </div>
+</section>
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="contact-grid stagger">
+      <div><span class="label">Careers</span><b><a href="mailto:contact@aventose.com?subject=Careers%20at%20Aventose">contact@aventose.com</a></b>Want to build electric mobility with us? Send your profile.</div>
+      <div><span class="label">Partners</span><b><a href="enquire.html?type=dealer">Become a dealer</a></b>Open an Aventose showroom or service point.</div>
+      <div><span class="label">Fleets</span><b><a href="enquire.html?type=fleet">Fleet sales</a></b>Electric vehicles for delivery and rental businesses.</div>
+    </div>
+  </div>
+</section>'''
+
 # ------------------------------------------------------------------ ENQUIRE
 enquire = '<div style="height:clamp(100px,10vw,130px)"></div>' + fix_links(P('lead')).replace('<h2 class="cond">Let\'s find the right Aventose for you.</h2>', '<h1 class="cond" style="font-size:clamp(38px,3.6vw,56px)">Let\'s find the right Aventose for you.</h1>').replace('style="padding-top:0"', 'style="padding-top:0;padding-bottom:clamp(48px,6vw,90px)"', 1) + '''
 <section style="padding-top:0">
@@ -423,7 +477,8 @@ PAGES = [
     ('range.html', 'range', 'Aventose range — S110, S125, M125, M150 compared', 'Compare Aventose electric scooters and motorcycles side by side: range, speed, torque, battery and price.', range_body, ('technology.html', 'Technology', 'Transmission.webp')),
     ('technology.html', 'technology', 'Aventose technology — T.E.J.A.S battery, AURA VCU, IP67', 'Inside Aventose: an 8-year LFP battery, the active-learning AURA VCU and an IP67, ARAI-certified rugged platform.', technology, ('ownership.html', 'Ownership', 'FortheOfficeGoer.webp')),
     ('ownership.html', 'ownership', 'Owning an Aventose — savings, warranty, charging', 'Calculate your petrol savings and see warranty, charging and service details for the Aventose S110.', ownership, ('about.html', 'About Aventose', 'FortheEntrepreneur.webp')),
-    ('about.html', 'about', 'About Aventose Energy — designed and built in India', 'Aventose Energy builds safe, rugged, flexible-charging electric two-wheelers in Chennai.', about, ('enquire.html', 'Book a test ride', 'closeimage.webp')),
+    ('about.html', 'about', 'About Aventose Energy — designed and built in India', 'Aventose Energy builds safe, rugged, flexible-charging electric two-wheelers in Chennai.', about, ('team.html', 'Meet the team', 'IntheCity.webp')),
+    ('team.html', 'team', 'Team — the people behind Aventose Energy', 'Meet the leadership team building Aventose Energy\'s rugged electric two-wheelers in India.', team, ('enquire.html', 'Book a test ride', 'closeimage.webp')),
     ('enquire.html', 'enquire', 'Enquire — test ride, fleet or dealership | Aventose Energy', 'Book an S110 test ride, plan an electric fleet, or apply to become an Aventose dealer.', enquire, None),
 ]
 
