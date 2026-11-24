@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aventose Energy — Rugged Electric Mobility</title>
+<meta name="description" content="Aventose S110. Rugged electric mobility engineered for real Indian roads. Prebook your test ride.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;500;700;800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06080a; --bg2:#0b0f12; --panel:#0f1519; --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+  --ink:#eef3f2; --mute:#8b9a99; --dim:#5b6968;
+  --teal:#3fe0c5; --teal-d:#1f6461; --amber:#ffb547;
+  --body-c:#1f6461; --body-hi:#2e8a85; /* colourway, switched by JS */
+  --r:22px; --pad:clamp(16px,4vw,56px);
+  --disp:"Unbounded",system-ui,sans-serif; --sans:"Inter Tight",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{overflow-x:clip;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.55;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img,svg{display:block;max-width:100%}
+.wrap{max-width:1320px;margin:0 auto;padding:0 var(--pad)}
+.mono{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.kicker{display:inline-flex;align-items:center;gap:10px}
+.kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 14px var(--teal)}
+h1,h2,h3{font-family:var(--disp);font-weight:700;letter-spacing:-.02em;line-height:1.02}
+h2{font-size:clamp(34px,5.4vw,76px)}
+.grad{background:linear-gradient(100deg,#fff 10%,var(--teal) 60%,#9ffbe9);-webkit-background-clip:text;background-clip:text;color:transparent}
+.btn{display:inline-flex;align-items:center;gap:12px;height:54px;padding:0 26px;border-radius:999px;font-weight:600;font-size:15px;transition:transform .25s,box-shadow .25s,background .25s;cursor:pointer;border:0;font-family:var(--sans)}
+.btn-p{background:var(--teal);color:#03211d;box-shadow:0 0 0 0 rgba(63,224,197,.5)}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 12px 40px -8px rgba(63,224,197,.6)}
+.btn-g{background:rgba(255,255,255,.04);color:var(--ink);border:1px solid var(--line2);backdrop-filter:blur(10px)}
+.btn-g:hover{background:rgba(255,255,255,.09)}
+.btn .arr{transition:transform .25s}.btn:hover .arr{transform:translateX(4px)}
+
+/* NAV */
+.nav{position:fixed;inset:14px 14px auto;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 10px 10px 22px;border-radius:999px;background:rgba(8,11,13,.55);border:1px solid var(--line);backdrop-filter:blur(18px) saturate(140%);transition:background .3s}
+.nav.solid{background:rgba(8,11,13,.85)}
+.logo{height:30px;filter:invert(1);mix-blend-mode:screen}
+.nav ul{display:flex;gap:30px;list-style:none;font-size:14px;color:var(--mute)}
+.nav ul a:hover{color:var(--ink)}
+.nav .btn{height:44px;padding:0 20px;font-size:14px}
+.burger{display:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);background:none;color:var(--ink);font-size:18px}
+
+/* HERO */
+.hero{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:flex-end;padding:120px 0 40px;overflow:hidden;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;z-index:-2;background:
+  radial-gradient(60% 50% at 70% 55%,rgba(63,224,197,.16),transparent 70%),
+  radial-gradient(40% 40% at 15% 20%,rgba(31,100,97,.35),transparent 70%),var(--bg)}
+.grid-floor{position:absolute;left:-20%;right:-20%;bottom:-10%;height:55%;z-index:-1;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;transform:perspective(700px) rotateX(62deg);transform-origin:center top;
+  mask-image:linear-gradient(to bottom,transparent,#000 30%,#000 70%,transparent);animation:floor 6s linear infinite}
+@keyframes floor{to{background-position:0 64px,0 0}}
+.hero-top{display:grid;grid-template-columns:.9fr 1.1fr;align-items:center;gap:20px}
+.hero h1{font-size:clamp(44px,6.2vw,96px);font-weight:800}
+.hero h1 span{display:block}
+.hero p.lead{max-width:470px;color:var(--mute);font-size:clamp(16px,1.4vw,19px);margin:26px 0 32px}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px}
+.bike-stage{position:relative}
+.bike-stage .halo{position:absolute;left:12%;right:8%;bottom:10%;height:16%;border-radius:50%;background:radial-gradient(closest-side,rgba(63,224,197,.45),transparent);filter:blur(18px)}
+.bike{width:112%;margin-left:-4%;filter:drop-shadow(0 40px 50px rgba(0,0,0,.6));transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.wheel-spin{transform-box:fill-box;transform-origin:center;animation:spin 1.4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.swatches{position:relative;display:flex;gap:10px;justify-content:center;margin-top:8px}
+.sw{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;padding:6px 14px 6px 6px;font-size:13px;color:var(--mute);cursor:pointer;transition:.25s}
+.sw i{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.25)}
+.sw[aria-pressed="true"]{color:var(--ink);border-color:var(--teal)}
+.hero-stats{margin-top:46px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
+.hero-stats div{padding:22px 0 0;border-right:1px solid var(--line);padding-left:22px}
+.hero-stats div:first-child{padding-left:0}.hero-stats div:last-child{border:0}
+.hero-stats b{display:block;font-family:var(--disp);font-size:clamp(24px,2.8vw,40px);font-weight:500}
+.hero-stats b small{font-size:.45em;color:var(--mute);margin-left:4px}
+
+/* MARQUEE */
+.marquee{border-block:1px solid var(--line);overflow:hidden;padding:18px 0;background:var(--bg2)}
+.marquee-track{display:flex;gap:56px;width:max-content;animation:mq 30s linear infinite;font-family:var(--disp);font-size:clamp(18px,2vw,26px);font-weight:300;color:var(--mute)}
+.marquee-track span{display:flex;align-items:center;gap:56px;white-space:nowrap}
+.marquee-track span::after{content:"✦";color:var(--teal);font-size:.7em}
+@keyframes mq{to{transform:translateX(-50%)}}
+
+section{padding:clamp(80px,12vw,160px) 0}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:30px;margin-bottom:60px;flex-wrap:wrap}
+.sec-head p{max-width:420px;color:var(--mute)}
+
+/* SPECS */
+.spec-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{position:relative;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border:1px solid var(--line);border-radius:var(--r);padding:28px;overflow:hidden;transition:border-color .3s,transform .4s}
+.card:hover{border-color:rgba(63,224,197,.35)}
+.card::after{content:"";position:absolute;inset:0;background:radial-gradient(400px circle at var(--mx,50%) var(--my,50%),rgba(63,224,197,.10),transparent 40%);opacity:0;transition:opacity .3s;pointer-events:none}
+.card:hover::after{opacity:1}
+.c-big{grid-column:span 6;min-height:340px;display:flex;flex-direction:column;justify-content:space-between}
+.c-med{grid-column:span 3;min-height:340px;display:flex;flex-direction:column;justify-content:space-between}
+.c-third{grid-column:span 4}
+.num{font-family:var(--disp);font-size:clamp(56px,7vw,104px);font-weight:500;line-height:1;letter-spacing:-.04em}
+.num small{font-size:.32em;color:var(--mute);letter-spacing:0;margin-left:6px}
+.card h3{font-size:20px;font-weight:500;margin:14px 0 8px}
+.card p{color:var(--mute);font-size:15px}
+.gauge{position:relative;width:100%;max-width:260px;margin-left:auto}
+.gauge circle{fill:none;stroke-width:10}
+.bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:18px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal-d),var(--teal));border-radius:9px;transition:width 1.6s cubic-bezier(.2,.8,.2,1)}
+.in .bar i{width:var(--w)}
+.note{margin-top:18px;font-size:12px;color:var(--dim)}
+
+/* RUGGED */
+.rugged{background:var(--bg2);border-block:1px solid var(--line)}
+.rug-list{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--line)}
+.rug{padding:36px 30px 40px 0;border-right:1px solid var(--line)}
+.rug+.rug{padding-left:30px}.rug:last-child{border:0}
+.rug .idx{font-family:var(--mono);color:var(--teal);font-size:13px}
+.rug h3{font-size:clamp(22px,2.2vw,30px);margin:40px 0 14px;font-weight:500}
+.rug p{color:var(--mute)}
+.terrain{height:120px;margin-top:0;width:100%}
+.terrain path{stroke:var(--teal);stroke-width:1.5;fill:none;stroke-dasharray:1600;stroke-dashoffset:1600;transition:stroke-dashoffset 2.6s ease}
+.in .terrain path{stroke-dashoffset:0}
+
+/* CALC */
+.calc{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.calc .card{padding:clamp(26px,3vw,44px)}
+.calc label{display:flex;justify-content:space-between;font-size:15px;color:var(--mute);margin-bottom:14px}
+.calc label b{color:var(--ink);font-family:var(--mono);font-weight:500}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:9px;background:linear-gradient(90deg,var(--teal) var(--p,30%),var(--line2) var(--p,30%));outline:none;margin-bottom:34px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:#fff;border:6px solid var(--teal);box-shadow:0 0 20px rgba(63,224,197,.6);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:6px solid var(--teal);cursor:pointer}
+.save{font-family:var(--disp);font-size:clamp(48px,6vw,88px);font-weight:500;letter-spacing:-.04em;line-height:1}
+.rows{margin-top:30px;border-top:1px solid var(--line)}
+.rows div{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line);font-size:15px;color:var(--mute)}
+.rows div b{color:var(--ink);font-weight:500;font-family:var(--mono)}
+
+/* APP */
+.app{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.phone{width:min(330px,82vw);aspect-ratio:9/19;margin:0 auto;border-radius:46px;padding:12px;background:linear-gradient(160deg,#2a3236,#0b0f12);box-shadow:0 60px 120px -30px rgba(63,224,197,.35),inset 0 0 0 1px rgba(255,255,255,.1)}
+.screen{height:100%;border-radius:36px;background:radial-gradient(80% 50% at 50% 0%,rgba(63,224,197,.18),transparent),#070a0c;padding:46px 20px 20px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.scr-top{display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+.ring{position:relative;width:180px;height:180px;margin:6px auto}
+.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:12}
+.ring .lbl{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .lbl b{font-family:var(--disp);font-size:40px;font-weight:500}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:16px;padding:12px;font-size:12px;color:var(--mute)}
+.tile b{display:block;color:var(--ink);font-size:17px;font-weight:600;margin-top:2px}
+.lock{margin-top:auto;height:48px;border-radius:14px;background:var(--teal);color:#03211d;display:grid;place-items:center;font-weight:600;font-size:14px}
+.feat-list{list-style:none;margin-top:36px;border-top:1px solid var(--line)}
+.feat-list li{display:flex;gap:18px;padding:20px 0;border-bottom:1px solid var(--line)}
+.feat-list li span{font-family:var(--mono);color:var(--teal);font-size:13px;padding-top:3px}
+.feat-list li b{display:block;font-weight:600}
+.feat-list li p{color:var(--mute);font-size:15px}
+
+/* PREBOOK */
+.prebook{position:relative;border-radius:36px;overflow:hidden;padding:clamp(36px,6vw,90px);border:1px solid var(--line);
+  background:radial-gradient(70% 90% at 100% 0%,rgba(63,224,197,.22),transparent 60%),linear-gradient(160deg,#0d1a1a,#070a0c)}
+.prebook-g{display:grid;grid-template-columns:1.1fr 1fr;gap:50px;align-items:center}
+.form{display:grid;gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field span{font-size:12px;color:var(--mute);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.field input,.field select{height:54px;border-radius:14px;border:1px solid var(--line2);background:rgba(0,0,0,.35);color:var(--ink);padding:0 16px;font:inherit;font-size:16px;outline:none;transition:border-color .2s}
+.field input:focus,.field select:focus{border-color:var(--teal)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form .btn{justify-content:center;width:100%;margin-top:6px}
+.form-msg{font-size:14px;color:var(--teal);min-height:20px}
+.wa{display:inline-flex;align-items:center;gap:8px;color:var(--mute);font-size:14px;margin-top:6px}
+.wa:hover{color:var(--ink)}
+
+footer{padding:80px 0 40px;border-top:1px solid var(--line);margin-top:clamp(80px,10vw,140px)}
+.f-top{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:40px}
+footer h4{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:var(--dim);font-weight:400;margin-bottom:16px;text-transform:uppercase}
+footer ul{list-style:none;display:grid;gap:10px;color:var(--mute);font-size:15px}
+footer ul a:hover{color:var(--teal)}
+.f-big{font-family:var(--disp);font-weight:800;font-size:clamp(48px,13.5vw,200px);letter-spacing:-.05em;white-space:nowrap;overflow:hidden;line-height:.85;margin:80px 0 30px;color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.14)}
+.f-bot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;color:var(--dim);font-size:13px}
+
+/* reveal */
+.rv{opacity:0;transform:translateY(40px);transition:opacity 1s cubic-bezier(.2,.8,.2,1),transform 1s cubic-bezier(.2,.8,.2,1)}
+.rv.in{opacity:1;transform:none}
+.d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}
+
+@media (max-width:1000px){
+  .nav ul{display:none}.burger{display:block}
+  .nav.open ul{display:flex;position:absolute;top:70px;left:0;right:0;flex-direction:column;gap:0;background:rgba(8,11,13,.96);border:1px solid var(--line);border-radius:24px;padding:10px 22px}
+  .nav.open ul li{padding:14px 0;border-bottom:1px solid var(--line)}.nav.open ul li:last-child{border:0}
+  .hero-top,.calc,.app,.prebook-g{grid-template-columns:1fr}
+  .bike-stage{order:-1;margin-top:-10px}
+  .c-big,.c-med,.c-third{grid-column:span 12;min-height:0}
+  .c-med{min-height:240px}
+  .rug-list{grid-template-columns:1fr}
+  .rug,.rug+.rug{padding:30px 0;border-right:0;border-bottom:1px solid var(--line)}
+  .rug h3{margin-top:30px}
+  .f-top{grid-template-columns:1fr 1fr}
+}
+@media (max-width:600px){
+  .nav .btn-p{display:none}
+  .hero-stats{grid-template-columns:1fr 1fr}
+  .hero-stats div{border-right:0;padding-left:0;padding-bottom:18px}
+  .two{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .rv{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a href="#top" aria-label="Aventose Energy home"><img class="logo" src="assets/logo_black.6dfd8e2.png" alt="Aventose Energy"></a>
+  <ul>
+    <li><a href="#s110">S110</a></li>
+    <li><a href="#rugged">Engineering</a></li>
+    <li><a href="#savings">Savings</a></li>
+    <li><a href="#app">Connected</a></li>
+    <li><a href="#prebook">Test ride</a></li>
+  </ul>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="#prebook" class="btn btn-p">Prebook S110 <span class="arr">→</span></a>
+    <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false">☰</button>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="grid-floor"></div>
+  <div class="wrap">
+    <div class="hero-top">
+      <div>
+        <div class="mono kicker rv">Aventose S110 · Prebookings open</div>
+        <h1 class="rv d1"><span>Rugged.</span><span>Electric.</span><span class="grad">Unstoppable.</span></h1>
+        <p class="lead rv d2">Engineered in India for the roads India actually has — potholes, monsoon floods and all. Zero petrol, zero compromise.</p>
+        <div class="cta-row rv d3">
+          <a href="#prebook" class="btn btn-p">Prebook now <span class="arr">→</span></a>
+          <a href="#s110" class="btn btn-g">Explore the S110</a>
+        </div>
+      </div>
+
+      <div class="bike-stage rv d2" id="stage">
+        <div class="halo"></div>
+        <!-- Stylised S110. Swap for real studio renders: <img class="bike" src="assets/s110-green.webp"> -->
+        <svg class="bike" id="bike" viewBox="0 0 820 500" role="img" aria-label="Aventose S110 electric motorcycle">
+          <defs>
+            <linearGradient id="bodyG" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="var(--body-hi)"/><stop offset="1" stop-color="var(--body-c)"/>
+            </linearGradient>
+            <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#3a4448"/><stop offset="1" stop-color="#141a1d"/>
+            </linearGradient>
+            <radialGradient id="lamp"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#bafff2"/><stop offset="1" stop-color="#3fe0c5" stop-opacity="0"/></radialGradient>
+            <filter id="glow"><feGaussianBlur stdDeviation="4"/></filter>
+          </defs>
+          <!-- light beam -->
+          <path d="M700 205 L820 150 L820 290 Z" fill="url(#lamp)" opacity=".18"/>
+          <!-- wheels -->
+          <g id="wheels">
+            <g transform="translate(200 370)">
+              <circle r="100" fill="#0a0d0f" stroke="#1c2326" stroke-width="26"/>
+              <circle r="100" fill="none" stroke="#2b3438" stroke-width="2" stroke-dasharray="4 7"/>
+              <circle r="70" fill="none" stroke="#2d363a" stroke-width="3"/>
+              <g class="wheel-spin"><circle r="70" fill="none" stroke="transparent"/>
+                <path d="M0-68 L10-10 M65-21 L12 6 M40 55 L4 12 M-40 55 L-4 12 M-65-21 L-12 6" stroke="#4a565b" stroke-width="7" stroke-linecap="round"/></g>
+              <circle r="34" fill="url(#metal)" stroke="var(--teal)" stroke-width="1.5"/>
+              <circle r="8" fill="var(--teal)"/>
+            </g>
+            <g transform="translate(640 370)">
+              <circle r="100" fill="#0a0d0f" stroke="#1c2326" stroke-width="26"/>
+              <circle r="100" fill="none" stroke="#2b3438" stroke-width="2" stroke-dasharray="4 7"/>
+              <circle r="70" fill="none" stroke="#2d363a" stroke-width="3"/>
+              <g class="wheel-spin"><circle r="70" fill="none" stroke="transparent"/>
+                <path d="M0-68 L10-10 M65-21 L12 6 M40 55 L4 12 M-40 55 L-4 12 M-65-21 L-12 6" stroke="#4a565b" stroke-width="7" stroke-linecap="round"/></g>
+              <circle r="48" fill="none" stroke="#5a676c" stroke-width="5"/>
+              <circle r="10" fill="#2a3337"/>
+            </g>
+          </g>
+          <!-- swingarm + shock -->
+          <path d="M200 370 L360 318 L372 340 L210 386 Z" fill="url(#metal)"/>
+          <path d="M300 335 L330 230" stroke="var(--amber)" stroke-width="10" stroke-linecap="round"/>
+          <path d="M300 335 L330 230" stroke="#111" stroke-width="3" stroke-dasharray="3 5"/>
+          <!-- front fork -->
+          <path d="M572 160 L640 370" stroke="#c9d3d2" stroke-width="16" stroke-linecap="round"/>
+          <path d="M586 200 L640 370" stroke="#20292c" stroke-width="22" stroke-linecap="round" opacity=".9"/>
+          <!-- belly / battery pack -->
+          <path d="M330 250 L540 240 L560 300 L520 345 L370 350 L330 310 Z" fill="#11171a" stroke="#2a3337" stroke-width="2"/>
+          <g fill="none" stroke="#2d383c" stroke-width="2"><path d="M360 270 H520"/><path d="M362 290 H530"/><path d="M366 310 H525"/><path d="M372 330 H512"/></g>
+          <path d="M380 322 H500" stroke="var(--teal)" stroke-width="4" stroke-linecap="round" filter="url(#glow)"/>
+          <path d="M380 322 H500" stroke="#c9fff5" stroke-width="2" stroke-linecap="round"/>
+          <!-- main body / tank -->
+          <path d="M300 214 C340 170 420 150 520 152 L585 160 L600 196 L548 246 L330 256 Z" fill="url(#bodyG)" stroke="rgba(255,255,255,.18)" stroke-width="1.5"/>
+          <path d="M360 190 C410 170 470 164 540 168" stroke="rgba(255,255,255,.35)" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- seat + tail -->
+          <path d="M150 205 L300 196 C310 196 318 202 318 212 L304 226 L190 232 Z" fill="#14191c" stroke="#2a3337"/>
+          <path d="M120 200 L160 196 L196 232 L150 236 Z" fill="url(#bodyG)"/>
+          <path d="M112 202 L132 200" stroke="#ff4d5e" stroke-width="5" stroke-linecap="round" filter="url(#glow)"/>
+          <path d="M112 202 L132 200" stroke="#ff8a95" stroke-width="2" stroke-linecap="round"/>
+          <!-- headlight + bars -->
+          <path d="M556 118 L620 112" stroke="#c9d3d2" stroke-width="8" stroke-linecap="round"/>
+          <rect x="560" y="102" width="40" height="14" rx="5" fill="#1b2225" stroke="var(--teal)" stroke-width="1"/>
+          <circle cx="612" cy="196" r="30" fill="#0e1417" stroke="url(#bodyG)" stroke-width="8"/>
+          <circle cx="612" cy="196" r="20" fill="none" stroke="var(--teal)" stroke-width="3" filter="url(#glow)"/>
+          <circle cx="612" cy="196" r="20" fill="none" stroke="#dffff9" stroke-width="1.5"/>
+          <circle cx="612" cy="196" r="7" fill="#dffff9"/>
+          <!-- badge -->
+          <text x="420" y="225" font-family="Unbounded" font-weight="700" font-size="20" fill="rgba(255,255,255,.85)" letter-spacing="2">S110</text>
+        </svg>
+        <div class="swatches" role="group" aria-label="Colourway">
+          <button class="sw" data-c="#1f6461" data-h="#2e8a85" aria-pressed="true"><i style="background:rgb(31,100,97)"></i>Forest Green</button>
+          <button class="sw" data-c="#0c0d0e" data-h="#3a3f43" aria-pressed="false"><i style="background:#111"></i>Stealth Black</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-stats rv d3">
+      <div><span class="mono">True range*</span><b data-count="151">0<small>km</small></b></div>
+      <div><span class="mono">Top speed*</span><b data-count="95">0<small>km/h</small></b></div>
+      <div><span class="mono">0–40 km/h*</span><b data-count="3.4" data-dec="1">0<small>s</small></b></div>
+      <div><span class="mono">Cost / km*</span><b>₹0.24</b></div>
+    </div>
+  </div>
+</header>
+
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>Rugged Electric Mobility</span><span>Made in India</span><span>Monsoon-proof IP67</span><span>Zero tailpipe</span><span>Charge anywhere</span><span>Built for broken roads</span>
+    <span>Rugged Electric Mobility</span><span>Made in India</span><span>Monsoon-proof IP67</span><span>Zero tailpipe</span><span>Charge anywhere</span><span>Built for broken roads</span>
+  </div>
+</div>
+
+<section id="s110">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="mono kicker rv">01 — The machine</div><h2 class="rv d1">Every number<br>earned on <span class="grad">real roads.</span></h2></div>
+      <p class="rv d2">Not lab figures. The S110 is tuned on Indian city traffic, highway runs and broken rural stretches, then rated for what you'll actually get.</p>
+    </div>
+
+    <div class="spec-grid">
+      <div class="card c-big rv">
+        <div class="mono">Battery</div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
+          <div><div class="num" data-count="4.2" data-dec="1">0<small>kWh</small></div>
+            <h3>Li-ion pack, liquid-tight</h3><p>Cell-level thermal monitoring and an aluminium casing built to sit through waterlogged streets.</p></div>
+          <svg class="gauge" viewBox="0 0 200 200"><circle cx="100" cy="100" r="80" stroke="rgba(255,255,255,.08)"/>
+            <circle id="gArc" cx="100" cy="100" r="80" stroke="url(#gg)" stroke-linecap="round" stroke-dasharray="503" stroke-dashoffset="503" transform="rotate(-90 100 100)" style="transition:stroke-dashoffset 2s cubic-bezier(.2,.8,.2,1)"/>
+            <defs><linearGradient id="gg"><stop offset="0" stop-color="#1f6461"/><stop offset="1" stop-color="#3fe0c5"/></linearGradient></defs>
+            <text x="100" y="98" text-anchor="middle" font-family="Unbounded" font-size="34" fill="#eef3f2">80%</text>
+            <text x="100" y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#8b9a99" letter-spacing="2">IN 3H 10M</text></svg>
+        </div>
+      </div>
+      <div class="card c-med rv d1">
+        <div class="mono">Peak power</div>
+        <div><div class="num" data-count="7.5" data-dec="1">0<small>kW</small></div><h3>Mid-drive PMSM</h3><p>Instant torque for overtakes and flyovers.</p>
+        <div class="bar"><i style="--w:82%"></i></div></div>
+      </div>
+      <div class="card c-med rv d2">
+        <div class="mono">Ground clearance</div>
+        <div><div class="num" data-count="200">0<small>mm</small></div><h3>Speed-breaker proof</h3><p>Scrapes nothing. Clears everything.</p>
+        <div class="bar"><i style="--w:90%"></i></div></div>
+      </div>
+      <div class="card c-third rv"><div class="mono">Ride modes</div><h3>Eco · City · Rugged</h3><p>Rugged mode remaps throttle and regen for loose gravel and wet tarmac.</p></div>
+      <div class="card c-third rv d1"><div class="mono">Braking</div><h3>Dual disc + CBS</h3><p>Combined braking with regenerative assist that feeds the pack on every stop.</p></div>
+      <div class="card c-third rv d2"><div class="mono">Charging</div><h3>Any 15A socket</h3><p>Portable charger in the box. Home, office or a dhaba — if it has a plug, you're charging.</p></div>
+    </div>
+    <p class="note">*Indicative figures for this concept demo. Final homologated specifications to be supplied by Aventose Energy.</p>
+  </div>
+</section>
+
+<section class="rugged" id="rugged">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="mono kicker rv">02 — Rugged by design</div><h2 class="rv d1">Built for the road<br>you <span class="grad">didn't choose.</span></h2></div>
+      <p class="rv d2">Most EVs are designed for brochures. The S110 is designed for Tuesday morning on a road nobody has fixed since 2019.</p>
+    </div>
+    <svg class="terrain rv" viewBox="0 0 1200 120" preserveAspectRatio="none" aria-hidden="true"><path d="M0 80 L80 80 L100 60 L130 60 L150 80 L320 80 Q340 100 360 80 L520 80 L540 40 L600 40 L620 80 L780 80 Q800 110 820 95 Q840 80 860 80 L1000 80 L1020 55 L1060 55 L1080 80 L1200 80"/></svg>
+    <div class="rug-list">
+      <div class="rug rv"><div class="idx">/ 01</div><h3>High-tensile steel chassis</h3><p>A trellis frame stress-tested over cobbles, ruts and kerbs, with long-travel suspension that keeps the tyre on the ground.</p></div>
+      <div class="rug rv d1"><div class="idx">/ 02</div><h3>Monsoon-sealed electrics</h3><p>IP67-rated battery and motor connectors. Ride through knee-deep water the way you already do — just without the worry.</p></div>
+      <div class="rug rv d2"><div class="idx">/ 03</div><h3>Heat-managed for 45°C</h3><p>Passive cooling fins and smart power limiting keep the pack healthy through Indian summers, not just test-track mornings.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="savings">
+  <div class="wrap">
+    <div class="sec-head">
+      <div><div class="mono kicker rv">03 — The maths</div><h2 class="rv d1">Your petrol bill,<br><span class="grad">deleted.</span></h2></div>
+      <p class="rv d2">Move the sliders. This is what switching to the S110 puts back in your pocket.</p>
+    </div>
+    <div class="calc">
+      <div class="card rv">
+        <label for="km">Daily ride <b id="kmV">40 km</b></label>
+        <input type="range" id="km" min="5" max="150" value="40">
+        <label for="fuel">Petrol price <b id="fuelV">₹103 / L</b></label>
+        <input type="range" id="fuel" min="90" max="120" value="103">
+        <label for="mil">Your current bike's mileage <b id="milV">45 km/L</b></label>
+        <input type="range" id="mil" min="25" max="70" value="45">
+        <p class="note">EV running cost assumes 3 kWh per 100 km at ₹8 per kWh home tariff (₹0.24/km). Adjust to your state's tariff.</p>
+      </div>
+      <div class="card rv d1" style="display:flex;flex-direction:column;justify-content:space-between">
+        <div><div class="mono">You save every year</div><div class="save grad" id="saveY">₹0</div></div>
+        <div class="rows">
+          <div>Petrol cost / month <b id="pM">—</b></div>
+          <div>S110 charging / month <b id="eM">—</b></div>
+          <div>Saved over 5 years <b id="s5">—</b></div>
+          <div>CO₂ avoided / year <b id="co2">—</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="app" style="padding-top:0">
+  <div class="wrap app">
+    <div class="rv">
+      <div class="phone"><div class="screen">
+        <div class="scr-top"><span>S110 · Forest Green</span><span>● Connected</span></div>
+        <div class="ring"><svg viewBox="0 0 180 180"><circle cx="90" cy="90" r="76" stroke="rgba(255,255,255,.07)"/><circle cx="90" cy="90" r="76" stroke="#3fe0c5" stroke-linecap="round" stroke-dasharray="477" stroke-dashoffset="105"/></svg>
+          <div class="lbl"><b>78%</b><span class="mono" style="font-size:10px">118 km left</span></div></div>
+        <div class="tiles">
+          <div class="tile">Mode<b>Rugged</b></div><div class="tile">Today<b>32.4 km</b></div>
+          <div class="tile">Saved<b>₹96</b></div><div class="tile">Tyres<b>OK</b></div>
+        </div>
+        <div class="tile" style="display:flex;justify-content:space-between;align-items:center">Parked · Indiranagar<b style="font-size:13px;color:#3fe0c5">Live ●</b></div>
+        <div class="lock">Hold to unlock</div>
+      </div></div>
+    </div>
+    <div>
+      <div class="mono kicker rv">04 — Connected</div>
+      <h2 class="rv d1">Your bike,<br><span class="grad">in your pocket.</span></h2>
+      <ul class="feat-list">
+        <li class="rv"><span>01</span><div><b>Live location & geo-fence</b><p>Get a WhatsApp alert the moment your S110 moves without you.</p></div></li>
+        <li class="rv d1"><span>02</span><div><b>Range you can trust</b><p>Remaining km calculated from your own riding, not a lab cycle.</p></div></li>
+        <li class="rv d2"><span>03</span><div><b>Remote diagnostics</b><p>Service team sees an issue before you do, and books the slot for you.</p></div></li>
+        <li class="rv d3"><span>04</span><div><b>Over-the-air updates</b><p>The S110 gets better every quarter, while it sits in your parking.</p></div></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="prebook" style="padding-top:0">
+  <div class="wrap">
+    <div class="prebook rv">
+      <div class="prebook-g">
+        <div>
+          <div class="mono kicker">05 — Ride it first</div>
+          <h2 style="margin-top:18px">Book a test ride.<br><span class="grad">Feel the torque.</span></h2>
+          <p style="color:var(--mute);margin-top:22px;max-width:440px">Reserve your S110 with a fully refundable prebooking, or just take one for a spin. We'll bring it to your doorstep.</p>
+          <a class="wa" href="https://wa.me/?text=Hi%20Aventose%2C%20I%27d%20like%20a%20test%20ride%20of%20the%20S110" target="_blank" rel="noopener">💬 Prefer WhatsApp? Chat with us →</a>
+        </div>
+        <form class="form" id="form" novalidate>
+          <div class="two">
+            <label class="field"><span>Full name</span><input name="name" required autocomplete="name" placeholder="Your name"></label>
+            <label class="field"><span>Mobile</span><input name="phone" required inputmode="numeric" pattern="[6-9][0-9]{9}" maxlength="10" placeholder="10-digit number"></label>
+          </div>
+          <div class="two">
+            <label class="field"><span>City</span><select name="city"><option>Bengaluru</option><option>Chennai</option><option>Hyderabad</option><option>Other</option></select></label>
+            <label class="field"><span>I want to</span><select name="intent"><option>Take a test ride</option><option>Prebook the S110</option><option>Become a dealer</option></select></label>
+          </div>
+          <button class="btn btn-p" type="submit">Confirm my slot <span class="arr">→</span></button>
+          <div class="form-msg" id="msg" role="status"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="f-top">
+      <div><img class="logo" style="height:40px" src="assets/logo_black.6dfd8e2.png" alt="Aventose Energy"><p style="color:var(--mute);margin-top:18px;max-width:300px;font-size:15px">Rugged electric mobility, designed and built in India.</p></div>
+      <div><h4>Ride</h4><ul><li><a href="#s110">Aventose S110</a></li><li><a href="#prebook">Test ride</a></li><li><a href="#prebook">Prebook</a></li><li><a href="#savings">Savings calculator</a></li></ul></div>
+      <div><h4>Company</h4><ul><li><a href="#rugged">Engineering</a></li><li><a href="#prebook">Dealership</a></li><li><a href="#">Careers</a></li><li><a href="#">Press</a></li></ul></div>
+      <div><h4>Follow</h4><ul>
+        <li><a href="https://www.instagram.com/aventoseenergy/" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="https://www.youtube.com/aventoseenergy" target="_blank" rel="noopener">YouTube</a></li>
+        <li><a href="https://www.linkedin.com/company/aventoseenergy/" target="_blank" rel="noopener">LinkedIn</a></li>
+        <li><a href="https://twitter.com/Aventoseenergy" target="_blank" rel="noopener">X / Twitter</a></li></ul></div>
+    </div>
+    <div class="f-big" aria-hidden="true">AVENTOSE</div>
+    <div class="f-bot"><span>© 2026 Aventose Energy. All rights reserved.</span><span>Concept design by Marvice Media Private Limited</span></div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (s, c = document) => c.querySelector(s), $$ = (s, c = document) => [...c.querySelectorAll(s)];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // nav
+  const nav = $('#nav');
+  addEventListener('scroll', () => nav.classList.toggle('solid', scrollY > 40), { passive: true });
+  $('#burger').addEventListener('click', e => {
+    const open = nav.classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', open);
+  });
+  $$('.nav ul a').forEach(a => a.addEventListener('click', () => nav.classList.remove('open')));
+
+  // counters
+  const count = el => {
+    const end = parseFloat(el.dataset.count), dec = +(el.dataset.dec || 0), unit = el.querySelector('small');
+    const unitHTML = unit ? unit.outerHTML : '', t0 = performance.now(), dur = reduce ? 0 : 1600;
+    const tick = t => {
+      const p = dur ? Math.min((t - t0) / dur, 1) : 1, v = end * (1 - Math.pow(1 - p, 3));
+      el.innerHTML = v.toFixed(dec) + unitHTML;
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
+  // reveal
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add('in');
+    $$('[data-count]', e.target).forEach(count);
+    if (e.target.dataset.count) count(e.target);
+    const arc = $('#gArc', e.target); if (arc) arc.style.strokeDashoffset = 503 * 0.2;
+    io.unobserve(e.target);
+  }), { threshold: .2 });
+  $$('.rv').forEach(el => io.observe(el));
+
+  // card spotlight
+  $$('.card').forEach(c => c.addEventListener('pointermove', e => {
+    const r = c.getBoundingClientRect();
+    c.style.setProperty('--mx', e.clientX - r.left + 'px'); c.style.setProperty('--my', e.clientY - r.top + 'px');
+  }));
+
+  // bike parallax
+  const bike = $('#bike'), stage = $('#stage');
+  if (!reduce) stage.addEventListener('pointermove', e => {
+    const r = stage.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+    bike.style.transform = `translate(${x * 18}px,${y * 10}px) rotate(${x * -1.5}deg)`;
+  });
+  stage.addEventListener('pointerleave', () => bike.style.transform = '');
+
+  // colourway
+  $$('.sw').forEach(b => b.addEventListener('click', () => {
+    $$('.sw').forEach(x => x.setAttribute('aria-pressed', x === b));
+    document.documentElement.style.setProperty('--body-c', b.dataset.c);
+    document.documentElement.style.setProperty('--body-hi', b.dataset.h);
+  }));
+
+  // savings calculator
+  const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+  const EV_KWH_PER_KM = 0.03, TARIFF = 8, CO2_PER_L = 2.31; // kg CO2 per litre petrol
+  const calc = () => {
+    const km = +$('#km').value, fuel = +$('#fuel').value, mil = +$('#mil').value;
+    const kmMonth = km * 30, petrolM = kmMonth / mil * fuel, evM = kmMonth * EV_KWH_PER_KM * TARIFF, saveY = (petrolM - evM) * 12;
+    $('#kmV').textContent = km + ' km'; $('#fuelV').textContent = '₹' + fuel + ' / L'; $('#milV').textContent = mil + ' km/L';
+    $('#pM').textContent = inr(petrolM); $('#eM').textContent = inr(evM);
+    $('#saveY').textContent = inr(saveY); $('#s5').textContent = inr(saveY * 5);
+    $('#co2').textContent = Math.round(kmMonth * 12 / mil * CO2_PER_L).toLocaleString('en-IN') + ' kg';
+    $$('input[type=range]').forEach(r => r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%'));
+  };
+  $$('input[type=range]').forEach(r => r.addEventListener('input', calc)); calc();
+
+  // form (demo: no backend wired)
+  $('#form').addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.currentTarget, msg = $('#msg');
+    if (!f.name.value.trim()) { msg.textContent = 'Please enter your name.'; return f.name.focus(); }
+    if (!/^[6-9]\d{9}$/.test(f.phone.value)) { msg.textContent = 'Please enter a valid 10-digit mobile number.'; return f.phone.focus(); }
+    msg.textContent = `Thanks ${f.name.value.trim().split(' ')[0]} — our ${f.city.value} team will call you within 24 hours.`;
+    f.reset();
+  });
+})();
+</script>
+</body>
+</html>
