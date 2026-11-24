@@ -619,6 +619,7 @@ details.payload pre{margin-top:10px;max-height:300px;overflow:auto;font-size:12p
 
       <form class="lead-main" id="lead" novalidate>
         <div class="lead-bar"><i id="leadBar"></i></div>
+        <label aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden">Website<input name="website" tabindex="-1" autocomplete="off"></label>
 
         <!-- STEP 1: intent -->
         <div class="step on" data-step="1">
@@ -912,7 +913,7 @@ details.payload pre{margin-top:10px;max-height:300px;overflow:auto;font-size:12p
   $$('section[id], div[id=charging]').forEach(s => sio.observe(s));
 
   // ---------- multi-step enquiry form ----------
-  const LEAD_WEBHOOK = ''; // e.g. your n8n webhook URL. Empty = demo mode, nothing is sent.
+  const LEAD_WEBHOOK = '/api/lead'; // nginx forwards this to the n8n workflow. Set to '' for offline demo mode.
   const form = $('#lead'), steps = $$('.step', form), err = $('#leadErr');
   let stepN = 1;
   const intent = () => (form.querySelector('[name=intent]:checked') || {}).value;
@@ -959,6 +960,7 @@ details.payload pre{margin-top:10px;max-height:300px;overflow:auto;font-size:12p
     b.querySelectorAll('[name]').forEach(el => { if (!(el.name in needs)) needs[el.name] = val(el.name, b); });
     const d = {
       ref: 'AE-' + Date.now().toString(36).toUpperCase().slice(-6),
+      website: val('website'),
       type: intent(), needs,
       contact: { name: val('name'), phone: '+91' + val('phone'), email: val('email'), pincode: val('pincode'), channel: val('channel'), bestTime: val('time'), testRide: intent() === 'individual' && !!val('testRide'), consent: true, consentAt: new Date().toISOString() },
       attribution: { firstTouch: store.get('ae_first_touch') || touch, lastTouch: touch, visits },
