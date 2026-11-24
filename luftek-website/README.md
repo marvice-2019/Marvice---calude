@@ -51,3 +51,7 @@ New resource → Static site → this repo, base directory `luftek-website`, no 
 6. **Sector text** in Industries and the project viewer describes what each sector needs. It doesn't claim which unit went into which project; Luftek can add per-project scope if they share it.
 7. **Enquiry form** opens a pre-filled email to sales@luftek.in. For CRM lead capture, wire it to an n8n webhook.
 8. **Photography**: all product and project images come from luftek.in. The project photos are low resolution; new site photography would lift the Projects page the most.
+
+## Live preview
+
+Deployed on Coolify at https://luftek.marvice.tech (Dockerfile build pack, base directory `/luftek-website`, branch `claude/admiring-wozniak-ghzrbm`). `nginx.conf` sends `X-Robots-Tag: noindex` for this staging domain: **remove that line when the site moves to luftek.in.**
