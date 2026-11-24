@@ -190,7 +190,15 @@
     burger.setAttribute("aria-expanded", String(open)); mnav.classList.toggle("is-open", open);
   });
   mnav.addEventListener("click", (e) => { if (e.target.tagName === "A") { burger.setAttribute("aria-expanded", "false"); mnav.classList.remove("is-open"); } });
-  const onScroll = () => nav.classList.toggle("is-scrolled", window.scrollY > 8);
+  const navLinks = [...document.querySelectorAll(".nav__links a")];
+  const spy = navLinks.map((a) => document.querySelector(a.getAttribute("href")));
+  const onScroll = () => {
+    nav.classList.toggle("is-scrolled", window.scrollY > 8);
+    const y = window.scrollY + 140;
+    let cur = -1;
+    spy.forEach((s, i) => { if (s && s.offsetTop <= y) cur = i; });
+    navLinks.forEach((a, i) => a.classList.toggle("is-active", i === cur));
+  };
   window.addEventListener("scroll", onScroll, { passive: true }); onScroll();
 
   // Reveal on scroll
