@@ -195,7 +195,7 @@
     };
     btns.forEach((b) => b.addEventListener("click", () => { apply(b.dataset.f); history.replaceState(null, "", b.dataset.f === "all" ? location.pathname : `#${b.dataset.f}`); }));
     const h = location.hash.slice(1);
-    if (["ahu", "fcu", "pkg"].includes(h)) apply(h);
+    if (["ahu", "fcu", "hau", "pkg"].includes(h)) apply(h);
   }
 
   // ---------------------------------------------------------------- projects page

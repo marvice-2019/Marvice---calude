@@ -723,4 +723,21 @@ a.phc:hover .i { color: #fff; }
 .ptile--slate { border-top-color: var(--slate); }
 .ptile--red { border-top-color: var(--red); }
 .ptile--red .ptile__go { color: var(--red); }
-@media (min-width: 1200px) { .pgroup[data-fam="fcu"] .pgrid { grid-template-columns: repeat(5, 1fr); } .pgroup .pgrid { grid-template-columns: repeat(4, 1fr); } }
+
+/* Four product categories */
+.mega__h a { color: inherit; text-decoration: none; } .mega__h a:hover { color: var(--red); }
+.mega__gap { height: 18px; }
+.drawer__h { margin: 14px 0 2px; padding-left: 16px; font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--red); }
+.pgroup__n { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--red); margin-bottom: 2px; }
+.rng__bar--hau { background: var(--navy); } .lg--hau::before { background: var(--navy); }
+.psingle { display: grid; gap: 20px; align-items: start; }
+.psingle__info { background: #fff; border: 1px solid var(--line); border-radius: var(--r-l); padding: 20px 24px; }
+.psingle__info .pd__lead { font-size: 16px; }
+.psingle__info .kts { grid-template-columns: repeat(2, 1fr); margin-top: 14px; }
+.psingle__info .clist { margin-top: 10px; }
+.psingle__info .pd__btns { margin-top: 16px; }
+@media (min-width: 900px) { .psingle { grid-template-columns: minmax(260px, 1fr) 2.2fr; } .psingle__info .kts { grid-template-columns: repeat(4, 1fr); } .psingle__info .kt:nth-child(2n) { border-right: 1px solid var(--line); } .psingle__info .kt:last-child { border-right: 0; } .psingle__info .kt { border-bottom: 0; } .psingle__info .clist { grid-template-columns: 1fr 1fr; column-gap: 24px; display: grid; } }
+.phelp { margin-top: 40px; }
+@media (min-width: 1200px) { .pgrid--4 { grid-template-columns: repeat(4, 1fr) !important; } .pgrid--3 { grid-template-columns: repeat(3, 1fr) !important; } }
+@media (min-width: 1100px) { .fams { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 700px) and (max-width: 1099px) { .fams { grid-template-columns: repeat(2, 1fr); } }

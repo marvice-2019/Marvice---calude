@@ -78,18 +78,20 @@ def header(root, active):
         cur = ' aria-current="page"' if key == active else ""
         return f'<a class="hdr__link" href="{root}{href}"{cur}>{label}</a>'
 
-    mega_cols = ""
-    for fk, f in FAMILIES.items():
+    def mega_group(fk):
+        f = FAMILIES[fk]
         items = "".join(
             f'<li><a href="{purl(root, p)}"><span class="mega__thumb">{img(root, p["imgs"][0], "")}</span>'
             f'<span><b>{e(p["name"])}</b><small>{e(cfm(p))}</small></span></a></li>'
             for p in PRODUCTS if p["fam"] == fk)
-        mega_cols += f'<div class="mega__col"><p class="mega__h">{f["name"]}</p><ul>{items}</ul></div>'
+        return f'<p class="mega__h"><a href="{root}products.html#{fk}">{f["name"]}</a></p><ul>{items}</ul>'
+    mega_cols = (f'<div class="mega__col">{mega_group("ahu")}</div><div class="mega__col">{mega_group("fcu")}</div>'
+                 f'<div class="mega__col">{mega_group("hau")}<div class="mega__gap"></div>{mega_group("pkg")}</div>')
 
     prod_cur = ' aria-current="page"' if active == "products" else ""
     return f"""<div class="util">
   <div class="wrap util__in">
-    <p class="util__note">Manufacturer of air handling units, fan coil units and package units · Cheyyar SIPCOT, Tamil Nadu</p>
+    <p class="util__note">Manufacturer of AHUs, FCUs, hide away units and package units · Cheyyar SIPCOT, Tamil Nadu</p>
     <div class="util__links">
       <a href="mailto:sales@luftek.in">{I['mail']}sales@luftek.in</a>
       <a href="tel:+914448678556">{I['phone']}+91 44 4867 8556</a>
@@ -133,7 +135,7 @@ def header(root, active):
     <a href="{root}about.html">About</a>
     <details><summary>Products {I['chev']}</summary>
       <a href="{root}products.html">All products</a>
-      {''.join(f'<a href="{purl(root, p)}">{e(p["name"])}</a>' for p in PRODUCTS)}
+      {''.join(f'<p class="drawer__h">{f["name"]}</p>' + ''.join(f'<a href="{purl(root, p)}">{e(p["name"])}</a>' for p in PRODUCTS if p["fam"] == fk) for fk, f in FAMILIES.items())}
     </details>
     <a href="{root}industries.html">Industries</a>
     <a href="{root}projects.html">Projects</a>
@@ -352,7 +354,7 @@ def page_home():
   <div class="wrap hs__in">
     <div class="hs__intro">
       <div><p class="kicker">Luftek Engineering · Since 2017</p>
-      <h1>Air handling units, fan coil units and package units, engineered and built in India to European standards.</h1></div>
+      <h1>Air handling units, fan coil units, hide away units and package units, engineered and built in India to European standards.</h1></div>
       <ul class="hs__proof" aria-label="Certifications"><li><b>Eurovent</b> certified AHUs</li><li><b>AHRI 410</b> certified coils</li><li><b>ISO 9001:2015</b> quality system</li></ul>
     </div>
     <div class="hs__stage">{slides}</div>
@@ -373,7 +375,7 @@ def page_home():
 <section class="sec">
   <div class="wrap">
     <div class="sec__head sec__head--split">
-      <div><p class="kicker">Product range</p><h2>Three families. Ten product lines.</h2></div>
+      <div><p class="kicker">Product range</p><h2>Four categories. Ten product lines.</h2></div>
       <p>Every Luftek unit is designed and built in our own plant, and customised to each project's construction, size and performance requirements.</p>
     </div>
     <div class="fams">{fam_cards}</div>
@@ -457,15 +459,33 @@ def page_products():
 
     groups = ""
     for fk, f in FAMILIES.items():
-        cards = "".join(product_card(root, p) for p in PRODUCTS if p["fam"] == fk)
-        if fk == "pkg":
-            cards += f"""<a class="ptile ptile--slate" href="#selector"><span class="ptile__k">Unit selector</span><b>Not sure which unit fits?</b><span>Enter airflow and application for an instant shortlist.</span><span class="ptile__go">Open selector {I['arrow']}</span></a>
-      <a class="ptile" href="#compare"><span class="ptile__k">Comparison</span><b>All 10 units side by side</b><span>Airflow, rated ESP, casing and certification in one table.</span><span class="ptile__go">See the table {I['arrow']}</span></a>
-      <a class="ptile ptile--red" href="{root}contact.html"><span class="ptile__k">Custom builds</span><b>Built to your schedule</b><span>Construction, size and performance customised to each project.</span><span class="ptile__go">Request a selection {I['arrow']}</span></a>"""
+        items = [p for p in PRODUCTS if p["fam"] == fk]
+        cards = "".join(product_card(root, p) for p in items)
+        if len(items) == 1:
+            p = items[0]
+            kts = "".join(f'<div class="kt"><dt>{e(a)}</dt><dd>{e(b)}<small>{e(c)}</small></dd></div>' for a, b, c in p["keys"])
+            feats = "".join(f"<li>{I['check']}<span>{e(x)}</span></li>" for x in p["features"][:4])
+            cards = f"""<div class="psingle">{cards}
+        <div class="psingle__info">
+          <p class="pd__lead">{e(p['intro'])}</p>
+          <dl class="kts">{kts}</dl>
+          <ul class="clist">{feats}</ul>
+          <div class="pd__btns"><a class="btn btn--dark" href="{purl(root, p)}">Full specification {I['arrow']}</a><a class="btn btn--line" href="{root}contact.html?product={quote(p['name'])}">Request a selection</a></div>
+        </div></div>"""
+        else:
+            cards = f'<div class="pgrid pgrid--{len(items)}">{cards}</div>'
         groups += f"""<div class="pgroup" id="{fk}" data-fam="{fk}">
-      <div class="pgroup__head"><h2>{f['name']}</h2><p>{f['blurb']}</p></div>
-      <div class="pgrid">{cards}</div>
+      <div class="pgroup__head"><div><p class="pgroup__n">{len(items)} product line{'s' if len(items) > 1 else ''}</p><h2>{f['name']}</h2></div><p>{f['blurb']}</p></div>
+      {cards}
     </div>"""
+    groups += f"""<div class="phelp">
+      <div class="pgroup__head"><div><p class="pgroup__n">Help</p><h2>Need help choosing?</h2></div><p>Use the selector, compare the full range, or send us your schedule for a custom build.</p></div>
+      <div class="pgrid pgrid--3">
+      <a class="ptile ptile--slate" href="#selector"><span class="ptile__k">Unit selector</span><b>Not sure which unit fits?</b><span>Enter airflow and application for an instant shortlist.</span><span class="ptile__go">Open selector {I['arrow']}</span></a>
+      <a class="ptile" href="#compare"><span class="ptile__k">Comparison</span><b>All 10 units side by side</b><span>Airflow, rated ESP, casing and certification in one table.</span><span class="ptile__go">See the table {I['arrow']}</span></a>
+      <a class="ptile ptile--red" href="{root}contact.html"><span class="ptile__k">Custom builds</span><b>Built to your schedule</b><span>Construction, size and performance customised to each project.</span><span class="ptile__go">Request a selection {I['arrow']}</span></a>
+      </div></div>
+"""
 
     def cell(p, kind):
         if kind == "esp":
@@ -479,7 +499,7 @@ def page_products():
     body = f"""{head("Products | Air Handling Units, Fan Coil Units & Package Units | Luftek", "Luftek's full range: UniFlow, Smart, Clean Room and Energy Recovery AHUs, fan coil units, hide away units and roof top package units. Compare airflow, casing and certification.", root, "products.html")}
 {header(root, "products")}
 <main id="main">
-{page_hero([("Home", "index.html"), ("Products", "products.html")], "Products", "Ten product lines across air handling units, fan coil units and package units. Compare airflow ranges, find your unit, or go straight to a datasheet.", root, "x-concealed", aside='<div class="phf"><b>10</b><span>product lines</span></div><div class="phf"><b>3</b><span>product families</span></div><div class="phf"><b>200 – 42,000</b><span>CFM airflow range</span></div><div class="phf"><b>35</b><span>UniFlow AHU models</span></div>')}
+{page_hero([("Home", "index.html"), ("Products", "products.html")], "Products", "Ten product lines across four categories: air handling units, fan coil units, hide away units and package units. Compare airflow ranges, find your unit, or go straight to a datasheet.", root, "x-concealed", aside='<div class="phf"><b>10</b><span>product lines</span></div><div class="phf"><b>4</b><span>product categories</span></div><div class="phf"><b>200 – 42,000</b><span>CFM airflow range</span></div><div class="phf"><b>35</b><span>UniFlow AHU models</span></div>')}
 
 <nav class="fambar" aria-label="Product families" data-fambar>
   <div class="wrap fambar__in">
@@ -503,7 +523,7 @@ def page_products():
       <div class="rng__axis" aria-hidden="true"><span class="rng__name"></span><span class="rng__ticks">{ticks}</span></div>
       {rows}
       <div class="rng__axis rng__axis--unit" aria-hidden="true"><span class="rng__name"></span><span>Airflow, CFM (log scale)</span></div>
-      <div class="rng__legend"><span class="lg lg--ahu">Air handling units</span><span class="lg lg--fcu">Fan coil units</span></div>
+      <div class="rng__legend"><span class="lg lg--ahu">Air handling units</span><span class="lg lg--fcu">Fan coil units</span><span class="lg lg--hau">Hide away units</span></div>
     </div>
   </div>
 </section>
