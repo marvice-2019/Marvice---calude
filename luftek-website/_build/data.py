@@ -5,13 +5,13 @@ Sector 'needs' text is general HVAC engineering context, not claims about specif
 """
 
 FAMILIES = {
-    "ahu": {"name": "Air Handling Units", "short": "AHU", "img": "p-uniflow",
+    "ahu": {"slug": "air-handling-units", "name": "Air Handling Units", "short": "AHU", "img": "p-uniflow",
             "blurb": "Double-skin, modular AHUs from 1,000 to 42,000 CFM, rated to EN 1886 and certified by Eurovent."},
-    "fcu": {"name": "Fan Coil Units", "short": "FCU", "img": "p-fcu-high",
+    "fcu": {"slug": "fan-coil-units", "name": "Fan Coil Units", "short": "FCU", "img": "p-fcu-high",
             "blurb": "Concealed, ducted and decorative fan coil units from 200 to 2,400 CFM for rooms, suites and wards."},
-    "hau": {"name": "Hide Away Units", "short": "Hide Away", "img": "p-hideaway",
+    "hau": {"slug": "hide-away-units", "name": "Hide Away Units", "short": "Hide Away", "img": "p-hideaway",
             "blurb": "Compact double-skin units from 1,000 to 8,000 CFM that sit above the false ceiling and run quietly."},
-    "pkg": {"name": "Package Units", "short": "Packaged", "img": "p-rtpu",
+    "pkg": {"slug": "package-units", "name": "Package Units", "short": "Packaged", "img": "p-rtpu",
             "blurb": "Self-contained roof top DX units for halls and large open spaces, built for ambient up to 52 °C."},
 }
 
@@ -257,3 +257,50 @@ TIMELINE = [
     ("2023", "Eurovent", "Construction of the new factory. Eurovent certification."),
     ("2024", "New factory", "New factory at Cheyyar SIPCOT inaugurated. Further machinery upgrades."),
 ]
+
+
+# Category page content. Facts are from the luftek.in product pages; guide text explains the published ratings.
+CATEGORY = {
+    "ahu": {
+        "lede": "Double-skin, modular air handling units built at Cheyyar SIPCOT. Every casing is rated to EN 1886 and certified by Eurovent, and every coil is AHRI 410 certified.",
+        "facts": [("4", "AHU product lines"), ("1,000 – 42,000", "CFM airflow"), ("35", "UniFlow models"), ("L1 · F9", "EN 1886 leakage classes")],
+        "guide_h": "Which AHU for which job",
+        "guide": [("UniFlow Unit", "General comfort and process air", "Modular sections, 35 models, the widest airflow choice"),
+                  ("Smart Unit", "Buildings run from a BMS", "Built-in controller, valve and sensors; MODBUS or BACnet"),
+                  ("Clean Room Unit", "Hospitals, pharma, food, sterile rooms", "Hygiene to VDI 6022 and DIN 1946-4, filter bypass F9"),
+                  ("Energy Recovery Unit", "High fresh-air loads", "Wheel, plate or heat pipe recovery certified to AHRI 1061")],
+        "common_h": "Common to every Luftek AHU",
+        "hero": "x-motor",
+    },
+    "fcu": {
+        "lede": "Conventional fan coil units with UL-recognised motor components and low-noise centrifugal DIDW blowers. The slim, low-height build suits hotels, hospitals and apartments.",
+        "facts": [("4", "FCU product lines"), ("200 – 2,400", "CFM airflow"), ("30 / 50 / 75", "Pa rated ESP"), ("2 / 4", "pipe coil options")],
+        "guide_h": "Choose by external static pressure",
+        "guide": [("Low Static Unit", "Free blow or very short ducts", "Rated at 30 Pa ESP · 400 – 1,200 CFM"),
+                  ("Medium Static Unit", "Short duct runs", "Rated at 50 Pa ESP · 200 – 1,200 CFM"),
+                  ("High Static Unit", "Longer ducts, higher resistance", "Rated at 75 Pa ESP · 800 – 2,400 CFM"),
+                  ("Decorative Unit", "Exposed, no false ceiling", "Free throw at minimum static · 200 – 1,200 CFM")],
+        "common_h": "Common to every Luftek FCU",
+        "hero": "x-concealed",
+    },
+    "hau": {
+        "lede": "Compact double-skin units that deliver AHU-class construction above a false ceiling. They fill the gap between fan coil units, which top out at 2,400 CFM, and floor-mounted AHUs that need a plant room.",
+        "facts": [("1,000 – 8,000", "CFM airflow"), ("25 / 40", "mm double-skin panels"), ("AHRI 410", "certified coils"), ("EC", "fan option")],
+        "guide_h": "Where a Hide Away Unit fits",
+        "guide": [("Fan Coil Units", "Up to 2,400 CFM", "Single rooms and suites"),
+                  ("Hide Away Unit", "1,000 – 8,000 CFM", "Zones, floors and halls with no plant room space"),
+                  ("Air Handling Units", "Up to 42,000 CFM", "Central plant with a dedicated AHU room")],
+        "common_h": "Construction",
+        "hero": "p-hideaway-inside",
+    },
+    "pkg": {
+        "lede": "Self-contained roof top DX units: compressor, condenser, evaporator and supply fan in one cabinet. No chilled water plant is needed, so they suit halls and large open spaces.",
+        "facts": [("52 °C", "maximum ambient"), ("R410A", "factory charged"), ("Scroll", "compressors"), ("ESMA", "certified")],
+        "guide_h": "Typical applications",
+        "guide": [("Auditoriums & convention centres", "Large single volumes", "High occupancy, intermittent use"),
+                  ("Banquet, marriage & prayer halls", "Event spaces", "Fast pull-down before events"),
+                  ("Supermarkets", "Retail floors", "Long operating hours on the roof, off the sales floor")],
+        "common_h": "Construction",
+        "hero": "p-rtpu-2",
+    },
+}

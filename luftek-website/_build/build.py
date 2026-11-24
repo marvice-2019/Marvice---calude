@@ -9,7 +9,7 @@ import os
 from html import escape as e
 from urllib.parse import quote
 
-from data import FAMILIES, OFFICES, PRODUCTS, PROJECTS, SECTORS, TIMELINE
+from data import CATEGORY, EN502, FAMILIES, OFFICES, PRODUCTS, PROJECTS, SECTORS, TIMELINE
 
 OUT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BY_KEY = {p["key"]: p for p in PRODUCTS}
@@ -34,6 +34,10 @@ I = {  # inline icons, 24px grid, stroke = currentColor
 
 def cfm(p):
     return f"{p['cmin']:,} – {p['cmax']:,} CFM" if p["cmin"] else "Packaged DX"
+
+
+def curl(root, fk):
+    return f"{root}products/{FAMILIES[fk]['slug']}.html"
 
 
 def purl(root, p):
@@ -84,7 +88,7 @@ def header(root, active):
             f'<li><a href="{purl(root, p)}"><span class="mega__thumb">{img(root, p["imgs"][0], "")}</span>'
             f'<span><b>{e(p["name"])}</b><small>{e(cfm(p))}</small></span></a></li>'
             for p in PRODUCTS if p["fam"] == fk)
-        return f'<p class="mega__h"><a href="{root}products.html#{fk}">{f["name"]}</a></p><ul>{items}</ul>'
+        return f'<p class="mega__h"><a href="{curl(root, fk)}">{f["name"]}</a></p><ul>{items}</ul>'
     mega_cols = (f'<div class="mega__col">{mega_group("ahu")}</div><div class="mega__col">{mega_group("fcu")}</div>'
                  f'<div class="mega__col">{mega_group("hau")}<div class="mega__gap"></div>{mega_group("pkg")}</div>')
 
@@ -135,7 +139,7 @@ def header(root, active):
     <a href="{root}about.html">About</a>
     <details><summary>Products {I['chev']}</summary>
       <a href="{root}products.html">All products</a>
-      {''.join(f'<p class="drawer__h">{f["name"]}</p>' + ''.join(f'<a href="{purl(root, p)}">{e(p["name"])}</a>' for p in PRODUCTS if p["fam"] == fk) for fk, f in FAMILIES.items())}
+      {''.join(f'<a class="drawer__h" href="{curl(root, fk)}">{f["name"]}</a>' + ''.join(f'<a href="{purl(root, p)}">{e(p["name"])}</a>' for p in PRODUCTS if p["fam"] == fk) for fk, f in FAMILIES.items())}
     </details>
     <a href="{root}industries.html">Industries</a>
     <a href="{root}projects.html">Projects</a>
@@ -149,7 +153,7 @@ def header(root, active):
 
 
 def footer(root):
-    prods = "".join(f'<li><a href="{purl(root, p)}">{e(p["name"])}</a></li>' for p in PRODUCTS[:6])
+    prods = "".join(f'<li><a href="{curl(root, fk)}">{f["name"]}</a></li>' for fk, f in FAMILIES.items())
     return f"""<section class="cta-band">
   <div class="wrap cta-band__in">
     <div>
@@ -299,10 +303,10 @@ def page_home():
         items = [p for p in PRODUCTS if p["fam"] == fk]
         links = "".join(f'<li><a href="{purl(root, p)}">{e(p["name"])} <span>{e(cfm(p))}</span></a></li>' for p in items)
         fam_cards += f"""<article class="fam">
-      <a class="fam__img" href="products.html#{fk}" tabindex="-1">{img(root, f['img'], f['name'])}</a>
+      <a class="fam__img" href="{curl(root, fk)}" tabindex="-1">{img(root, f['img'], f['name'])}</a>
       <div class="fam__body">
         <p class="fam__n">{len(items)} product line{'s' if len(items) > 1 else ''}</p>
-        <h3><a href="products.html#{fk}">{f['name']}</a></h3>
+        <h3><a href="{curl(root, fk)}">{f['name']}</a></h3>
         <p>{f['blurb']}</p>
         <ul class="fam__list">{links}</ul>
       </div>
@@ -475,7 +479,7 @@ def page_products():
         else:
             cards = f'<div class="pgrid pgrid--{len(items)}">{cards}</div>'
         groups += f"""<div class="pgroup" id="{fk}" data-fam="{fk}">
-      <div class="pgroup__head"><div><p class="pgroup__n">{len(items)} product line{'s' if len(items) > 1 else ''}</p><h2>{f['name']}</h2></div><p>{f['blurb']}</p></div>
+      <div class="pgroup__head"><div><p class="pgroup__n">{len(items)} product line{'s' if len(items) > 1 else ''}</p><h2><a href="{curl(root, fk)}">{f['name']}</a></h2></div><p>{f['blurb']} <a class="link" href="{curl(root, fk)}">View category {I['arrow']}</a></p></div>
       {cards}
     </div>"""
     groups += f"""<div class="phelp">
@@ -606,7 +610,7 @@ def page_product(p):
 {header(root, "products")}
 <main id="main" class="pd">
   <div class="wrap">
-    <nav class="crumbs crumbs--dark" aria-label="Breadcrumb"><a href="{root}index.html">Home</a><span aria-hidden="true">/</span><a href="{root}products.html">Products</a><span aria-hidden="true">/</span><a href="{root}products.html#{p['fam']}">{fam['name']}</a><span aria-hidden="true">/</span><span aria-current="page">{e(p['name'])}</span></nav>
+    <nav class="crumbs crumbs--dark" aria-label="Breadcrumb"><a href="{root}index.html">Home</a><span aria-hidden="true">/</span><a href="{root}products.html">Products</a><span aria-hidden="true">/</span><a href="{curl(root, p['fam'])}">{fam['name']}</a><span aria-hidden="true">/</span><span aria-current="page">{e(p['name'])}</span></nav>
     <div class="pd__top">
       <div class="gal" data-gallery='{gal_items}' data-caption="Luftek {e(p['title'])}">
         <button class="gal__main" aria-label="Enlarge image">{img(root, p['imgs'][0], 'Luftek ' + p['title'], lazy=False)}<span class="gal__zoom">{I['zoom']}</span></button>
@@ -940,6 +944,89 @@ def page_contact():
     write("contact.html", body)
 
 
+def page_category(fk):
+    root = "../"
+    f, c = FAMILIES[fk], CATEGORY[fk]
+    items = [p for p in PRODUCTS if p["fam"] == fk]
+    facts = "".join(f'<div class="phf"><b>{e(a)}</b><span>{e(b)}</span></div>' for a, b in c["facts"])
+    hero = page_hero([("Home", "index.html"), ("Products", "products.html"), (f["name"], f"products/{f['slug']}.html")], f["name"], e(c["lede"]), root, c["hero"], aside=facts)
+
+    if len(items) > 1:
+        lineup = f'<div class="pgrid pgrid--{len(items)}">' + "".join(product_card(root, p) for p in items) + "</div>"
+    else:
+        p = items[0]
+        kts = "".join(f'<div class="kt"><dt>{e(a)}</dt><dd>{e(b)}<small>{e(x)}</small></dd></div>' for a, b, x in p["keys"])
+        thumbs = "".join(f'<span class="cat1__th">{img(root, n, "")}</span>' for n in p["imgs"][1:4])
+        lineup = f"""<div class="cat1">
+      <a class="cat1__img" href="{purl(root, p)}">{img(root, p['imgs'][0], 'Luftek ' + p['title'], lazy=False)}</a>
+      <div class="cat1__body">
+        <p class="kicker">{f['name']}</p>
+        <h2><a href="{purl(root, p)}">{e(p['title'])}</a></h2>
+        <p class="pd__lead">{e(p['intro'])}</p>
+        <dl class="kts">{kts}</dl>
+        <div class="cat1__ths">{thumbs}</div>
+        <div class="pd__btns"><a class="btn btn--dark" href="{purl(root, p)}">Full specification {I['arrow']}</a><a class="btn btn--line" href="{root}contact.html?product={quote(p['name'])}">Request a selection</a></div>
+      </div></div>"""
+
+    def link_name(n):
+        hit = next((p for p in PRODUCTS if p["name"] == n), None)
+        if hit:
+            return f'<a href="{purl(root, hit)}">{e(n)}</a>'
+        fam = next((k for k, v in FAMILIES.items() if v["name"] == n), None)
+        return f'<a href="{curl(root, fam)}">{e(n)}</a>' if fam else e(n)
+    guide = "".join(f'<tr{" class=is-here" if (fk == "hau" and a == "Hide Away Unit") else ""}><th scope="row">{link_name(a)}</th><td>{e(b)}</td><td>{e(x)}</td></tr>' for a, b, x in c["guide"])
+    heads = {"ahu": ("Unit", "Best for", "Why"), "fcu": ("Unit", "Duct situation", "Rating"), "hau": ("Category", "Airflow", "Typical use"), "pkg": ("Space", "Type", "Why packaged")}[fk]
+
+    if fk == "ahu":
+        common = "".join(f'<tr><th scope="row">{e(a)}</th><td>{e(b)}</td></tr>' for a, b in items[0]["tech"][1:])
+        pills = {"Thermal conductivity": ["T1", "T2", "T3", "T4", "T5"], "Thermal bridging": ["TB1", "TB2", "TB3", "TB4", "TB5"], "Casing strength": ["D1", "D2", "D3"], "Casing leakage": ["L1", "L2", "L3"], "Filter bypass leakage": ["F9", "F8", "F7", "G1–M6"]}
+        en = "".join(f'<div class="enr"><span class="enr__n">{n}</span><span class="enr__s">' + "".join(f'<span class="{"on" if x == v else ""}">{x}</span>' for x in pills[n]) + "</span></div>" for n, v in EN502)
+        extra = f"""<div class="cat2"><div><h3 class="indd__h">Construction</h3><table class="spec">{common}</table></div>
+      <div><h3 class="indd__h">EN 1886 casing rating · 502LK series</h3><div class="enscale">{en}</div><a class="link" href="{root}certifications.html#en1886">What each class means {I['arrow']}</a></div></div>"""
+    elif fk == "fcu":
+        from data import FCU_FEATURES
+        feats = "".join(f"<li>{I['check']}<span>{e(x)}</span></li>" for x in FCU_FEATURES + ["Single-phase PSC motor, multi-speed, IP20", "Stainless steel drain pan", "Option: 25 mm double-skin casing with PU insulation", "High Delta-T coils for district cooling"])
+        extra = f'<h3 class="indd__h">{c["common_h"]}</h3><ul class="flist">{feats}</ul>'
+    else:
+        tech = "".join(f'<tr><th scope="row">{e(a)}</th><td>{e(b)}</td></tr>' for a, b in items[0]["tech"])
+        feats = "".join(f"<li>{I['check']}<span>{e(x)}</span></li>" for x in items[0]["features"])
+        extra = f"""<div class="cat2"><div><h3 class="indd__h">Technical data</h3><table class="spec">{tech}</table></div>
+      <div><h3 class="indd__h">Salient features</h3><ul class="clist">{feats}</ul></div></div>"""
+
+    secs = sorted({sk for p in items for sk in p["apps"]}, key=list(SECTORS).index)
+    apps = "".join(f'<a class="acard" href="{root}industries.html#{sk}"><span class="acard__img">{img(root, SECTORS[sk]["img"], SECTORS[sk]["name"])}</span><span class="acard__b"><b>{SECTORS[sk]["name"]}</b><span>{sum(1 for x in PROJECTS if x[4] == sk)} reference projects</span></span></a>' for sk in secs)
+    others = "".join(f'<a class="catnav__i" href="{curl(root, k)}"><span>{img(root, v["img"], "")}</span><b>{v["name"]}</b><small>{sum(1 for p in PRODUCTS if p["fam"] == k)} product line{"s" if sum(1 for p in PRODUCTS if p["fam"] == k) > 1 else ""}</small></a>' for k, v in FAMILIES.items() if k != fk)
+
+    ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": f"Luftek {f['name']}", "description": c["lede"],
+          "hasPart": [{"@type": "Product", "name": f"Luftek {p['title']}", "url": f"{SITE}/products/{p['slug']}.html"} for p in items]}
+    cats = "".join(f'<a href="{curl(root, k)}"{" aria-current=page" if k == fk else ""}>{v["name"]}</a>' for k, v in FAMILIES.items())
+    body = f"""{head(f"{f['name']} | Luftek Engineering", c["lede"][:155], root, f"products/{f['slug']}.html", f'<script type="application/ld+json">{json.dumps(ld)}</script>')}
+{header(root, "products")}
+<main id="main">
+{hero}
+<nav class="fambar" aria-label="Product categories"><div class="wrap fambar__in fambar__in--links fambar__in--cats"><a href="{root}products.html">All products</a>{cats}</div></nav>
+<section class="sec sec--tight"><div class="wrap">
+  <div class="sec__head sec__head--split"><div><p class="kicker">{len(items)} product line{'s' if len(items) > 1 else ''}</p><h2>{'The range' if len(items) > 1 else 'The unit'}</h2></div><p>{e(f['blurb'])}</p></div>
+  {lineup}
+</div></section>
+<section class="sec sec--grey"><div class="wrap">
+  <div class="sec__head"><p class="kicker">Selection guide</p><h2>{c['guide_h']}</h2></div>
+  <div class="tbl-wrap"><table class="tbl tbl--guide"><thead><tr><th scope="col">{heads[0]}</th><th scope="col">{heads[1]}</th><th scope="col">{heads[2]}</th></tr></thead><tbody>{guide}</tbody></table></div>
+  {extra}
+</div></section>
+<section class="sec"><div class="wrap">
+  <div class="sec__head sec__head--split"><div><p class="kicker">Applications</p><h2>Where these units work.</h2></div><a class="link" href="{root}projects.html">All 37 projects {I['arrow']}</a></div>
+  <div class="acards">{apps}</div>
+</div></section>
+<section class="sec sec--grey"><div class="wrap">
+  <div class="sec__head"><p class="kicker">More categories</p><h2>Explore the rest of the range.</h2></div>
+  <div class="catnav">{others}</div>
+</div></section>
+</main>
+{footer(root)}"""
+    write(f"products/{f['slug']}.html", body)
+
+
 def page_industries():
     root = ""
     nav = "".join(f'<a href="#{k}">{s["name"]}</a>' for k, s in SECTORS.items())
@@ -1020,7 +1107,7 @@ def page_404():
 
 
 def write_seo():
-    urls = ["", "about.html", "products.html", "industries.html", "projects.html", "certifications.html", "contact.html", "privacy-policy.html"] + [f"products/{p['slug']}.html" for p in PRODUCTS]
+    urls = ["", "about.html", "products.html", "industries.html", "projects.html", "certifications.html", "contact.html", "privacy-policy.html"] + [f"products/{f['slug']}.html" for f in FAMILIES.values()] + [f"products/{p['slug']}.html" for p in PRODUCTS]
     sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "".join(f"  <url><loc>{SITE}/{u}</loc><lastmod>2026-11-24</lastmod></url>\n" for u in urls) + "</urlset>\n"
     write("sitemap.xml", sm)
     write("robots.txt", f"User-agent: *\nAllow: /\nDisallow: /_build/\n\nSitemap: {SITE}/sitemap.xml\n")
@@ -1035,8 +1122,10 @@ if __name__ == "__main__":
     page_about()
     page_certs()
     page_contact()
+    for fk in FAMILIES:
+        page_category(fk)
     page_industries()
     page_privacy()
     page_404()
     write_seo()
-    print("built", 9 + len(PRODUCTS), "pages + sitemap.xml + robots.txt")
+    print("built", 9 + len(PRODUCTS) + len(FAMILIES), "pages + sitemap.xml + robots.txt")
