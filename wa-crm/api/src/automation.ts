@@ -52,7 +52,9 @@ export const triggerSchema = z.discriminatedUnion('type', [
 ]);
 export type FlowTrigger = z.infer<typeof triggerSchema>;
 
-export const graphSchema = z.object({ nodes: z.array(nodeSchema).min(2).max(200), edges: z.array(edgeSchema).max(400) })
+// Canvas position is stored for the visual editor; the engine ignores it.
+const positioned = z.intersection(nodeSchema, z.object({ position: z.object({ x: z.number(), y: z.number() }).optional() }));
+export const graphSchema = z.object({ nodes: z.array(positioned).min(2).max(200), edges: z.array(edgeSchema).max(400) })
   .superRefine((g, ctx) => {
     const ids = new Set<string>();
     for (const n of g.nodes) {

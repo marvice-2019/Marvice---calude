@@ -48,6 +48,11 @@ export const billingRoutes = (deps: Deps): FastifyPluginAsync => async (app) => 
     return reply.code(201).send({ subscriptionId: data.id, shortUrl: data.short_url ?? null });
   });
 
+  app.get('/billing/plans', async () => ({ data: (await deps.db.query(
+    `SELECT p.id, p.name, p.price_paise, p.billing_cycle, (p.razorpay_plan_id IS NOT NULL) AS purchasable,
+            coalesce((SELECT json_object_agg(resource, max_value) FROM plan_limits l WHERE l.plan_id = p.id), '{}') AS limits
+       FROM plans p WHERE p.is_active ORDER BY p.price_paise`)).rows }));
+
   app.get('/billing/subscription', { preHandler: requireRole('owner', 'admin') }, async (req) =>
     withTenant(deps.db, req.principal!.tenantId, async (tx) => {
       const r = await tx.query(

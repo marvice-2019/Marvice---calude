@@ -48,6 +48,15 @@ export const inboxRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
     }
   });
 
+  // Connected accounts and numbers for pickers. Never returns tokens.
+  app.get('/waba', async (req) => withTenant(deps.db, req.principal!.tenantId, async (tx) => ({ data: (await tx.query(
+    `SELECT w.id, w.meta_waba_id, w.name,
+            coalesce(json_agg(json_build_object('id', pn.id, 'displayPhone', pn.display_phone, 'verifiedName', pn.verified_name,
+              'metaPhoneNumberId', pn.meta_phone_number_id, 'qualityRating', pn.quality_rating) ORDER BY pn.created_at)
+              FILTER (WHERE pn.id IS NOT NULL), '[]') AS numbers
+       FROM waba_accounts w LEFT JOIN phone_numbers pn ON pn.waba_account_id = w.id
+      GROUP BY w.id ORDER BY w.created_at`)).rows })));
+
   // Agents see only conversations assigned to them; owners and admins see all.
   app.get('/conversations', async (req) => {
     const p = req.principal!;

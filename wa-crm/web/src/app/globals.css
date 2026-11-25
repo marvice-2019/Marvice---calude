@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Brand tokens. Teal for action, saffron for attention; calm neutrals so chats stay readable. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
+  --color-canvas: #f8fafc;
+  --color-brand: #0f766e;
+  --color-brand-dark: #115e59;
+  --color-brand-soft: #ccfbf1;
+  --color-accent: #f59e0b;
+  --color-danger: #dc2626;
+  --color-bubble-in: #ffffff;
+  --color-bubble-out: #d9f99d;
+}
+
+html, body { height: 100%; }
+body { background: var(--color-canvas); color: var(--color-ink); font-family: var(--font-sans); }
+
+@utility btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: .5rem; padding: .5rem .875rem; font-size: .875rem; font-weight: 500; transition: background-color .15s; }
+@utility btn-primary { background: var(--color-brand); color: #fff; &:hover { background: var(--color-brand-dark); } &:disabled { opacity: .5; } }
+@utility btn-ghost { border: 1px solid var(--color-line); background: #fff; color: var(--color-ink); &:hover { background: var(--color-canvas); } &:disabled { opacity: .5; } }
+@utility btn-danger { background: var(--color-danger); color: #fff; &:hover { opacity: .9; } }
+@utility input { width: 100%; border-radius: .5rem; border: 1px solid var(--color-line); background: #fff; padding: .5rem .75rem; font-size: .875rem; outline: none; &:focus { border-color: var(--color-brand); box-shadow: 0 0 0 3px var(--color-brand-soft); } }
+@utility label { display: block; margin-bottom: .25rem; font-size: .75rem; font-weight: 500; color: var(--color-muted); }
+@utility card { border-radius: .75rem; border: 1px solid var(--color-line); background: #fff; }
+@utility badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: .125rem .5rem; font-size: .75rem; font-weight: 500; }
+@utility th { padding: .625rem 1rem; text-align: left; font-size: .75rem; font-weight: 500; text-transform: uppercase; letter-spacing: .025em; color: var(--color-muted); }
+@utility td { border-top: 1px solid var(--color-line); padding: .75rem 1rem; font-size: .875rem; }

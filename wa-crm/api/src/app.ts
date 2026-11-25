@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import type { Config } from './config.js';
 import type { Db } from './db.js';
@@ -45,6 +46,9 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
     return reply.code(500).send({ error: 'internal_error' });
   });
 
+  // Only the configured web app origins may call the API from a browser. Webhooks are server-to-server.
+  await app.register(cors, { origin: deps.config.WEB_ORIGINS.length ? deps.config.WEB_ORIGINS : false,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type'], maxAge: 600 });
   await app.register(rateLimit, { global: false });
 
   app.get('/health', async () => {

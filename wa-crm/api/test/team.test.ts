@@ -106,3 +106,11 @@ test('round-robin gives a new conversation to the least-busy agent', async () =>
   const second = (await list()).find((c: { contact_phone: string }) => c.contact_phone === '919522222222');
   assert.equal(second.assigned_user_id, free);
 });
+
+test('read endpoints for the web app: numbers without tokens, plans, inbox setting', async () => {
+  const waba = (await api('GET', '/waba', owner.token)).json().data;
+  assert.equal(waba[0].numbers[0].metaPhoneNumberId, PNID);
+  assert.ok(!JSON.stringify(waba).includes('access_token'), 'tokens never leave the server');
+  assert.equal((await api('GET', '/billing/plans', owner.token)).statusCode, 200);
+  assert.deepEqual((await api('GET', '/settings/inbox', owner.token)).json(), { autoAssign: false });
+});

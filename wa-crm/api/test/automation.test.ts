@@ -153,3 +153,12 @@ test('outside working hours the away message goes once per cooldown', async () =
   await send('anyone?');
   assert.deepEqual(textsTo('919100000006'), ['We are closed now, Priya. We reply by 10 AM.']);
 });
+
+test('node positions from the visual editor are saved and returned', async () => {
+  const r = await api('POST', '/flows', { name: 'Layout', trigger: { type: 'any_message' }, graph: {
+    nodes: [{ id: 's', type: 'start', position: { x: 10, y: 20 } }, { id: 'e', type: 'end', position: { x: 300, y: 20 } }],
+    edges: [{ from: 's', to: 'e' }] } });
+  assert.equal(r.statusCode, 201, r.body);
+  const f = (await api('GET', `/flows/${r.json().id}`)).json();
+  assert.deepEqual(f.nodes[0].position, { x: 10, y: 20 });
+});

@@ -54,3 +54,14 @@ test('an agent cannot connect a WhatsApp number', async () => {
     metaWabaId: '1234567890', accessToken: 'EAAG' + 'x'.repeat(40), phoneNumberId: '1098765432', displayPhone: '+91 1' } });
   assert.equal(r.statusCode, 403);
 });
+
+test('CORS: only configured web origins get access headers', async () => {
+  const c2 = await setup({ WEB_ORIGINS: 'https://app.example.com' });
+  try {
+    const ok = await c2.app.inject({ method: 'OPTIONS', url: '/contacts',
+      headers: { origin: 'https://app.example.com', 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization' } });
+    assert.equal(ok.headers['access-control-allow-origin'], 'https://app.example.com');
+    const bad = await c2.app.inject({ method: 'GET', url: '/health', headers: { origin: 'https://evil.example.net' } });
+    assert.equal(bad.headers['access-control-allow-origin'], undefined);
+  } finally { await c2.close(); }
+});

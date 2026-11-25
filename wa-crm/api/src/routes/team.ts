@@ -208,6 +208,11 @@ export const teamRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
     return removed ? reply.code(204).send() : reply.code(404).send({ error: 'not_found_or_owner' });
   });
 
+  app.get('/settings/inbox', async (req) => {
+    const r = await deps.db.query<{ auto_assign: boolean }>('SELECT auto_assign FROM tenants WHERE id = $1', [req.principal!.tenantId]);
+    return { autoAssign: r.rows[0]?.auto_assign ?? false };
+  });
+
   app.patch('/settings/inbox', managers, async (req, reply) => {
     const body = z.object({ autoAssign: z.boolean() }).safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: 'invalid_body' });
