@@ -15,6 +15,8 @@ export interface InboundMessage {
   waMessageId: string;
   type: string;
   body: string | null;
+  /** Id of the button or list row the customer tapped, if any. */
+  replyId: string | null;
   timestamp: Date;
   raw: unknown;
 }
@@ -76,9 +78,11 @@ export function parseWebhook(body: unknown): {
         const body = type === 'text' ? str(obj(msg.text).body)
           : str(obj(msg.button).text) ?? str(obj(obj(msg.interactive).button_reply).title)
             ?? str(obj(obj(msg.interactive).list_reply).title) ?? str(obj(msg[type]).caption);
+        const replyId = str(obj(obj(msg.interactive).button_reply).id) ?? str(obj(obj(msg.interactive).list_reply).id)
+          ?? str(obj(msg.button).payload);
         messages.push({
           phoneNumberId, from, profileName: names.get(from) ?? null, waMessageId: id, type,
-          body, timestamp: new Date(Number(str(msg.timestamp) ?? 0) * 1000 || Date.now()), raw: m,
+          body, replyId, timestamp: new Date(Number(str(msg.timestamp) ?? 0) * 1000 || Date.now()), raw: m,
         });
       }
       for (const s of arr(value.statuses)) {
@@ -166,6 +170,18 @@ export async function sendTemplate(
   const res = await fetchFn(graph(ver, `${phoneNumberId}/messages`), {
     method: 'POST', headers: authJson(token),
     body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template }) });
+  const data = obj(await res.json().catch(() => ({})));
+  const wamid = str(obj(arr(data.messages)[0]).id);
+  if (!res.ok || !wamid) throw new MetaApiError(res.status, data.error ?? data);
+  return wamid;
+}
+
+/** Sends any Cloud API message object ({type, text|interactive|image|...}). Returns the wamid. */
+export async function sendRaw(fetchFn: FetchLike, ver: string, phoneNumberId: string, token: string, to: string,
+  message: Record<string, unknown>): Promise<string> {
+  const res = await fetchFn(graph(ver, `${phoneNumberId}/messages`), {
+    method: 'POST', headers: authJson(token),
+    body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to, ...message }) });
   const data = obj(await res.json().catch(() => ({})));
   const wamid = str(obj(arr(data.messages)[0]).id);
   if (!res.ok || !wamid) throw new MetaApiError(res.status, data.error ?? data);

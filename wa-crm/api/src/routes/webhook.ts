@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { withPlatform, withTenant } from '../db.js';
 import { isValidSignature, parseWebhook } from '../meta.js';
+import { FLOW_INBOUND } from '../automation.js';
+import { enqueue } from '../jobs.js';
 import type { Deps } from '../app.js';
 
 // A status may arrive after a later one; never move a message backwards.
@@ -76,6 +78,9 @@ export const webhookRoutes = (deps: Deps): FastifyPluginAsync => async (app) => 
           `UPDATE conversations SET last_message_at = greatest(coalesce(last_message_at, $2), $2),
                   last_inbound_at = greatest(coalesce(last_inbound_at, $2), $2), unread_count = unread_count + 1
             WHERE id = $1`, [c.id, m.timestamp]);
+        // Chatbot flows, keyword replies and the away message run on the job queue, so Meta gets its 200 fast.
+        await enqueue(tx, FLOW_INBOUND, { conversationId: c.id, body: m.body, replyId: m.replyId, isNew: c.created },
+          { tenantId: route.tenant_id, dedupeKey: `in:${m.waMessageId}` });
         return { conversationId: c.id, assignee, assignedNow: c.created && assignee !== null, message: inserted.rows[0] };
       });
       // Emit only after commit, so clients never see data that was rolled back.

@@ -5,6 +5,9 @@ import { attachSocketIo, type Realtime } from './realtime.js';
 import { startBackgroundWorker } from './worker.js';
 
 const config = loadConfig();
+// Every outbound call (Meta, Razorpay, flow webhooks) gives up after 15 s.
+const httpFetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) =>
+  fetch(url, { ...init, signal: AbortSignal.timeout(15_000) });
 const db = createPool(config.DATABASE_URL);
 
 // The socket server needs Fastify's http server, and the routes need the socket: bind lazily.
@@ -13,13 +16,13 @@ const realtime: Realtime = {
   conversation: (...a) => live?.conversation(...a),
   toUser: (...a) => live?.toUser(...a),
 };
-const app = await buildApp({ config, db, fetch: (url, init) => fetch(url, init), realtime });
+const app = await buildApp({ config, db, fetch: httpFetch, realtime });
 const { realtime: socketRealtime, io } = attachSocketIo(app.server, config.JWT_SECRET, config.WEB_ORIGINS);
 live = socketRealtime;
 
 // Background jobs run in the same process by default (one VPS). Set RUN_WORKER=false to split them out.
 const stopWorker = process.env.RUN_WORKER === 'false' ? async () => {} :
-  startBackgroundWorker({ config, db, fetch: (url, init) => fetch(url, init), realtime });
+  startBackgroundWorker({ config, db, fetch: httpFetch, realtime });
 
 const shutdown = async () => {
   await stopWorker();

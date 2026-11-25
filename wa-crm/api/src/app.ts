@@ -11,6 +11,7 @@ import { LimitError } from './limits.js';
 import { contactRoutes } from './routes/contacts.js';
 import { inboxRoutes } from './routes/inbox.js';
 import { campaignRoutes } from './routes/campaigns.js';
+import { flowRoutes } from './routes/flows.js';
 import { teamRoutes } from './routes/team.js';
 import { templateRoutes } from './routes/templates.js';
 import { webhookRoutes } from './routes/webhook.js';
@@ -57,6 +58,7 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
   await app.register(templateRoutes(deps));
   await app.register(teamRoutes(deps));
   await app.register(campaignRoutes(deps));
+  await app.register(flowRoutes(deps));
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));
   await app.register(razorpayWebhookRoutes(deps));
