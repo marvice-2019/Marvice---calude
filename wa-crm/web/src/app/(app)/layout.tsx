@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Bot, CreditCard, FileText, KanbanSquare, LogOut, Megaphone, Menu, MessageSquare, Settings, Users, UsersRound } from 'lucide-react';
+import { Bot, CreditCard, FileText, KanbanSquare, LogOut, Megaphone, Menu, QrCode, MessageSquare, Settings, Users, UsersRound } from 'lucide-react';
 import { APP_NAME } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/pipeline', label: 'Pipeline', icon: KanbanSquare, roles: ['owner', 'admin', 'agent'] },
   { href: '/templates', label: 'Templates', icon: FileText, roles: ['owner', 'admin', 'agent'] },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone, roles: ['owner', 'admin'] },
+  { href: '/growth', label: 'Growth tools', icon: QrCode, roles: ['owner', 'admin'] },
   { href: '/flows', label: 'Automation', icon: Bot, roles: ['owner', 'admin'] },
   { href: '/team', label: 'Team', icon: Users, roles: ['owner', 'admin'] },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['owner', 'admin'] },
