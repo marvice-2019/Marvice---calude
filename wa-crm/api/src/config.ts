@@ -10,6 +10,11 @@ const schema = z.object({
   META_APP_SECRET: z.string().min(1),
   META_WEBHOOK_VERIFY_TOKEN: z.string().min(8),
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v21.0'),
+  RAZORPAY_KEY_ID: z.string().min(1).optional(),
+  RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
+  SUPPLIER_STATE_CODE: z.string().regex(/^\d{2}$/).default('29'),
+  BILLING_GRACE_DAYS: z.coerce.number().int().min(0).max(60).default(7),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

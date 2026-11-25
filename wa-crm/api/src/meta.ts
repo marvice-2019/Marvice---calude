@@ -70,7 +70,7 @@ export function parseWebhook(body: unknown): { messages: InboundMessage[]; statu
   return { messages, statuses };
 }
 
-export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string }) =>
+export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) =>
   Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
 export class MetaApiError extends Error {

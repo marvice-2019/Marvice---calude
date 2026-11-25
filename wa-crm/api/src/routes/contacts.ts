@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { withTenant } from '../db.js';
+import { assertWithinLimit, requireActiveTenant } from '../limits.js';
 import type { AppDeps } from '../app.js';
 
 const phone = z.string().transform((v) => v.replace(/[^\d]/g, '')).pipe(z.string().regex(/^[1-9]\d{7,14}$/));
@@ -21,6 +22,7 @@ const listQuery = z.object({
 
 export const contactRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
   app.addHook('preHandler', requireAuth(deps.config.JWT_SECRET));
+  app.addHook('preHandler', requireActiveTenant(deps.db));
 
   app.get('/contacts', async (req, reply) => {
     const q = listQuery.safeParse(req.query);
@@ -47,6 +49,7 @@ export const contactRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) 
     const p0 = req.principal!;
     try {
       const row = await withTenant(deps.db, p0.tenantId, async (tx) => {
+        await assertWithinLimit(tx, 'contacts');
         const r = await tx.query(
           `INSERT INTO contacts (tenant_id, phone_e164, name, email, opted_in_at, opt_in_source)
            VALUES ($1, $2, $3, $4, CASE WHEN $5::text IS NULL THEN NULL ELSE now() END, $5)

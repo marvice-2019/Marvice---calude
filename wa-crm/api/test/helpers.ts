@@ -16,12 +16,12 @@ export const VERIFY_TOKEN = 'verify-token-123';
 export interface TestCtx {
   app: FastifyInstance;
   db: Db;
-  sent: { url: string; body: unknown }[];
+  sent: { url: string; method: string; headers: Record<string, string>; body: unknown }[];
   setMetaResponse: (r: { ok: boolean; status: number; body: unknown }) => void;
   close: () => Promise<void>;
 }
 
-export async function setup(): Promise<TestCtx> {
+export async function setup(extra: Record<string, string> = {}): Promise<TestCtx> {
   const name = `wacrm_test_${randomBytes(4).toString('hex')}`;
   const admin = new pg.Client({ connectionString: ADMIN_URL });
   await admin.connect();
@@ -37,12 +37,13 @@ export async function setup(): Promise<TestCtx> {
     META_APP_SECRET: APP_SECRET,
     META_WEBHOOK_VERIFY_TOKEN: VERIFY_TOKEN,
     LOG_LEVEL: 'silent',
+    ...extra,
   });
   const db = createPool(url);
   const sent: TestCtx['sent'] = [];
   let metaResponse = { ok: true, status: 200, body: { messages: [{ id: 'wamid.OUT1' }] } as unknown };
   const fetchFn: FetchLike = async (u, init) => {
-    sent.push({ url: u, body: JSON.parse(init.body) });
+    sent.push({ url: u, method: init.method, headers: init.headers, body: init.body ? JSON.parse(init.body) : undefined });
     const r = metaResponse;
     return { ok: r.ok, status: r.status, json: async () => r.body };
   };

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireRole } from '../auth.js';
 import { encryptSecret, decryptSecret } from '../crypto.js';
 import { withTenant } from '../db.js';
+import { assertWithinLimit, requireActiveTenant } from '../limits.js';
 import { MetaApiError, sendText } from '../meta.js';
 import type { AppDeps } from '../app.js';
 
@@ -19,6 +20,7 @@ const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export const inboxRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
   app.addHook('preHandler', requireAuth(deps.config.JWT_SECRET));
+  app.addHook('preHandler', requireActiveTenant(deps.db));
 
   // Manual connection for now; Meta Embedded Signup replaces this once we are a Tech Provider.
   app.post('/waba/connect', { preHandler: requireRole('owner', 'admin') }, async (req, reply) => {
@@ -27,6 +29,7 @@ export const inboxRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) =>
     const b = body.data, p = req.principal!;
     try {
       const out = await withTenant(deps.db, p.tenantId, async (tx) => {
+        await assertWithinLimit(tx, 'whatsapp_numbers');
         const w = await tx.query<{ id: string }>(
           `INSERT INTO waba_accounts (tenant_id, meta_waba_id, access_token_enc) VALUES ($1, $2, $3) RETURNING id`,
           [p.tenantId, b.metaWabaId, encryptSecret(b.accessToken, deps.config.TOKEN_ENCRYPTION_KEY)]);
