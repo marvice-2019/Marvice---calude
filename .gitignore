@@ -33,3 +33,5 @@ video.marvice.tech/brag-output/work/
 .locks/
 design-log/
 .prodscope/
+# Browser MCP tool scratch (page snapshots, console logs)
+.playwright-mcp/
