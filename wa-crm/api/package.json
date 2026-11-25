@@ -12,6 +12,8 @@
     "start": "node dist/src/server.js",
     "migrate": "tsx scripts/migrate.ts",
     "migrate:prod": "node dist/scripts/migrate.js",
+    "create-admin": "tsx scripts/create-admin.ts",
+    "create-admin:prod": "node dist/scripts/create-admin.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test --test-concurrency=1 test/*.test.ts"
   },

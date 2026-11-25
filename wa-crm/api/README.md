@@ -12,6 +12,7 @@ tenants and login, contacts, the WhatsApp webhook, the shared inbox and replies.
 | WhatsApp number | `POST /waba/connect` (owner or admin; token stored encrypted) |
 | Meta webhook | `GET /webhooks/meta` (verification), `POST /webhooks/meta` (signed messages and statuses) |
 | Inbox | `GET /conversations`, `GET /conversations/:id/messages`, `POST /conversations/:id/messages` |
+| Platform admin | `POST /admin/auth/login`; `/admin/plans`, `/admin/tenants`, `/admin/tenants/:id/impersonate` (15 min), `/admin/stats`, `/admin/audit-logs`. Create one with `npm run create-admin -- email name` (`create-admin:prod` in the container) |
 | Health | `GET /health` |
 
 How it keeps tenants apart: every tenant table has Postgres row-level security. Tenant requests run as

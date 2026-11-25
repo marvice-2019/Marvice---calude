@@ -3,6 +3,7 @@ import rateLimit from '@fastify/rate-limit';
 import type { Config } from './config.js';
 import type { Db } from './db.js';
 import type { FetchLike } from './meta.js';
+import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { billingRoutes, razorpayWebhookRoutes } from './routes/billing.js';
 import { LimitError } from './limits.js';
@@ -48,6 +49,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));
   await app.register(razorpayWebhookRoutes(deps));
+  await app.register(adminRoutes(deps));
 
 
   return app;
