@@ -2,6 +2,7 @@ import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
 import { attachSocketIo, type Realtime } from './realtime.js';
+import { startBackgroundWorker } from './worker.js';
 
 const config = loadConfig();
 const db = createPool(config.DATABASE_URL);
@@ -16,7 +17,12 @@ const app = await buildApp({ config, db, fetch: (url, init) => fetch(url, init),
 const { realtime: socketRealtime, io } = attachSocketIo(app.server, config.JWT_SECRET, config.WEB_ORIGINS);
 live = socketRealtime;
 
+// Background jobs run in the same process by default (one VPS). Set RUN_WORKER=false to split them out.
+const stopWorker = process.env.RUN_WORKER === 'false' ? async () => {} :
+  startBackgroundWorker({ config, db, fetch: (url, init) => fetch(url, init), realtime });
+
 const shutdown = async () => {
+  await stopWorker();
   await io.close();
   await app.close();
   await db.end();

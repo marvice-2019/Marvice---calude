@@ -19,11 +19,9 @@ export interface EnqueueOptions {
 
 /** Adds a job. Pass the caller's transaction so the job commits with the data it refers to. */
 export async function enqueue(q: Db | Tx, queue: string, payload: Record<string, unknown>, opts: EnqueueOptions = {}) {
-  const r = await q.query<{ id: string }>(
-    `INSERT INTO jobs (queue, tenant_id, payload, run_at, max_attempts, dedupe_key)
-     VALUES ($1, $2, $3, coalesce($4, now()), $5, $6)
-     ON CONFLICT (queue, dedupe_key) WHERE dedupe_key IS NOT NULL AND status IN ('queued','running') DO NOTHING
-     RETURNING id`,
+  // Through enqueue_job() so tenant transactions can queue work without access to the jobs table.
+  const r = await q.query<{ id: string | null }>(
+    'SELECT enqueue_job($1, $2, $3, $4, $5, $6)::text AS id',
     [queue, opts.tenantId ?? null, JSON.stringify(payload), opts.runAt ?? null, opts.maxAttempts ?? 5, opts.dedupeKey ?? null]);
   return r.rows[0]?.id ?? null;
 }

@@ -23,6 +23,7 @@ export interface TestCtx {
   /** A fixed response, or a function of the URL for tests that call several endpoints. */
   setMetaResponse: (r: MetaResponse | ((url: string) => MetaResponse)) => void;
   config: ReturnType<typeof loadConfig>;
+  fetch: FetchLike;
   close: () => Promise<void>;
 }
 
@@ -54,7 +55,7 @@ export async function setup(extra: Record<string, string> = {}, more: { realtime
   };
   const app = await buildApp({ config, db, fetch: fetchFn, realtime: more.realtime });
   return {
-    app, db, sent, config,
+    app, db, sent, config, fetch: fetchFn,
     setMetaResponse: (r) => { metaResponse = r; },
     close: async () => {
       await app.close();
