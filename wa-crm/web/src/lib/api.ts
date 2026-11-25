@@ -41,6 +41,11 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
 export function errorText(e: unknown): string {
   if (!(e instanceof ApiError)) return 'Something went wrong. Please try again.';
   // A send that reached WhatsApp but was refused comes back as the saved failed message.
+  if (e.body.error === 'meta_error' && typeof e.body.step === 'string') {
+    const steps: Record<string, string> = { exchange_code: 'confirming your Facebook login', subscribe_app: 'linking your WhatsApp account',
+      register_number: 'registering the phone number', number_details: 'reading the number details' };
+    return `Meta stopped the setup while ${steps[e.body.step] ?? e.body.step}: ${String(e.body.detail ?? 'no reason given')}. Nothing was connected; you can try again.`;
+  }
   if (e.body.status === 'failed' && e.body.error_code) {
     const meta: Record<string, string> = {
       '190': 'WhatsApp refused the access token. Reconnect this number in Settings with a valid permanent token.',

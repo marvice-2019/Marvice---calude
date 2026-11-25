@@ -26,6 +26,7 @@ flows, team roles, Razorpay billing with GST invoices, and a super-admin API. Bu
    | `TOKEN_ENCRYPTION_KEY` | `openssl rand -base64 32` (keep a copy: losing it makes stored WhatsApp tokens unreadable) |
    | `META_APP_SECRET` | Meta app → App settings → Basic → App secret |
    | `META_WEBHOOK_VERIFY_TOKEN` | any random string, also pasted into Meta |
+   | `META_APP_ID`, `META_ES_CONFIG_ID` | app ID, and the Embedded Signup configuration ID from Meta app → Facebook Login for Business → Configurations. Leave empty until Tech Provider review passes; the "Connect with Facebook" button stays hidden. |
    | `WEB_URL` | `https://app.yourdomain.com` |
    | `API_URL` | `https://api.yourdomain.com` |
    | `APP_NAME` | your product name (shown in the app) |
@@ -50,7 +51,9 @@ broadcasts before selling large plans.
 ## Before the first real client
 
 - Meta Business Verification for your company, then Tech Provider app review, so clients can connect
-  through Embedded Signup. Until then, numbers are connected manually in Settings with a system-user token.
+  through Embedded Signup (set `META_APP_ID` and `META_ES_CONFIG_ID`, and add your app domain under
+  Facebook Login for Business → Allowed domains). Until then, numbers are connected manually in Settings
+  with a system-user token.
 - Privacy policy, terms and a data processing agreement (India DPDP Act). Have a lawyer review them.
 - Confirm the current Graph API version and set `META_GRAPH_VERSION`.
 

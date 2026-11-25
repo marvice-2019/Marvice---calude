@@ -5,6 +5,7 @@ import { Alert, PageHeader, useApi } from '@/components/ui';
 import { api, API_URL, errorText } from '@/lib/api';
 import type { Waba } from '@/lib/types';
 import { AiSection, IntegrationsSection } from '@/components/integrations';
+import { EmbeddedSignup } from '@/components/embedded-signup';
 
 const DAYS = [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']] as const;
 type Hours = Partial<Record<(typeof DAYS)[number][0], [string, string][]>>;
@@ -39,8 +40,9 @@ function WhatsAppSection() {
         </ul>
       )}
       {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
+      <EmbeddedSignup onConnected={(text) => { setMsg({ tone: 'success', text }); wabas.reload(); }} />
       <details className="text-sm" open={numbers.length === 0}>
-        <summary className="cursor-pointer font-medium text-brand">Connect a number</summary>
+        <summary className="cursor-pointer font-medium text-brand">Connect a number manually (system-user token)</summary>
         <form className="mt-3 grid gap-3 md:grid-cols-2" onSubmit={async (e) => { e.preventDefault(); setMsg(null);
           try { await api('/waba/connect', { body: { ...f, verifiedName: f.verifiedName || undefined } }); setMsg({ tone: 'success', text: 'Number connected.' });
             setF({ metaWabaId: '', phoneNumberId: '', displayPhone: '', verifiedName: '', accessToken: '' }); wabas.reload(); }

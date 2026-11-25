@@ -9,6 +9,9 @@ const schema = z.object({
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'TOKEN_ENCRYPTION_KEY must be 32 bytes, base64'),
   META_APP_SECRET: z.string().min(1),
   META_WEBHOOK_VERIFY_TOKEN: z.string().min(8),
+  /** Meta app id and Embedded Signup configuration id (Facebook Login for Business). Signup is off until both are set. */
+  META_APP_ID: z.string().regex(/^\d+$/).optional(),
+  META_ES_CONFIG_ID: z.string().regex(/^\d+$/).optional(),
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v21.0'),
   RAZORPAY_KEY_ID: z.string().min(1).optional(),
   RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
