@@ -37,6 +37,8 @@ export const nodeSchema = z.discriminatedUnion('type', [
   z.object({ id, type: z.literal('remove_tag'), data: z.object({ tagId: z.string().uuid() }) }),
   z.object({ id, type: z.literal('assign_agent'), data: z.object({ userId: z.union([z.string().uuid(), z.literal('round_robin')]) }) }),
   z.object({ id, type: z.literal('webhook'), data: z.object({ url: z.string().url().startsWith('https://'), saveAs: z.string().regex(/^[a-z_][a-z0-9_]{0,39}$/).optional() }) }),
+  z.object({ id, type: z.literal('deal_stage'), data: z.object({ pipelineId: z.string().uuid(), stageId: z.string().min(1).max(64),
+    title: z.string().max(160).default('') }) }),
   z.object({ id, type: z.literal('close_conversation'), data: z.object({}).default({}) }),
   z.object({ id, type: z.literal('end'), data: z.object({}).default({}) }),
 ]);
@@ -296,6 +298,30 @@ export async function execute(deps: Deps, tenantId: string, run: RunRow, resumeH
             vars[node.data.saveAs] = res.ok && out !== null ? JSON.stringify(out).slice(0, 2000) : `error:${res.status}`;
           }
           current = nextEdge(run.edges, node.id, res.ok ? 'ok' : 'error'); break;
+        }
+        case 'deal_stage': {
+          // Moves the contact's newest open deal in this pipeline to the stage, or opens a deal there if none exists.
+          const { pipelineId, stageId } = node.data;
+          const ok = await withTenant(deps.db, tenantId, async (tx) => {
+            const p = await tx.query<{ ok: boolean }>('SELECT stages @> $2::jsonb AS ok FROM pipelines WHERE id = $1',
+              [pipelineId, JSON.stringify([{ id: stageId }])]);
+            if (!p.rows[0]?.ok) return false;
+            const nextPos = '(SELECT COALESCE(max(position), 0) + 1 FROM deals WHERE pipeline_id = $1 AND stage_id = $2)';
+            const moved = await tx.query(
+              `UPDATE deals SET stage_id = $2, position = ${nextPos}
+               WHERE id = (SELECT id FROM deals WHERE pipeline_id = $1 AND contact_id = $3 AND status = 'open' ORDER BY created_at DESC LIMIT 1)`,
+              [pipelineId, stageId, ctx.contact_id]);
+            if (!moved.rowCount) {
+              const title = (r(node.data.title).trim() || `WhatsApp: ${ctx.name ?? `+${ctx.phone}`}`).slice(0, 160);
+              await tx.query(
+                `INSERT INTO deals (tenant_id, pipeline_id, stage_id, contact_id, title, owner_user_id, position)
+                 VALUES ($4, $1, $2, $3, $5, $6, ${nextPos})`,
+                [pipelineId, stageId, ctx.contact_id, tenantId, title, ctx.assigned_user_id]);
+            }
+            return true;
+          });
+          if (!ok) throw new FlowError('pipeline or stage no longer exists');
+          current = nextEdge(run.edges, node.id); break;
         }
         case 'close_conversation':
           await withTenant(deps.db, tenantId, (tx) => tx.query("UPDATE conversations SET status = 'closed' WHERE id = $1", [ctx.conversation_id]));

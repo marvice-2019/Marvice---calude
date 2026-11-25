@@ -11,7 +11,8 @@ import { Alert, StatusBadge, useApi } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 
 type Kind = 'start' | 'send_text' | 'send_buttons' | 'send_list' | 'send_media' | 'send_template' | 'wait_reply' | 'delay' | 'condition'
-  | 'set_var' | 'add_tag' | 'remove_tag' | 'assign_agent' | 'webhook' | 'close_conversation' | 'end';
+  | 'set_var' | 'add_tag' | 'remove_tag' | 'assign_agent' | 'deal_stage' | 'webhook' | 'close_conversation' | 'end';
+interface Pipeline { id: string; name: string; stages: { id: string; name: string }[] }
 type StepData = { kind: Kind; data: Record<string, unknown> };
 type StepNode = Node<StepData, 'step'>;
 
@@ -28,6 +29,7 @@ const KINDS: { kind: Kind; label: string; group: string; init: Record<string, un
   { kind: 'add_tag', label: 'Add tag', group: 'CRM', init: { tagId: '' } },
   { kind: 'remove_tag', label: 'Remove tag', group: 'CRM', init: { tagId: '' } },
   { kind: 'assign_agent', label: 'Assign agent', group: 'CRM', init: { userId: 'round_robin' } },
+  { kind: 'deal_stage', label: 'Move deal', group: 'CRM', init: { pipelineId: '', stageId: '', title: '' } },
   { kind: 'webhook', label: 'Webhook', group: 'CRM', init: { url: 'https://', saveAs: '' } },
   { kind: 'close_conversation', label: 'Close chat', group: 'CRM', init: {} },
   { kind: 'end', label: 'End', group: 'CRM', init: {} },
@@ -57,6 +59,7 @@ function summary(d: StepData): string {
     case 'delay': return `${x.minutes} min`;
     case 'condition': return `${x.left} ${x.op} ${x.right}`;
     case 'set_var': return `${x.name} = ${x.value}`;
+    case 'deal_stage': return x.stageId ? 'to the chosen stage' : 'choose a stage';
     case 'webhook': case 'send_media': return String(x.url ?? '');
     default: return '';
   }
@@ -96,6 +99,7 @@ export default function FlowBuilderPage() {
   const flow = useApi<ApiFlow>(isNew ? null : `/flows/${id}`);
   const tags = useApi<{ data: { id: string; label: string }[] }>('/tags');
   const team = useApi<{ data: { id: string; name: string }[] }>('/team');
+  const pipes = useApi<{ data: Pipeline[] }>('/pipelines');
   const tpls = useApi<{ data: { id: string; name: string; language: string }[] }>('/templates?status=APPROVED');
 
   const [name, setName] = useState('New flow');
@@ -195,7 +199,7 @@ export default function FlowBuilderPage() {
           <aside className="w-72 shrink-0 overflow-y-auto border-l border-line bg-white p-4 text-sm" aria-label="Step settings">
             <div className="mb-3 flex items-center justify-between"><b>{LABEL[sel.data.kind]}</b>
               <button className="text-danger" onClick={() => { setNodes((ns) => ns.filter((n) => n.id !== sel.id)); setEdges((es) => es.filter((e) => e.source !== sel.id && e.target !== sel.id)); setSelected(null); }}>Delete</button></div>
-            <StepForm kind={sel.data.kind} data={sel.data.data} onChange={update} tags={tags.data?.data ?? []} team={team.data?.data ?? []} templates={tpls.data?.data ?? []} />
+            <StepForm kind={sel.data.kind} data={sel.data.data} onChange={update} tags={tags.data?.data ?? []} team={team.data?.data ?? []} templates={tpls.data?.data ?? []} pipelines={pipes.data?.data ?? []} />
             <p className="mt-4 text-xs text-muted">Use {'{{contact.name}}'}, {'{{contact.phone}}'} or {'{{var.name}}'} in text.</p>
           </aside>
         )}
@@ -224,7 +228,7 @@ function TriggerEditor({ trigger, onChange }: { trigger: Trigger; onChange: (t: 
   );
 }
 
-function StepForm({ kind, data, onChange, tags, team, templates }: { kind: Kind; data: Record<string, unknown>; onChange: (d: Record<string, unknown>) => void;
+function StepForm({ kind, data, onChange, tags, team, templates, pipelines }: { pipelines: Pipeline[]; kind: Kind; data: Record<string, unknown>; onChange: (d: Record<string, unknown>) => void;
   tags: { id: string; label: string }[]; team: { id: string; name: string }[]; templates: { id: string; name: string; language: string }[] }) {
   const set = (k: string, v: unknown) => onChange({ ...data, [k]: v });
   const field = (k: string, label: string, opts: { type?: string; textarea?: boolean } = {}) => (
@@ -281,6 +285,18 @@ function StepForm({ kind, data, onChange, tags, team, templates }: { kind: Kind;
       <div className="mb-3"><label className="label" htmlFor="f-ag">Assign to</label>
         <select id="f-ag" className="input" value={String(data.userId)} onChange={(e) => set('userId', e.target.value)}>
           <option value="round_robin">Least busy agent</option>{team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>);
+    case 'deal_stage': {
+      const pipe = pipelines.find((p) => p.id === data.pipelineId) ?? (pipelines.length === 1 ? pipelines[0] : undefined);
+      return (<>
+        {pipelines.length > 1 && <div className="mb-3"><label className="label" htmlFor="f-pl">Pipeline</label>
+          <select id="f-pl" className="input" value={String(data.pipelineId ?? '')} onChange={(e) => onChange({ ...data, pipelineId: e.target.value, stageId: '' })}>
+            <option value="">Choose…</option>{pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>}
+        <div className="mb-3"><label className="label" htmlFor="f-st">Move the contact's open deal to</label>
+          <select id="f-st" className="input" value={String(data.stageId ?? '')} onChange={(e) => onChange({ ...data, pipelineId: pipe?.id ?? '', stageId: e.target.value })}>
+            <option value="">Choose…</option>{(pipe?.stages ?? []).map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}</select></div>
+        {field('title', 'If the contact has no open deal, create one named (empty = "WhatsApp: <name>")')}
+      </>);
+    }
     case 'webhook': return <>{field('url', 'https URL (receives the contact and variables as JSON)')}{field('saveAs', 'Save the response as variable')}</>;
     default: return <p className="text-muted">No settings.</p>;
   }
