@@ -1,0 +1,56 @@
+# One-VPS deployment for Coolify (Resource type: Docker Compose, base directory /wa-crm).
+# Set every ${VAR} in Coolify's environment variables screen; nothing secret lives in this file.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wacrm
+      POSTGRES_USER: wacrm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wacrm -d wacrm"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://wacrm:${POSTGRES_PASSWORD}@postgres:5432/wacrm
+      PORT: "3000"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:?set TOKEN_ENCRYPTION_KEY}
+      META_APP_SECRET: ${META_APP_SECRET:?set META_APP_SECRET}
+      META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN:?set META_WEBHOOK_VERIFY_TOKEN}
+      META_GRAPH_VERSION: ${META_GRAPH_VERSION:-v21.0}
+      WEB_ORIGINS: ${WEB_URL:?set WEB_URL}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      SUPPLIER_STATE_CODE: ${SUPPLIER_STATE_CODE:-29}
+      BILLING_GRACE_DAYS: ${BILLING_GRACE_DAYS:-7}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    expose:
+      - "3000"
+
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL:?set API_URL}
+        NEXT_PUBLIC_APP_NAME: ${APP_NAME:-Converse}
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - "3100"
+
+volumes:
+  pgdata:
