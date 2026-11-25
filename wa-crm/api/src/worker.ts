@@ -1,5 +1,6 @@
 import type { Deps } from './app.js';
 import { FLOW_INBOUND, FLOW_TIMER, flowInboundHandler, flowTimerHandler } from './automation.js';
+import { IMPORT_QUEUE, importHandler, WEBHOOK_QUEUE, webhookDeliverHandler } from './integrations.js';
 import { enqueue, startWorker } from './jobs.js';
 import { billingGraceCheck } from './routes/billing.js';
 import { CAMPAIGN_QUEUE, campaignSendHandler } from './routes/campaigns.js';
@@ -12,6 +13,8 @@ export function startBackgroundWorker(deps: Deps) {
     [CAMPAIGN_QUEUE]: campaignSendHandler(deps),
     [FLOW_INBOUND]: flowInboundHandler(deps),
     [FLOW_TIMER]: flowTimerHandler(deps),
+    [IMPORT_QUEUE]: importHandler(deps),
+    [WEBHOOK_QUEUE]: webhookDeliverHandler(deps),
     [GRACE_QUEUE]: billingGraceCheck(deps.db, deps.config.BILLING_GRACE_DAYS),
   }, { log: (m, e) => console.error(m, e) });
 

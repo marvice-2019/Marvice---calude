@@ -7,6 +7,7 @@ import { enqueue, PermanentJobError, type Handler } from '../jobs.js';
 import { requireActiveTenant } from '../limits.js';
 import { MetaApiError, sendTemplate } from '../meta.js';
 import { variableNumbers } from './templates.js';
+import { queueEvent } from '../integrations.js';
 import type { Deps } from '../app.js';
 
 export const CAMPAIGN_QUEUE = 'campaign.send';
@@ -196,7 +197,8 @@ export function campaignSendHandler(deps: Deps, opts: { batchSize?: number; batc
       const left = (await tx.query<{ n: number }>(
         "SELECT count(*)::int AS n FROM campaign_recipients WHERE campaign_id = $1 AND status IN ('pending','sending')", [campaignId])).rows[0]!.n;
       if (left === 0) {
-        await tx.query("UPDATE campaigns SET status = 'completed', completed_at = now() WHERE id = $1 AND status = 'sending'", [campaignId]);
+        const done = await tx.query("UPDATE campaigns SET status = 'completed', completed_at = now() WHERE id = $1 AND status = 'sending' RETURNING id", [campaignId]);
+        if (done.rowCount) await queueEvent(tx, tenantId, 'campaign.completed', { campaignId, stats: (await statsFor(tx, [campaignId])).get(campaignId) ?? null });
       } else {
         await enqueue(tx, CAMPAIGN_QUEUE, { campaignId }, { tenantId, runAt: delayMs > 0 ? new Date(Date.now() + delayMs) : undefined });
       }

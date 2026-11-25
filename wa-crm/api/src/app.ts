@@ -12,6 +12,9 @@ import { LimitError } from './limits.js';
 import { contactRoutes } from './routes/contacts.js';
 import { inboxRoutes } from './routes/inbox.js';
 import { campaignRoutes } from './routes/campaigns.js';
+import { integrationRoutes } from './routes/integrations.js';
+import { hashKey } from './integrations.js';
+import { signToken } from './auth.js';
 import { flowRoutes } from './routes/flows.js';
 import { teamRoutes } from './routes/team.js';
 import { templateRoutes } from './routes/templates.js';
@@ -51,6 +54,20 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['authorization', 'content-type'], maxAge: 600 });
   await app.register(rateLimit, { global: false });
 
+  // API keys (x-api-key) act as an admin of their workspace, but only on integration-safe paths:
+  // a leaked key cannot touch team, billing, settings or other keys.
+  const KEY_PATHS = /^\/(contacts|conversations|templates|campaigns|tags|waba)(\/|\?|$)/;
+  app.addHook('onRequest', async (req, reply) => {
+    const key = req.headers['x-api-key'];
+    if (typeof key !== 'string' || req.headers.authorization) return;
+    if (!KEY_PATHS.test(req.url)) return reply.code(403).send({ error: 'api_key_not_allowed_here' });
+    const r = await deps.db.query<{ tenant_id: string; created_by: string | null }>(
+      'UPDATE api_keys SET last_used_at = now() WHERE key_hash = $1 AND revoked_at IS NULL RETURNING tenant_id, created_by', [hashKey(key)]);
+    const k = r.rows[0];
+    if (!k?.created_by) return reply.code(401).send({ error: 'invalid_api_key' });
+    req.headers.authorization = `Bearer ${await signToken({ userId: k.created_by, tenantId: k.tenant_id, role: 'admin' }, deps.config.JWT_SECRET)}`;
+  });
+
   app.get('/health', async () => {
     await deps.db.query('SELECT 1');
     return { ok: true };
@@ -63,6 +80,7 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
   await app.register(teamRoutes(deps));
   await app.register(campaignRoutes(deps));
   await app.register(flowRoutes(deps));
+  await app.register(integrationRoutes(deps));
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));
   await app.register(razorpayWebhookRoutes(deps));

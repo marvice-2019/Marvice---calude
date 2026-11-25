@@ -5,6 +5,7 @@ import { Plus, Tag } from 'lucide-react';
 import { Alert, Empty, Modal, PageHeader, StatusBadge, useApi } from '@/components/ui';
 import { api, errorText, when } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { ImportContacts } from '@/components/integrations';
 
 interface TagT { id: string; label: string; color: string; contact_count?: number }
 interface Contact { id: string; phone: string; name: string | null; email: string | null; status: string; opted_out_at: string | null; created_at: string; tags: TagT[] }
@@ -26,6 +27,7 @@ export default function ContactsPage() {
       <PageHeader title="Contacts" subtitle={contacts.data ? `${contacts.data.total.toLocaleString('en-IN')} contacts` : undefined}
         actions={<>
           {isManager && <TagManager tags={tags.data?.data ?? []} onChange={tags.reload} />}
+          {isManager && <ImportContacts onDone={contacts.reload} />}
           <button className="btn btn-primary" onClick={() => setAdding(true)}><Plus size={16} /> Add contact</button>
         </>} />
       <input className="input mb-4 max-w-sm" placeholder="Search name, number or email" value={search} aria-label="Search contacts"

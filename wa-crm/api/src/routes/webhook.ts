@@ -3,6 +3,7 @@ import { withPlatform, withTenant } from '../db.js';
 import { isValidSignature, parseWebhook } from '../meta.js';
 import { FLOW_INBOUND } from '../automation.js';
 import { enqueue } from '../jobs.js';
+import { queueEvent } from '../integrations.js';
 import type { Deps } from '../app.js';
 
 // A status may arrive after a later one; never move a message backwards.
@@ -81,6 +82,8 @@ export const webhookRoutes = (deps: Deps): FastifyPluginAsync => async (app) => 
         // Chatbot flows, keyword replies and the away message run on the job queue, so Meta gets its 200 fast.
         await enqueue(tx, FLOW_INBOUND, { conversationId: c.id, body: m.body, replyId: m.replyId, isNew: c.created },
           { tenantId: route.tenant_id, dedupeKey: `in:${m.waMessageId}` });
+        await queueEvent(tx, route.tenant_id, 'message.received', { conversationId: c.id,
+          contact: { phone: m.from, name: m.profileName }, message: inserted.rows[0] });
         return { conversationId: c.id, assignee, assignedNow: c.created && assignee !== null, message: inserted.rows[0] };
       });
       // Emit only after commit, so clients never see data that was rolled back.
@@ -97,14 +100,21 @@ export const webhookRoutes = (deps: Deps): FastifyPluginAsync => async (app) => 
     for (const s of statuses) {
       const route = routes.get(s.phoneNumberId);
       if (!route) continue;
-      const updated = await withTenant(deps.db, route.tenant_id, (tx) => tx.query<{ id: string; conversation_id: string; assigned_user_id: string | null }>(
+      const updated = await withTenant(deps.db, route.tenant_id, async (tx) => {
+        const res = await tx.query<{ id: string; conversation_id: string; assigned_user_id: string | null }>(
         `UPDATE messages SET status = $2, error_code = coalesce($3, error_code)
           WHERE tenant_id = $4 AND wa_message_id = $1 AND direction = 'outbound'
             AND (CASE status WHEN 'pending' THEN 0 WHEN 'sent' THEN 1 WHEN 'delivered' THEN 2
                              WHEN 'read' THEN 3 WHEN 'failed' THEN 4 ELSE 0 END) < $5
           RETURNING id, conversation_id,
                     (SELECT assigned_user_id FROM conversations c WHERE c.id = messages.conversation_id)`,
-        [s.waMessageId, s.status, s.errorCode, route.tenant_id, STATUS_RANK[s.status]]));
+        [s.waMessageId, s.status, s.errorCode, route.tenant_id, STATUS_RANK[s.status]]);
+        for (const u of res.rows) {
+          await queueEvent(tx, route.tenant_id, 'message.status', { conversationId: u.conversation_id, messageId: u.id,
+            waMessageId: s.waMessageId, status: s.status, errorCode: s.errorCode });
+        }
+        return res;
+      });
       for (const u of updated.rows) {
         deps.realtime.conversation(route.tenant_id, u.assigned_user_id, 'message.status',
           { conversationId: u.conversation_id, messageId: u.id, status: s.status });

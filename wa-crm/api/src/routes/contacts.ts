@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { withTenant } from '../db.js';
 import { assertWithinLimit, requireActiveTenant } from '../limits.js';
+import { queueEvent } from '../integrations.js';
 import type { Deps } from '../app.js';
 
 const phone = z.string().transform((v) => v.replace(/[^\d]/g, '')).pipe(z.string().regex(/^[1-9]\d{7,14}$/));
@@ -60,6 +61,7 @@ export const contactRoutes = (deps: Deps): FastifyPluginAsync => async (app) => 
         await tx.query(
           "INSERT INTO audit_logs (tenant_id, user_id, action, target) VALUES ($1, $2, 'contact.create', $3)",
           [p0.tenantId, p0.userId, r.rows[0].id]);
+        await queueEvent(tx, p0.tenantId, 'contact.created', r.rows[0]);
         return r.rows[0];
       });
       return reply.code(201).send(row);
