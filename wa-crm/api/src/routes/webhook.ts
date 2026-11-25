@@ -31,7 +31,7 @@ export const webhookRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) 
     let payload: unknown;
     try { payload = JSON.parse(raw.toString('utf8')); } catch { return reply.code(400).send({ error: 'bad_json' }); }
 
-    const { messages, statuses } = parseWebhook(payload);
+    const { messages, statuses, templateUpdates } = parseWebhook(payload);
     const phoneIds = [...new Set([...messages, ...statuses].map((x) => x.phoneNumberId))];
     const routes = phoneIds.length === 0 ? new Map<string, { id: string; tenant_id: string }>() :
       await withPlatform(deps.db, async (tx) => {
@@ -77,6 +77,17 @@ export const webhookRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) 
             AND (CASE status WHEN 'pending' THEN 0 WHEN 'sent' THEN 1 WHEN 'delivered' THEN 2
                              WHEN 'read' THEN 3 WHEN 'failed' THEN 4 ELSE 0 END) < $5`,
         [s.waMessageId, s.status, s.errorCode, route.tenant_id, STATUS_RANK[s.status]]));
+    }
+
+    // Template review results: tenant found via the WABA id.
+    for (const t of templateUpdates) {
+      const owner = (await deps.db.query<{ tenant_id: string; id: string }>(
+        'SELECT tenant_id, id FROM waba_accounts WHERE meta_waba_id = $1', [t.wabaId])).rows[0];
+      if (!owner || !['APPROVED', 'REJECTED', 'PAUSED', 'DISABLED', 'PENDING'].includes(t.event)) continue;
+      await withTenant(deps.db, owner.tenant_id, (tx) => tx.query(
+        `UPDATE message_templates SET status = $1, rejected_reason = CASE WHEN $1 = 'REJECTED' THEN $2 ELSE NULL END
+          WHERE waba_account_id = $3 AND (meta_template_id = $4 OR (name = $5 AND language = $6))`,
+        [t.event, t.reason, owner.id, t.metaTemplateId, t.name, t.language]));
     }
 
     // Meta retries anything that isn't a 200, so acknowledge once stored.

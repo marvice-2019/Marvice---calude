@@ -8,6 +8,7 @@ import { billingRoutes, razorpayWebhookRoutes } from './routes/billing.js';
 import { LimitError } from './limits.js';
 import { contactRoutes } from './routes/contacts.js';
 import { inboxRoutes } from './routes/inbox.js';
+import { templateRoutes } from './routes/templates.js';
 import { webhookRoutes } from './routes/webhook.js';
 
 export interface AppDeps {
@@ -43,6 +44,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(authRoutes(deps));
   await app.register(contactRoutes(deps));
   await app.register(inboxRoutes(deps));
+  await app.register(templateRoutes(deps));
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));
   await app.register(razorpayWebhookRoutes(deps));

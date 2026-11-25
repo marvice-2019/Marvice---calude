@@ -13,11 +13,14 @@ const ADMIN_URL = process.env.TEST_DATABASE_URL ?? 'postgres://postgres@localhos
 export const APP_SECRET = 'test-app-secret';
 export const VERIFY_TOKEN = 'verify-token-123';
 
+export interface MetaResponse { ok: boolean; status: number; body: unknown }
+
 export interface TestCtx {
   app: FastifyInstance;
   db: Db;
   sent: { url: string; method: string; headers: Record<string, string>; body: unknown }[];
-  setMetaResponse: (r: { ok: boolean; status: number; body: unknown }) => void;
+  /** A fixed response, or a function of the URL for tests that call several endpoints. */
+  setMetaResponse: (r: MetaResponse | ((url: string) => MetaResponse)) => void;
   close: () => Promise<void>;
 }
 
@@ -36,15 +39,15 @@ export async function setup(extra: Record<string, string> = {}): Promise<TestCtx
     TOKEN_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     META_APP_SECRET: APP_SECRET,
     META_WEBHOOK_VERIFY_TOKEN: VERIFY_TOKEN,
-    LOG_LEVEL: 'silent',
+    LOG_LEVEL: process.env.TEST_LOG_LEVEL ?? 'silent',
     ...extra,
   });
   const db = createPool(url);
   const sent: TestCtx['sent'] = [];
-  let metaResponse = { ok: true, status: 200, body: { messages: [{ id: 'wamid.OUT1' }] } as unknown };
+  let metaResponse: MetaResponse | ((url: string) => MetaResponse) = { ok: true, status: 200, body: { messages: [{ id: 'wamid.OUT1' }] } };
   const fetchFn: FetchLike = async (u, init) => {
     sent.push({ url: u, method: init.method, headers: init.headers, body: init.body ? JSON.parse(init.body) : undefined });
-    const r = metaResponse;
+    const r = typeof metaResponse === 'function' ? metaResponse(u) : metaResponse;
     return { ok: r.ok, status: r.status, json: async () => r.body };
   };
   const app = await buildApp({ config, db, fetch: fetchFn });

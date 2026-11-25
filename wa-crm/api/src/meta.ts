@@ -26,18 +26,41 @@ export interface StatusUpdate {
   errorCode: string | null;
 }
 
+export interface TemplateUpdate {
+  wabaId: string;
+  event: string;
+  metaTemplateId: string | null;
+  name: string | null;
+  language: string | null;
+  reason: string | null;
+}
+
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj => (v && typeof v === 'object' ? (v as Obj) : {});
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
 /** Flattens a WhatsApp Cloud API webhook body into messages and status updates. */
-export function parseWebhook(body: unknown): { messages: InboundMessage[]; statuses: StatusUpdate[] } {
+export function parseWebhook(body: unknown): {
+  messages: InboundMessage[]; statuses: StatusUpdate[]; templateUpdates: TemplateUpdate[];
+} {
   const messages: InboundMessage[] = [];
   const statuses: StatusUpdate[] = [];
+  const templateUpdates: TemplateUpdate[] = [];
   for (const entry of arr(obj(body).entry)) {
     for (const change of arr(obj(entry).changes)) {
       const value = obj(obj(change).value);
+      // Template review results arrive per WABA (entry.id), not per phone number.
+      if (obj(change).field === 'message_template_status_update') {
+        const wabaId = str(obj(entry).id), event = str(value.event);
+        const tid = value.message_template_id;
+        if (wabaId && event) {
+          templateUpdates.push({ wabaId, event, metaTemplateId: tid == null ? null : String(tid),
+            name: str(value.message_template_name), language: str(value.message_template_language),
+            reason: str(value.reason) });
+        }
+        continue;
+      }
       const phoneNumberId = str(obj(value.metadata).phone_number_id);
       if (!phoneNumberId) continue;
       const names = new Map<string, string>();
@@ -67,7 +90,7 @@ export function parseWebhook(body: unknown): { messages: InboundMessage[]; statu
       }
     }
   }
-  return { messages, statuses };
+  return { messages, statuses, templateUpdates };
 }
 
 export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) =>
@@ -88,6 +111,61 @@ export async function sendText(
     headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { body: text } }),
   });
+  const data = obj(await res.json().catch(() => ({})));
+  const wamid = str(obj(arr(data.messages)[0]).id);
+  if (!res.ok || !wamid) throw new MetaApiError(res.status, data.error ?? data);
+  return wamid;
+}
+
+const graph = (ver: string, path: string) => `https://graph.facebook.com/${ver}/${path}`;
+const authJson = (token: string) => ({ authorization: `Bearer ${token}`, 'content-type': 'application/json' });
+
+export interface TemplateDefinition {
+  name: string;
+  language: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+  components: unknown[];
+}
+
+/** Submits a template for Meta review. Returns Meta's template id and initial status. */
+export async function createTemplate(fetchFn: FetchLike, ver: string, wabaId: string, token: string, t: TemplateDefinition) {
+  const res = await fetchFn(graph(ver, `${wabaId}/message_templates`), {
+    method: 'POST', headers: authJson(token), body: JSON.stringify(t) });
+  const data = obj(await res.json().catch(() => ({})));
+  const id = data.id == null ? null : String(data.id);
+  if (!res.ok || !id) throw new MetaApiError(res.status, data.error ?? data);
+  return { id, status: str(data.status) ?? 'PENDING' };
+}
+
+export interface MetaTemplate {
+  id: string; name: string; language: string; status: string; category: string;
+  components: unknown[]; rejected_reason?: string;
+}
+
+/** Lists every template on a WABA, following Meta's paging. */
+export async function listTemplates(fetchFn: FetchLike, ver: string, wabaId: string, token: string): Promise<MetaTemplate[]> {
+  const out: MetaTemplate[] = [];
+  let url: string | null = graph(ver, `${wabaId}/message_templates?limit=100`);
+  for (let page = 0; url && page < 50; page++) {
+    const res = await fetchFn(url, { method: 'GET', headers: { authorization: `Bearer ${token}` } });
+    const data = obj(await res.json().catch(() => ({})));
+    if (!res.ok) throw new MetaApiError(res.status, data.error ?? data);
+    for (const t of arr(data.data)) out.push(t as MetaTemplate);
+    url = str(obj(data.paging).next);
+  }
+  return out;
+}
+
+/** Sends an approved template. Allowed at any time, including outside the 24-hour window. */
+export async function sendTemplate(
+  fetchFn: FetchLike, ver: string, phoneNumberId: string, token: string, to: string,
+  t: { name: string; language: string; components?: unknown[] },
+): Promise<string> {
+  const template: Obj = { name: t.name, language: { code: t.language } };
+  if (t.components?.length) template.components = t.components;
+  const res = await fetchFn(graph(ver, `${phoneNumberId}/messages`), {
+    method: 'POST', headers: authJson(token),
+    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template }) });
   const data = obj(await res.json().catch(() => ({})));
   const wamid = str(obj(arr(data.messages)[0]).id);
   if (!res.ok || !wamid) throw new MetaApiError(res.status, data.error ?? data);
