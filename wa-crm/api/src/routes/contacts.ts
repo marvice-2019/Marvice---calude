@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth.js';
 import { withTenant } from '../db.js';
 import { assertWithinLimit, requireActiveTenant } from '../limits.js';
-import type { AppDeps } from '../app.js';
+import type { Deps } from '../app.js';
 
 const phone = z.string().transform((v) => v.replace(/[^\d]/g, '')).pipe(z.string().regex(/^[1-9]\d{7,14}$/));
 
@@ -20,7 +20,7 @@ const listQuery = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
-export const contactRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
+export const contactRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
   app.addHook('preHandler', requireAuth(deps.config.JWT_SECRET));
   app.addHook('preHandler', requireActiveTenant(deps.db));
 
@@ -32,6 +32,8 @@ export const contactRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) 
     return withTenant(deps.db, req.principal!.tenantId, async (tx) => {
       const rows = await tx.query(
         `SELECT id, phone_e164 AS phone, name, email, status, opted_in_at, opted_out_at, created_at,
+                coalesce((SELECT json_agg(json_build_object('id', t.id, 'label', t.label, 'color', t.color) ORDER BY t.label)
+                            FROM contact_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.contact_id = contacts.id), '[]') AS tags,
                 count(*) OVER () AS total
            FROM contacts
           WHERE $1::text IS NULL OR name ILIKE $1 OR phone_e164 LIKE $1 OR email::text ILIKE $1

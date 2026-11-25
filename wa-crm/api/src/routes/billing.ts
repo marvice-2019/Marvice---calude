@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from '../auth.js';
 import { withPlatform, withTenant, type Db } from '../db.js';
 import { financialYear, splitInclusive } from '../gst.js';
 import type { Handler } from '../jobs.js';
-import type { AppDeps } from '../app.js';
+import type { Deps } from '../app.js';
 
 const RAZORPAY = 'https://api.razorpay.com/v1';
 const subscribeBody = z.object({ planId: z.string().uuid() });
@@ -17,7 +17,7 @@ export function isValidRazorpaySignature(raw: Buffer, header: string | undefined
 }
 
 /** Authenticated billing routes (JSON bodies). */
-export const billingRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
+export const billingRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
   app.addHook('preHandler', requireAuth(deps.config.JWT_SECRET));
 
   app.post('/billing/subscribe', { preHandler: requireRole('owner') }, async (req, reply) => {
@@ -72,7 +72,7 @@ type Entity = Record<string, unknown>;
 const unix = (v: unknown) => (typeof v === 'number' && v > 0 ? new Date(v * 1000) : null);
 
 /** Razorpay webhook (raw body for the signature). Separate plugin so the raw parser stays scoped here. */
-export const razorpayWebhookRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
+export const razorpayWebhookRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
   app.addContentTypeParser('application/json', { parseAs: 'buffer', bodyLimit: 512 * 1024 }, (_r, body, done) => done(null, body));
 
   app.post('/webhooks/razorpay', async (req, reply) => {

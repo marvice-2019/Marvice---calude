@@ -15,6 +15,8 @@ const schema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
   SUPPLIER_STATE_CODE: z.string().regex(/^\d{2}$/).default('29'),
   BILLING_GRACE_DAYS: z.coerce.number().int().min(0).max(60).default(7),
+  /** Comma-separated web app origins allowed to open the live inbox socket. */
+  WEB_ORIGINS: z.string().default('').transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean)),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

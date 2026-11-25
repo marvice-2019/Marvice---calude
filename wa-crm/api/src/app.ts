@@ -3,22 +3,30 @@ import rateLimit from '@fastify/rate-limit';
 import type { Config } from './config.js';
 import type { Db } from './db.js';
 import type { FetchLike } from './meta.js';
+import { noopRealtime, type Realtime } from './realtime.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { billingRoutes, razorpayWebhookRoutes } from './routes/billing.js';
 import { LimitError } from './limits.js';
 import { contactRoutes } from './routes/contacts.js';
 import { inboxRoutes } from './routes/inbox.js';
+import { teamRoutes } from './routes/team.js';
 import { templateRoutes } from './routes/templates.js';
 import { webhookRoutes } from './routes/webhook.js';
+
+/** AppDeps with every optional dependency resolved. Route plugins receive this. */
+export type Deps = AppDeps & { realtime: Realtime };
 
 export interface AppDeps {
   config: Config;
   db: Db;
   fetch: FetchLike;
+  /** Live inbox events; defaults to a no-op (tests, workers). */
+  realtime?: Realtime;
 }
 
-export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
+export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
+  const deps: Deps = { ...input, realtime: input.realtime ?? noopRealtime };
   const app = Fastify({
     logger: { level: deps.config.LOG_LEVEL, redact: ['req.headers.authorization', 'req.headers["x-hub-signature-256"]', 'req.headers["x-razorpay-signature"]'] },
     trustProxy: true,
@@ -46,6 +54,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(contactRoutes(deps));
   await app.register(inboxRoutes(deps));
   await app.register(templateRoutes(deps));
+  await app.register(teamRoutes(deps));
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));
   await app.register(razorpayWebhookRoutes(deps));

@@ -5,7 +5,7 @@ import { decryptSecret } from '../crypto.js';
 import { withTenant } from '../db.js';
 import { requireActiveTenant } from '../limits.js';
 import { createTemplate, listTemplates, MetaApiError, sendTemplate } from '../meta.js';
-import type { AppDeps } from '../app.js';
+import type { Deps } from '../app.js';
 
 const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'PAUSED', 'DISABLED', 'DRAFT'] as const;
 const CATEGORIES = ['MARKETING', 'UTILITY', 'AUTHENTICATION'] as const;
@@ -35,7 +35,7 @@ const createBody = z.object({
 
 const sendBody = z.object({ templateId: z.string().uuid(), parameters: z.array(z.string().max(1024)).max(20).default([]) });
 
-export const templateRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
+export const templateRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
   app.addHook('preHandler', requireAuth(deps.config.JWT_SECRET));
   app.addHook('preHandler', requireActiveTenant(deps.db));
   const key = deps.config.TOKEN_ENCRYPTION_KEY, ver = deps.config.META_GRAPH_VERSION;
@@ -155,9 +155,11 @@ export const templateRoutes = (deps: AppDeps): FastifyPluginAsync => async (app)
          VALUES ($1, $2, 'outbound', 'template', $3, $4, $5, $6, $7, $8)
          RETURNING id, direction, type, body, status, error_code, created_at`,
         [p.tenantId, id.data, rendered, JSON.stringify(payload), wamid, wamid ? 'sent' : 'failed', errorCode, p.userId]);
-      await tx.query('UPDATE conversations SET last_message_at = now() WHERE id = $1', [id.data]);
-      return m.rows[0];
+      const c = await tx.query<{ assigned_user_id: string | null }>(
+        'UPDATE conversations SET last_message_at = now() WHERE id = $1 RETURNING assigned_user_id', [id.data]);
+      return { message: m.rows[0], assignee: c.rows[0]?.assigned_user_id ?? null };
     });
-    return reply.code(wamid ? 201 : 502).send(saved);
+    deps.realtime.conversation(p.tenantId, saved.assignee, 'message.created', { conversationId: id.data, message: saved.message });
+    return reply.code(wamid ? 201 : 502).send(saved.message);
   });
 };

@@ -1,12 +1,12 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { withPlatform, withTenant } from '../db.js';
 import { isValidSignature, parseWebhook } from '../meta.js';
-import type { AppDeps } from '../app.js';
+import type { Deps } from '../app.js';
 
 // A status may arrive after a later one; never move a message backwards.
 const STATUS_RANK = { pending: 0, sent: 1, delivered: 2, read: 3, failed: 4 } as const;
 
-export const webhookRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
+export const webhookRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
   // Keep the raw bytes: the signature is computed over them, not over re-serialised JSON.
   app.addContentTypeParser('application/json', { parseAs: 'buffer', bodyLimit: 1024 * 1024 }, (_req, body, done) => {
     done(null, body);
@@ -41,42 +41,69 @@ export const webhookRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) 
         return new Map(r.rows.map((row) => [row.meta_phone_number_id, row]));
       });
 
+    const autoAssign = new Map<string, boolean>();
     for (const m of messages) {
       const route = routes.get(m.phoneNumberId);
       if (!route) { req.log.warn({ phoneNumberId: m.phoneNumberId }, 'meta webhook: unknown phone number'); continue; }
-      await withTenant(deps.db, route.tenant_id, async (tx) => {
+      if (!autoAssign.has(route.tenant_id)) {
+        const t = await deps.db.query<{ auto_assign: boolean }>('SELECT auto_assign FROM tenants WHERE id = $1', [route.tenant_id]);
+        autoAssign.set(route.tenant_id, t.rows[0]?.auto_assign ?? false);
+      }
+      const event = await withTenant(deps.db, route.tenant_id, async (tx) => {
         const contact = await tx.query<{ id: string }>(
           `INSERT INTO contacts (tenant_id, phone_e164, name) VALUES ($1, $2, $3)
            ON CONFLICT (tenant_id, phone_e164) DO UPDATE SET name = COALESCE(contacts.name, EXCLUDED.name)
            RETURNING id`, [route.tenant_id, m.from, m.profileName]);
-        const conv = await tx.query<{ id: string }>(
+        const conv = await tx.query<{ id: string; assigned_user_id: string | null; created: boolean }>(
           `INSERT INTO conversations (tenant_id, phone_number_id, contact_id) VALUES ($1, $2, $3)
            ON CONFLICT (tenant_id, phone_number_id, contact_id) DO UPDATE SET status = 'open'
-           RETURNING id`, [route.tenant_id, route.id, contact.rows[0]!.id]);
+           RETURNING id, assigned_user_id, (xmax = 0) AS created`, [route.tenant_id, route.id, contact.rows[0]!.id]);
+        const c = conv.rows[0]!;
+        let assignee = c.assigned_user_id;
+        if (c.created && autoAssign.get(route.tenant_id)) {
+          const pick = await tx.query<{ id: string | null }>('SELECT pick_round_robin_agent() AS id');
+          assignee = pick.rows[0]?.id ?? null;
+          if (assignee) await tx.query('UPDATE conversations SET assigned_user_id = $2 WHERE id = $1', [c.id, assignee]);
+        }
         const inserted = await tx.query(
           `INSERT INTO messages (tenant_id, conversation_id, direction, type, body, payload, wa_message_id, status, created_at)
            VALUES ($1, $2, 'inbound', $3, $4, $5, $6, 'received', $7)
            ON CONFLICT (tenant_id, wa_message_id) WHERE wa_message_id IS NOT NULL DO NOTHING
-           RETURNING id`,
-          [route.tenant_id, conv.rows[0]!.id, m.type, m.body, JSON.stringify(m.raw), m.waMessageId, m.timestamp]);
-        if (inserted.rowCount) {
-          await tx.query(
-            `UPDATE conversations SET last_message_at = greatest(coalesce(last_message_at, $2), $2),
-                    last_inbound_at = greatest(coalesce(last_inbound_at, $2), $2), unread_count = unread_count + 1
-              WHERE id = $1`, [conv.rows[0]!.id, m.timestamp]);
-        }
+           RETURNING id, direction, type, body, status, created_at`,
+          [route.tenant_id, c.id, m.type, m.body, JSON.stringify(m.raw), m.waMessageId, m.timestamp]);
+        if (!inserted.rowCount) return null;
+        await tx.query(
+          `UPDATE conversations SET last_message_at = greatest(coalesce(last_message_at, $2), $2),
+                  last_inbound_at = greatest(coalesce(last_inbound_at, $2), $2), unread_count = unread_count + 1
+            WHERE id = $1`, [c.id, m.timestamp]);
+        return { conversationId: c.id, assignee, assignedNow: c.created && assignee !== null, message: inserted.rows[0] };
       });
+      // Emit only after commit, so clients never see data that was rolled back.
+      if (event) {
+        deps.realtime.conversation(route.tenant_id, event.assignee, 'message.created',
+          { conversationId: event.conversationId, message: event.message });
+        if (event.assignedNow) {
+          deps.realtime.conversation(route.tenant_id, event.assignee, 'conversation.assigned',
+            { conversationId: event.conversationId, userId: event.assignee });
+        }
+      }
     }
 
     for (const s of statuses) {
       const route = routes.get(s.phoneNumberId);
       if (!route) continue;
-      await withTenant(deps.db, route.tenant_id, (tx) => tx.query(
+      const updated = await withTenant(deps.db, route.tenant_id, (tx) => tx.query<{ id: string; conversation_id: string; assigned_user_id: string | null }>(
         `UPDATE messages SET status = $2, error_code = coalesce($3, error_code)
           WHERE tenant_id = $4 AND wa_message_id = $1 AND direction = 'outbound'
             AND (CASE status WHEN 'pending' THEN 0 WHEN 'sent' THEN 1 WHEN 'delivered' THEN 2
-                             WHEN 'read' THEN 3 WHEN 'failed' THEN 4 ELSE 0 END) < $5`,
+                             WHEN 'read' THEN 3 WHEN 'failed' THEN 4 ELSE 0 END) < $5
+          RETURNING id, conversation_id,
+                    (SELECT assigned_user_id FROM conversations c WHERE c.id = messages.conversation_id)`,
         [s.waMessageId, s.status, s.errorCode, route.tenant_id, STATUS_RANK[s.status]]));
+      for (const u of updated.rows) {
+        deps.realtime.conversation(route.tenant_id, u.assigned_user_id, 'message.status',
+          { conversationId: u.conversation_id, messageId: u.id, status: s.status });
+      }
     }
 
     // Template review results: tenant found via the WABA id.

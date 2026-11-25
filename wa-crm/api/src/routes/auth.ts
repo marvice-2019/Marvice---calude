@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { hashPassword, signToken, verifyPassword, type Role } from '../auth.js';
 import { withPlatform } from '../db.js';
-import type { AppDeps } from '../app.js';
+import type { Deps } from '../app.js';
 
 const signupBody = z.object({
   businessName: z.string().trim().min(2).max(120),
@@ -17,7 +17,7 @@ const loginBody = z.object({
   tenantId: z.string().uuid().optional(),
 });
 
-export const authRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
+export const authRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
   const limit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
 
   app.post('/auth/signup', limit, async (req, reply) => {

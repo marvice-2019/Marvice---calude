@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { requirePlatformAdmin, signImpersonationToken, signPlatformToken, verifyPassword } from '../auth.js';
 import { withPlatform, type Tx } from '../db.js';
-import type { AppDeps } from '../app.js';
+import type { Deps } from '../app.js';
 
 // Platform (super-admin) API. Everything here reads platform-wide with the owner connection
 // (withPlatform), never by looping over tenants with withTenant.
@@ -67,7 +67,7 @@ async function replaceLimits(tx: Tx, planId: string, limits: Record<string, numb
 
 const escapeLike = (s: string) => `%${s.replace(/[%_\\]/g, '\\$&')}%`;
 
-export const adminRoutes = (deps: AppDeps): FastifyPluginAsync => async (app) => {
+export const adminRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
   const limit = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
 
   app.post('/admin/auth/login', limit, async (req, reply) => {

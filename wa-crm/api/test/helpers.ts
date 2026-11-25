@@ -5,6 +5,7 @@ import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { createPool, type Db } from '../src/db.js';
 import type { FetchLike } from '../src/meta.js';
+import type { Realtime } from '../src/realtime.js';
 import { migrate } from '../scripts/migrate.js';
 
 // TEST_DATABASE_URL points at a server where we may create throwaway databases.
@@ -21,10 +22,11 @@ export interface TestCtx {
   sent: { url: string; method: string; headers: Record<string, string>; body: unknown }[];
   /** A fixed response, or a function of the URL for tests that call several endpoints. */
   setMetaResponse: (r: MetaResponse | ((url: string) => MetaResponse)) => void;
+  config: ReturnType<typeof loadConfig>;
   close: () => Promise<void>;
 }
 
-export async function setup(extra: Record<string, string> = {}): Promise<TestCtx> {
+export async function setup(extra: Record<string, string> = {}, more: { realtime?: Realtime } = {}): Promise<TestCtx> {
   const name = `wacrm_test_${randomBytes(4).toString('hex')}`;
   const admin = new pg.Client({ connectionString: ADMIN_URL });
   await admin.connect();
@@ -50,9 +52,9 @@ export async function setup(extra: Record<string, string> = {}): Promise<TestCtx
     const r = typeof metaResponse === 'function' ? metaResponse(u) : metaResponse;
     return { ok: r.ok, status: r.status, json: async () => r.body };
   };
-  const app = await buildApp({ config, db, fetch: fetchFn });
+  const app = await buildApp({ config, db, fetch: fetchFn, realtime: more.realtime });
   return {
-    app, db, sent,
+    app, db, sent, config,
     setMetaResponse: (r) => { metaResponse = r; },
     close: async () => {
       await app.close();
