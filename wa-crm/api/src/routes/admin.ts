@@ -19,10 +19,16 @@ const planBody = z.object({
   slug: z.string().trim().regex(/^[a-z0-9][a-z0-9-]{1,59}$/),
   pricePaise: z.number().int().min(0),
   billingCycle: z.enum(['monthly', 'yearly']),
+  // The Razorpay plan this maps to (Razorpay dashboard → Subscriptions → Plans). Null = not purchasable yet.
+  razorpayPlanId: z.string().regex(/^plan_[A-Za-z0-9]{6,40}$/).nullable().default(null),
   limits: limitsSchema.default({}),
 });
 
-const planPatch = planBody.omit({ limits: true }).partial().extend({ limits: limitsSchema.optional() });
+const planPatch = planBody.omit({ limits: true, razorpayPlanId: true }).partial().extend({
+  limits: limitsSchema.optional(),
+  razorpayPlanId: z.string().regex(/^plan_[A-Za-z0-9]{6,40}$/).nullable().optional(),
+  isActive: z.boolean().optional(),
+});
 
 const tenantPatch = z.object({
   status: z.enum(['active', 'suspended']).optional(),
@@ -49,7 +55,7 @@ const auditQuery = z.object({
 const uuid = z.string().uuid();
 
 const PLAN_SELECT = `
-  SELECT p.id, p.name, p.slug, p.price_paise, p.billing_cycle, p.is_active, p.created_at, p.updated_at,
+  SELECT p.id, p.name, p.slug, p.price_paise, p.billing_cycle, p.razorpay_plan_id, p.is_active, p.created_at, p.updated_at,
          coalesce((SELECT jsonb_object_agg(l.resource, l.max_value) FROM plan_limits l WHERE l.plan_id = p.id),
                   '{}'::jsonb) AS limits,
          (SELECT count(*) FROM tenants t WHERE t.plan_id = p.id)::int AS tenant_count
@@ -101,8 +107,8 @@ export const adminRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
       try {
         const plan = await withPlatform(deps.db, async (tx) => {
           const p = await tx.query<{ id: string }>(
-            `INSERT INTO plans (name, slug, price_paise, billing_cycle) VALUES ($1, $2, $3, $4) RETURNING id`,
-            [b.name, b.slug, b.pricePaise, b.billingCycle]);
+            `INSERT INTO plans (name, slug, price_paise, billing_cycle, razorpay_plan_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [b.name, b.slug, b.pricePaise, b.billingCycle, b.razorpayPlanId]);
           const id = p.rows[0]!.id;
           await replaceLimits(tx, id, b.limits);
           return (await tx.query(`${PLAN_SELECT} WHERE p.id = $1`, [id])).rows[0];
@@ -124,9 +130,12 @@ export const adminRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
         const plan = await withPlatform(deps.db, async (tx) => {
           const u = await tx.query(
             `UPDATE plans SET name = coalesce($2, name), slug = coalesce($3, slug),
-                    price_paise = coalesce($4, price_paise), billing_cycle = coalesce($5, billing_cycle)
+                    price_paise = coalesce($4, price_paise), billing_cycle = coalesce($5, billing_cycle),
+                    razorpay_plan_id = CASE WHEN $6 THEN $7 ELSE razorpay_plan_id END,
+                    is_active = coalesce($8, is_active)
               WHERE id = $1 RETURNING id`,
-            [id.data, b.name ?? null, b.slug ?? null, b.pricePaise ?? null, b.billingCycle ?? null]);
+            [id.data, b.name ?? null, b.slug ?? null, b.pricePaise ?? null, b.billingCycle ?? null,
+             b.razorpayPlanId !== undefined, b.razorpayPlanId ?? null, b.isActive ?? null]);
           if (!u.rowCount) return null;
           if (b.limits) await replaceLimits(tx, id.data, b.limits);
           return (await tx.query(`${PLAN_SELECT} WHERE p.id = $1`, [id.data])).rows[0];

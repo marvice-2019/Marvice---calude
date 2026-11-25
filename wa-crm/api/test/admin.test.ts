@@ -174,3 +174,15 @@ test('impersonation: 15-minute owner token for that tenant only, audited', async
   assert.equal(logs.total, 1);
   assert.equal(logs.data[0].user_id, adminId);
 });
+
+test('plans carry a Razorpay plan id and can be reactivated', async () => {
+  const created = await ctx.app.inject({ method: 'POST', url: '/admin/plans', headers: admin(), payload: {
+    name: 'Growth RZ', slug: 'growth-rz', pricePaise: 99900, billingCycle: 'monthly', razorpayPlanId: 'plan_ABCdef123456', limits: { contacts: 5000 } } });
+  assert.equal(created.statusCode, 201, created.body);
+  assert.equal(created.json().razorpay_plan_id, 'plan_ABCdef123456');
+  const id = created.json().id;
+  assert.equal((await ctx.app.inject({ method: 'DELETE', url: `/admin/plans/${id}`, headers: admin() })).statusCode < 300, true);
+  const back = await ctx.app.inject({ method: 'PATCH', url: `/admin/plans/${id}`, headers: admin(), payload: { isActive: true, razorpayPlanId: null } });
+  assert.equal(back.statusCode, 200, back.body);
+  assert.deepEqual([back.json().is_active, back.json().razorpay_plan_id], [true, null]);
+});
