@@ -69,6 +69,9 @@ export function errorText(e: unknown): string {
     invalid_flow: 'The flow has a problem: check every step is connected and there is one Start.',
     empty_audience: 'No contacts match this audience.',
     parameter_count: 'Fill in every variable in the template.',
+    ai_not_configured: 'AI replies are not switched on for this server yet.',
+    ai_provider_error: 'The AI service did not answer. Try again in a moment.',
+    nothing_to_reply_to: 'The customer has not written anything yet.',
   };
   const issue = Array.isArray(e.body.issues) ? (e.body.issues[0] as { message?: string } | undefined)?.message : undefined;
   return (map[e.message] ?? `Request failed (${e.message}).`) + (issue ? ` ${issue}.` : '');

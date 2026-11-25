@@ -58,6 +58,35 @@ export function ImportContacts({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** Settings → AI reply suggestions. */
+export function AiSection() {
+  const s = useApi<{ configured: boolean; business_context: string; tone: string }>('/settings/ai');
+  const [ctx, setCtx] = useState<string | null>(null);
+  const [tone, setTone] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ tone: 'error' | 'success'; text: string } | null>(null);
+  if (!s.data) return null;
+  const value = ctx ?? s.data.business_context, t = tone ?? s.data.tone;
+  return (
+    <section className="card p-5">
+      <h2 className="font-semibold">AI reply suggestions</h2>
+      <p className="mb-3 text-sm text-muted">Agents get a ✨ button that drafts a reply from the chat and the facts below. They always review before sending.
+        {!s.data.configured && <b className="text-amber-700"> Not switched on for this server yet.</b>}</p>
+      <label className="label" htmlFor="aic">What should the AI know about your business? Products, prices, delivery areas, hours, policies.</label>
+      <textarea id="aic" className="input" rows={6} maxLength={4000} value={value} onChange={(e) => setCtx(e.target.value)}
+        placeholder="We sell handloom sarees from ₹1,499. Free delivery in Tamil Nadu above ₹999, 2-3 days. COD available. Returns within 7 days." />
+      <div className="mt-3 flex items-center gap-3">
+        <label className="label mb-0" htmlFor="ait">Tone</label>
+        <select id="ait" className="input w-auto" value={t} onChange={(e) => setTone(e.target.value)}>
+          <option value="friendly">Friendly</option><option value="formal">Formal</option><option value="short">Short</option></select>
+        <button className="btn btn-primary ml-auto" onClick={async () => { setMsg(null);
+          try { await api('/settings/ai', { method: 'PUT', body: { businessContext: value, tone: t } }); setMsg({ tone: 'success', text: 'Saved.' }); }
+          catch (e) { setMsg({ tone: 'error', text: errorText(e) }); } }}>Save</button>
+      </div>
+      {msg && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
+    </section>
+  );
+}
+
 /** Settings → API keys and outgoing webhooks. */
 export function IntegrationsSection() {
   const keys = useApi<{ data: { id: string; name: string; prefix: string; last_used_at: string | null; revoked_at: string | null; created_at: string }[] }>('/settings/api-keys');

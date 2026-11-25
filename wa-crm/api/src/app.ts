@@ -13,6 +13,7 @@ import { contactRoutes } from './routes/contacts.js';
 import { inboxRoutes } from './routes/inbox.js';
 import { campaignRoutes } from './routes/campaigns.js';
 import { integrationRoutes } from './routes/integrations.js';
+import { aiRoutes } from './routes/ai.js';
 import { hashKey } from './integrations.js';
 import { signToken } from './auth.js';
 import { flowRoutes } from './routes/flows.js';
@@ -81,6 +82,7 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
   await app.register(campaignRoutes(deps));
   await app.register(flowRoutes(deps));
   await app.register(integrationRoutes(deps));
+  await app.register(aiRoutes(deps));
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));
   await app.register(razorpayWebhookRoutes(deps));

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, PageHeader, useApi } from '@/components/ui';
 import { api, API_URL, errorText } from '@/lib/api';
 import type { Waba } from '@/lib/types';
-import { IntegrationsSection } from '@/components/integrations';
+import { AiSection, IntegrationsSection } from '@/components/integrations';
 
 const DAYS = [['mon', 'Monday'], ['tue', 'Tuesday'], ['wed', 'Wednesday'], ['thu', 'Thursday'], ['fri', 'Friday'], ['sat', 'Saturday'], ['sun', 'Sunday']] as const;
 type Hours = Partial<Record<(typeof DAYS)[number][0], [string, string][]>>;
@@ -16,6 +16,7 @@ export default function SettingsPage() {
       <WhatsAppSection />
       <InboxSection />
       <HoursSection />
+      <AiSection />
       <IntegrationsSection />
     </div>
   );

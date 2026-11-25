@@ -17,6 +17,11 @@ const schema = z.object({
   BILLING_GRACE_DAYS: z.coerce.number().int().min(0).max(60).default(7),
   /** Comma-separated web app origins allowed to open the live inbox socket. */
   WEB_ORIGINS: z.string().default('').transform((v) => v.split(',').map((o) => o.trim()).filter(Boolean)),
+  /** AI reply suggestions. Off until AI_API_KEY is set. */
+  AI_PROVIDER: z.enum(['anthropic', 'openai']).default('anthropic'),
+  AI_API_KEY: z.string().min(1).optional(),
+  AI_MODEL: z.string().min(1).default('claude-haiku-5-5'),
+  AI_BASE_URL: z.string().url().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 

@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Db, Tx } from './db.js';
 
-export type LimitedResource = 'contacts' | 'agents' | 'whatsapp_numbers';
+export type LimitedResource = 'contacts' | 'agents' | 'whatsapp_numbers' | 'ai_replies_month';
 
 export class LimitError extends Error {
   constructor(public resource: LimitedResource, public limit: number, public used: number) {

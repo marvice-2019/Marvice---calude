@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, CheckCheck, Clock, FileText, Send, StickyNote, UserPlus } from 'lucide-react';
+import { Bot, CheckCheck, Clock, FileText, Send, Sparkles, StickyNote, UserPlus } from 'lucide-react';
 import { Alert, Modal, StatusBadge, useApi } from '@/components/ui';
 import { api, errorText, when } from '@/lib/api';
 import { useSession } from '@/lib/session';
@@ -91,6 +91,7 @@ function Thread({ conv, team, isManager, onBack, onChanged }: { conv: Conversati
   const [error, setError] = useState<string | null>(null);
   const [tplOpen, setTplOpen] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -164,6 +165,18 @@ function Thread({ conv, team, isManager, onBack, onChanged }: { conv: Conversati
           {windowOpen ? (
             <form onSubmit={send} className="flex gap-2 border-t border-line bg-white p-3">
               <button type="button" className="btn-ghost btn" onClick={() => setTplOpen(true)} title="Send a template"><FileText size={16} /></button>
+              <button type="button" className="btn-ghost btn" title="Suggest a reply with AI" disabled={aiBusy} onClick={async () => {
+                setAiBusy(true); setError(null);
+                try { const r = await api<{ text: string }>(`/conversations/${conv.id}/suggest-reply`, { body: {} }); setText(r.text); }
+                catch (e) { setError(errorText(e)); } finally { setAiBusy(false); } }}><Sparkles size={16} /></button>
+              {text.trim() && (
+                <select className="input w-auto" aria-label="Rewrite" value="" disabled={aiBusy} onChange={async (e) => {
+                  const style = e.target.value; if (!style) return; setAiBusy(true); setError(null);
+                  try { const r = await api<{ text: string }>('/ai/rewrite', { body: { text, style } }); setText(r.text); }
+                  catch (err) { setError(errorText(err)); } finally { setAiBusy(false); } }}>
+                  <option value="">Rewrite…</option><option value="polite">More polite</option><option value="shorter">Shorter</option>
+                  <option value="fix">Fix spelling</option><option value="tamil">In Tamil</option><option value="hindi">In Hindi</option><option value="english">In English</option>
+                </select>)}
               <textarea className="input min-h-[42px] flex-1 resize-none" rows={1} placeholder="Type a reply" value={text} aria-label="Reply"
                 onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(e); } }} />
               <button className="btn btn-primary" aria-label="Send"><Send size={16} /></button>
