@@ -65,6 +65,18 @@ export const graphSchema = z.object({ nodes: z.array(positioned).min(2).max(200)
     for (const e of g.edges) {
       if (!ids.has(e.from) || !ids.has(e.to)) ctx.addIssue({ code: 'custom', message: `edge ${e.from}->${e.to} points at a missing node` });
     }
+    // Every step must be reachable from Start, or it can never run.
+    const start = g.nodes.find((n) => n.type === 'start');
+    if (start) {
+      const seen = new Set([start.id]);
+      const queue = [start.id];
+      while (queue.length) {
+        const cur = queue.shift()!;
+        for (const e of g.edges) if (e.from === cur && !seen.has(e.to)) { seen.add(e.to); queue.push(e.to); }
+      }
+      const orphans = g.nodes.filter((n) => !seen.has(n.id)).map((n) => n.id);
+      if (orphans.length) ctx.addIssue({ code: 'custom', message: `steps not connected to Start: ${orphans.join(', ')}` });
+    }
     const endIds = new Set(g.nodes.filter((n) => n.type === 'end').map((n) => n.id));
     if (g.edges.some((e) => endIds.has(e.from))) ctx.addIssue({ code: 'custom', message: 'an end node cannot have outgoing edges' });
   });

@@ -122,7 +122,13 @@ export default function FlowBuilderPage() {
   const add = (kind: Kind) => {
     const k = KINDS.find((x) => x.kind === kind)!;
     const nid = newId();
-    setNodes((ns) => [...ns, { id: nid, type: 'step', position: { x: 120 + ns.length * 40, y: 60 + ns.length * 40 }, data: { kind, data: structuredClone(k.init) } }]);
+    // New steps go to the right of the right-most step (or of the selected one), never on top of another.
+    setNodes((ns) => {
+      const anchor = ns.find((n) => n.id === selected) ?? ns.reduce((a, b) => (b.position.x > a.position.x ? b : a), ns[0]!);
+      const x = anchor.position.x + 280;
+      const taken = ns.filter((n) => Math.abs(n.position.x - x) < 200).length;
+      return [...ns, { id: nid, type: 'step', position: { x, y: anchor.position.y + taken * 150 }, data: { kind, data: structuredClone(k.init) } }];
+    });
     setSelected(nid);
   };
   const sel = nodes.find((n) => n.id === selected);
@@ -149,7 +155,8 @@ export default function FlowBuilderPage() {
     } catch (e) { setMsg({ tone: 'error', text: errorText(e) }); return null; }
   }
   async function setLive(action: 'publish' | 'pause') {
-    const fid = await save();
+    // Pausing must always work, even when the current edits would not pass validation.
+    const fid = action === 'pause' ? id : await save();
     if (!fid || isNew) return;
     try { const r = await api<{ status: string }>(`/flows/${fid}/${action}`, { body: {} }); setStatus(r.status); setMsg({ tone: 'success', text: action === 'publish' ? 'Flow is live.' : 'Flow paused.' }); }
     catch (e) { setMsg({ tone: 'error', text: errorText(e) }); }
@@ -180,7 +187,7 @@ export default function FlowBuilderPage() {
         </aside>
         <div className="min-w-0 flex-1">
           <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
-            onNodeClick={(_, n) => setSelected(n.id)} onPaneClick={() => setSelected(null)} fitView deleteKeyCode={['Backspace', 'Delete']}>
+            onNodeClick={(_, n) => setSelected(n.id)} onPaneClick={() => setSelected(null)} fitView fitViewOptions={{ maxZoom: 1 }} deleteKeyCode={['Backspace', 'Delete']}>
             <Background /><Controls />
           </ReactFlow>
         </div>

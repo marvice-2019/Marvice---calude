@@ -35,13 +35,13 @@ function WhatsAppSection() {
             <span className="text-xs text-muted">Quality: {n.qualityRating ?? 'unknown'}</span></li>)}
         </ul>
       )}
+      {msg && <div className="mb-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
       <details className="text-sm" open={numbers.length === 0}>
         <summary className="cursor-pointer font-medium text-brand">Connect a number</summary>
         <form className="mt-3 grid gap-3 md:grid-cols-2" onSubmit={async (e) => { e.preventDefault(); setMsg(null);
           try { await api('/waba/connect', { body: { ...f, verifiedName: f.verifiedName || undefined } }); setMsg({ tone: 'success', text: 'Number connected.' });
             setF({ metaWabaId: '', phoneNumberId: '', displayPhone: '', verifiedName: '', accessToken: '' }); wabas.reload(); }
           catch (err) { setMsg({ tone: 'error', text: errorText(err) }); } }}>
-          {msg && <div className="md:col-span-2"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
           <div><label className="label" htmlFor="w1">WhatsApp Business Account ID</label><input id="w1" className="input" required pattern="\d+" value={f.metaWabaId} onChange={(e) => setF({ ...f, metaWabaId: e.target.value })} /></div>
           <div><label className="label" htmlFor="w2">Phone number ID</label><input id="w2" className="input" required pattern="\d+" value={f.phoneNumberId} onChange={(e) => setF({ ...f, phoneNumberId: e.target.value })} /></div>
           <div><label className="label" htmlFor="w3">Display number</label><input id="w3" className="input" required placeholder="+91 98765 43210" value={f.displayPhone} onChange={(e) => setF({ ...f, displayPhone: e.target.value })} /></div>

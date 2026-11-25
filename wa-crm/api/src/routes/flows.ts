@@ -71,9 +71,25 @@ export const flowRoutes = (deps: Deps): FastifyPluginAsync => async (app) => {
     app.post(`/flows/:id/${action}`, managers, async (req, reply) => {
       const id = uuidParam(req.params);
       if (!id.success) return reply.code(400).send({ error: 'invalid_id' });
-      const r = await withTenant(deps.db, req.principal!.tenantId, (tx) =>
-        tx.query('UPDATE flows SET status = $2 WHERE id = $1 RETURNING id', [id.data, status]));
-      return r.rowCount ? { ok: true, status } : reply.code(404).send({ error: 'not_found' });
+      const res = await withTenant(deps.db, req.principal!.tenantId, async (tx) => {
+        if (status === 'published') {
+          // Two live flows answering the same keyword on the same number: the older would silently win.
+          const clash = (await tx.query<{ name: string; keyword: string }>(
+            `SELECT o.name, k AS keyword
+               FROM flows f, flows o, jsonb_array_elements_text(o.trigger->'keywords') k
+              WHERE f.id = $1 AND o.id <> f.id AND o.status = 'published'
+                AND f.trigger->>'type' = 'keyword' AND o.trigger->>'type' = 'keyword'
+                AND (f.phone_number_id IS NULL OR o.phone_number_id IS NULL OR f.phone_number_id = o.phone_number_id)
+                AND f.trigger->'keywords' ? k LIMIT 1`, [id.data])).rows[0];
+          if (clash) return { clash };
+        }
+        const r = await tx.query('UPDATE flows SET status = $2 WHERE id = $1 RETURNING id', [id.data, status]);
+        return { found: !!r.rowCount };
+      });
+      if ('clash' in res && res.clash) {
+        return reply.code(409).send({ error: 'keyword_in_use', keyword: res.clash.keyword, flow: res.clash.name });
+      }
+      return 'found' in res && res.found ? { ok: true, status } : reply.code(404).send({ error: 'not_found' });
     });
   }
 

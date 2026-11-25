@@ -40,6 +40,20 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
 /** Human message for an API error code. */
 export function errorText(e: unknown): string {
   if (!(e instanceof ApiError)) return 'Something went wrong. Please try again.';
+  // A send that reached WhatsApp but was refused comes back as the saved failed message.
+  if (e.body.status === 'failed' && e.body.error_code) {
+    const meta: Record<string, string> = {
+      '190': 'WhatsApp refused the access token. Reconnect this number in Settings with a valid permanent token.',
+      '131047': 'More than 24 hours since the customer wrote. Send an approved template instead.',
+      '131026': 'WhatsApp could not deliver this message (the number may not be on WhatsApp).',
+      '131056': 'Too many messages to this number too quickly. Wait a moment and try again.',
+      '132001': 'This template does not exist in WhatsApp or is not approved for this language.',
+    };
+    return meta[String(e.body.error_code)] ?? `WhatsApp rejected the message (code ${String(e.body.error_code)}).`;
+  }
+  if (e.message === 'keyword_in_use') {
+    return `The keyword "${String(e.body.keyword)}" is already used by the live flow "${String(e.body.flow)}". Pause that flow or change the keyword.`;
+  }
   const map: Record<string, string> = {
     invalid_credentials: 'Email or password is wrong.',
     email_taken: 'An account with this email already exists.',
@@ -56,7 +70,8 @@ export function errorText(e: unknown): string {
     empty_audience: 'No contacts match this audience.',
     parameter_count: 'Fill in every variable in the template.',
   };
-  return map[e.message] ?? `Request failed (${e.message}).`;
+  const issue = Array.isArray(e.body.issues) ? (e.body.issues[0] as { message?: string } | undefined)?.message : undefined;
+  return (map[e.message] ?? `Request failed (${e.message}).`) + (issue ? ` ${issue}.` : '');
 }
 
 export interface Principal { userId: string; tenantId: string; role: 'owner' | 'admin' | 'agent'; exp: number }

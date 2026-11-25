@@ -80,6 +80,10 @@ test('an invalid graph is rejected', async () => {
   const dangling = await api('POST', '/flows', { name: 'x', trigger: { type: 'any_message' },
     graph: { nodes: [{ id: 's', type: 'start' }, { id: 'b', type: 'end' }], edges: [{ from: 's', to: 'nowhere' }] } });
   assert.equal(dangling.statusCode, 400);
+  const orphan = await api('POST', '/flows', { name: 'x', trigger: { type: 'any_message' },
+    graph: { nodes: [{ id: 's', type: 'start' }, { id: 't', type: 'send_text', data: { text: 'never sent' } }], edges: [] } });
+  assert.equal(orphan.statusCode, 400);
+  assert.match(orphan.body, /not connected to Start: t/);
 });
 
 test('a keyword flow replies, personalised; other messages do not trigger it', async () => {
@@ -161,4 +165,17 @@ test('node positions from the visual editor are saved and returned', async () =>
   assert.equal(r.statusCode, 201, r.body);
   const f = (await api('GET', `/flows/${r.json().id}`)).json();
   assert.deepEqual(f.nodes[0].position, { x: 10, y: 20 });
+});
+
+test('publishing a flow whose keyword another live flow already uses is refused', async () => {
+  const mk = async (name: string, keywords: string[]) => (await api('POST', '/flows', { name, trigger: { type: 'keyword', keywords },
+    graph: { nodes: [{ id: 's', type: 'start' }, { id: 't', type: 'send_text', data: { text: name } }], edges: [{ from: 's', to: 't' }] } })).json().id;
+  const a = await mk('Offers A', ['offer', 'deal']);
+  const b = await mk('Offers B', ['deal']);
+  assert.equal((await api('POST', `/flows/${a}/publish`)).statusCode, 200);
+  const r = await api('POST', `/flows/${b}/publish`);
+  assert.equal(r.statusCode, 409);
+  assert.deepEqual(r.json(), { error: 'keyword_in_use', keyword: 'deal', flow: 'Offers A' });
+  assert.equal((await api('POST', `/flows/${a}/pause`)).statusCode, 200);
+  assert.equal((await api('POST', `/flows/${b}/publish`)).statusCode, 200);
 });
