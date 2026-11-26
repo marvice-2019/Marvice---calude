@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { withPlatform, withTenant } from '../db.js';
 import { isValidSignature, parseWebhook } from '../meta.js';
 import { FLOW_INBOUND } from '../automation.js';
+import { orderFromCart } from '../commerce.js';
 import { enqueue } from '../jobs.js';
 import { queueEvent } from '../integrations.js';
 import type { Deps } from '../app.js';
@@ -75,6 +76,8 @@ export const webhookRoutes = (deps: Deps): FastifyPluginAsync => async (app) => 
            RETURNING id, direction, type, body, status, created_at`,
           [route.tenant_id, c.id, m.type, m.body, JSON.stringify(m.raw), m.waMessageId, m.timestamp]);
         if (!inserted.rowCount) return null;
+        // A WhatsApp cart becomes an order (idempotent: the message insert above already de-duplicates by wamid).
+        if (m.type === 'order') await orderFromCart(tx, route.tenant_id, contact.rows[0]!.id, c.id, m.waMessageId, m.raw);
         await tx.query(
           `UPDATE conversations SET last_message_at = greatest(coalesce(last_message_at, $2), $2),
                   last_inbound_at = greatest(coalesce(last_inbound_at, $2), $2), unread_count = unread_count + 1

@@ -77,7 +77,8 @@ export function parseWebhook(body: unknown): {
         if (!id || !from || !type) continue;
         const body = type === 'text' ? str(obj(msg.text).body)
           : str(obj(msg.button).text) ?? str(obj(obj(msg.interactive).button_reply).title)
-            ?? str(obj(obj(msg.interactive).list_reply).title) ?? str(obj(msg[type]).caption);
+            ?? str(obj(obj(msg.interactive).list_reply).title) ?? str(obj(msg[type]).caption)
+          ?? (type === 'order' ? `🛒 Order: ${arr(obj(msg.order).product_items).length} item(s)${str(obj(msg.order).text) ? ` · ${str(obj(msg.order).text)}` : ''}` : null);
         const replyId = str(obj(obj(msg.interactive).button_reply).id) ?? str(obj(obj(msg.interactive).list_reply).id)
           ?? str(obj(msg.button).payload);
         messages.push({

@@ -16,6 +16,7 @@ import { integrationRoutes } from './routes/integrations.js';
 import { aiRoutes } from './routes/ai.js';
 import { pipelineRoutes } from './routes/pipelines.js';
 import { appointmentRoutes } from './routes/appointments.js';
+import { commerceRoutes } from './routes/commerce.js';
 import { embeddedSignupRoutes } from './routes/embedded-signup.js';
 import { hashKey } from './integrations.js';
 import { signToken } from './auth.js';
@@ -60,7 +61,7 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
 
   // API keys (x-api-key) act as an admin of their workspace, but only on integration-safe paths:
   // a leaked key cannot touch team, billing, settings or other keys.
-  const KEY_PATHS = /^\/(contacts|conversations|templates|campaigns|tags|appointments|waba(?!\/(connect|embedded-signup)))(\/|\?|$)/;
+  const KEY_PATHS = /^\/(contacts|conversations|templates|campaigns|tags|appointments|products|orders|waba(?!\/(connect|embedded-signup)))(\/|\?|$)/;
   app.addHook('onRequest', async (req, reply) => {
     const key = req.headers['x-api-key'];
     if (typeof key !== 'string' || req.headers.authorization) return;
@@ -88,6 +89,7 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
   await app.register(aiRoutes(deps));
   await app.register(pipelineRoutes(deps));
   await app.register(appointmentRoutes(deps));
+  await app.register(commerceRoutes(deps));
   await app.register(embeddedSignupRoutes(deps));
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));

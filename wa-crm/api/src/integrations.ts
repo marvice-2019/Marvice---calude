@@ -7,7 +7,7 @@ import { enqueue, PermanentJobError, type Handler } from './jobs.js';
 
 export const IMPORT_QUEUE = 'contacts.import';
 export const WEBHOOK_QUEUE = 'webhook.deliver';
-export const EVENTS = ['message.received', 'message.status', 'contact.created', 'campaign.completed'] as const;
+export const EVENTS = ['message.received', 'message.status', 'contact.created', 'campaign.completed', 'order.created'] as const;
 export type EventName = (typeof EVENTS)[number];
 
 // ---------- CSV ----------
