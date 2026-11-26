@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Bot, CalendarDays, CreditCard, FileText, KanbanSquare, LogOut, Megaphone, Menu, QrCode, MessageSquare, Settings, Users, UsersRound } from 'lucide-react';
+import { Bot, CalendarDays, CreditCard, ShoppingBag, FileText, KanbanSquare, LogOut, Megaphone, Menu, QrCode, MessageSquare, Settings, Users, UsersRound } from 'lucide-react';
 import { APP_NAME } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
@@ -11,6 +11,7 @@ const NAV = [
   { href: '/inbox', label: 'Inbox', icon: MessageSquare, roles: ['owner', 'admin', 'agent'] },
   { href: '/contacts', label: 'Contacts', icon: UsersRound, roles: ['owner', 'admin', 'agent'] },
   { href: '/pipeline', label: 'Pipeline', icon: KanbanSquare, roles: ['owner', 'admin', 'agent'] },
+  { href: '/orders', label: 'Orders', icon: ShoppingBag, roles: ['owner', 'admin', 'agent'] },
   { href: '/appointments', label: 'Appointments', icon: CalendarDays, roles: ['owner', 'admin', 'agent'] },
   { href: '/templates', label: 'Templates', icon: FileText, roles: ['owner', 'admin', 'agent'] },
   { href: '/campaigns', label: 'Campaigns', icon: Megaphone, roles: ['owner', 'admin'] },

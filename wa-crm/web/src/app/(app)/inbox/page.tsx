@@ -24,6 +24,8 @@ export default function InboxPage() {
   const convs = useApi<{ data: Conversation[] }>('/conversations');
   const team = useApi<{ data: Member[] }>(isManager ? '/team' : null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Deep link from Orders and other pages: /inbox?c=<conversation id>.
+  useEffect(() => { const c = new URLSearchParams(window.location.search).get('c'); if (c && /^[0-9a-f-]{36}$/.test(c)) setActiveId(c); }, []);
 
   // Live updates: refresh the list on any event; the open thread handles its own messages.
   useEffect(() => {
