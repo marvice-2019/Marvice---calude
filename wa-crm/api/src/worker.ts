@@ -2,6 +2,7 @@ import type { Deps } from './app.js';
 import { FLOW_INBOUND, FLOW_TIMER, flowInboundHandler, flowTimerHandler } from './automation.js';
 import { IMPORT_QUEUE, importHandler, WEBHOOK_QUEUE, webhookDeliverHandler } from './integrations.js';
 import { REMINDER_QUEUE, reminderHandler } from './booking.js';
+import { scheduleDailyShopifySync, SHOPIFY_QUEUE, shopifySyncHandler } from './shopify.js';
 import { enqueue, startWorker } from './jobs.js';
 import { billingGraceCheck } from './routes/billing.js';
 import { CAMPAIGN_QUEUE, campaignSendHandler } from './routes/campaigns.js';
@@ -17,6 +18,7 @@ export function startBackgroundWorker(deps: Deps) {
     [IMPORT_QUEUE]: importHandler(deps),
     [WEBHOOK_QUEUE]: webhookDeliverHandler(deps),
     [REMINDER_QUEUE]: reminderHandler(deps),
+    [SHOPIFY_QUEUE]: shopifySyncHandler(deps),
     [GRACE_QUEUE]: billingGraceCheck(deps.db, deps.config.BILLING_GRACE_DAYS),
   }, { log: (m, e) => console.error(m, e) });
 
@@ -24,6 +26,7 @@ export function startBackgroundWorker(deps: Deps) {
   const tick = () => {
     const day = new Date().toISOString().slice(0, 10);
     enqueue(deps.db, GRACE_QUEUE, {}, { dedupeKey: `grace:${day}` }).catch((e) => console.error('schedule failed', e));
+    scheduleDailyShopifySync(deps).catch((e) => console.error('shopify schedule failed', e));
   };
   tick();
   const timer = setInterval(tick, 60 * 60 * 1000);

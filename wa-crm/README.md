@@ -56,6 +56,7 @@ broadcasts before selling large plans.
   with a system-user token.
 - Privacy policy, terms and a data processing agreement (India DPDP Act). Have a lawyer review them.
 - Confirm the current Graph API version and set `META_GRAPH_VERSION`.
+- Confirm the current Shopify Admin API version and set `SHOPIFY_API_VERSION` (format `YYYY-MM`).
 
 ## Known limits
 

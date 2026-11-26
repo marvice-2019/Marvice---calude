@@ -18,6 +18,7 @@ export default function ProductsPage() {
     <div className="space-y-5 p-6">
       <PageHeader title="Products" subtitle="Use the same SKU as the “Content ID” in your Meta catalog, so WhatsApp carts match these products."
         actions={canEdit && <button className="btn btn-primary" onClick={() => setEdit('new')}><Plus size={16} aria-hidden /> Add product</button>} />
+      {canEdit && <ShopifyPanel onSynced={() => list.reload()} />}
       {list.error && <Alert>{list.error}</Alert>}
       {list.data && list.data.data.length === 0 ? <Empty title="No products yet">Add your products here, or connect Shopify to sync them.</Empty> : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -64,5 +65,61 @@ function ProductForm({ product, onClose, onDone }: { product: Product | null; on
         <button className="btn btn-primary w-full">{product ? 'Save' : 'Add product'}</button>
       </form>
     </Modal>
+  );
+}
+
+interface ShopifyStatus { connected: boolean; shop_domain?: string; shop_name?: string; last_synced_at?: string | null;
+  last_result?: { ok: boolean; created?: number; updated?: number; hidden?: number; error?: string } | null }
+
+function ShopifyPanel({ onSynced }: { onSynced: () => void }) {
+  const st = useApi<ShopifyStatus>('/integrations/shopify');
+  const [f, setF] = useState({ shopDomain: '', accessToken: '' });
+  const [msg, setMsg] = useState<{ tone: 'error' | 'success' | 'info'; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const s = st.data;
+  if (!s) return null;
+  async function waitForSync(since: string | null | undefined) {
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const now = await api<ShopifyStatus>('/integrations/shopify');
+      if (now.last_result && (now.last_synced_at !== since || now.last_result.ok === false)) { st.setData(() => now); onSynced(); return now; }
+    }
+    return null;
+  }
+  const r = s.last_result;
+  return (
+    <details className="card p-4" open={!s.connected}>
+      <summary className="cursor-pointer font-semibold">Shopify {s.connected ? `· ${s.shop_name ?? s.shop_domain}` : '· not connected'}</summary>
+      {msg && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
+      {s.connected ? (
+        <div className="mt-3 space-y-2 text-sm">
+          <p className="text-muted">Products sync automatically once a day. Shopify is the source of truth for prices, stock and names of the SKUs it owns; products you add here are never changed.</p>
+          {r && (r.ok
+            ? <p>Last sync {s.last_synced_at ? new Date(s.last_synced_at).toLocaleString('en-IN') : ''}: {r.created} new, {r.updated} updated, {r.hidden} hidden.</p>
+            : <Alert>Last sync failed: {r.error}</Alert>)}
+          <div className="flex gap-2">
+            <button className="btn btn-primary" disabled={busy} onClick={async () => { setBusy(true); setMsg(null);
+              try { await api('/integrations/shopify/sync', { method: 'POST' }); const done = await waitForSync(s.last_synced_at);
+                setMsg(done ? null : { tone: 'info', text: 'Sync is still running. Refresh in a minute.' }); }
+              catch (e) { setMsg({ tone: 'error', text: errorText(e) }); } setBusy(false); }}>{busy ? 'Syncing…' : 'Sync now'}</button>
+            <button className="btn btn-secondary" onClick={async () => { if (!confirm('Disconnect Shopify? Imported products stay.')) return;
+              await api('/integrations/shopify', { method: 'DELETE' }); st.reload(); }}>Disconnect</button>
+          </div>
+        </div>
+      ) : (
+        <form className="mt-3 grid gap-3 md:grid-cols-2" onSubmit={async (e) => { e.preventDefault(); setBusy(true); setMsg(null);
+          try { await api('/integrations/shopify', { method: 'PUT', body: f }); setF({ shopDomain: '', accessToken: '' });
+            setMsg({ tone: 'success', text: 'Connected. Importing your products…' }); const done = await waitForSync(null);
+            setMsg(done?.last_result?.ok ? { tone: 'success', text: 'Connected and products imported.' } : done ? null : { tone: 'info', text: 'Import is still running. Refresh in a minute.' }); }
+          catch (err) { setMsg({ tone: 'error', text: errorText(err) }); } setBusy(false); }}>
+          <p className="text-sm text-muted md:col-span-2">In Shopify admin: Settings → Apps and sales channels → Develop apps → create an app with the <b>read_products</b> and <b>read_inventory</b> scopes, install it, and copy the Admin API access token.</p>
+          <div><label className="label" htmlFor="sh-d">Store address</label>
+            <input id="sh-d" className="input" required placeholder="yourstore.myshopify.com" value={f.shopDomain} onChange={(e) => setF({ ...f, shopDomain: e.target.value })} /></div>
+          <div><label className="label" htmlFor="sh-t">Admin API access token</label>
+            <input id="sh-t" type="password" className="input" required minLength={20} autoComplete="off" value={f.accessToken} onChange={(e) => setF({ ...f, accessToken: e.target.value })} /></div>
+          <div className="md:col-span-2"><button className="btn btn-primary" disabled={busy}>{busy ? 'Connecting…' : 'Connect Shopify'}</button></div>
+        </form>
+      )}
+    </details>
   );
 }

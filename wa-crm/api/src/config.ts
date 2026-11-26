@@ -13,6 +13,7 @@ const schema = z.object({
   META_APP_ID: z.string().regex(/^\d+$/).optional(),
   META_ES_CONFIG_ID: z.string().regex(/^\d+$/).optional(),
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default('v21.0'),
+  SHOPIFY_API_VERSION: z.string().regex(/^\d{4}-\d{2}$/).default('2025-10'),
   RAZORPAY_KEY_ID: z.string().min(1).optional(),
   RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),

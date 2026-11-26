@@ -73,6 +73,8 @@ export function errorText(e: unknown): string {
     sku_in_use: 'Another product already uses this SKU.',
     product_unavailable: 'One of the products is hidden or no longer exists.',
     mixed_currencies: 'All products in one order must use the same currency.',
+    shopify_rejected: 'Shopify did not accept that store address and token. Check both, and that the app has the read_products scope.',
+    not_connected: 'Connect Shopify first.',
     slot_unavailable: 'That time was just taken or is no longer bookable. Pick another time.',
     billing_not_configured: 'Billing is not set up on this server yet.',
     invalid_flow: 'The flow has a problem: check every step is connected and there is one Start.',

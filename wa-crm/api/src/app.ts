@@ -17,6 +17,7 @@ import { aiRoutes } from './routes/ai.js';
 import { pipelineRoutes } from './routes/pipelines.js';
 import { appointmentRoutes } from './routes/appointments.js';
 import { commerceRoutes } from './routes/commerce.js';
+import { shopifyRoutes } from './routes/shopify.js';
 import { embeddedSignupRoutes } from './routes/embedded-signup.js';
 import { hashKey } from './integrations.js';
 import { signToken } from './auth.js';
@@ -90,6 +91,7 @@ export async function buildApp(input: AppDeps): Promise<FastifyInstance> {
   await app.register(pipelineRoutes(deps));
   await app.register(appointmentRoutes(deps));
   await app.register(commerceRoutes(deps));
+  await app.register(shopifyRoutes(deps));
   await app.register(embeddedSignupRoutes(deps));
   await app.register(webhookRoutes(deps));
   await app.register(billingRoutes(deps));
