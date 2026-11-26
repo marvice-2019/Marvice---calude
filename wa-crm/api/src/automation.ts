@@ -5,7 +5,8 @@ import type { Deps } from './app.js';
 import { decryptSecret } from './crypto.js';
 import { withTenant, type Tx } from './db.js';
 import { enqueue, PermanentJobError, type Handler } from './jobs.js';
-import { MetaApiError, sendRaw, sendTemplate } from './meta.js';
+import { bookSlot, BookingError, formatWhen, listFreeSlots, loadSettings } from './booking.js';
+import { MetaApiError, sendRaw, sendTemplate, sendText } from './meta.js';
 
 export const FLOW_INBOUND = 'flow.inbound';
 export const FLOW_TIMER = 'flow.timer';
@@ -39,6 +40,10 @@ export const nodeSchema = z.discriminatedUnion('type', [
   z.object({ id, type: z.literal('webhook'), data: z.object({ url: z.string().url().startsWith('https://'), saveAs: z.string().regex(/^[a-z_][a-z0-9_]{0,39}$/).optional() }) }),
   z.object({ id, type: z.literal('deal_stage'), data: z.object({ pipelineId: z.string().uuid(), stageId: z.string().min(1).max(64),
     title: z.string().max(160).default('') }) }),
+  z.object({ id, type: z.literal('book_appointment'), data: z.object({
+    text: z.string().min(1).max(1024).default('Pick a time that suits you'),
+    button: z.string().min(1).max(20).default('See times'),
+    confirmText: z.string().max(1024).default('You are booked for {{var.appointment}}. See you then!') }) }),
   z.object({ id, type: z.literal('close_conversation'), data: z.object({}).default({}) }),
   z.object({ id, type: z.literal('end'), data: z.object({}).default({}) }),
 ]);
@@ -196,10 +201,12 @@ export async function execute(deps: Deps, tenantId: string, run: RunRow, resumeH
       `UPDATE flow_runs SET current_node = $2, vars = $3, steps = $4, status = $5, wait_token = $6, error = $7 WHERE id = $1`,
       [run.id, current ?? run.current_node, JSON.stringify(vars), steps, status, extra.wait_token ?? null, extra.error ?? null]));
 
-  // Leaving the node we were waiting on.
+  // Leaving the node we were waiting on. A booking step keeps the reply and handles it itself.
+  let slotReply: string | null | undefined;
   if (resumeHandle !== undefined) {
     const nodeNow = run.nodes.find((n) => n.id === current);
-    current = nodeNow ? nextEdge(run.edges, nodeNow.id, resumeHandle) : null;
+    if (nodeNow?.type === 'book_appointment') slotReply = resumeHandle;
+    else current = nodeNow ? nextEdge(run.edges, nodeNow.id, resumeHandle) : null;
   }
 
   try {
@@ -322,6 +329,38 @@ export async function execute(deps: Deps, tenantId: string, run: RunRow, resumeH
           });
           if (!ok) throw new FlowError('pipeline or stage no longer exists');
           current = nextEdge(run.edges, node.id); break;
+        }
+        case 'book_appointment': {
+          if (slotReply !== undefined) {
+            // The customer answered the list: book the tapped slot. Typed text or a slot taken meanwhile → 'failed'.
+            const reply = slotReply; slotReply = undefined;
+            const at = reply?.startsWith('slot:') ? new Date(reply.slice(5)) : null;
+            let booked: { when: string } | null = null;
+            if (at && !Number.isNaN(at.getTime())) {
+              try {
+                booked = await withTenant(deps.db, tenantId, (tx) => bookSlot(tx, tenantId, { contactId: ctx.contact_id, startsAt: at, source: 'flow' }));
+              } catch (err) { if (!(err instanceof BookingError)) throw err; }
+            }
+            vars.appointment = booked?.when ?? '';
+            if (booked && node.data.confirmText.trim()) {
+              const body = render(node.data.confirmText, contact, vars);
+              await sendAndRecord(deps, tenantId, ctx, 'text', body, (tok) => sendText(deps.fetch, deps.config.META_GRAPH_VERSION, ctx.meta_pn, tok, ctx.phone, body));
+            }
+            current = nextEdge(run.edges, node.id, booked ? 'booked' : 'failed'); break;
+          }
+          // Offer the next free slots as a WhatsApp list (10 rows at most).
+          const slots = await withTenant(deps.db, tenantId, async (tx) => {
+            const s = await loadSettings(tx);
+            const now = new Date();
+            return (await listFreeSlots(tx, now, now, new Date(now.getTime() + s.days_ahead * 86400000), 10))
+              .map((d) => ({ id: `slot:${d.toISOString()}`, title: formatWhen(d, s.timezone).slice(0, 24) }));
+          });
+          if (!slots.length) { vars.appointment = ''; current = nextEdge(run.edges, node.id, 'failed'); break; }
+          const body = r(node.data.text);
+          await sendAndRecord(deps, tenantId, ctx, 'interactive', body, (tok) => sendRaw(deps.fetch, deps.config.META_GRAPH_VERSION,
+            ctx.meta_pn, tok, ctx.phone, { type: 'interactive', interactive: { type: 'list', body: { text: body },
+              action: { button: node.data.button, sections: [{ title: 'Available times', rows: slots }] } } }));
+          await save('waiting_reply'); return;
         }
         case 'close_conversation':
           await withTenant(deps.db, tenantId, (tx) => tx.query("UPDATE conversations SET status = 'closed' WHERE id = $1", [ctx.conversation_id]));

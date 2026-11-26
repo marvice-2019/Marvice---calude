@@ -70,6 +70,7 @@ export function errorText(e: unknown): string {
     already_a_member: 'This person is already on your team.',
     contact_exists: 'A contact with this number already exists.',
     meta_error: 'WhatsApp rejected the request. Check the details and try again.',
+    slot_unavailable: 'That time was just taken or is no longer bookable. Pick another time.',
     billing_not_configured: 'Billing is not set up on this server yet.',
     invalid_flow: 'The flow has a problem: check every step is connected and there is one Start.',
     empty_audience: 'No contacts match this audience.',

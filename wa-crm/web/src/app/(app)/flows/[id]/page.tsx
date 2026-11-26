@@ -11,7 +11,7 @@ import { Alert, StatusBadge, useApi } from '@/components/ui';
 import { api, errorText } from '@/lib/api';
 
 type Kind = 'start' | 'send_text' | 'send_buttons' | 'send_list' | 'send_media' | 'send_template' | 'wait_reply' | 'delay' | 'condition'
-  | 'set_var' | 'add_tag' | 'remove_tag' | 'assign_agent' | 'deal_stage' | 'webhook' | 'close_conversation' | 'end';
+  | 'set_var' | 'add_tag' | 'remove_tag' | 'assign_agent' | 'deal_stage' | 'book_appointment' | 'webhook' | 'close_conversation' | 'end';
 interface Pipeline { id: string; name: string; stages: { id: string; name: string }[] }
 type StepData = { kind: Kind; data: Record<string, unknown> };
 type StepNode = Node<StepData, 'step'>;
@@ -29,6 +29,7 @@ const KINDS: { kind: Kind; label: string; group: string; init: Record<string, un
   { kind: 'add_tag', label: 'Add tag', group: 'CRM', init: { tagId: '' } },
   { kind: 'remove_tag', label: 'Remove tag', group: 'CRM', init: { tagId: '' } },
   { kind: 'assign_agent', label: 'Assign agent', group: 'CRM', init: { userId: 'round_robin' } },
+  { kind: 'book_appointment', label: 'Book appointment', group: 'CRM', init: { text: 'Pick a time that suits you', button: 'See times', confirmText: 'You are booked for {{var.appointment}}. See you then!' } },
   { kind: 'deal_stage', label: 'Move deal', group: 'CRM', init: { pipelineId: '', stageId: '', title: '' } },
   { kind: 'webhook', label: 'Webhook', group: 'CRM', init: { url: 'https://', saveAs: '' } },
   { kind: 'close_conversation', label: 'Close chat', group: 'CRM', init: {} },
@@ -47,6 +48,7 @@ function outputs(d: StepData): { id: string; label?: string }[] {
     case 'condition': return [{ id: 'true', label: 'yes' }, { id: 'false', label: 'no' }];
     case 'wait_reply': return [{ id: 'next', label: 'reply' }, { id: 'timeout', label: 'no reply' }];
     case 'webhook': return [{ id: 'ok', label: 'ok' }, { id: 'error', label: 'error' }];
+    case 'book_appointment': return [{ id: 'booked', label: 'booked' }, { id: 'failed', label: 'not booked' }];
     default: return [{ id: 'next' }];
   }
 }
@@ -54,7 +56,7 @@ function outputs(d: StepData): { id: string; label?: string }[] {
 function summary(d: StepData): string {
   const x = d.data as Record<string, unknown>;
   switch (d.kind) {
-    case 'send_text': case 'send_buttons': case 'send_list': return String(x.text ?? '');
+    case 'send_text': case 'send_buttons': case 'send_list': case 'book_appointment': return String(x.text ?? '');
     case 'wait_reply': return `save as ${x.saveAs || '—'}${x.timeoutMinutes ? `, ${x.timeoutMinutes} min` : ''}`;
     case 'delay': return `${x.minutes} min`;
     case 'condition': return `${x.left} ${x.op} ${x.right}`;
@@ -285,6 +287,12 @@ function StepForm({ kind, data, onChange, tags, team, templates, pipelines }: { 
       <div className="mb-3"><label className="label" htmlFor="f-ag">Assign to</label>
         <select id="f-ag" className="input" value={String(data.userId)} onChange={(e) => set('userId', e.target.value)}>
           <option value="round_robin">Least busy agent</option>{team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>);
+    case 'book_appointment': return (<>
+      {field('text', 'Message above the list of times')}
+      {field('button', 'List button (max 20 characters)')}
+      {field('confirmText', 'Confirmation ({{var.appointment}} = the booked time; empty = none)')}
+      <p className="text-xs text-muted">Shows the next 10 free times from Appointments → Booking hours. "not booked" runs when the customer types instead of tapping, the time was just taken, or nothing is free.</p>
+    </>);
     case 'deal_stage': {
       const pipe = pipelines.find((p) => p.id === data.pipelineId) ?? (pipelines.length === 1 ? pipelines[0] : undefined);
       return (<>

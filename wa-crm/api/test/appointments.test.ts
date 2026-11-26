@@ -109,3 +109,49 @@ test('reminder: queued before the appointment, sent as text inside the 24-hour w
   await reminderHandler(deps)({ id: 'y', queue: REMINDER_QUEUE, tenant_id: owner.tenantId, payload: { appointmentId: other.id, startsAt: other.starts_at }, attempts: 1, max_attempts: 5 });
   assert.equal(ctx.sent.length, b2, 'no reminder for a cancelled appointment');
 });
+
+test('in chat: the bot lists free times, the customer taps one, it is booked and confirmed; a taken slot goes to "failed"', async () => {
+  await settings({ capacity: 1, reminderMinutes: 0 });
+  const { FLOW_INBOUND, FLOW_TIMER, flowInboundHandler, flowTimerHandler } = await import('../src/automation.js');
+  const { claim, complete } = await import('../src/jobs.js');
+  const deps = { config: ctx.config, db: ctx.db, fetch: ctx.fetch, realtime: noopRealtime };
+  const handlers = { [FLOW_INBOUND]: flowInboundHandler(deps), [FLOW_TIMER]: flowTimerHandler(deps) };
+  const drain = async () => { for (let i = 0; i < 50; i++) { let h = 0;
+    for (const [q, fn] of Object.entries(handlers)) for (const job of await claim(ctx.db, q, 5)) { h++; await fn(job); await complete(ctx.db, job.id); }
+    if (!h) return; } };
+  const send = async (phone: string, msg: (m: Record<string, unknown>) => void) => {
+    const body = inboundText(PNID, phone, `wamid.APF${++wam}`, 'x');
+    msg(body.entry[0]!.changes[0]!.value.messages[0]! as Record<string, unknown>);
+    await ctx.app.inject({ method: 'POST', url: '/webhooks/meta', ...signedWebhook(body) });
+    await drain();
+  };
+  const say = (phone: string, text: string) => send(phone, (m) => { (m.text as { body: string }).body = text; });
+  const tap = (phone: string, id: string) => send(phone, (m) => { m.type = 'interactive'; delete m.text;
+    m.interactive = { type: 'list_reply', list_reply: { id, title: 'slot' } }; });
+
+  const flow = await api('POST', '/flows', { name: 'book', trigger: { type: 'keyword', keywords: ['book'], match: 'exact' }, graph: {
+    nodes: [{ id: 's', type: 'start' }, { id: 'b', type: 'book_appointment', data: { text: 'When works for you?', button: 'See times' } },
+      { id: 'ok', type: 'send_text', data: { text: 'Done: {{var.appointment}}' } }, { id: 'no', type: 'send_text', data: { text: 'Sorry, that time is gone.' } }],
+    edges: [{ from: 's', to: 'b' }, { from: 'b', to: 'ok', handle: 'booked' }, { from: 'b', to: 'no', handle: 'failed' }] } });
+  assert.equal(flow.statusCode, 201, flow.body);
+  assert.equal((await api('POST', `/flows/${flow.json().id}/publish`)).statusCode, 200);
+
+  const lastTo = (phone: string) => ctx.sent.filter((s) => (s.body as { to?: string }).to === phone).map((s) => s.body as {
+    text?: { body: string }; interactive?: { action: { sections: { rows: { id: string; title: string }[] }[] } } });
+
+  await say('919700000010', 'book');
+  const list = lastTo('919700000010').at(-1)!.interactive!.action.sections[0]!.rows;
+  assert.ok(list.length > 0 && list.length <= 10);
+  assert.ok(list.every((r) => r.title.length <= 24 && r.id.startsWith('slot:')));
+  await tap('919700000010', list[0]!.id);
+  const texts = lastTo('919700000010').slice(-2).map((b) => b.text?.body);
+  assert.match(texts[0]!, /^You are booked for /);
+  assert.match(texts[1]!, /^Done: \S/);
+  const booked = (await api('GET', '/appointments')).json().data as { starts_at: string; source: string; contact_phone: string }[];
+  assert.ok(booked.some((a) => a.contact_phone === '919700000010' && a.source === 'flow' && new Date(a.starts_at).toISOString() === list[0]!.id.slice(5)));
+
+  // A second customer was shown the same list earlier and taps the slot that has just gone.
+  await say('919700000011', 'book');
+  await tap('919700000011', list[0]!.id);
+  assert.equal(lastTo('919700000011').at(-1)!.text?.body, 'Sorry, that time is gone.');
+});
